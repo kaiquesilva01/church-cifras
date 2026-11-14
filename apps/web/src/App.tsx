@@ -6,7 +6,7 @@ import { PeoplePage } from './people/PeoplePage';
 import { HomePage } from './routes/HomePage';
 import { LoginPage } from './routes/LoginPage';
 import { RequireAuth } from './routes/RequireAuth';
-import { RequireAdmin } from './routes/RequireRole';
+import { RequireRole } from './routes/RequireRole';
 import { AppShell } from './ui/AppShell';
 
 export interface AppProps {
@@ -22,7 +22,7 @@ function AppRoutes({ peopleApi }: { peopleApi: PeopleApi }) {
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
-          <Route element={<RequireAdmin />}>
+          <Route element={<RequireRole roles={['admin']} />}>
             <Route path="/pessoas" element={<PeoplePage api={peopleApi} />} />
           </Route>
         </Route>

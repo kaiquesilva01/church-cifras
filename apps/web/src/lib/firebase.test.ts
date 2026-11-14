@@ -6,7 +6,9 @@ vi.mock('firebase/auth', () => ({
   connectAuthEmulator: vi.fn(),
 }));
 vi.mock('firebase/firestore', () => ({
-  getFirestore: vi.fn(() => ({ name: 'db' })),
+  initializeFirestore: vi.fn(() => ({ name: 'db' })),
+  persistentLocalCache: vi.fn((o: unknown) => ({ cache: o })),
+  persistentMultipleTabManager: vi.fn(() => ({ tab: 'multi' })),
   connectFirestoreEmulator: vi.fn(),
 }));
 vi.mock('firebase/storage', () => ({
@@ -19,7 +21,11 @@ vi.mock('firebase/functions', () => ({
 }));
 
 import { connectAuthEmulator, getAuth } from 'firebase/auth';
-import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
+import {
+  connectFirestoreEmulator,
+  initializeFirestore,
+  persistentLocalCache,
+} from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
 import { connectStorageEmulator, getStorage } from 'firebase/storage';
 import { createFirebase, type WebEnv } from './firebase';
@@ -58,7 +64,26 @@ describe('createFirebase', () => {
     const s = createFirebase(baseEnv);
     expect(getFunctions).toHaveBeenCalledWith(s.app, 'southamerica-east1');
     expect(getAuth).toHaveBeenCalled();
-    expect(getFirestore).toHaveBeenCalled();
+    expect(initializeFirestore).toHaveBeenCalled();
     expect(getStorage).toHaveBeenCalled();
+  });
+
+  it('uses memory cache without IndexedDB and persistent cache with it', () => {
+    expect(typeof indexedDB).toBe('undefined');
+    createFirebase(baseEnv);
+    expect(initializeFirestore).toHaveBeenLastCalledWith({ name: 'app' }, {});
+    expect(persistentLocalCache).not.toHaveBeenCalled();
+
+    vi.stubGlobal('indexedDB', {});
+    try {
+      createFirebase(baseEnv);
+      expect(persistentLocalCache).toHaveBeenCalledWith({ tabManager: { tab: 'multi' } });
+      expect(initializeFirestore).toHaveBeenLastCalledWith(
+        { name: 'app' },
+        { localCache: { cache: { tabManager: { tab: 'multi' } } } },
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

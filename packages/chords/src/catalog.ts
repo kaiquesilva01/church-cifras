@@ -17,6 +17,19 @@ export function compareKeys(a: KeyName, b: KeyName): number {
   return (ia === -1 ? ORDERED_KEYS.length : ia) - (ib === -1 ? ORDERED_KEYS.length : ib);
 }
 
+function shortHash(text: string): string {
+  let h = 5381;
+  for (const ch of text) h = (Math.imul(h, 33) ^ ch.codePointAt(0)!) >>> 0;
+  return h.toString(36);
+}
+
 export function artistIdFromName(name: string): string {
-  return normalizeText(name).replace(/ /g, '-');
+  const id = normalizeText(name)
+    .replace(/[^a-z0-9 ]/g, '')
+    .replace(/ /g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120)
+    .replace(/-+$/g, '');
+  return id === '' ? `a-${shortHash(name)}` : id;
 }

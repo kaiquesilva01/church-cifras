@@ -20,4 +20,15 @@ describe('catalog helpers', () => {
     expect(artistIdFromName('Aline Barros ')).toBe('aline-barros');
     expect(artistIdFromName('Damáris  ANDRADE')).toBe('damaris-andrade');
   });
+
+  it('keeps artist ids ASCII-safe and bounded', () => {
+    const cyr = artistIdFromName('Эй');
+    expect(cyr).toMatch(/^a-[a-z0-9]+$/);
+    expect(artistIdFromName('Эй')).toBe(cyr);
+    expect(artistIdFromName('Ой')).not.toBe(cyr);
+    expect(artistIdFromName('Aline Barros')).toBe('aline-barros');
+    expect(artistIdFromName('Hillsong - United!')).toBe('hillsong-united');
+    expect(artistIdFromName('a'.repeat(200)).length).toBeLessThanOrEqual(120);
+    expect(artistIdFromName('a'.repeat(200))).toMatch(/^[a-z0-9-]{1,120}$/);
+  });
 });

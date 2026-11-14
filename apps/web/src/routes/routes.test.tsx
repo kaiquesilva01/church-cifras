@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from '../App';
 import type { Role } from '../auth/roles';
@@ -66,6 +66,15 @@ describe('routes', () => {
 
   it('redirects non-admin away from /pessoas', () => {
     setup('/pessoas', 'member');
+    expect(screen.getByText('Olá, Maria')).toBeInTheDocument();
+  });
+
+  it('RequireRole allows listed roles and redirects others', () => {
+    setup('/pessoas', 'admin');
+    expect(screen.getByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
+    cleanup();
+    setup('/pessoas', 'viewer');
+    expect(screen.queryByRole('heading', { name: 'Pessoas' })).not.toBeInTheDocument();
     expect(screen.getByText('Olá, Maria')).toBeInTheDocument();
   });
 
