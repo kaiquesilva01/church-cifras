@@ -5,6 +5,7 @@ import { classifySegment, isLabel, segmentLine, tokenizeSegment } from './lines'
 import type { TextLine } from './lines';
 
 const RIGHT_MARGIN = 20;
+const TOLERANCE_EM = 0.05;
 
 export type Measure = (text: string, fontName: string, fontSize: number) => number;
 
@@ -63,10 +64,11 @@ export function buildTransposePlan(input: {
         const { fontSize, fontName } = token.run;
         const newWidth = measure(replacement, fontName, fontSize);
         const next = tokens[i + 1];
+        const tolerance = TOLERANCE_EM * fontSize;
         const collides =
           next !== undefined
-            ? newWidth + measure('n', fontName, fontSize) > next.x - token.x
-            : token.x + newWidth > line.pageWidth - RIGHT_MARGIN;
+            ? newWidth + measure('n', fontName, fontSize) > next.x - token.x + tolerance
+            : token.x + newWidth > line.pageWidth - RIGHT_MARGIN + tolerance;
         chords.push({
           page: line.page,
           x: token.x,

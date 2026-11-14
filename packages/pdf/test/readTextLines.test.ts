@@ -115,4 +115,24 @@ describe('readTextLines', () => {
     const plan = buildTransposePlan({ lines: result, from: key('Bm'), to: key('Cm'), measure });
     expect(plan.chords.map((c) => [c.original, c.replacement])).toEqual([['Bm7', 'Cm7']]);
   });
+
+  it('transposes chords in both columns of a two-column page', async () => {
+    const data = await buildSyntheticPdf({
+      title: 'Cancao Inventada',
+      keyStyle: 'none',
+      chordFont: 'CourierBold',
+      lyricFont: 'Courier',
+      twoColumns: true,
+      lines: [
+        { chords: [[40, 'C']], lyric: 'Primeira coluna' },
+        { chords: [[40, 'G']], lyric: 'Ainda a primeira' },
+        { chords: [[40, 'Am']], lyric: 'Segunda coluna' },
+        { chords: [[40, 'F']], lyric: 'Ainda a segunda' },
+      ],
+    });
+    const result = await readTextLines(data);
+    const plan = buildTransposePlan({ lines: result, from: key('C'), to: key('D'), measure });
+    expect(plan.chords.map((c) => c.replacement).sort()).toEqual(['A', 'Bm', 'D', 'G']);
+    expect(plan.chords.some((c) => c.x > 300)).toBe(true);
+  });
 });

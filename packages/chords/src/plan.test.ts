@@ -36,6 +36,17 @@ describe('buildTransposePlan', () => {
     expect(plan.collisions).toBe(1);
   });
 
+  it('does not collide when an equal-length chord fits a one-space gap', () => {
+    const noisy = (text: string) => text.length * 6.0000001;
+    const plan = buildTransposePlan({
+      lines: [line([run('F', 10), run('G', 22)])],
+      from: key('F'),
+      to: key('A'),
+      measure: noisy,
+    });
+    expect(plan.chords[0]).toMatchObject({ replacement: 'A', collides: false });
+  });
+
   it('does not flag collision when there is room', () => {
     const plan = buildTransposePlan({
       lines: [line([run('E', 10), run('A', 10 + 6 * 6)])],

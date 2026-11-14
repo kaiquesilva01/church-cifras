@@ -24,6 +24,7 @@ function realFontName(commonObjs: { get(id: string): unknown }, id: string): str
 
 export async function readTextLines(data: Uint8Array): Promise<TextLine[]> {
   // pdf.js transfers the buffer to its worker; copy so callers keep their data.
+  // fontExtraProperties is required in pdfjs 6.x to expose real font names (bold detection).
   const task = pdfjs.getDocument({ data: data.slice(), verbosity: 0, fontExtraProperties: true });
   const doc = await task.promise;
   const lines: TextLine[] = [];

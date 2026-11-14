@@ -44,6 +44,12 @@ describe.skipIf(files.length === 0)('real fixtures', () => {
       measure,
     });
     expect(plan.chordCount).toBeGreaterThan(0);
+    if (name.startsWith('Gabriela Rocha')) expect(plan.collisions).toBe(0);
+    if (name.startsWith('Sonda-me')) {
+      for (const c of plan.chords.filter((x) => x.collides)) {
+        expect(c.newWidth).toBeGreaterThan(c.width);
+      }
+    }
     for (const chord of plan.chords) {
       expect(parseChord(chord.original), chord.original).not.toBeNull();
       const row = lines.find((l) => l.page === chord.page && Math.abs(l.y - chord.y) <= 1);
