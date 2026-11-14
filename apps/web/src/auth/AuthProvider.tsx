@@ -11,6 +11,7 @@ export interface SessionUser {
 
 export interface AuthGateway {
   onUser(cb: (u: SessionUser | null) => void): () => void;
+  getClaimRole(): Promise<Role | undefined>;
   onUserDoc(uid: string, cb: (role: Role | undefined) => void): () => void;
   refreshToken(): Promise<void>;
   signIn(): Promise<void>;
@@ -21,7 +22,10 @@ type Session = { resolved: false } | { resolved: true; user: SessionUser | null 
 
 export function AuthProvider({ gateway, children }: { gateway: AuthGateway; children: ReactNode }) {
   const [session, setSession] = useState<Session>({ resolved: false });
-  const [docRole, setDocRole] = useState<Role | undefined>(undefined);
+  const [doc, setDoc] = useState<{ loaded: boolean; role: Role | undefined }>({
+    loaded: false,
+    role: undefined,
+  });
   const uid = session.resolved ? session.user?.uid : undefined;
 
   useEffect(() => {
@@ -30,31 +34,41 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
 
   useEffect(() => {
     if (!uid) return;
-    let seen = false;
-    let previous: Role | undefined;
+    let active = true;
+    const requested = new Set<Role>();
+    const syncClaim = async (role: Role) => {
+      if (requested.has(role)) return;
+      requested.add(role);
+      try {
+        // O gatilho define o claim depois do login: renova o token se estiver defasado.
+        if ((await gateway.getClaimRole()) !== role && active) await gateway.refreshToken();
+      } catch (error) {
+        requested.delete(role);
+        console.warn('Falha ao atualizar o token de sessão', error);
+      }
+    };
     const unsubscribe = gateway.onUserDoc(uid, (role) => {
-      // O gatilho define o claim depois do login: ao mudar o papel, renova o token.
-      if (seen && role !== previous) void gateway.refreshToken().catch(() => undefined);
-      seen = true;
-      previous = role;
-      setDocRole(role);
+      setDoc({ loaded: true, role });
+      if (role) void syncClaim(role);
     });
     return () => {
+      active = false;
       unsubscribe();
-      setDocRole(undefined);
+      setDoc({ loaded: false, role: undefined });
     };
   }, [gateway, uid]);
 
   const value = useMemo<AuthState>(() => {
     const user = session.resolved ? session.user : null;
     return {
-      status: !session.resolved ? 'loading' : user ? 'signed-in' : 'signed-out',
+      status:
+        !session.resolved || (user && !doc.loaded) ? 'loading' : user ? 'signed-in' : 'signed-out',
       user,
-      role: docRole ?? 'viewer',
+      role: doc.role ?? 'viewer',
       signIn: () => gateway.signIn(),
       signOut: () => gateway.signOut(),
     };
-  }, [session, docRole, gateway]);
+  }, [session, doc, gateway]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

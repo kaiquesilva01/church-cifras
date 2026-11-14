@@ -37,7 +37,7 @@ describe('routes', () => {
     setup('/', 'viewer');
     expect(screen.getByText('Olá, Maria')).toBeInTheDocument();
     expect(screen.getByText('A busca de cifras chega em breve.')).toBeInTheDocument();
-    expect(screen.queryByText('Pessoas')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Pessoas' })).not.toBeInTheDocument();
   });
 
   it('shows Pessoas link for admin', () => {
@@ -48,6 +48,24 @@ describe('routes', () => {
   it('redirects non-admin away from /pessoas', () => {
     setup('/pessoas', 'member');
     expect(screen.getByText('Olá, Maria')).toBeInTheDocument();
+  });
+
+  it('waits for the role before deciding on /pessoas', () => {
+    const gateway = createFakeGateway();
+    render(<App gateway={gateway} initialPath="/pessoas" />);
+    act(() => gateway.emitUser(testUser));
+    expect(screen.getByText('Carregando…')).toBeInTheDocument();
+    act(() => gateway.emitRole('admin'));
+    expect(screen.getByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
+  });
+
+  it('disables the login button while the popup is open', () => {
+    const gateway = createFakeGateway();
+    gateway.signIn = () => new Promise(() => undefined);
+    render(<App gateway={gateway} initialPath="/login" />);
+    act(() => gateway.emitUser(null));
+    fireEvent.click(screen.getByText('Entrar com Google'));
+    expect(screen.getByRole('button', { name: 'Entrar com Google' })).toBeDisabled();
   });
 
   it('header shows role label and Sair', () => {

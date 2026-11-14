@@ -16,6 +16,13 @@ describe('readWebEnv', () => {
     expect(readWebEnv({ ...full, EXTRA: 'x' })).toEqual(full);
   });
 
+  it('requires emulator host only when emulators are on', () => {
+    const raw = { ...full, VITE_EMULATOR_HOST: undefined };
+    expect(() => readWebEnv(raw)).toThrow('VITE_EMULATOR_HOST');
+    const prod = readWebEnv({ ...raw, VITE_USE_EMULATORS: 'false' });
+    expect(prod.VITE_EMULATOR_HOST).toBe('');
+  });
+
   it('throws listing every missing env key', () => {
     const raw = { ...full, VITE_FIREBASE_API_KEY: undefined, VITE_FIREBASE_APP_ID: '' };
     expect(() => readWebEnv(raw)).toThrow(

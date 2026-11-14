@@ -5,6 +5,7 @@ import type { Role } from '../auth/roles';
 export interface FakeGateway extends AuthGateway {
   emitUser(user: SessionUser | null): void;
   emitRole(role: Role | undefined): void;
+  claimRole: Role | undefined;
 }
 
 export const testUser: SessionUser = {
@@ -17,7 +18,8 @@ export const testUser: SessionUser = {
 export function createFakeGateway(): FakeGateway {
   let userCb: ((u: SessionUser | null) => void) | undefined;
   let roleCb: ((r: Role | undefined) => void) | undefined;
-  return {
+  const gateway: FakeGateway = {
+    claimRole: 'viewer',
     onUser: (cb) => {
       userCb = cb;
       return () => {
@@ -30,10 +32,12 @@ export function createFakeGateway(): FakeGateway {
         roleCb = undefined;
       };
     },
+    getClaimRole: () => Promise.resolve(gateway.claimRole),
     refreshToken: vi.fn(() => Promise.resolve()),
     signIn: vi.fn(() => Promise.resolve()),
     signOut: vi.fn(() => Promise.resolve()),
     emitUser: (u) => userCb?.(u),
     emitRole: (r) => roleCb?.(r),
   };
+  return gateway;
 }

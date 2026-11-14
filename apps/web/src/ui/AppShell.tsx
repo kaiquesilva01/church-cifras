@@ -21,11 +21,13 @@ export function AppShell() {
           <Link to="/" className="brand">
             Cifras · Louvor
           </Link>
-          {isAdmin(role) && (
-            <Link to="/pessoas" className="nav-link">
-              Pessoas
-            </Link>
-          )}
+          <nav aria-label="Principal">
+            {isAdmin(role) && (
+              <Link to="/pessoas" className="nav-link">
+                Pessoas
+              </Link>
+            )}
+          </nav>
           <span className="spacer" />
           <span className="avatar" aria-hidden="true">
             {initials(name)}

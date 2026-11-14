@@ -34,15 +34,40 @@ describe('AuthProvider', () => {
     expect(screen.getByText('status:signed-out')).toBeInTheDocument();
   });
 
-  it('treats missing role as viewer and refreshes token when users doc changes', () => {
+  it('treats missing role as viewer and refreshes token when users doc changes', async () => {
     const gateway = setup();
     act(() => gateway.emitUser(testUser));
     act(() => gateway.emitRole(undefined));
     expect(screen.getByText('status:signed-in')).toBeInTheDocument();
     expect(screen.getByText('role:viewer')).toBeInTheDocument();
-    act(() => gateway.emitRole('member'));
+    await act(async () => gateway.emitRole('member'));
     expect(screen.getByText('role:member')).toBeInTheDocument();
     expect(gateway.refreshToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes token when first snapshot role differs from token claim', async () => {
+    const gateway = setup();
+    act(() => gateway.emitUser(testUser));
+    await act(async () => gateway.emitRole('member'));
+    expect(gateway.refreshToken).toHaveBeenCalledTimes(1);
+    await act(async () => gateway.emitRole('member'));
+    expect(gateway.refreshToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refresh when claim already matches', async () => {
+    const gateway = setup();
+    gateway.claimRole = 'member';
+    act(() => gateway.emitUser(testUser));
+    await act(async () => gateway.emitRole('member'));
+    expect(gateway.refreshToken).not.toHaveBeenCalled();
+  });
+
+  it('stays loading until the users doc arrives', () => {
+    const gateway = setup();
+    act(() => gateway.emitUser(testUser));
+    expect(screen.getByText('status:loading')).toBeInTheDocument();
+    act(() => gateway.emitRole(undefined));
+    expect(screen.getByText('status:signed-in')).toBeInTheDocument();
   });
 
   it('signs out', () => {

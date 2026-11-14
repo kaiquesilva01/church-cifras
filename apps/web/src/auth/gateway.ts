@@ -1,6 +1,7 @@
 import {
   GoogleAuthProvider,
   getIdToken,
+  getIdTokenResult,
   onAuthStateChanged,
   signInWithPopup,
   signOut,
@@ -28,6 +29,11 @@ export function createAuthGateway({ auth, db }: FirebaseServices): AuthGateway {
         const role = snap.data()?.role as Role | undefined;
         cb(role);
       }),
+    getClaimRole: async () => {
+      if (!auth.currentUser) return undefined;
+      const { claims } = await getIdTokenResult(auth.currentUser);
+      return claims.role as Role | undefined;
+    },
     refreshToken: async () => {
       if (auth.currentUser) await getIdToken(auth.currentUser, true);
     },
