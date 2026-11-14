@@ -41,6 +41,15 @@ describe('HomePage', () => {
     );
   });
 
+  it('lists songs sorted by normalized title', () => {
+    renderHome();
+    const titles = screen
+      .getAllByRole('listitem')
+      .map((li) => li.querySelector('.song-title')?.textContent)
+      .filter(Boolean);
+    expect(titles).toEqual(['Grande é o Senhor', 'Ressuscita-me', 'Sonda-me']);
+  });
+
   it('searches by artist', () => {
     renderHome();
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar música ou cantor…' }), {

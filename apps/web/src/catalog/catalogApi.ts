@@ -43,7 +43,7 @@ export interface CatalogApi {
   /** Reserva o id de uma m√∫sica nova (o arquivo precisa dele antes do batch). */
   newSongId(): string;
   uploadPdf(songId: string, key: KeyName, file: Blob): Promise<string>;
-  /** Descarta um PDF Ûrf„o que o prÛprio usu·rio enviou (via callable `discardUpload`). */
+  /** Descarta um PDF √≥rf√£o que o pr√≥prio usu√°rio enviou (via callable `discardUpload`). */
   deleteFile(path: string): Promise<void>;
   createSongWithArrangement(input: NewSongInput): Promise<string>;
   addArrangement(songId: string, input: NewArrangementInput): Promise<void>;

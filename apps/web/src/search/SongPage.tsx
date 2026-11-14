@@ -18,7 +18,7 @@ export function SongPage({ api }: { api: CatalogApi }) {
   const { status, songs } = useSongs(api);
   const song = songs.find((s) => s.id === songId);
 
-  // Os tons v�m dos arranjos (tempo real); song.keys (Function) pode atrasar logo ap�s salvar.
+  // Os tons vêm dos arranjos (tempo real); song.keys (Function) pode atrasar após salvar.
   const [loaded, setLoaded] = useState<{ songId: string; list: ArrangementSummary[] } | null>(null);
   useEffect(() => {
     if (!songId) return;

@@ -20,7 +20,13 @@ export function HomePage({ api }: { api: CatalogApi }) {
   const tab = params.get('aba') === 'cantores' ? TABS[1] : TABS[0];
 
   const artists = useMemo(() => deriveArtists(songs), [songs]);
-  const visibleSongs = useMemo(() => filterSongs(songs, query), [songs, query]);
+  const visibleSongs = useMemo(
+    () =>
+      filterSongs(songs, query).sort((a, b) =>
+        a.titleNormalized.localeCompare(b.titleNormalized, 'pt-BR'),
+      ),
+    [songs, query],
+  );
   const visibleArtists = useMemo(() => filterArtists(artists, query), [artists, query]);
 
   const setQuery = (value: string) => {
