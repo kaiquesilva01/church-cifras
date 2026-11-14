@@ -25,10 +25,17 @@ export function createAuthGateway({ auth, db }: FirebaseServices): AuthGateway {
         ),
       ),
     onUserDoc: (uid, cb) =>
-      onSnapshot(doc(db, 'users', uid), (snap) => {
-        const role = snap.data()?.role as Role | undefined;
-        cb(role);
-      }),
+      onSnapshot(
+        doc(db, 'users', uid),
+        (snap) => {
+          const role = snap.data()?.role as Role | undefined;
+          cb(role);
+        },
+        (error) => {
+          console.warn('Falha ao carregar o perfil do usuário', error);
+          cb(undefined);
+        },
+      ),
     getClaimRole: async () => {
       if (!auth.currentUser) return undefined;
       const { claims } = await getIdTokenResult(auth.currentUser);
