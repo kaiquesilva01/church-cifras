@@ -27,7 +27,10 @@ export function loadFontBytes(id: FontId): Promise<Uint8Array> {
     promise = download(id);
     cache.set(id, promise);
     // A failed download must not stick: the next call tries again.
-    promise.catch(() => cache.delete(id));
+    const current = promise;
+    current.catch(() => {
+      if (cache.get(id) === current) cache.delete(id);
+    });
   }
   return promise;
 }

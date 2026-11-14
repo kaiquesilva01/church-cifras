@@ -13,3 +13,14 @@ describe('pdfFileName', () => {
     expect(pdfFileName('Dois   espaços', 'X', 'G')).toBe('Dois espaços - X (G).pdf');
   });
 });
+
+describe('pdfFileName limits', () => {
+  it('caps each part at 80 characters', () => {
+    const name = pdfFileName('a'.repeat(100), 'b'.repeat(100), 'G');
+    expect(name).toBe(`${'a'.repeat(80)} - ${'b'.repeat(80)} (G).pdf`);
+  });
+
+  it('falls back to "cifra" when a part is empty after cleaning', () => {
+    expect(pdfFileName('///', '  ', 'G')).toBe('cifra - cifra (G).pdf');
+  });
+});

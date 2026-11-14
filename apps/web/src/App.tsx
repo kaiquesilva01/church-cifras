@@ -11,10 +11,10 @@ import { ErrorBoundary } from './routes/ErrorBoundary';
 import { RequireRole } from './routes/RequireRole';
 import { ArtistPage } from './search/ArtistPage';
 import { HomePage } from './search/HomePage';
-import { SongPage } from './search/SongPage';
 import { AppShell } from './ui/AppShell';
 
 const UploadRoute = lazy(() => import('./upload/UploadRoute'));
+const ViewerRoute = lazy(() => import('./viewer/ViewerRoute'));
 
 export interface AppProps {
   gateway: AuthGateway;
@@ -47,7 +47,22 @@ function AppRoutes({
         >
           <Route index element={<HomePage />} />
           <Route path="/cantores/:artistId" element={<ArtistPage />} />
-          <Route path="/musicas/:songId" element={<SongPage api={catalogApi} />} />
+          <Route
+            path="/musicas/:songId"
+            element={
+              <ErrorBoundary onReload={onReload}>
+                <Suspense
+                  fallback={
+                    <p role="status" className="status">
+                      Carregando cifra�
+                    </p>
+                  }
+                >
+                  <ViewerRoute api={catalogApi} />
+                </Suspense>
+              </ErrorBoundary>
+            }
+          />
           <Route element={<RequireRole roles={['member', 'admin']} />}>
             <Route
               path="/nova"

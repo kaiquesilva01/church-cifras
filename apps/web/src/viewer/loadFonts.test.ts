@@ -47,4 +47,24 @@ describe('loadFontBytes', () => {
     await expect(loadFontBytes('sans-bold')).rejects.toThrow();
     await expect(loadFontBytes('sans-bold')).resolves.toBeInstanceOf(Uint8Array);
   });
+
+  it('a stale failure does not evict a newer cache entry', async () => {
+    let rejectFirst: (r: unknown) => void = () => undefined;
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(new Promise((_resolve, reject) => (rejectFirst = reject)))
+      .mockResolvedValue(okResponse([1]));
+    vi.stubGlobal('fetch', fetchMock);
+    const first = loadFontBytes('mono-bold');
+    const firstSettled = first.catch(() => undefined);
+    // let the first download reach fetch before the cache is reset
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    resetFontCache();
+    const second = loadFontBytes('mono-bold');
+    rejectFirst(new Error('late failure'));
+    await firstSettled;
+    await second;
+    expect(loadFontBytes('mono-bold')).toBe(second);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
