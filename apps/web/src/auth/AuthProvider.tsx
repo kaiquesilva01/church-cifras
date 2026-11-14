@@ -35,15 +35,15 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
   useEffect(() => {
     if (!uid) return;
     let active = true;
-    const requested = new Set<Role>();
+    let last: Role | undefined;
     const syncClaim = async (role: Role) => {
-      if (requested.has(role)) return;
-      requested.add(role);
+      if (role === last) return;
+      last = role;
       try {
         // O gatilho define o claim depois do login: renova o token se estiver defasado.
         if ((await gateway.getClaimRole()) !== role && active) await gateway.refreshToken();
       } catch (error) {
-        requested.delete(role);
+        last = undefined;
         console.warn('Falha ao atualizar o token de sessão', error);
       }
     };

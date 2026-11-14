@@ -17,6 +17,7 @@ export const testUser: SessionUser = {
 
 export function createFakeGateway(): FakeGateway {
   let userCb: ((u: SessionUser | null) => void) | undefined;
+  let currentRole: Role | undefined;
   let roleCb: ((r: Role | undefined) => void) | undefined;
   const gateway: FakeGateway = {
     claimRole: 'viewer',
@@ -33,11 +34,17 @@ export function createFakeGateway(): FakeGateway {
       };
     },
     getClaimRole: () => Promise.resolve(gateway.claimRole),
-    refreshToken: vi.fn(() => Promise.resolve()),
+    refreshToken: vi.fn(() => {
+      gateway.claimRole = currentRole;
+      return Promise.resolve();
+    }),
     signIn: vi.fn(() => Promise.resolve()),
     signOut: vi.fn(() => Promise.resolve()),
     emitUser: (u) => userCb?.(u),
-    emitRole: (r) => roleCb?.(r),
+    emitRole: (r) => {
+      currentRole = r;
+      roleCb?.(r);
+    },
   };
   return gateway;
 }

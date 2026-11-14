@@ -54,6 +54,16 @@ describe('AuthProvider', () => {
     expect(gateway.refreshToken).toHaveBeenCalledTimes(1);
   });
 
+  it('refreshes again when role returns to a previous value', async () => {
+    const gateway = setup();
+    act(() => gateway.emitUser(testUser));
+    await act(async () => gateway.emitRole('member'));
+    await act(async () => gateway.emitRole('viewer'));
+    await act(async () => gateway.emitRole('member'));
+    // viewer -> member (3 syncs: the claim follows each role change via the fake refresh)
+    expect(gateway.refreshToken).toHaveBeenCalledTimes(3);
+  });
+
   it('does not refresh when claim already matches', async () => {
     const gateway = setup();
     gateway.claimRole = 'member';
