@@ -15,6 +15,18 @@ export interface PeopleApi {
   setRole(uid: string, role: Role): Promise<void>;
 }
 
+const ROLES: readonly Role[] = ['viewer', 'member', 'admin'];
+
+export function toPersonRow(uid: string, data: Record<string, unknown>): PersonRow {
+  const role = ROLES.find((r) => r === data.role) ?? 'viewer';
+  return {
+    uid,
+    displayName: String(data.displayName ?? ''),
+    email: String(data.email ?? ''),
+    role,
+  };
+}
+
 export function createPeopleApi({ db, functions }: FirebaseServices): PeopleApi {
   const callSetUserRole = httpsCallable<{ uid: string; role: Role }, unknown>(
     functions,
@@ -23,15 +35,7 @@ export function createPeopleApi({ db, functions }: FirebaseServices): PeopleApi 
   return {
     listUsers: async () => {
       const snap = await getDocs(query(collection(db, 'users'), orderBy('displayName')));
-      return snap.docs.map((d) => {
-        const data = d.data();
-        return {
-          uid: d.id,
-          displayName: String(data.displayName ?? ''),
-          email: String(data.email ?? ''),
-          role: (data.role as Role | undefined) ?? 'viewer',
-        };
-      });
+      return snap.docs.map((d) => toPersonRow(d.id, d.data()));
     },
     setRole: async (uid, role) => {
       await callSetUserRole({ uid, role });

@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { testUser } from '../test/fakeGateway';
-import type { PeopleApi, PersonRow } from './peopleApi';
-import { PeoplePage } from './PeoplePage';
+import { toPersonRow, type PeopleApi, type PersonRow } from './peopleApi';
+import { PeoplePage, maskEmail } from './PeoplePage';
 
 const rows: PersonRow[] = [
   { uid: 'u1', displayName: 'Maria Souza', email: 'maria@example.com', role: 'admin' },
@@ -73,8 +73,38 @@ describe('PeoplePage', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Papel de Kaique Silva' }), {
       target: { value: 'member' },
     });
-    expect(await screen.findByText('Não foi possível alterar o papel.')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível alterar o papel.');
     expect(screen.getByRole('combobox', { name: 'Papel de Kaique Silva' })).toHaveValue('viewer');
+  });
+
+  it('disables the row while its change is pending', async () => {
+    let resolve!: () => void;
+    const api = fakeApi({ setRole: () => new Promise<void>((r) => (resolve = r)) });
+    renderPage(api);
+    await screen.findByText('Kaique Silva');
+    const select = screen.getByRole('combobox', { name: 'Papel de Kaique Silva' });
+    fireEvent.change(select, { target: { value: 'member' } });
+    expect(select).toBeDisabled();
+    resolve();
+    expect(await screen.findByText('Papel atualizado')).toBeInTheDocument();
+    expect(select).toBeEnabled();
+  });
+
+  it.each([
+    ['functions/not-found', 'Essa pessoa não existe mais.'],
+    ['functions/permission-denied', 'Você não tem permissão para alterar papéis.'],
+    ['functions/failed-precondition', 'Você não pode alterar o próprio papel.'],
+    ['functions/internal', 'Não foi possível alterar o papel.'],
+  ])('maps callable error %s to a clear message and logs it', async (code, text) => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderPage(fakeApi({ setRole: () => Promise.reject(Object.assign(new Error('x'), { code })) }));
+    await screen.findByText('Kaique Silva');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Papel de Kaique Silva' }), {
+      target: { value: 'member' },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(text);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it('shows empty state', async () => {
@@ -82,9 +112,40 @@ describe('PeoplePage', () => {
     expect(await screen.findByText('Ninguém entrou ainda.')).toBeInTheDocument();
   });
 
+  it('has no trailing space before (você)', async () => {
+    renderPage(fakeApi());
+    await screen.findByText('Kaique Silva');
+    expect(screen.getByText('(você)').parentElement?.textContent).toBe('Maria Souza (você)');
+  });
+
   it('shows error when listing fails', async () => {
     renderPage(fakeApi({ listUsers: () => Promise.reject(new Error('x')) }));
-    expect(await screen.findByText('Não foi possível carregar as pessoas.')).toBeInTheDocument();
-    await act(async () => {});
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível carregar as pessoas.',
+    );
+  });
+});
+
+describe('maskEmail', () => {
+  it('masks after the first character', () => {
+    expect(maskEmail('kaique@gmail.com')).toBe('k•••@gmail.com');
+    expect(maskEmail('k@gmail.com')).toBe('k•••@gmail.com');
+  });
+  it('never exposes unmaskable values', () => {
+    expect(maskEmail('')).toBe('•••');
+    expect(maskEmail('semarroba')).toBe('•••');
+    expect(maskEmail('@gmail.com')).toBe('•••');
+  });
+});
+
+describe('toPersonRow', () => {
+  it('falls back to viewer for unknown roles', () => {
+    expect(toPersonRow('u9', { displayName: 'A', email: 'a@b.c', role: 'owner' }).role).toBe(
+      'viewer',
+    );
+    expect(toPersonRow('u9', { displayName: 'A', email: 'a@b.c' }).role).toBe('viewer');
+    expect(toPersonRow('u9', { displayName: 'A', email: 'a@b.c', role: 'member' }).role).toBe(
+      'member',
+    );
   });
 });
