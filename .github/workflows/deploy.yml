@@ -49,6 +49,9 @@ jobs:
           elif [ "$VITE_FIREBASE_PROJECT_ID" != "$FIREBASE_PROJECT_ID" ]; then
             echo "::error::VITE_FIREBASE_PROJECT_ID difere de FIREBASE_PROJECT_ID"
             exit 1
+          elif [[ "$ADMIN_EMAILS" == *[$'\r\n"'\''#\=']* ]]; then
+            echo "::error::ADMIN_EMAILS contém caractere inválido (quebra de linha, aspas, #, \ ou =); use apenas e-mails separados por vírgula"
+            exit 1
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
