@@ -54,7 +54,7 @@ function AppRoutes({
                 <Suspense
                   fallback={
                     <p role="status" className="status">
-                      Carregando cifra�
+                      Carregando cifra…
                     </p>
                   }
                 >

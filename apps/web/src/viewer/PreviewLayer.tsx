@@ -59,12 +59,13 @@ interface Props {
   viewport: ViewportLike;
   ops: OverlayOp[];
   highlight?: boolean;
+  onError?: () => void;
 }
 
 // Transparent canvas above one page canvas; redrawing it never touches the page itself.
-export function PreviewLayer({ page, viewport, ops, highlight = false }: Props) {
+export function PreviewLayer({ page, viewport, ops, highlight = false, onError }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -102,13 +103,15 @@ export function PreviewLayer({ page, viewport, ops, highlight = false }: Props) 
       },
       () => {
         // Without the font the preview would lie about widths: leave the layer empty.
-        if (!cancelled) clear();
+        if (cancelled) return;
+        clear();
+        onError?.();
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [ops, page, viewport, highlight, dpr]);
+  }, [ops, page, viewport, highlight, dpr, onError]);
 
   return (
     <canvas

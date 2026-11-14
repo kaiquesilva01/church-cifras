@@ -37,6 +37,7 @@ export function ViewerPage({ api, songId, tomSlug, openPdf }: ViewerPageProps) {
   }, [arrangements, tomSlug]);
 
   const path = selected?.storagePath ?? null;
+  const [previewFailed, setPreviewFailed] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<{ path: string; result: Loaded } | null>(null);
 
   useEffect(() => {
@@ -89,8 +90,10 @@ export function ViewerPage({ api, songId, tomSlug, openPdf }: ViewerPageProps) {
     const link = document.createElement('a');
     link.href = url;
     link.download = pdfFileName(song.title, song.artistName, selected.key);
+    document.body.appendChild(link);
     link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
 
   return (
@@ -104,7 +107,7 @@ export function ViewerPage({ api, songId, tomSlug, openPdf }: ViewerPageProps) {
         <KeyChips
           songId={song.id}
           title={song.title}
-          keys={arrangements.map((a) => a.key)}
+          keys={arrangements.length > 0 ? arrangements.map((a) => a.key) : song.keys}
           selected={selected?.key}
           replace
         />
@@ -116,7 +119,18 @@ export function ViewerPage({ api, songId, tomSlug, openPdf }: ViewerPageProps) {
       ) : arrStatus === 'ready' && !selected ? (
         <p className="status">Esta música ainda não tem PDF.</p>
       ) : current?.status === 'ready' ? (
-        <PdfPages doc={current.doc} overlays={NO_OVERLAYS} />
+        <>
+          {previewFailed === path && (
+            <p role="alert" className="error">
+              Não foi possível mostrar a prévia.
+            </p>
+          )}
+          <PdfPages
+            doc={current.doc}
+            overlays={NO_OVERLAYS}
+            onPreviewError={() => setPreviewFailed(path)}
+          />
+        </>
       ) : (
         <p role="status" className="status">
           Carregando cifra…

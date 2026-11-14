@@ -212,9 +212,9 @@ describe('buildTransposePlan', () => {
     ]);
   });
 
-  it('transposes a bracketed intro line but leaves a [Refr�o] label alone', () => {
+  it('transposes a bracketed intro line but leaves a [Refrão] label alone', () => {
     const plan = buildTransposePlan({
-      lines: [line([run('[Intro: Am G]', 10)]), line([run('[Refr�o]', 10)], 1, 600)],
+      lines: [line([run('[Intro: Am G]', 10)]), line([run('[Refrão]', 10)], 1, 600)],
       from: key('Am'),
       to: key('Cm'),
       measure,

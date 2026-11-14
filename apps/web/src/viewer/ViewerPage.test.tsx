@@ -6,8 +6,16 @@ import { fakeCatalogApi, makeSong } from '../test/fakeCatalogApi';
 import { ViewerPage } from './ViewerPage';
 
 vi.mock('./PdfPages', () => ({
-  PdfPages: ({ doc }: { doc: { numPages: number } }) => (
-    <div data-testid="pdf-pages" data-pages={doc.numPages} />
+  PdfPages: ({
+    doc,
+    onPreviewError,
+  }: {
+    doc: { numPages: number };
+    onPreviewError?: () => void;
+  }) => (
+    <div data-testid="pdf-pages" data-pages={doc.numPages}>
+      <button onClick={onPreviewError}>fail-preview</button>
+    </div>
   ),
 }));
 
@@ -43,7 +51,7 @@ describe('ViewerPage', () => {
     const { api } = renderViewer('/musicas/s1?tom=A');
     expect(screen.getByRole('status')).toHaveTextContent('Carregando cifra…');
     expect(screen.getByText('Aline Barros')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /^(� )?Sonda-me$/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sonda-me' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sonda-me, tom A' })).toHaveAttribute(
       'aria-current',
       'true',
@@ -71,13 +79,18 @@ describe('ViewerPage', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
       this: HTMLAnchorElement,
     ) {
-      downloads.push(`${this.download}|${this.href}`);
+      downloads.push(`${this.download}|${this.href}|${this.isConnected}`);
     });
     renderViewer('/musicas/s1?tom=G');
     await screen.findByTestId('pdf-pages');
+    vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: '⬇ PDF' }));
-    expect(downloads).toEqual(['Sonda-me - Aline Barros (G).pdf|blob:cifra']);
+    expect(downloads).toEqual(['Sonda-me - Aline Barros (G).pdf|blob:cifra|true']);
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(10_000);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:cifra');
+    vi.useRealTimers();
   });
 
   it('shows not found for unknown song', () => {
@@ -91,5 +104,19 @@ describe('ViewerPage', () => {
     });
     renderViewer('/musicas/s1?tom=G', api);
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível abrir o PDF.');
+  });
+
+  it('shows chips from song.keys while arrangements load', () => {
+    const api = fakeCatalogApi(undefined, { subscribeArrangements: () => () => undefined });
+    renderViewer('/musicas/s1', api);
+    expect(screen.getByRole('link', { name: 'Sonda-me, tom G' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sonda-me, tom A' })).toBeInTheDocument();
+  });
+
+  it('shows a preview error message', async () => {
+    renderViewer('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    fireEvent.click(screen.getByRole('button', { name: 'fail-preview' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível mostrar a prévia.');
   });
 });

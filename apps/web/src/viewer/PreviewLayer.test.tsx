@@ -79,4 +79,16 @@ describe('PreviewLayer', () => {
     expect(ctx.fillRect).toHaveBeenCalledWith(20, 736, 60, 24);
     expect(container.querySelector('canvas')).toHaveAttribute('aria-hidden', 'true');
   });
+
+  it('reports a font load failure through onError', async () => {
+    const { ensurePreviewFonts } = await import('./previewFonts');
+    vi.mocked(ensurePreviewFonts).mockRejectedValueOnce(new Error('no font'));
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    const onError = vi.fn();
+    render(<PreviewLayer page={1} viewport={viewport} ops={[op()]} onError={onError} />);
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+  });
 });

@@ -30,21 +30,25 @@ interface Layout {
 }
 
 const RESIZE_DEBOUNCE_MS = 200;
+// Retina is enough for reading; 3x would triple the canvas memory.
+const MAX_DPR = 2;
 
 export function PdfPages({
   doc,
   overlays,
   highlight = true,
+  onPreviewError,
 }: {
   doc: PdfDocument;
   overlays: OverlayOp[];
   highlight?: boolean;
+  onPreviewError?: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const canvases = useRef(new Map<number, HTMLCanvasElement>());
   const [width, setWidth] = useState(0);
   const [layout, setLayout] = useState<Layout[]>([]);
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
 
   useEffect(() => {
     const el = container.current;
@@ -53,12 +57,17 @@ export function PdfPages({
     let timer: ReturnType<typeof setTimeout> | undefined;
     const onResize = (): void => {
       clearTimeout(timer);
-      timer = setTimeout(() => setWidth(el.clientWidth), RESIZE_DEBOUNCE_MS);
+      // Width-change guard: height-only changes (our own pages growing) must not re-render.
+      timer = setTimeout(() => {
+        const next = el.clientWidth;
+        setWidth((current) => (current === next ? current : next));
+      }, RESIZE_DEBOUNCE_MS);
     };
-    window.addEventListener('resize', onResize);
+    const observer = new ResizeObserver(onResize);
+    observer.observe(el);
     return () => {
       clearTimeout(timer);
-      window.removeEventListener('resize', onResize);
+      observer.disconnect();
     };
   }, []);
 
@@ -96,7 +105,11 @@ export function PdfPages({
         });
         await task.promise;
       }
-    })().catch(() => undefined);
+    })().catch((error: unknown) => {
+      if ((error as { name?: string } | null)?.name !== 'RenderingCancelledException') {
+        console.error('Falha ao renderizar a página do PDF', error);
+      }
+    });
     return () => {
       cancelled = true;
       task?.cancel();
@@ -121,7 +134,15 @@ export function PdfPages({
             height={Math.round(css.height * dpr)}
             style={{ width: `${css.width}px`, height: `${css.height}px` }}
           />
-          <PreviewLayer page={pageNumber} viewport={css} ops={overlays} highlight={highlight} />
+          {overlays.some((op) => op.page === pageNumber) && (
+            <PreviewLayer
+              page={pageNumber}
+              viewport={css}
+              ops={overlays}
+              highlight={highlight}
+              onError={onPreviewError}
+            />
+          )}
         </div>
       ))}
     </div>

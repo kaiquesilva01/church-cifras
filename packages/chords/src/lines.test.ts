@@ -61,13 +61,13 @@ describe('lines', () => {
     expect(parseChordToken('G]')).toMatchObject({ prefix: '', suffix: ']' });
     expect(parseChordToken('[Intro:Am]')).toMatchObject({ prefix: '[Intro:', suffix: ']' });
     expect(parseChordToken('Am')).toMatchObject({ prefix: '', suffix: '' });
-    expect(parseChordToken('[Refr�o]')).toBeNull();
+    expect(parseChordToken('[Refrão]')).toBeNull();
     expect(parseChordToken('[Intro:')).toBeNull();
   });
 
   it('classifies a bracketed intro line as chords', () => {
     expect(classifySegment(tokenizeSegment([run('[Intro: Am G]', 10)]))).toBe('chords');
-    expect(classifySegment(tokenizeSegment([run('[Refr�o] 2x', 10)]))).toBe('other');
+    expect(classifySegment(tokenizeSegment([run('[Refrão] 2x', 10)]))).toBe('other');
   });
 
   it('reports unknown tokens next to chords', () => {
