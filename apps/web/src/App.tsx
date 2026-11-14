@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Suspense, lazy, useMemo } from 'react';
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router';
 import { AuthProvider, type AuthGateway } from './auth/AuthProvider';
 import type { CatalogApi } from './catalog/catalogApi';
@@ -11,6 +11,8 @@ import { ArtistPage } from './search/ArtistPage';
 import { HomePage } from './search/HomePage';
 import { SongPage } from './search/SongPage';
 import { AppShell } from './ui/AppShell';
+
+const UploadRoute = lazy(() => import('./upload/UploadRoute'));
 
 export interface AppProps {
   gateway: AuthGateway;
@@ -28,6 +30,22 @@ function AppRoutes({ peopleApi, catalogApi }: { peopleApi: PeopleApi; catalogApi
           <Route index element={<HomePage api={catalogApi} />} />
           <Route path="/cantores/:artistId" element={<ArtistPage api={catalogApi} />} />
           <Route path="/musicas/:songId" element={<SongPage api={catalogApi} />} />
+          <Route element={<RequireRole roles={['member', 'admin']} />}>
+            <Route
+              path="/nova"
+              element={
+                <Suspense
+                  fallback={
+                    <p role="status" className="status">
+                      Carregando…
+                    </p>
+                  }
+                >
+                  <UploadRoute api={catalogApi} />
+                </Suspense>
+              }
+            />
+          </Route>
           <Route element={<RequireRole roles={['admin']} />}>
             <Route path="/pessoas" element={<PeoplePage api={peopleApi} />} />
           </Route>
