@@ -20,5 +20,6 @@ export { findChords } from './findChords';
 export type { ChordOccurrence } from './findChords';
 export { buildTransposePlan } from './plan';
 export type { Replacement, SuspectSegment, TransposePlan } from './plan';
+export { artistIdFromName, compareKeys, keyFromSlug, keySlug } from './catalog';
 export { normalizeText, suggestMetadata } from './metadata';
 export type { MetadataSuggestion } from './metadata';
