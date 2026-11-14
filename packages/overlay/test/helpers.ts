@@ -21,7 +21,8 @@ export async function loadAllFonts(): Promise<LoadedFonts> {
   return fonts;
 }
 
-const SUBSTITUTE = /Liberation|Roboto/;
+// pdf-lib names the embedded font `<Family>-<Weight>-<random digits>`; originals have no digits.
+const SUBSTITUTE = /(Liberation|Roboto).*-\d+$/;
 const MERGE_SLACK_EM = 0.6;
 
 // pdf.js merges neighbouring chunks of the same font into one item ("A/C#G9"), so the op's text is
@@ -40,6 +41,24 @@ const originalFamily = (fontName: string): string => {
 // Every op's text must appear in the written PDF, in a substitute font, at the planned position.
 export function expectOpsWritten(lines: TextLine[], ops: OverlayOp[], measure: Measure): void {
   for (const op of ops) {
+    const words = op.text.value.split(' ');
+    if (words.length > 1) {
+      // a reflowed group: pdf.js splits the drawn string at its spaces, so look for every word
+      // inside the span the group should occupy
+      const runs = lines.filter((l) => l.page === op.page).flatMap((l) => l.runs);
+      const pieces = runs.filter(
+        (r) => SUBSTITUTE.test(r.fontName) && Math.abs(r.y - op.text.y) <= 0.5,
+      );
+      const end = op.rect.x + op.rect.width + 0.5;
+      const inside = pieces.filter((r) => r.x >= op.text.x - 0.5 && r.x <= end);
+      expect(
+        inside
+          .map((r) => r.text.trim())
+          .filter(Boolean)
+          .join(' '),
+      ).toContain(op.text.value);
+      continue;
+    }
     const found = lines
       .filter((l) => l.page === op.page)
       .flatMap((l) => l.runs)

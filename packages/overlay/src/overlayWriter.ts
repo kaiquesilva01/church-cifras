@@ -19,8 +19,10 @@ export function createOverlayWriter(loadFont: FontBytesLoader): ChordWriter {
       doc.registerFontkit(fontkit);
       const ops = overlayOps(plan);
       const embedded = new Map<FontId, PDFFont>();
+      // Not subset: fontkit's subsetter emits broken outlines for several glyphs (D, F, #, ...) in
+      // these fonts, leaving them blank. Full programs cost ~100-350 KB per font actually used.
       for (const id of new Set(ops.map((op) => op.text.fontId))) {
-        embedded.set(id, await doc.embedFont(await loadFont(id), { subset: true }));
+        embedded.set(id, await doc.embedFont(await loadFont(id), { subset: false }));
       }
       const pages = doc.getPages();
       for (const op of ops) {

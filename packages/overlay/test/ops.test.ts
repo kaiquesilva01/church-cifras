@@ -20,6 +20,9 @@ function replacement(overrides: Partial<Replacement> = {}): Replacement {
     replacement: 'D',
     newWidth: 6,
     collides: false,
+    runKey: '1:700:100',
+    spaceWidth: 6,
+    limitX: 580.5,
     ...overrides,
   };
 }
@@ -61,7 +64,9 @@ describe('overlayOps', () => {
   });
 
   it('keeps the collision flag', () => {
-    const ops = overlayOps(plan([replacement({ collides: true }), replacement()]));
+    const ops = overlayOps(
+      plan([replacement({ collides: true }), replacement({ runKey: 'other' })]),
+    );
     expect(ops.map((o) => o.collides)).toEqual([true, false]);
   });
 
@@ -86,5 +91,84 @@ describe('overlayOps', () => {
 
   it('returns nothing for an empty plan', () => {
     expect(overlayOps(plan([]))).toEqual([]);
+  });
+
+  describe('packed runs', () => {
+    // Three chords in one run, 6 apart (one space): D / A/C# / Bm replace A# / F/A / Gm.
+    const packed = (overrides: Array<Partial<Replacement>> = []): Replacement[] => [
+      replacement({ x: 100, width: 12, replacement: 'D', newWidth: 6, ...overrides[0] }),
+      replacement({
+        x: 118,
+        width: 18,
+        replacement: 'A/C#',
+        newWidth: 24,
+        collides: true,
+        ...overrides[1],
+      }),
+      replacement({ x: 142, width: 12, replacement: 'Bm', newWidth: 12, ...overrides[2] }),
+    ];
+
+    it('reflows a packed group that collides into one op with single spaces', () => {
+      const ops = overlayOps(plan(packed()));
+      expect(ops).toHaveLength(1);
+      const [op] = ops;
+      expect(op!.text.value).toBe('D A/C# Bm');
+      expect(op!.text.x).toBe(100);
+      expect(op!.kind).toBe('chord');
+      // old extent 100..154 (54); new 6 + 6 + 24 + 6 + 12 = 54; pad 0.4
+      expect(op!.rect.x).toBeCloseTo(99.6, 10);
+      expect(op!.rect.width).toBeCloseTo(54.8, 10);
+      expect(op!.collides).toBe(false);
+    });
+
+    it('rect covers the old run when it is wider than the reflowed text', () => {
+      const [op] = overlayOps(plan(packed([{ width: 30 }, {}, { width: 30 }])));
+      // old: 100 .. 142 + 30 = 172; new 54
+      expect(op!.rect.width).toBeCloseTo(72.8, 10);
+    });
+
+    it('recomputes the collision of the reflowed text against what follows the group', () => {
+      const [op] = overlayOps(plan(packed([{}, {}, { limitX: 140 }])));
+      expect(op!.collides).toBe(true);
+    });
+
+    it('leaves a packed group alone when nothing collides', () => {
+      const ops = overlayOps(plan(packed([{}, { collides: false }])));
+      expect(ops.map((o) => o.text.value)).toEqual(['D', 'A/C#', 'Bm']);
+    });
+
+    it('does not reflow chords aligned to lyrics (gaps over 1.5 spaces)', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 6 }),
+          replacement({ x: 130, newWidth: 24, collides: true, replacement: 'A/C#' }),
+          replacement({ x: 170, newWidth: 12, replacement: 'Bm' }),
+        ]),
+      );
+      expect(ops.map((o) => o.text.value)).toEqual(['D', 'A/C#', 'Bm']);
+      expect(ops.map((o) => o.collides)).toEqual([false, true, false]);
+    });
+
+    it('only groups chords of the same run', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 24, collides: true }),
+          replacement({ x: 118, runKey: '1:700:118', replacement: 'Bm' }),
+        ]),
+      );
+      expect(ops).toHaveLength(2);
+    });
+
+    it('reflows only the colliding packed segment, keeping others', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, runKey: 'a', replacement: 'D' }),
+          replacement({ x: 118, runKey: 'a', replacement: 'G', newWidth: 24, collides: true }),
+          replacement({ x: 200, runKey: 'a', replacement: 'Em' }),
+        ]),
+      );
+      // the first two are packed (gap 6) and reflow; the third is aligned and stays
+      expect(ops.map((o) => o.text.value)).toEqual(['D G', 'Em']);
+    });
   });
 });

@@ -106,7 +106,9 @@ describe.skipIf(files.length === 0)('real fixtures', () => {
     writeFileSync(resolve(outDir, `${file.replace(/\.pdf$/i, '')} → D.pdf`), written);
 
     const ops = overlayOps(plan);
-    expect(ops).toHaveLength(plan.chords.length + (plan.keyIndicator ? 1 : 0));
+    // packed groups that collide are reflowed into one op, so there are never more ops than chords
+    expect(ops.length).toBeLessThanOrEqual(plan.chords.length + (plan.keyIndicator ? 1 : 0));
+    expect(ops.length).toBeGreaterThan(0);
     expectOpsWritten(await readTextLines(written), ops, measure);
   });
 });
