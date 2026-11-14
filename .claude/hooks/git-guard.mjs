@@ -11,12 +11,23 @@ try {
   const git = (args) =>
     execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
-  const stagedFiles = git(['diff', '--cached', '--name-only']).split('\n').filter(Boolean);
+  // -z + quotePath=false: nomes com acentos/espaços chegam crus, separados por NUL.
+  const stagedFiles = git(['-c', 'core.quotePath=false', 'diff', '--cached', '--name-only', '-z'])
+    .split('\0')
+    .filter(Boolean);
 
   const result = evaluateCommand({ command, branch, stagedFiles });
   if (!result.allow) {
     process.stderr.write('[git-guard] ' + result.reason);
     process.exit(2);
+  }
+  if (result.reminder) {
+    process.stdout.write(
+      JSON.stringify({
+        systemMessage: result.reminder,
+        hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: result.reminder },
+      }),
+    );
   }
   process.exit(0);
 } catch (err) {
