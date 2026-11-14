@@ -6,6 +6,7 @@ import type { PeopleApi } from './people/peopleApi';
 import { PeoplePage } from './people/PeoplePage';
 import { LoginPage } from './routes/LoginPage';
 import { RequireAuth } from './routes/RequireAuth';
+import { ErrorBoundary } from './routes/ErrorBoundary';
 import { RequireRole } from './routes/RequireRole';
 import { ArtistPage } from './search/ArtistPage';
 import { HomePage } from './search/HomePage';
@@ -19,9 +20,19 @@ export interface AppProps {
   peopleApi: PeopleApi;
   catalogApi: CatalogApi;
   initialPath?: string;
+  /** Recarrega a página (injetável nos testes). */
+  onReload?: () => void;
 }
 
-function AppRoutes({ peopleApi, catalogApi }: { peopleApi: PeopleApi; catalogApi: CatalogApi }) {
+function AppRoutes({
+  peopleApi,
+  catalogApi,
+  onReload,
+}: {
+  peopleApi: PeopleApi;
+  catalogApi: CatalogApi;
+  onReload: () => void;
+}) {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
@@ -34,15 +45,17 @@ function AppRoutes({ peopleApi, catalogApi }: { peopleApi: PeopleApi; catalogApi
             <Route
               path="/nova"
               element={
-                <Suspense
-                  fallback={
-                    <p role="status" className="status">
-                      Carregando…
-                    </p>
-                  }
-                >
-                  <UploadRoute api={catalogApi} />
-                </Suspense>
+                <ErrorBoundary onReload={onReload}>
+                  <Suspense
+                    fallback={
+                      <p role="status" className="status">
+                        Carregando…
+                      </p>
+                    }
+                  >
+                    <UploadRoute api={catalogApi} />
+                  </Suspense>
+                </ErrorBoundary>
               }
             />
           </Route>
@@ -56,19 +69,27 @@ function AppRoutes({ peopleApi, catalogApi }: { peopleApi: PeopleApi; catalogApi
   );
 }
 
-export function App({ gateway, peopleApi, catalogApi, initialPath }: AppProps) {
+const reloadPage = () => window.location.reload();
+
+export function App({
+  gateway,
+  peopleApi,
+  catalogApi,
+  initialPath,
+  onReload = reloadPage,
+}: AppProps) {
   const router = useMemo(
     () =>
       initialPath ? (
         <MemoryRouter initialEntries={[initialPath]}>
-          <AppRoutes peopleApi={peopleApi} catalogApi={catalogApi} />
+          <AppRoutes peopleApi={peopleApi} catalogApi={catalogApi} onReload={onReload} />
         </MemoryRouter>
       ) : (
         <BrowserRouter>
-          <AppRoutes peopleApi={peopleApi} catalogApi={catalogApi} />
+          <AppRoutes peopleApi={peopleApi} catalogApi={catalogApi} onReload={onReload} />
         </BrowserRouter>
       ),
-    [initialPath, peopleApi, catalogApi],
+    [initialPath, peopleApi, catalogApi, onReload],
   );
   return <AuthProvider gateway={gateway}>{router}</AuthProvider>;
 }

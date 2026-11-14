@@ -14,13 +14,10 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_TEXT = 120;
 const DEBOUNCE_MS = 300;
 
+type PickError = 'too-big' | 'unreadable' | 'no-chords';
+
 type FileState =
-  | { status: 'empty' }
-  | { status: 'reading'; name: string }
-  | { status: 'too-big' }
-  | { status: 'unreadable' }
-  | { status: 'no-chords' }
-  | { status: 'ready'; name: string; chordCount: number; suspects: string[] };
+  { status: 'empty' } | { status: 'ready'; name: string; chordCount: number; suspects: string[] };
 
 type LookupResult =
   { status: 'error' } | { status: 'done'; decision: UploadDecision; songId: string | null };
@@ -44,12 +41,17 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   const navigate = useNavigate();
   const { songs } = useSongs(api);
   const artists = useMemo(() => deriveArtists(songs).map((a) => a.name), [songs]);
+  // Known race: if the songs finish loading after a PDF was read, the title/artist swap
+  // heuristic ran with an incomplete artist list. Accepted; the swap button covers it.
   const artistsRef = useRef(artists);
   useEffect(() => {
     artistsRef.current = artists;
   }, [artists]);
 
   const [fileState, setFileState] = useState<FileState>({ status: 'empty' });
+  const [reading, setReading] = useState(false);
+  const [pickError, setPickError] = useState<PickError | null>(null);
+  const keyRef = useRef<HTMLSelectElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [chordCount, setChordCount] = useState(0);
   const [title, setTitle] = useState('');
@@ -107,20 +109,23 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   const onPick = (picked: File | undefined) => {
     if (!picked) return;
     const id = ++readId.current;
-    setSave('idle');
-    setAttempted(false);
+    setPickError(null);
     if (picked.size > MAX_BYTES) {
-      setFileState({ status: 'too-big' });
+      setReading(false);
+      setPickError('too-big');
       return;
     }
-    setFileState({ status: 'reading', name: picked.name });
+    setReading(true);
     readPdf(picked, artistsRef.current).then(
       (result) => {
         if (id !== readId.current) return;
+        setReading(false);
         if (result.chordCount < 1) {
-          setFileState({ status: 'no-chords' });
+          setPickError('no-chords');
           return;
         }
+        setSave('idle');
+        setAttempted(false);
         const { suggestion } = result;
         const parsed = suggestion.key ? parseKey(suggestion.key) : null;
         setFile(picked);
@@ -142,7 +147,9 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
         });
       },
       () => {
-        if (id === readId.current) setFileState({ status: 'unreadable' });
+        if (id !== readId.current) return;
+        setReading(false);
+        setPickError('unreadable');
       },
     );
   };
@@ -194,58 +201,55 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     </label>
   );
 
+  const clearSaveError = () => setSave((s) => (s === 'saving' ? s : 'idle'));
+
   const editKey = (value: string) => {
+    clearSaveError();
     setKey(value);
     setFromPdf((f) => ({ ...f, key: false }));
   };
 
-  if (
-    fileState.status === 'empty' ||
-    fileState.status === 'too-big' ||
-    fileState.status === 'unreadable'
-  ) {
+  const pickErrorText =
+    pickError === 'too-big'
+      ? 'O PDF precisa ter até 10 MB.'
+      : pickError === 'unreadable'
+        ? 'Não foi possível ler este PDF.'
+        : null;
+  const noChords = pickError === 'no-chords' && (
+    <div role="alert" className="banner banner-error">
+      <strong>✕ Não encontramos acordes neste PDF.</strong>
+      <p>
+        Os acordes precisam estar em negrito, numa linha acima da letra. PDF escaneado ou imagem não
+        funciona.
+      </p>
+    </div>
+  );
+
+  if (fileState.status !== 'ready') {
+    if (reading) {
+      return (
+        <section className="upload">
+          <h1 className="page-title">Nova cifra</h1>
+          <p role="status" className="status">
+            Lendo PDF…
+          </p>
+        </section>
+      );
+    }
     return (
       <section className="upload">
         <h1 className="page-title">Nova cifra</h1>
-        <p className="muted">Escolha o PDF da cifra. Nós lemos o título, o cantor e o tom.</p>
-        {picker('Escolher PDF')}
-        {fileState.status === 'too-big' && (
+        {pickError === 'no-chords' ? (
+          noChords
+        ) : (
+          <p className="muted">Escolha o PDF da cifra. Nós lemos o título, o cantor e o tom.</p>
+        )}
+        {picker(pickError === 'no-chords' ? 'Escolher outro arquivo' : 'Escolher PDF')}
+        {pickErrorText && (
           <p role="alert" className="error">
-            O PDF precisa ter até 10 MB.
+            {pickErrorText}
           </p>
         )}
-        {fileState.status === 'unreadable' && (
-          <p role="alert" className="error">
-            Não foi possível ler este PDF.
-          </p>
-        )}
-      </section>
-    );
-  }
-
-  if (fileState.status === 'reading') {
-    return (
-      <section className="upload">
-        <h1 className="page-title">Nova cifra</h1>
-        <p role="status" className="status">
-          Lendo PDF…
-        </p>
-      </section>
-    );
-  }
-
-  if (fileState.status === 'no-chords') {
-    return (
-      <section className="upload">
-        <h1 className="page-title">Nova cifra</h1>
-        <div role="alert" className="banner banner-error">
-          <strong>✕ Não encontramos acordes neste PDF.</strong>
-          <p>
-            Os acordes precisam estar em negrito, numa linha acima da letra. PDF escaneado ou imagem
-            não funciona.
-          </p>
-        </div>
-        {picker('Escolher outro arquivo')}
       </section>
     );
   }
@@ -265,6 +269,17 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
       {fileState.suspects.length > 0 && (
         <p role="status" className="banner banner-warn">
           Confira: não reconhecemos {fileState.suspects.join(', ')} como acorde.
+        </p>
+      )}
+      {reading && (
+        <p role="status" className="status">
+          Lendo PDF…
+        </p>
+      )}
+      {noChords}
+      {pickErrorText && (
+        <p role="alert" className="error">
+          {pickErrorText}
         </p>
       )}
       {picker('Escolher outro arquivo')}
@@ -290,6 +305,7 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
             aria-invalid={attempted && titleError ? true : undefined}
             aria-describedby={attempted && titleError ? 'up-title-err' : undefined}
             onChange={(e) => {
+              clearSaveError();
               setTitle(e.target.value);
               setFromPdf((f) => ({ ...f, title: false }));
             }}
@@ -315,6 +331,7 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
             aria-invalid={attempted && artistError ? true : undefined}
             aria-describedby={attempted && artistError ? 'up-artist-err' : undefined}
             onChange={(e) => {
+              clearSaveError();
               setArtist(e.target.value);
               setFromPdf((f) => ({ ...f, artist: false }));
             }}
@@ -335,6 +352,7 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           type="button"
           className="link-btn"
           onClick={() => {
+            clearSaveError();
             setTitle(artist);
             setArtist(title);
             setFromPdf((f) => ({ ...f, title: f.artist, artist: f.title }));
@@ -351,6 +369,7 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           <div className="key-row">
             <select
               id="up-key"
+              ref={keyRef}
               className="input"
               value={key}
               aria-invalid={attempted && keyError ? true : undefined}
@@ -378,6 +397,7 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
                     if (minor === mode.value) return;
                     setMinor(mode.value);
                     editKey('');
+                    keyRef.current?.focus();
                   }}
                 >
                   {mode.label}

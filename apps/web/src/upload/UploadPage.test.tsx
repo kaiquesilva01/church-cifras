@@ -239,4 +239,41 @@ describe('UploadPage', () => {
     pick();
     expect(await screen.findByText('Não foi possível ler este PDF.')).toBeInTheDocument();
   });
+
+  it('keeps the filled form when a second file is too big', async () => {
+    setup();
+    pick();
+    await screen.findByLabelText('Música');
+    pick('big.pdf', 10 * 1024 * 1024 + 1);
+    expect(await screen.findByText('O PDF precisa ter até 10 MB.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Música')).toHaveValue('Sonda-me');
+  });
+
+  it('keeps the filled form when a second file cannot be read', async () => {
+    const { readPdf } = setup();
+    pick();
+    await screen.findByLabelText('Música');
+    vi.mocked(readPdf).mockRejectedValueOnce(new Error('x'));
+    pick('b.pdf');
+    expect(await screen.findByText('Não foi possível ler este PDF.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Música')).toHaveValue('Sonda-me');
+  });
+
+  it('clears the save error when a field is edited', async () => {
+    setup({ api: { createSongWithArrangement: vi.fn(() => Promise.reject(new Error('boom'))) } });
+    pick();
+    fireEvent.click(await enabledButton('Salvar cifra'));
+    await screen.findByText('Não foi possível salvar. Tente de novo.');
+    fireEvent.change(screen.getByLabelText('Música'), { target: { value: 'Outra' } });
+    expect(screen.queryByText('Não foi possível salvar. Tente de novo.')).not.toBeInTheDocument();
+  });
+
+  it('moves focus to the key select when the mode clears the key', async () => {
+    setup();
+    pick();
+    await screen.findByLabelText('Música');
+    fireEvent.click(screen.getByRole('button', { name: 'Menor' }));
+    expect(screen.getByLabelText('Tom')).toHaveFocus();
+    expect(screen.getByLabelText('Tom')).toHaveValue('');
+  });
 });
