@@ -5,7 +5,7 @@ import { defineString } from 'firebase-functions/params';
 import * as functionsV1 from 'firebase-functions/v1';
 import { onCall } from 'firebase-functions/v2/https';
 import { buildHealth } from './health';
-import { parseAdminEmails } from './roles';
+import { parseAdminEmails, ROLES } from './roles';
 import { changeUserRole, createUserProfile, type UserDeps } from './users';
 
 if (getApps().length === 0) initializeApp();
@@ -19,6 +19,10 @@ const deps: UserDeps = {
     await getFirestore().doc(`users/${uid}`).set(data, { merge });
   },
   userExists: async (uid) => (await getFirestore().doc(`users/${uid}`).get()).exists,
+  getUserRole: async (uid) => {
+    const role = (await getFirestore().doc(`users/${uid}`).get()).data()?.role;
+    return ROLES.find((r) => r === role);
+  },
   now: () => new Date(),
 };
 
@@ -33,6 +37,7 @@ export const onUserCreated = functionsV1
       {
         uid: user.uid,
         email: user.email,
+        emailVerified: user.emailVerified,
         displayName: user.displayName,
         photoURL: user.photoURL,
       },

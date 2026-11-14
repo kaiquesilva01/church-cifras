@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import type { Role } from './roles';
 import { changeUserRole, createUserProfile, type UserDeps } from './users';
 
 const NOW = new Date('2026-11-14T12:00:00Z');
 
-function fakeDeps(exists = true) {
+function fakeDeps(exists = true, existingRole?: Role) {
   const claims: Array<[string, { role: string }]> = [];
   const writes: Array<[string, Record<string, unknown>, boolean]> = [];
   const deps: UserDeps = {
     setClaims: async (uid, c) => void claims.push([uid, c]),
     writeUser: async (uid, data, merge) => void writes.push([uid, data, merge]),
     userExists: async () => exists,
+    getUserRole: async () => existingRole,
     now: () => NOW,
   };
   return { deps, claims, writes };
@@ -20,7 +22,7 @@ describe('createUserProfile', () => {
     const { deps, claims, writes } = fakeDeps();
     const role = await createUserProfile(
       deps,
-      { uid: 'u1', email: 'a@x.com', displayName: 'A', photoURL: 'p' },
+      { uid: 'u1', email: 'a@x.com', emailVerified: true, displayName: 'A', photoURL: 'p' },
       ['admin@cifras.local'],
     );
     expect(role).toBe('viewer');
@@ -36,17 +38,44 @@ describe('createUserProfile', () => {
 
   it('creates admin profile for admin email', async () => {
     const { deps, claims, writes } = fakeDeps();
-    const role = await createUserProfile(deps, { uid: 'u9', email: 'Admin@Cifras.local' }, [
-      'admin@cifras.local',
-    ]);
+    const role = await createUserProfile(
+      deps,
+      { uid: 'u9', email: 'Admin@Cifras.local', emailVerified: true },
+      ['admin@cifras.local'],
+    );
     expect(role).toBe('admin');
     expect(claims).toEqual([['u9', { role: 'admin' }]]);
     expect(writes[0]?.[1]).toMatchObject({ role: 'admin' });
   });
 });
 
+describe('createUserProfile guards', () => {
+  it('does not grant admin to unverified email', async () => {
+    const { deps, claims } = fakeDeps();
+    const role = await createUserProfile(
+      deps,
+      { uid: 'u9', email: 'admin@cifras.local', emailVerified: false },
+      ['admin@cifras.local'],
+    );
+    expect(role).toBe('viewer');
+    expect(claims).toEqual([['u9', { role: 'viewer' }]]);
+  });
+
+  it('does not overwrite an existing profile', async () => {
+    const { deps, claims, writes } = fakeDeps(true, 'member');
+    const role = await createUserProfile(
+      deps,
+      { uid: 'u1', email: 'a@x.com', emailVerified: true },
+      [],
+    );
+    expect(role).toBe('member');
+    expect(claims).toHaveLength(0);
+    expect(writes).toHaveLength(0);
+  });
+});
+
 describe('createUserProfile retries', () => {
-  const user = { uid: 'u1', email: 'a@x.com' };
+  const user = { uid: 'u1', email: 'a@x.com', emailVerified: true };
 
   it('retries setClaims before writing profile', async () => {
     const { deps, writes } = fakeDeps();

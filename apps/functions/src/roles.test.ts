@@ -10,9 +10,13 @@ describe('parseAdminEmails', () => {
 
 describe('roleForNewUser', () => {
   it('matches admin emails case-insensitively', () => {
-    expect(roleForNewUser(' Admin@Cifras.local ', ['admin@cifras.local'])).toBe('admin');
-    expect(roleForNewUser('other@x.com', ['admin@cifras.local'])).toBe('viewer');
-    expect(roleForNewUser(undefined, ['admin@cifras.local'])).toBe('viewer');
+    expect(roleForNewUser(' Admin@Cifras.local ', true, ['admin@cifras.local'])).toBe('admin');
+    expect(roleForNewUser('other@x.com', true, ['admin@cifras.local'])).toBe('viewer');
+    expect(roleForNewUser(undefined, true, ['admin@cifras.local'])).toBe('viewer');
+  });
+
+  it('does not grant admin to unverified email', () => {
+    expect(roleForNewUser('admin@cifras.local', false, ['admin@cifras.local'])).toBe('viewer');
   });
 });
 

@@ -5,6 +5,7 @@ export type UserDeps = {
   setClaims(uid: string, claims: { role: Role }): Promise<void>;
   writeUser(uid: string, data: Record<string, unknown>, merge: boolean): Promise<void>;
   userExists(uid: string): Promise<boolean>;
+  getUserRole(uid: string): Promise<Role | undefined>;
   now(): Date;
 };
 
@@ -25,10 +26,19 @@ async function setClaimsWithRetry(deps: UserDeps, uid: string, role: Role): Prom
 
 export async function createUserProfile(
   deps: UserDeps,
-  user: { uid: string; email?: string; displayName?: string; photoURL?: string },
+  user: {
+    uid: string;
+    email?: string;
+    emailVerified?: boolean;
+    displayName?: string;
+    photoURL?: string;
+  },
   adminEmails: string[],
 ): Promise<Role> {
-  const role = roleForNewUser(user.email, adminEmails);
+  // Evento duplicado não pode rebaixar quem já foi promovido.
+  const existing = await deps.getUserRole(user.uid);
+  if (existing) return existing;
+  const role = roleForNewUser(user.email, user.emailVerified === true, adminEmails);
   await setClaimsWithRetry(deps, user.uid, role);
   await deps.writeUser(
     user.uid,

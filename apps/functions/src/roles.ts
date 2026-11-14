@@ -10,8 +10,12 @@ export function parseAdminEmails(raw: string | undefined): string[] {
     .filter((e) => e.length > 0);
 }
 
-export function roleForNewUser(email: string | undefined, adminEmails: string[]): Role {
-  if (!email) return 'viewer';
+export function roleForNewUser(
+  email: string | undefined,
+  emailVerified: boolean,
+  adminEmails: string[],
+): Role {
+  if (!email || emailVerified !== true) return 'viewer';
   return adminEmails.includes(email.trim().toLowerCase()) ? 'admin' : 'viewer';
 }
 
