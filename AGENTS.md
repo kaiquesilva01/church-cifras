@@ -70,6 +70,7 @@ Um plano por fase da §11 do spec.
 
 - `docker compose up --build` — sobe web (5173), functions (build watch) e emuladores (UI 4000).
 - `docker compose down` — encerra o ambiente local.
+- Comandos npm no host exigem Node 22 + Java 21; ou rode dentro do contêiner: `docker compose exec emulators npm test`.
 - `npm test` — testes de todos os workspaces.
 - `npm run lint` — ESLint.
 - `npm run typecheck` — TypeScript.

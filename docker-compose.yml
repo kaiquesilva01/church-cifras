@@ -22,8 +22,16 @@ services:
     <<: *dev
     command: >
       sh -c "until [ -f apps/functions/lib/index.js ]; do sleep 1; done;
-      npx firebase emulators:start --project demo-church-cifras
+      exec node_modules/.bin/firebase emulators:start --project demo-church-cifras
       --import=./emulator-data --export-on-exit=./emulator-data"
+    stop_grace_period: 30s
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/functions/node_modules
+      - /app/tests/node_modules
+      - firebase-emulator-cache:/root/.cache/firebase/emulators
     ports:
       - '4000:4000'
       - '9099:9099'
@@ -43,3 +51,6 @@ services:
       - '5173:5173'
     depends_on:
       - emulators
+
+volumes:
+  firebase-emulator-cache: {}
