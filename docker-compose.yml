@@ -11,7 +11,9 @@ x-dev: &dev
     - /app/node_modules
     - /app/apps/web/node_modules
     - /app/apps/functions/node_modules
+    - /app/packages/chords/node_modules
     - /app/tests/node_modules
+    - firebase-emulator-cache:/root/.cache/firebase/emulators
 
 services:
   functions:
@@ -25,13 +27,6 @@ services:
       exec node_modules/.bin/firebase emulators:start --project demo-church-cifras
       --import=./emulator-data --export-on-exit=./emulator-data"
     stop_grace_period: 30s
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/apps/web/node_modules
-      - /app/apps/functions/node_modules
-      - /app/tests/node_modules
-      - firebase-emulator-cache:/root/.cache/firebase/emulators
     ports:
       - '4000:4000'
       - '9099:9099'
