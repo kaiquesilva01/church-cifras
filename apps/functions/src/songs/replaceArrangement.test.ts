@@ -9,8 +9,14 @@ function setup(
     source: 'generated',
     storagePath: 'songs/s1/Fs-old.pdf',
   },
-  opts: { fileExists?: boolean; deleteFails?: boolean } = {},
+  opts: {
+    fileExists?: boolean;
+    deleteFails?: boolean;
+    owner?: string | null;
+    vanishes?: boolean;
+  } = {},
 ) {
+  let checks = 0;
   const writes: Array<[string, string, Record<string, unknown>]> = [];
   const deleted: string[] = [];
   const deps: ReplaceDeps = {
@@ -25,7 +31,12 @@ function setup(
       if (opts.deleteFails) throw new Error('boom');
       deleted.push(path);
     },
-    fileExists: async () => opts.fileExists ?? true,
+    fileExists: async () => {
+      checks += 1;
+      if (opts.vanishes && checks > 1) return false;
+      return opts.fileExists ?? true;
+    },
+    getFileOwner: async () => (opts.owner === undefined ? 'u1' : opts.owner),
     now: () => NOW,
   };
   return { deps, writes, deleted };
@@ -115,6 +126,25 @@ describe('replaceArrangement', () => {
       code: 'invalid-argument',
     });
     expect(writes).toEqual([]);
+  });
+
+  it("rejects replacing with someone else's file", async () => {
+    for (const owner of ['u2', null]) {
+      const { deps, writes } = setup(undefined, { owner });
+      await expect(replaceArrangement(deps, input)).rejects.toMatchObject({
+        code: 'permission-denied',
+      });
+      expect(writes).toEqual([]);
+    }
+  });
+
+  it('logs when the new file vanished after the transaction', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { deps, writes } = setup(undefined, { vanishes: true });
+    await expect(replaceArrangement(deps, input)).resolves.toEqual({ songId: 's1', key: 'F#' });
+    expect(writes).toHaveLength(1);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('vanished'), NEW_PATH);
+    error.mockRestore();
   });
 
   it('keeps going when old file delete fails', async () => {

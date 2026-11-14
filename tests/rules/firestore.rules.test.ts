@@ -154,21 +154,62 @@ describe('firestore.rules', () => {
     await assertSucceeds(batch.commit());
   });
 
-  it('allows admin to create song and generated arrangement', async () => {
+  const seedArrangement = (slug: string, data: Record<string, unknown>) =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `songs/s1/arrangements/${slug}`), data);
+    });
+
+  const generatedData = (over: Record<string, unknown> = {}) =>
+    arrData({
+      key: 'F#m',
+      storagePath: 'songs/s1/Fsm-a_b-1.pdf',
+      source: 'generated',
+      derivedFromKey: 'Am',
+      writer: 'overlay',
+      ...over,
+    });
+
+  it('allows generated derived from an existing handmade of the same mode', async () => {
+    await seedArrangement('Am', { key: 'Am', source: 'handmade' });
     const db = env.authenticatedContext('m1', { role: 'admin' }).firestore();
-    const batch = writeBatch(db);
-    batch.set(doc(db, 'songs/n1'), songData());
-    batch.set(
-      doc(db, 'songs/n1/arrangements/Fsm'),
-      arrData({
-        key: 'F#m',
-        storagePath: 'songs/n1/Fsm-a_b-1.pdf',
-        source: 'generated',
-        derivedFromKey: 'Am',
-        writer: 'overlay',
-      }),
+    await assertSucceeds(setDoc(doc(db, 'songs/s1/arrangements/Fsm'), generatedData()));
+  });
+
+  it('allows generated derived from a sharp handmade key', async () => {
+    await seedArrangement('Cs', { key: 'C#', source: 'handmade' });
+    const db = memberDb();
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'songs/s1/arrangements/D'),
+        generatedData({ key: 'D', storagePath: 'songs/s1/D-a.pdf', derivedFromKey: 'C#' }),
+      ),
     );
-    await assertSucceeds(batch.commit());
+  });
+
+  it('denies generated derived from a generated key', async () => {
+    await seedArrangement('Am', { key: 'Am', source: 'generated' });
+    const db = memberDb();
+    await assertFails(setDoc(doc(db, 'songs/s1/arrangements/Fsm'), generatedData()));
+  });
+
+  it('denies generated derived from a missing key', async () => {
+    const db = memberDb();
+    await assertFails(setDoc(doc(db, 'songs/s1/arrangements/Fsm'), generatedData()));
+  });
+
+  it('denies generated with a different mode', async () => {
+    await seedArrangement('C', { key: 'C', source: 'handmade' });
+    const db = memberDb();
+    await assertFails(
+      setDoc(doc(db, 'songs/s1/arrangements/Fsm'), generatedData({ derivedFromKey: 'C' })),
+    );
+    await seedArrangement('Am', { key: 'Am', source: 'handmade' });
+    await assertFails(
+      setDoc(
+        doc(db, 'songs/s1/arrangements/F'),
+        generatedData({ key: 'F', storagePath: 'songs/s1/F-a.pdf', derivedFromKey: 'Am' }),
+      ),
+    );
   });
 
   it('allows member to add a key to an existing song', async () => {
