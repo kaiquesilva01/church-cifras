@@ -5,7 +5,8 @@
   "version": "0.0.0",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "tests"
   ],
   "engines": {
     "node": ">=22"
@@ -16,12 +17,14 @@
     "test": "npm run test --workspaces --if-present",
     "test:harness": "node --test \".claude/**/*.test.mjs\"",
     "build": "npm run build --workspaces --if-present",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-church-cifras \"npm run test:rules -w @cifras/tests\""
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "eslint": "10.15.0",
     "eslint-plugin-react-hooks": "7.1.1",
+    "firebase-tools": "15.36.0",
     "globals": "17.14.0",
     "prettier": "3.10.1",
     "typescript": "6.0.3",
