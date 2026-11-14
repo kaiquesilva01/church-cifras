@@ -8,6 +8,7 @@ import { onCall } from 'firebase-functions/v2/https';
 import { requireRole } from './auth/requireRole';
 import { buildHealth } from './health';
 import { parseAdminEmails, ROLES } from './roles';
+import { discardUpload as discardUploadLogic, type DiscardDeps } from './songs/discardUpload';
 import {
   replaceArrangement as replaceArrangementLogic,
   type ReplaceDeps,
@@ -84,6 +85,30 @@ export const replaceArrangement = onCall({ region: REGION }, async (request) => 
     storagePath: data.storagePath,
     chordCount: data.chordCount,
   });
+});
+
+const discardDeps: DiscardDeps = {
+  getUploader: async (path) => {
+    const file = getStorage().bucket().file(path);
+    if (!(await file.exists())[0]) return 'missing' as const;
+    const [metadata] = await file.getMetadata();
+    const uploadedBy = metadata.metadata?.uploadedBy;
+    return { uploadedBy: typeof uploadedBy === 'string' ? uploadedBy : undefined };
+  },
+  isReferenced: async (songId, slug, path) => {
+    const data = (await getFirestore().doc(`songs/${songId}/arrangements/${slug}`).get()).data();
+    return data?.storagePath === path;
+  },
+  deleteFile: async (path) => {
+    await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
+  },
+};
+
+export const discardUpload = onCall({ region: REGION }, async (request) => {
+  const uid = request.auth?.uid;
+  await requireRole(deps, uid, ['member', 'admin']);
+  const data = (request.data ?? {}) as Record<string, unknown>;
+  return discardUploadLogic(discardDeps, { uid: uid as string, storagePath: data.storagePath });
 });
 
 export const setUserRole = onCall({ region: REGION }, async (request) => {

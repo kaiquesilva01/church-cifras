@@ -49,7 +49,7 @@ export async function replaceArrangement(
   }
 
   if (!(await deps.fileExists(storagePath))) {
-    throw new HttpsError('failed-precondition', 'Uploaded file not found.');
+    throw new HttpsError('invalid-argument', 'Uploaded file not found.');
   }
 
   const result = await deps.replaceIfGenerated(songId, slug, {

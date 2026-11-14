@@ -42,7 +42,11 @@ describe('storage.rules', () => {
     await assertFails(getBytes(ref(storage, 'songs/s1/original.pdf')));
   });
 
-  const pdf = { contentType: 'application/pdf' };
+  const pdfFor = (uid: string) => ({
+    contentType: 'application/pdf',
+    customMetadata: { uploadedBy: uid },
+  });
+  const pdf = pdfFor('m1');
   const one = new Uint8Array([1]);
 
   it('allows member to upload pdf under songs', async () => {
@@ -52,17 +56,25 @@ describe('storage.rules', () => {
 
   it('allows admin to upload pdf under songs', async () => {
     const storage = env.authenticatedContext('a1', { role: 'admin' }).storage();
-    await assertSucceeds(uploadBytes(ref(storage, 'songs/s1/Fsm-admin1.pdf'), one, pdf));
+    await assertSucceeds(uploadBytes(ref(storage, 'songs/s1/Fsm-admin1.pdf'), one, pdfFor('a1')));
+  });
+
+  it('denies upload without or with someone else as uploadedBy', async () => {
+    const storage = env.authenticatedContext('m1', { role: 'member' }).storage();
+    await assertFails(
+      uploadBytes(ref(storage, 'songs/s1/H-nometa.pdf'), one, { contentType: 'application/pdf' }),
+    );
+    await assertFails(uploadBytes(ref(storage, 'songs/s1/H-other.pdf'), one, pdfFor('someone')));
   });
 
   it('denies viewer upload', async () => {
     const storage = env.authenticatedContext('u1', { role: 'viewer' }).storage();
-    await assertFails(uploadBytes(ref(storage, 'songs/s1/D-viewer.pdf'), one, pdf));
+    await assertFails(uploadBytes(ref(storage, 'songs/s1/D-viewer.pdf'), one, pdfFor('u1')));
   });
 
   it('denies upload without role claim and unauthenticated', async () => {
     const noRole = env.authenticatedContext('u1').storage();
-    await assertFails(uploadBytes(ref(noRole, 'songs/s1/D-norole.pdf'), one, pdf));
+    await assertFails(uploadBytes(ref(noRole, 'songs/s1/D-norole.pdf'), one, pdfFor('u1')));
     const anon = env.unauthenticatedContext().storage();
     await assertFails(uploadBytes(ref(anon, 'songs/s1/D-anon.pdf'), one, pdf));
   });
@@ -70,14 +82,16 @@ describe('storage.rules', () => {
   it('denies non-pdf', async () => {
     const storage = env.authenticatedContext('m1', { role: 'member' }).storage();
     await assertFails(
-      uploadBytes(ref(storage, 'songs/s1/E-text.pdf'), one, { contentType: 'text/plain' }),
+      uploadBytes(ref(storage, 'songs/s1/E-text.pdf'), one, { ...pdf, contentType: 'text/plain' }),
     );
     await assertFails(uploadBytes(ref(storage, 'songs/s1/E-none.pdf'), one));
   });
 
-  it('denies files over 10 MB', async () => {
+  it('allows exactly 10 MB and denies above', async () => {
     const storage = env.authenticatedContext('m1', { role: 'member' }).storage();
-    const big = new Uint8Array(10 * 1024 * 1024);
+    const limit = new Uint8Array(10 * 1024 * 1024);
+    await assertSucceeds(uploadBytes(ref(storage, 'songs/s1/G-limit.pdf'), limit, pdf));
+    const big = new Uint8Array(10 * 1024 * 1024 + 1);
     await assertFails(uploadBytes(ref(storage, 'songs/s1/G-big.pdf'), big, pdf));
   });
 

@@ -112,7 +112,7 @@ describe('replaceArrangement', () => {
   it('rejects missing file', async () => {
     const { deps, writes } = setup(undefined, { fileExists: false });
     await expect(replaceArrangement(deps, input)).rejects.toMatchObject({
-      code: 'failed-precondition',
+      code: 'invalid-argument',
     });
     expect(writes).toEqual([]);
   });
