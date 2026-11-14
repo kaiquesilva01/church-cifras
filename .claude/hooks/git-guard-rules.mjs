@@ -48,21 +48,51 @@ export function splitSegments(command) {
 
 const block = (reason) => ({ allow: false, reason });
 
-function checkCommit(branch, stagedFiles) {
+// Branch efetiva desconhecida (ex.: depois de `git checkout <caminho>` no mesmo comando).
+const UNKNOWN = '<desconhecida>';
+
+const unknownBranchBlock = () =>
+  block(
+    'Não foi possível determinar a branch após `git checkout`; ' +
+      'rode o checkout em um comando separado e só então faça commit/push.'
+  );
+
+const pdfBlock = (files) =>
+  block(
+    `Nunca commite arquivos PDF (repositório público, letras protegidas por direitos autorais): ${files.join(', ')}. ` +
+      'Remova do stage com `git restore --staged <arquivo>` e adicione o padrão ao .gitignore.'
+  );
+
+const isPdf = (f) => /\.pdf$/i.test(f);
+
+// Argumentos de `git add`/`git commit` que são caminhos (ignora flags e valores de -m/-F/etc.).
+function pathArgs(args) {
+  const valueFlags = ['--message', '--file', '--author', '--date', '--reuse-message', '--reedit-message'];
+  const paths = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (valueFlags.includes(a) || /^-[a-zA-Z]*[mFcC]$/.test(a)) i++; // consome o valor
+    else if (!a.startsWith('-')) paths.push(a);
+  }
+  return paths;
+}
+
+function checkPdfPaths(args) {
+  const pdfs = pathArgs(args).filter(isPdf);
+  return pdfs.length ? pdfBlock(pdfs) : null;
+}
+
+function checkCommit(args, branch, stagedFiles) {
+  if (branch === UNKNOWN) return unknownBranchBlock();
   if (isProtected(branch)) {
     return block(
       `Commit direto em "${branch}" é proibido. Crie uma branch a partir do develop: ` +
         '`git checkout -b <tipo>/<nome> origin/develop` e commite nela.'
     );
   }
-  const pdfs = stagedFiles.filter((f) => /\.pdf$/i.test(f));
-  if (pdfs.length) {
-    return block(
-      `Nunca commite arquivos PDF (repositório público, letras protegidas por direitos autorais): ${pdfs.join(', ')}. ` +
-        'Remova do stage com `git restore --staged <arquivo>` e adicione o padrão ao .gitignore.'
-    );
-  }
-  return null;
+  const staged = stagedFiles.filter(isPdf);
+  if (staged.length) return pdfBlock(staged);
+  return checkPdfPaths(args);
 }
 
 // Destino do refspec: após o último ":", sem "+" inicial e sem "refs/heads/".
@@ -76,7 +106,9 @@ function checkPush(args, branch) {
   const refspecs = positional.slice(1); // primeiro posicional é o remote
   const targets = refspecs.length ? refspecs.map(refspecDestination) : ['HEAD'];
   for (const t of targets) {
-    const dest = t === 'HEAD' || t === '' ? branch : t;
+    const implicit = t === 'HEAD' || t === '';
+    if (implicit && branch === UNKNOWN) return unknownBranchBlock();
+    const dest = implicit ? branch : t;
     if (isProtected(dest)) {
       return block(
         `Push para "${dest}" é proibido. Publique sua branch de feature ` +
@@ -107,6 +139,7 @@ function checkPrCreate(args, branch) {
   }
   if (base === 'main') {
     const head = optionValue(args, ['--head', '-H']) ?? branch;
+    if (head === UNKNOWN) return unknownBranchBlock();
     if (head !== 'develop') {
       return block(
         `PR para main só pode vir do develop (head atual: "${head}"). ` +
@@ -117,36 +150,53 @@ function checkPrCreate(args, branch) {
   return null;
 }
 
-// Pula opções globais do git (-C <dir>, -c <k=v>, --git-dir, --work-tree, ...)
-// e devolve [subcomando, argumentos restantes].
-function parseGitArgs(args) {
+// Pula flags iniciais; `valueFlags` consomem o argumento seguinte.
+// Devolve [primeiro não-flag, argumentos restantes].
+function skipLeadingFlags(args, valueFlags) {
   let i = 0;
-  while (i < args.length && args[i].startsWith('-')) {
-    const a = args[i];
-    const takesValue = a === '-C' || a === '-c' || a === '--git-dir' || a === '--work-tree';
-    i += takesValue ? 2 : 1;
-  }
+  while (i < args.length && args[i].startsWith('-')) i += valueFlags.includes(args[i]) ? 2 : 1;
   return [args[i], args.slice(i + 1)];
+}
+
+const parseGitArgs = (args) => skipLeadingFlags(args, ['-C', '-c', '--git-dir', '--work-tree']);
+
+// Primeiro argumento não-flag antes de `--` (ou undefined). "-" (branch anterior) conta como alvo.
+function firstTarget(args) {
+  for (const a of args) {
+    if (a === '--') return undefined;
+    if (!a.startsWith('-') || a === '-') return a;
+  }
+  return undefined;
+}
+
+// Atualiza a branch efetiva após checkout/switch.
+function trackBranch(sub, args, state) {
+  const createFlags = sub === 'checkout' ? ['-b', '-B'] : ['-c', '-C', '--create', '--force-create'];
+  const i = args.findIndex((a) => createFlags.includes(a));
+  if (i !== -1 && args[i + 1]) {
+    state.branch = args[i + 1];
+    return;
+  }
+  const target = firstTarget(args);
+  if (target === undefined) return; // ex.: `git checkout -- arquivo`
+  if (sub === 'switch') state.branch = target === '-' ? UNKNOWN : target;
+  else state.branch = isProtected(target) ? target : UNKNOWN;
 }
 
 function checkGit(tokens, state, stagedFiles) {
   const [sub, rest] = parseGitArgs(tokens.slice(1));
   if (!sub) return null;
 
-  if (sub === 'commit') return checkCommit(state.branch, stagedFiles);
+  if (sub === 'commit') return checkCommit(rest, state.branch, stagedFiles);
   if (sub === 'push') return checkPush(rest, state.branch);
-
-  if (sub === 'checkout' || sub === 'switch') {
-    const createFlags = sub === 'checkout' ? ['-b', '-B'] : ['-c', '-C', '--create', '--force-create'];
-    const i = rest.findIndex((a) => createFlags.includes(a));
-    if (i !== -1 && rest[i + 1]) state.branch = rest[i + 1];
-    else if (rest[0] && !rest[0].startsWith('-')) state.branch = rest[0];
-  }
+  if (sub === 'add') return checkPdfPaths(rest);
+  if (sub === 'checkout' || sub === 'switch') trackBranch(sub, rest, state);
   return null;
 }
 
 function checkGh(tokens, state) {
-  const [, area, action, ...args] = tokens;
+  const [area, afterArea] = skipLeadingFlags(tokens.slice(1), ['-R', '--repo']);
+  const [action, ...args] = afterArea;
   if (area !== 'pr') return null;
   if (action === 'merge') {
     return block(
@@ -158,22 +208,49 @@ function checkGh(tokens, state) {
   return null;
 }
 
-// Remove atribuições de ambiente iniciais (FOO=1 git commit).
-function skipEnvAssignments(tokens) {
-  let i = 0;
-  while (i < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[i])) i++;
-  return tokens.slice(i);
+const WRAPPERS = new Set([
+  '(', '{', '!', 'then', 'do', 'else', 'elif', 'if', 'while', 'until',
+  'time', 'command', 'env', 'sudo', 'nohup',
+]);
+const SHELLS = new Set(['bash', 'sh', 'zsh', 'pwsh', 'powershell']);
+
+// Remove do início do segmento: atribuições de ambiente, palavras-chave/wrappers e "(" coladas.
+function stripPrefixes(tokens) {
+  const out = [...tokens];
+  while (out.length) {
+    out[0] = out[0].replace(/^\(+/, '');
+    if (out[0] === '' || WRAPPERS.has(out[0]) || /^[A-Za-z_][A-Za-z0-9_]*=/.test(out[0])) out.shift();
+    else break;
+  }
+  return out;
 }
 
-export function evaluateCommand({ command, branch, stagedFiles = [] }) {
-  const state = { branch };
+// "/usr/bin/git" -> "git"; "C:\Git\git.EXE" -> "git".
+const programName = (token) => token.split(/[\\/]/).pop().replace(/\.exe$/i, '');
+
+// Código inline de `bash -c "..."` / `pwsh -Command "..."`, se houver.
+function inlineScript(tokens) {
+  const i = tokens.findIndex((t) => /^-(c|command)$/i.test(t));
+  return i !== -1 ? tokens[i + 1] : undefined;
+}
+
+function evaluateSegments(command, state, stagedFiles) {
   for (const segment of splitSegments(command)) {
-    const tokens = skipEnvAssignments(segment);
-    const program = tokens[0];
+    const tokens = stripPrefixes(segment);
+    if (!tokens.length) continue;
+    const program = programName(tokens[0]);
     let result = null;
     if (program === 'git') result = checkGit(tokens, state, stagedFiles);
     else if (program === 'gh') result = checkGh(tokens, state);
+    else if (SHELLS.has(program)) {
+      const script = inlineScript(tokens);
+      if (script) result = evaluateSegments(script, state, stagedFiles);
+    }
     if (result) return result;
   }
-  return { allow: true };
+  return null;
+}
+
+export function evaluateCommand({ command, branch, stagedFiles = [] }) {
+  return evaluateSegments(command, { branch }, stagedFiles) ?? { allow: true };
 }
