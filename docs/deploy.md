@@ -22,7 +22,9 @@ Cloud Functions exige o plano Blaze (pago conforme o uso, com cota gratuita). Em
 ### APIs do Google Cloud
 
 Para publicar Functions, as seguintes APIs precisam estar ativas: Cloud Functions, Cloud Build, Artifact Registry, Cloud Run e Eventarc (a API de Firebase Extensions não é necessária).
-O primeiro `firebase deploy` pode pedir para ativá-las. Recomendado: rodar um deploy manual uma vez (`npx firebase deploy --project <id>`) ou ativar as APIs pelo console (APIs e serviços > Biblioteca).
+O primeiro deploy pode pedir para ativá-las. Recomendado: ativar as APIs pelo console (APIs e serviços > Biblioteca) ou rodar um deploy manual **apenas de Functions** uma vez: `npx firebase deploy --only functions --project <id>`.
+
+> **Atenção:** nunca faça deploy do Hosting a partir de um build local (`firebase deploy` sem `--only`, ou `--only hosting`). O build de produção precisa das variáveis `VITE_FIREBASE_*` e `VITE_USE_EMULATORS=false` definidas pela CI; um build local pode publicar o site apontando para os emuladores ou com configuração errada. O Hosting só é publicado pelo workflow de deploy.
 
 ### Domínios autorizados
 
