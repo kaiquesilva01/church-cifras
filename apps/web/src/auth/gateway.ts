@@ -9,7 +9,7 @@ import {
 import { doc, onSnapshot } from 'firebase/firestore';
 import type { FirebaseServices } from '../lib/firebase';
 import type { AuthGateway } from './AuthProvider';
-import { isRole, type Role } from './roles';
+import { isRole } from './roles';
 
 export function createAuthGateway({ auth, db }: FirebaseServices): AuthGateway {
   return {
