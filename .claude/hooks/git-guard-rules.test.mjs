@@ -213,6 +213,18 @@ test('blocks mutating gh api calls', () => {
     'gh api graphql --input q.json',
     'echo ok && gh api repos/o/r/issues/1/comments -f body=x',
     'bash -c "gh api repos/o/r/pulls/3/merge -X PUT"',
+    '/usr/bin/gh api repos/o/r/pulls/5/merge -X PUT',
+    'C:\\gh\\gh.exe api repos/o/r/pulls/5/merge -X PUT',
+    'gh.EXE api repos/o/r/pulls/5/merge -X PUT',
+    '"gh" api repos/o/r/pulls/5/merge -X PUT',
+    '& "C:\\Program Files\\GitHub CLI\\gh.exe" api repos/o/r/pulls/5/merge -X PUT',
+    'gh api repos/o/r/merges -f base=main -f head=develop -t graphql',
+    'gh api repos/o/r/merges -f base=main --jq graphql',
+    'gh api graphql -F query=@m.graphql',
+    'gh api graphql -f query=@m.graphql',
+    'gh api -iX PUT repos/o/r/pulls/3/merge',
+    'gh api -iXPUT repos/o/r/pulls/3/merge',
+    'gh api -if base=main repos/o/r/pulls/3',
   ]) {
     const r = merge(c, () => 'develop');
     assert.equal(r.allow, false, c);

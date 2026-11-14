@@ -327,7 +327,7 @@ function checkMerge(args, state, leadingRepo) {
 // segmentos, então o texto é varrido direto). Aspas agrupam; `;`, `|`, `&` e quebra de linha terminam.
 function apiInvocations(command) {
   const calls = [];
-  const re = /(?:^|[\s;|&(){}"'])gh(?:\.exe)?\s+(?:-\S+\s+)*api(?=\s|$)/g;
+  const re = /(?:^|[\s;|&(){}"'\/])gh(?:\.exe)?["']?\s+(?:-\S+\s+)*api(?=\s|$)/gi;
   for (let m; (m = re.exec(command)); ) {
     const tokens = [];
     let cur = '';
@@ -358,21 +358,36 @@ function apiInvocations(command) {
   return calls;
 }
 
-const API_FIELD = /^(-[fF].*|--field(=.*)?|--raw-field(=.*)?|--input(=.*)?)$/;
+const API_FIELD = /^(-i*[fF].*|--field(=.*)?|--raw-field(=.*)?|--input(=.*)?)$/;
+const API_VALUE_FLAGS = [
+  '-H', '--header', '-q', '--jq', '-t', '--template', '-X', '--method', '-f', '-F',
+  '--field', '--raw-field', '--input', '--cache', '--hostname', '-p', '--preview',
+];
+
+// Endpoint: primeiro posicional depois de `api`, ignorando flags e os valores delas.
+function apiEndpoint(tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (API_VALUE_FLAGS.includes(t)) i++;
+    else if (!t.startsWith('-')) return t;
+  }
+  return null;
+}
 
 // `gh api` só para leitura: método GET, sem campos (que fazem o gh usar POST) e sem --input.
-// Exceção: graphql sem `mutation` aceita -f/-F (consultas usam POST com campos).
+// Exceção: endpoint graphql sem `mutation` e sem `@arquivo` aceita -f/-F (consultas usam POST com campos).
 function apiMutates(tokens, command) {
-  const graphql = tokens.includes('graphql');
+  const graphql =
+    apiEndpoint(tokens) === 'graphql' && !/mutation/i.test(command) && !tokens.some((t) => /=@/.test(t));
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
     let method;
-    if (t === '-X' || t === '--method') method = tokens[i + 1];
+    if (t === '--method') method = tokens[i + 1];
     else if (t.startsWith('--method=')) method = t.slice(9);
-    else if (t.startsWith('-X')) method = t.slice(2);
+    else if (/^-i*X/.test(t)) method = t.replace(/^-i*X/, '') || tokens[i + 1];
     if (method !== undefined && method.toUpperCase() !== 'GET') return true;
     if (/^--input(=|$)/.test(t)) return true;
-    if (API_FIELD.test(t) && !(graphql && !/mutation/i.test(command))) return true;
+    if (API_FIELD.test(t) && !graphql) return true;
   }
   return false;
 }
@@ -395,6 +410,11 @@ function checkGh(tokens, state) {
     i += t === '-R' || t === '--repo' ? 2 : 1;
   }
   const [area, action, ...args] = tokens.slice(i);
+  if (area === 'api') {
+    return apiMutates(tokens.slice(i + 1), state.command)
+      ? block('`gh api` só é permitido para leitura (GET); para PRs use `gh pr ...`.')
+      : null;
+  }
   if (area !== 'pr') return null;
   if (action === 'merge') return checkMerge(args, state, leadingRepo);
   if (action === 'edit' && optionValue(args, ['--base', '-B']) === 'main') {
