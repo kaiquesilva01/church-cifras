@@ -1,15 +1,25 @@
-import { httpsCallable } from 'firebase/functions';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import { createFirebase, type WebEnv } from './lib/firebase';
+import { createAuthGateway } from './auth/gateway';
+import { readWebEnv } from './lib/env';
+import { createFirebase } from './lib/firebase';
+import { createPeopleApi } from './people/peopleApi';
+import './ui/styles.css';
 
-const { functions } = createFirebase(import.meta.env as unknown as WebEnv);
-const health = httpsCallable<unknown, { status: string }>(functions, 'health');
-const callHealth = async () => (await health()).data;
+const root = createRoot(document.getElementById('root')!);
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App callHealth={callHealth} />
-  </StrictMode>,
-);
+try {
+  const env = readWebEnv(import.meta.env as Record<string, string | undefined>);
+  const services = createFirebase(env);
+  const gateway = createAuthGateway(services);
+  const peopleApi = createPeopleApi(services);
+  root.render(
+    <StrictMode>
+      <App gateway={gateway} peopleApi={peopleApi} />
+    </StrictMode>,
+  );
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  root.render(<p role="alert">{message}</p>);
+}

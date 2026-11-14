@@ -3,6 +3,7 @@ dist/
 coverage/
 .env
 .env.*
+!apps/functions/.env.demo-church-cifras
 !.env.example
 !.env.docker
 *.log

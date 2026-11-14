@@ -29,10 +29,11 @@ jobs:
           VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
         run: |
           total=0
           missing=""
-          for name in FIREBASE_PROJECT_ID FIREBASE_SERVICE_ACCOUNT VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_STORAGE_BUCKET VITE_FIREBASE_APP_ID; do
+          for name in FIREBASE_PROJECT_ID FIREBASE_SERVICE_ACCOUNT VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_STORAGE_BUCKET VITE_FIREBASE_APP_ID ADMIN_EMAILS; do
             total=$((total + 1))
             if [ -z "${!name}" ]; then
               missing="$missing $name"
@@ -47,6 +48,9 @@ jobs:
             exit 1
           elif [ "$VITE_FIREBASE_PROJECT_ID" != "$FIREBASE_PROJECT_ID" ]; then
             echo "::error::VITE_FIREBASE_PROJECT_ID difere de FIREBASE_PROJECT_ID"
+            exit 1
+          elif [[ "$ADMIN_EMAILS" == *[$'\r\n"'\''#\=']* ]]; then
+            echo "::error::ADMIN_EMAILS contém caractere inválido (quebra de linha, aspas, #, \ ou =); use apenas e-mails separados por vírgula"
             exit 1
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
@@ -85,4 +89,7 @@ jobs:
         if: steps.config.outputs.configured == 'true'
         env:
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
-        run: npx firebase deploy --only hosting,functions,firestore,storage --project "$FIREBASE_PROJECT_ID" --non-interactive --force
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+        run: |
+          printf 'ADMIN_EMAILS=%s\n' "$ADMIN_EMAILS" > "apps/functions/.env.$FIREBASE_PROJECT_ID"
+          npx firebase deploy --only hosting,functions,firestore,storage --project "$FIREBASE_PROJECT_ID" --non-interactive --force

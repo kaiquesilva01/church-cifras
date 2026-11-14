@@ -1,21 +1,20 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
+import { createFakeGateway } from './test/fakeGateway';
+import type { PeopleApi } from './people/peopleApi';
+
+const peopleApi: PeopleApi = {
+  listUsers: () => Promise.resolve([]),
+  setRole: () => Promise.resolve(),
+};
 
 describe('App', () => {
-  it('renders app title', async () => {
-    render(<App callHealth={() => Promise.resolve({ status: 'ok' })} />);
+  it('shows nothing but a loading state until session resolves, then login', () => {
+    const gateway = createFakeGateway();
+    render(<App gateway={gateway} peopleApi={peopleApi} initialPath="/" />);
+    expect(screen.getByText('Carregando…')).toBeInTheDocument();
+    act(() => gateway.emitUser(null));
     expect(screen.getByText('Cifras · Louvor')).toBeInTheDocument();
-    await screen.findByText('Servidor: ok');
-  });
-
-  it('shows backend status from health', async () => {
-    render(<App callHealth={() => Promise.resolve({ status: 'ok' })} />);
-    expect(await screen.findByText('Servidor: ok')).toBeInTheDocument();
-  });
-
-  it('shows offline when health fails', async () => {
-    render(<App callHealth={() => Promise.reject(new Error('down'))} />);
-    expect(await screen.findByText('Servidor: indisponível')).toBeInTheDocument();
   });
 });
