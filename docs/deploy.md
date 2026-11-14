@@ -1,0 +1,56 @@
+# Deploy em produção
+
+O deploy roda sozinho no GitHub Actions a cada push em `main` (ou manualmente em Actions > Deploy > Run workflow).
+Enquanto a configuração abaixo não existir, o workflow termina com sucesso e mostra o aviso
+`Deploy ignorado: configure FIREBASE_PROJECT_ID e FIREBASE_SERVICE_ACCOUNT`.
+
+## 1. Criar o projeto Firebase
+
+1. Acesse o [console do Firebase](https://console.firebase.google.com/) e crie um projeto (ex.: `church-cifras`).
+2. Anote o **ID do projeto**.
+
+## 2. Ativar o plano Blaze
+
+Cloud Functions exige o plano Blaze (pago conforme o uso, com cota gratuita). Em **Uso e faturamento**, altere o plano para Blaze.
+
+## 3. Ativar os serviços
+
+- **Authentication**: Build > Authentication > Começar > provedor **Google**.
+- **Firestore**: Build > Firestore Database > Criar banco de dados, região **`southamerica-east1`** (São Paulo).
+- **Storage**: Build > Storage > Começar (use a mesma região, `southamerica-east1`).
+
+## 4. Criar o app Web
+
+1. Em Configurações do projeto > Seus apps, adicione um app **Web**.
+2. Copie os valores de `firebaseConfig`.
+
+## 5. Variáveis do GitHub (`vars`)
+
+No repositório: Settings > Secrets and variables > Actions > aba **Variables**. Crie:
+
+| Variável | Valor |
+| --- | --- |
+| `FIREBASE_PROJECT_ID` | ID do projeto |
+| `VITE_FIREBASE_API_KEY` | `apiKey` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `authDomain` |
+| `VITE_FIREBASE_PROJECT_ID` | `projectId` |
+| `VITE_FIREBASE_STORAGE_BUCKET` | `storageBucket` |
+| `VITE_FIREBASE_APP_ID` | `appId` |
+
+Esses valores não são segredos (vão para o site publicado).
+
+## 6. Service account (`secrets`)
+
+1. No Google Cloud Console do projeto: IAM e administrador > Contas de serviço > Criar conta de serviço.
+2. Conceda os papéis **Firebase Admin**, **Cloud Functions Admin** e **Service Account User**.
+3. Em Chaves > Adicionar chave > JSON, baixe o arquivo.
+4. No GitHub, aba **Secrets**, crie `FIREBASE_SERVICE_ACCOUNT` com o **conteúdo inteiro** do JSON.
+5. Apague o arquivo JSON local. Nunca o commite.
+
+## 7. Administradores (Fase 2)
+
+Defina `ADMIN_EMAILS` (lista de e-mails separados por vírgula dos administradores). Ele só é usado a partir da Fase 2; nesta fase pode ficar para depois.
+
+## 8. Publicar
+
+Faça o PR `develop` -> `main` e aprove o merge. O workflow **Deploy** publica hosting, functions, regras do Firestore e regras do Storage.
