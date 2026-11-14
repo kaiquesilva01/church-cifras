@@ -17,9 +17,9 @@ try {
     .filter(Boolean);
 
   // Chamado só quando há `gh pr merge`; qualquer falha -> null (o guard bloqueia).
-  const resolvePrBase = (target) => {
+  const resolvePrBase = (target, repo) => {
     try {
-      const args = ['pr', 'view', ...(target ? [target] : []), '--json', 'baseRefName', '-q', '.baseRefName'];
+      const args = ['pr', 'view', ...(target ? [target] : []), ...(repo ? ['-R', repo] : []), '--json', 'baseRefName', '-q', '.baseRefName'];
       const out = execFileSync('gh', args, {
         cwd,
         encoding: 'utf8',

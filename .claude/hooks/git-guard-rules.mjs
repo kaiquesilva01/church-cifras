@@ -2,7 +2,7 @@
 // sob o fluxo de branches do projeto. Sem dependências, sem I/O.
 //
 // evaluateCommand({ command, branch, stagedFiles, resolvePrBase }) devolve
-// (resolvePrBase(alvo) -> base do PR ou null; injetado pelo entrypoint, só chamado em `gh pr merge`):
+// (resolvePrBase(alvo, repo) -> base do PR ou null; injetado pelo entrypoint, só chamado em `gh pr merge`):
 //   { allow: false, reason }     comando bloqueado;
 //   { allow: true, reminder }    permitido, com lembrete (ex.: `gh pr create` -> rodar testes);
 //   { allow: true }              permitido.
@@ -270,23 +270,46 @@ function checkGit(tokens, state, stagedFiles) {
 }
 
 const MERGE_VALUE_FLAGS = [
-  '--subject', '-t', '--body', '-b', '--body-file', '-F', '--match-head-commit', '-R', '--repo',
+  '--subject', '-t', '--body', '-b', '--body-file', '-F', '--match-head-commit',
+  '--author-email', '-A', '-R', '--repo',
 ];
 
-// Alvo do `gh pr merge` (número, URL ou branch): primeiro posicional, ignorando flags e seus valores.
-function mergeTarget(args) {
+// Argumentos de `gh pr merge`: { positionals, repo } ignorando flags, seus valores e redirecionamentos.
+function parseMergeArgs(args) {
+  const positionals = [];
+  let repo = null;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (MERGE_VALUE_FLAGS.includes(a)) i++;
-    else if (!a.startsWith('-')) return a;
+    if (a === '-R' || a === '--repo') repo = args[++i] ?? repo;
+    else if (a.startsWith('--repo=')) repo = a.slice(7);
+    else if (MERGE_VALUE_FLAGS.includes(a)) i++;
+    else if (/^\d*[<>]/.test(a)) {
+      if (/^\d*[<>]+$/.test(a)) i++; // `> arquivo`: o próximo token é o destino
+    } else if (!a.startsWith('-')) positionals.push(a);
   }
-  return null;
+  return { positionals, repo };
 }
 
 // Merge só para PRs com base develop (fail closed: base desconhecida bloqueia).
-function checkMerge(args, state) {
-  const target = mergeTarget(args);
-  const base = state.resolvePrBase(target);
+function checkMerge(args, state, leadingRepo) {
+  if (/\bGH_REPO\b/.test(state.command)) {
+    return block('Não use GH_REPO com `gh pr merge`: defina o repositório com -R <dono/repo>.');
+  }
+  if (++state.merges > 1) {
+    return block('Faça um merge por comando: rode cada `gh pr merge` separadamente.');
+  }
+  const { positionals, repo } = parseMergeArgs(args);
+  if (positionals.length > 1) {
+    return block('`gh pr merge` com mais de um alvo: informe apenas um PR (`gh pr merge <n> --squash --delete-branch`).');
+  }
+  const target = positionals[0] ?? null;
+  if (target === null) {
+    return block(
+      'Sem alvo explícito o PR depende da branch/diretório atual: informe o número do PR: ' +
+        '`gh pr merge <n> --squash --delete-branch`.'
+    );
+  }
+  const base = state.resolvePrBase(target, repo ?? leadingRepo);
   if (base === 'develop') return null;
   if (base === 'main') {
     return block(
@@ -295,15 +318,37 @@ function checkMerge(args, state) {
   }
   return block(
     'Não foi possível determinar a base do PR; merge bloqueado. ' +
-      `Confira com \`gh pr view ${target ?? '<n>'} --json baseRefName\` e só faça merge de PRs com base develop.`
+      `Confira com \`gh pr view ${target} --json baseRefName\` e só faça merge de PRs com base develop.`
   );
 }
 
+const BASE_FIELD_FLAGS = ['-f', '-F', '--field', '--raw-field'];
+
+// `gh api` que faz merge de PR ou muda a base de um PR contorna `gh pr merge`.
+function checkApi(args) {
+  const merges = args.some((a) => /\/pulls\/\d+\/merge\b/.test(a));
+  const setsBase = args.some((a) => /\/pulls\/\d+\/?$/.test(a)) &&
+    args.some((a, i) => (BASE_FIELD_FLAGS.includes(args[i - 1]) && a.startsWith('base=')) ||
+      /^(--field|--raw-field)=base=/.test(a));
+  if (merges || setsBase) {
+    return block('`gh api` não pode fazer merge nem trocar a base de PR: use `gh pr merge <n>` (e `gh pr create --base`).');
+  }
+  return null;
+}
+
 function checkGh(tokens, state) {
-  const [area, afterArea] = skipLeadingFlags(tokens.slice(1), ['-R', '--repo']);
-  const [action, ...args] = afterArea;
+  let i = 1;
+  let leadingRepo = null;
+  while (i < tokens.length && tokens[i].startsWith('-')) {
+    const t = tokens[i];
+    if (t === '-R' || t === '--repo') leadingRepo = tokens[i + 1] ?? null;
+    else if (t.startsWith('--repo=')) leadingRepo = t.slice(7);
+    i += t === '-R' || t === '--repo' ? 2 : 1;
+  }
+  const [area, action, ...args] = tokens.slice(i);
+  if (area === 'api') return checkApi(tokens.slice(i + 1));
   if (area !== 'pr') return null;
-  if (action === 'merge') return checkMerge(args, state);
+  if (action === 'merge') return checkMerge(args, state, leadingRepo);
   if (action === 'edit' && optionValue(args, ['--base', '-B']) === 'main') {
     return block(
       'Base main só via PR develop → main criado com `gh pr create --base main --head develop`; ' +
@@ -366,7 +411,7 @@ const PR_REMINDER =
   'e confirme que passam antes de abrir o PR.';
 
 export function evaluateCommand({ command, branch, stagedFiles = [], resolvePrBase = () => null }) {
-  const state = { branch, prCreate: false, resolvePrBase };
+  const state = { branch, prCreate: false, resolvePrBase, command, merges: 0 };
   const blocked = evaluateSegments(command, state, stagedFiles);
   if (blocked) return blocked;
   return state.prCreate ? { allow: true, reminder: PR_REMINDER } : { allow: true };

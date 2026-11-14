@@ -127,15 +127,84 @@ test('blocks merge with -R when base main', () => {
   assert.ok(r.reason.includes('humana'), r.reason);
 });
 
-test('passes null target when merge has no positional', () => {
-  let received = 'unset';
-  const r = merge('gh pr merge --squash', (t) => ((received = t), 'develop'));
-  assert.equal(r.allow, true);
-  assert.equal(received, null);
+test('blocks merge without explicit target', () => {
+  for (const c of ['gh pr merge --squash', 'git checkout develop; gh pr merge --squash', 'git switch develop && gh pr merge --merge', 'cd ../wt && gh pr merge --squash']) {
+    let called = false;
+    const r = merge(c, () => ((called = true), 'develop'));
+    assert.equal(r.allow, false, c);
+    assert.ok(r.reason.includes('informe o número do PR'), r.reason);
+    assert.equal(called, false);
+  }
 });
 
 test('skips flag values when finding the merge target', () => {
   let received;
   merge('gh pr merge --subject "x y" -b body --match-head-commit abc -R o/r 7 --auto', (t) => ((received = t), 'develop'));
   assert.equal(received, '7');
+});
+
+const target = (command) => {
+  let got = 'unset';
+  const r = merge(command, (t, repo) => ((got = [t, repo]), 'develop'));
+  return { r, got };
+};
+
+test('author-email flag value is not the target', () => {
+  assert.deepEqual(target('gh pr merge -A x 7').got, ['7', null]);
+  assert.deepEqual(target('gh pr merge --author-email x 7').got, ['7', null]);
+});
+
+test('blocks merge with more than one target', () => {
+  const { r } = target('gh pr merge 7 5');
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('mais de um alvo'), r.reason);
+});
+
+test('passes repo to resolver', () => {
+  assert.deepEqual(target('gh -R o/r pr merge 7').got, ['7', 'o/r']);
+  assert.deepEqual(target('gh pr merge 7 -R o/r').got, ['7', 'o/r']);
+  assert.deepEqual(target('gh pr merge 7 --repo=o/r').got, ['7', 'o/r']);
+  assert.deepEqual(target('gh --repo o/r pr merge 7').got, ['7', 'o/r']);
+});
+
+test('blocks merge with GH_REPO', () => {
+  for (const c of ['GH_REPO=o/r gh pr merge 7', '$env:GH_REPO="o/r"; gh pr merge 7']) {
+    const { r } = target(c);
+    assert.equal(r.allow, false, c);
+    assert.ok(r.reason.includes('-R'), r.reason);
+  }
+});
+
+test('url, branch and =-form targets', () => {
+  assert.equal(target('gh pr merge https://github.com/o/r/pull/9').got[0], 'https://github.com/o/r/pull/9');
+  assert.equal(target('gh pr merge feat/x').got[0], 'feat/x');
+  assert.equal(target('gh pr merge --subject=foo 7').got[0], '7');
+});
+
+test('redirects are not the target', () => {
+  assert.equal(target('gh pr merge 3 --squash 2>&1').got[0], '3');
+  assert.equal(target('gh pr merge 3 >out.txt').got[0], '3');
+  assert.equal(target('gh pr merge 3 > out.txt').got[0], '3');
+});
+
+test('blocks more than one merge per command', () => {
+  const r = merge('gh pr merge 1 && gh pr merge 2', () => 'develop');
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('um merge por comando'), r.reason);
+});
+
+test('blocks gh api merge and base change', () => {
+  for (const c of [
+    'gh api -X PUT repos/o/r/pulls/3/merge',
+    'gh api repos/o/r/pulls/3/merge -f merge_method=squash',
+    'gh api -X PATCH repos/o/r/pulls/3 -f base=main',
+    'gh api repos/o/r/pulls/3 -X PATCH --field base=main',
+    'gh api repos/o/r/pulls/3 --raw-field base=main',
+    'gh api repos/o/r/pulls/3 -F base=main',
+  ]) {
+    const r = merge(c, () => 'develop');
+    assert.equal(r.allow, false, c);
+    assert.ok(r.reason.includes('gh pr merge <n>'), r.reason);
+  }
+  assert.equal(merge('gh api repos/o/r/pulls/3', () => null).allow, true);
 });

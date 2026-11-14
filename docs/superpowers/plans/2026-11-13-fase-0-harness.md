@@ -14,6 +14,7 @@
 
 - Nenhum commit direto em `main` ou `develop`. Features saem de `develop` e abrem PR para `develop`. Apenas `develop` abre PR para `main`.
 - Sem proteção de branches no GitHub: a regra vive no `AGENTS.md` e é imposta aos agentes pelo hook.
+- Atualização 2026-11-13: merge de PR para develop passou a ser feito pelo orquestrador após aprovação do code-reviewer; PR para main continua só humano (ver AGENTS.md).
 - Repositório **público**: nunca commitar PDFs reais, credenciais, `.env`, service accounts, `.superpowers/`.
 - Escrita de código: **Sonnet 5.5, effort `medium`** (`model: sonnet`, `effort: medium` nos agentes `frontend-dev`, `backend-dev`, `qa`).
 - Mensagens de commit: Conventional Commits em inglês, terminando com `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (ou o modelo que de fato escreveu).
