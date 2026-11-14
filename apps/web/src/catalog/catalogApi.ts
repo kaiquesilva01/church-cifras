@@ -64,6 +64,16 @@ function newFileId(): string {
   return crypto.randomUUID().replace(/-/g, '');
 }
 
+export class ArrangementExistsError extends Error {
+  constructor() {
+    super('Esse tom acabou de ser salvo por outra pessoa.');
+    this.name = 'ArrangementExistsError';
+  }
+}
+
+const errorCode = (error: unknown): unknown =>
+  typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
+
 export function createCatalogApi({ auth, db, storage, functions }: FirebaseServices): CatalogApi {
   const callReplace = httpsCallable<
     { songId: string; key: KeyName; storagePath: string; chordCount: number },
@@ -110,7 +120,8 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
     getArrangement: async (songId, key) => {
       const snap = await getDoc(doc(db, 'songs', songId, 'arrangements', keySlug(key)));
       if (!snap.exists()) return null;
-      return { source: snap.data().source === 'generated' ? 'generated' : 'handmade' };
+      const source: unknown = snap.data().source;
+      return source === 'generated' || source === 'handmade' ? { source } : null;
     },
     newSongId: () => doc(collection(db, 'songs')).id,
     uploadPdf: async (songId, key, file) => {
@@ -187,6 +198,14 @@ export async function saveUpload(
     return { songId, key: plan.key };
   } catch (error) {
     await api.deleteFile(storagePath).catch(() => undefined);
+    const code = errorCode(error);
+    if (plan.action === 'replace-generated') {
+      if (code === 'functions/failed-precondition') throw new ArrangementExistsError();
+    } else if (code === 'permission-denied') {
+      // Segundo membro no mesmo tom: o create do arrangement é negado pelas regras.
+      const existing = await api.getArrangement(songId, plan.key).catch(() => null);
+      if (existing) throw new ArrangementExistsError();
+    }
     throw error;
   }
 }

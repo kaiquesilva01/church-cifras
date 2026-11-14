@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { saveUpload, type CatalogApi } from './catalogApi';
+import { ArrangementExistsError, saveUpload, type CatalogApi } from './catalogApi';
 import type { UploadPlan } from './types';
 
 function fakeApi(overrides: Partial<CatalogApi> = {}): CatalogApi {
@@ -75,5 +75,39 @@ describe('saveUpload', () => {
     await expect(
       saveUpload(api, { ...base, action: 'replace-generated', songId: 's9' }),
     ).rejects.toBe(boom);
+  });
+
+  it('throws ArrangementExistsError when another person saved the key first', async () => {
+    const denied = Object.assign(new Error('denied'), { code: 'permission-denied' });
+    for (const action of ['new-song', 'add-key'] as const) {
+      const api = fakeApi({
+        createSongWithArrangement: vi.fn(() => Promise.reject(denied)),
+        addArrangement: vi.fn(() => Promise.reject(denied)),
+        getArrangement: vi.fn(() => Promise.resolve({ source: 'handmade' as const })),
+      });
+      const plan: UploadPlan =
+        action === 'new-song'
+          ? { ...base, action, title: 'T', artistName: 'A' }
+          : { ...base, action, songId: 's9' };
+      await expect(saveUpload(api, plan)).rejects.toBeInstanceOf(ArrangementExistsError);
+      expect(api.deleteFile).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('rethrows permission-denied when the arrangement does not exist', async () => {
+    const denied = Object.assign(new Error('denied'), { code: 'permission-denied' });
+    const api = fakeApi({ addArrangement: vi.fn(() => Promise.reject(denied)) });
+    await expect(saveUpload(api, { ...base, action: 'add-key', songId: 's9' })).rejects.toBe(
+      denied,
+    );
+  });
+
+  it('maps callable failed-precondition to ArrangementExistsError', async () => {
+    const pre = Object.assign(new Error('handmade'), { code: 'functions/failed-precondition' });
+    const api = fakeApi({ replaceArrangement: vi.fn(() => Promise.reject(pre)) });
+    await expect(
+      saveUpload(api, { ...base, action: 'replace-generated', songId: 's9' }),
+    ).rejects.toBeInstanceOf(ArrangementExistsError);
+    expect(api.deleteFile).toHaveBeenCalledTimes(1);
   });
 });
