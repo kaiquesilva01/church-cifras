@@ -282,9 +282,10 @@ function parseMergeArgs(args) {
     const a = args[i];
     if (a === '-R' || a === '--repo') repo = args[++i] ?? repo;
     else if (a.startsWith('--repo=')) repo = a.slice(7);
+    else if (/^-R./.test(a)) repo = a.slice(2);
     else if (MERGE_VALUE_FLAGS.includes(a)) i++;
-    else if (/^\d*[<>]/.test(a)) {
-      if (/^\d*[<>]+$/.test(a)) i++; // `> arquivo`: o próximo token é o destino
+    else if (/^[\d*]*[<>]/.test(a)) {
+      if (/^[\d*]*[<>]+$/.test(a)) i++; // `> arquivo`: o próximo token é o destino
     } else if (!a.startsWith('-')) positionals.push(a);
   }
   return { positionals, repo };
@@ -322,16 +323,63 @@ function checkMerge(args, state, leadingRepo) {
   );
 }
 
-const BASE_FIELD_FLAGS = ['-f', '-F', '--field', '--raw-field'];
+// Tokens de uma invocação de `gh api` no texto cru (as chaves de `{owner}/{repo}` quebram os
+// segmentos, então o texto é varrido direto). Aspas agrupam; `;`, `|`, `&` e quebra de linha terminam.
+function apiInvocations(command) {
+  const calls = [];
+  const re = /(?:^|[\s;|&(){}"'])gh(?:\.exe)?\s+(?:-\S+\s+)*api(?=\s|$)/g;
+  for (let m; (m = re.exec(command)); ) {
+    const tokens = [];
+    let cur = '';
+    let has = false;
+    let quote = null;
+    for (let i = m.index + m[0].length; i < command.length; i++) {
+      const c = command[i];
+      if (quote) {
+        if (c === quote) quote = null;
+        else cur += c;
+      } else if (c === '"' || c === "'") {
+        quote = c;
+        has = true;
+      } else if (/[;|&\n\r]/.test(c)) {
+        break;
+      } else if (/\s/.test(c)) {
+        if (has) tokens.push(cur);
+        cur = '';
+        has = false;
+      } else {
+        cur += c;
+        has = true;
+      }
+    }
+    if (has) tokens.push(cur);
+    calls.push(tokens);
+  }
+  return calls;
+}
 
-// `gh api` que faz merge de PR ou muda a base de um PR contorna `gh pr merge`.
-function checkApi(args) {
-  const merges = args.some((a) => /\/pulls\/\d+\/merge\b/.test(a));
-  const setsBase = args.some((a) => /\/pulls\/\d+\/?$/.test(a)) &&
-    args.some((a, i) => (BASE_FIELD_FLAGS.includes(args[i - 1]) && a.startsWith('base=')) ||
-      /^(--field|--raw-field)=base=/.test(a));
-  if (merges || setsBase) {
-    return block('`gh api` não pode fazer merge nem trocar a base de PR: use `gh pr merge <n>` (e `gh pr create --base`).');
+const API_FIELD = /^(-[fF].*|--field(=.*)?|--raw-field(=.*)?|--input(=.*)?)$/;
+
+// `gh api` só para leitura: método GET, sem campos (que fazem o gh usar POST) e sem --input.
+// Exceção: graphql sem `mutation` aceita -f/-F (consultas usam POST com campos).
+function apiMutates(tokens, command) {
+  const graphql = tokens.includes('graphql');
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    let method;
+    if (t === '-X' || t === '--method') method = tokens[i + 1];
+    else if (t.startsWith('--method=')) method = t.slice(9);
+    else if (t.startsWith('-X')) method = t.slice(2);
+    if (method !== undefined && method.toUpperCase() !== 'GET') return true;
+    if (/^--input(=|$)/.test(t)) return true;
+    if (API_FIELD.test(t) && !(graphql && !/mutation/i.test(command))) return true;
+  }
+  return false;
+}
+
+function checkApi(command) {
+  if (apiInvocations(command).some((tokens) => apiMutates(tokens, command))) {
+    return block('`gh api` só é permitido para leitura (GET); para PRs use `gh pr ...`.');
   }
   return null;
 }
@@ -343,10 +391,10 @@ function checkGh(tokens, state) {
     const t = tokens[i];
     if (t === '-R' || t === '--repo') leadingRepo = tokens[i + 1] ?? null;
     else if (t.startsWith('--repo=')) leadingRepo = t.slice(7);
+    else if (/^-R./.test(t)) leadingRepo = t.slice(2);
     i += t === '-R' || t === '--repo' ? 2 : 1;
   }
   const [area, action, ...args] = tokens.slice(i);
-  if (area === 'api') return checkApi(tokens.slice(i + 1));
   if (area !== 'pr') return null;
   if (action === 'merge') return checkMerge(args, state, leadingRepo);
   if (action === 'edit' && optionValue(args, ['--base', '-B']) === 'main') {
@@ -412,7 +460,7 @@ const PR_REMINDER =
 
 export function evaluateCommand({ command, branch, stagedFiles = [], resolvePrBase = () => null }) {
   const state = { branch, prCreate: false, resolvePrBase, command, merges: 0 };
-  const blocked = evaluateSegments(command, state, stagedFiles);
+  const blocked = checkApi(command) ?? evaluateSegments(command, state, stagedFiles);
   if (blocked) return blocked;
   return state.prCreate ? { allow: true, reminder: PR_REMINDER } : { allow: true };
 }

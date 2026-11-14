@@ -193,18 +193,51 @@ test('blocks more than one merge per command', () => {
   assert.ok(r.reason.includes('um merge por comando'), r.reason);
 });
 
-test('blocks gh api merge and base change', () => {
+const API_REASON = 'só é permitido para leitura';
+
+test('blocks mutating gh api calls', () => {
   for (const c of [
     'gh api -X PUT repos/o/r/pulls/3/merge',
+    'gh api repos/{owner}/{repo}/pulls/5/merge -X PUT',
+    'gh api repos/o/r/pulls/3/merge -XPUT',
+    'gh api repos/o/r/pulls/3 --method=patch',
+    'gh api repos/o/r/pulls/3 --method POST',
     'gh api repos/o/r/pulls/3/merge -f merge_method=squash',
-    'gh api -X PATCH repos/o/r/pulls/3 -f base=main',
-    'gh api repos/o/r/pulls/3 -X PATCH --field base=main',
-    'gh api repos/o/r/pulls/3 --raw-field base=main',
+    'gh api repos/o/r/pulls/3 -fbase=main',
     'gh api repos/o/r/pulls/3 -F base=main',
+    'gh api repos/o/r/pulls/3 --field base=main',
+    'gh api repos/o/r/pulls/3 --raw-field=base=main',
+    'gh api repos/o/r/merges -f base=main -f head=develop',
+    'gh api repos/o/r/pulls/3 --input b.json',
+    `gh api graphql -f query='mutation { mergePullRequest(input: {pullRequestId: "x"}) { clientMutationId } }'`,
+    'gh api graphql --input q.json',
+    'echo ok && gh api repos/o/r/issues/1/comments -f body=x',
+    'bash -c "gh api repos/o/r/pulls/3/merge -X PUT"',
   ]) {
     const r = merge(c, () => 'develop');
     assert.equal(r.allow, false, c);
-    assert.ok(r.reason.includes('gh pr merge <n>'), r.reason);
+    assert.ok(r.reason.includes(API_REASON), r.reason);
   }
-  assert.equal(merge('gh api repos/o/r/pulls/3', () => null).allow, true);
+});
+
+test('allows read-only gh api calls', () => {
+  for (const c of [
+    'gh api repos/o/r/pulls/3',
+    'gh api repos/{owner}/{repo}/pulls/3/files',
+    'gh api -X GET repos/o/r/pulls',
+    'gh api --method=get repos/o/r/pulls',
+    `gh api graphql -f query='query { viewer { login } }'`,
+    'gh api repos/o/r/pulls/3 --jq .title | cat',
+  ]) {
+    assert.equal(merge(c, () => null).allow, true, c);
+  }
+});
+
+test('star redirect is not the target', () => {
+  assert.equal(target('gh pr merge 3 --squash *>&1').got[0], '3');
+});
+
+test('glued -R repo', () => {
+  assert.deepEqual(target('gh pr merge 7 -Ro/r').got, ['7', 'o/r']);
+  assert.deepEqual(target('gh -Ro/r pr merge 7').got, ['7', 'o/r']);
 });
