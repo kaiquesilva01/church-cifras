@@ -2,7 +2,8 @@
 
 O deploy roda sozinho no GitHub Actions a cada push em `main` (ou manualmente em Actions > Deploy > Run workflow).
 Enquanto a configuração abaixo não existir, o workflow termina com sucesso e mostra o aviso
-`Deploy ignorado: configure FIREBASE_PROJECT_ID e FIREBASE_SERVICE_ACCOUNT`.
+`Deploy ignorado: produção ainda não configurada (docs/deploy.md)`.
+Se apenas parte da configuração existir (alguma variável ou segredo faltando), o workflow **falha** listando o que falta.
 
 ## 1. Criar o projeto Firebase
 
@@ -15,9 +16,9 @@ Cloud Functions exige o plano Blaze (pago conforme o uso, com cota gratuita). Em
 
 ## 3. Ativar os serviços
 
-- **Authentication**: Build > Authentication > Começar > provedor **Google**.
+- **Authentication**: Build > Authentication > Começar > provedor **Google**. Mantenha o provedor **Anonymous** (anônimo) **desativado**: as regras tratam qualquer usuário autenticado como leitor, então o login anônimo daria acesso de leitura a qualquer pessoa.
 - **Firestore**: Build > Firestore Database > Criar banco de dados, região **`southamerica-east1`** (São Paulo).
-- **Storage**: Build > Storage > Começar (use a mesma região, `southamerica-east1`).
+- **Storage**: Build > Storage > Começar (use a mesma região, `southamerica-east1`). Atenção: um bucket em `southamerica-east1` fica fora da cota gratuita do Storage; o custo é irrisório para PDFs.
 
 ### APIs do Google Cloud
 
@@ -47,8 +48,9 @@ No repositório: Settings > Secrets and variables > Actions > aba **Variables**.
 | `VITE_FIREBASE_PROJECT_ID` | `projectId` |
 | `VITE_FIREBASE_STORAGE_BUCKET` | `storageBucket` |
 | `VITE_FIREBASE_APP_ID` | `appId` |
+| `ADMIN_EMAILS` | e-mails dos administradores, separados por vírgula (ex.: `a@igreja.org,b@igreja.org`) |
 
-Esses valores não são segredos (vão para o site publicado).
+Esses valores não são segredos (os `VITE_*` vão para o site publicado; `ADMIN_EMAILS` é gravado em `apps/functions/.env.<projectId>` durante o deploy). A comparação de e-mails ignora maiúsculas.
 
 ## 6. Service account (`secrets`)
 
@@ -58,9 +60,9 @@ Esses valores não são segredos (vão para o site publicado).
 4. No GitHub, aba **Secrets**, crie `FIREBASE_SERVICE_ACCOUNT` com o **conteúdo inteiro** do JSON.
 5. Apague o arquivo JSON local. Nunca o commite.
 
-## 7. Administradores (Fase 2)
+## 7. Administradores
 
-`ADMIN_EMAILS` será uma variável de repositório do GitHub (`vars.ADMIN_EMAILS`), com e-mails separados por vírgula. O workflow de deploy a gravará em `apps/functions/.env.<projectId>` no momento do deploy (implementado na Fase 2). Nesta fase pode ficar para depois.
+Defina `ADMIN_EMAILS` como variável do repositório (seção 5). O workflow de deploy a grava em `apps/functions/.env.<projectId>` antes de publicar as Functions. Quem entra com um desses e-mails no primeiro login vira Admin; os demais entram como Visitante e um admin altera o papel na página Pessoas. Como `ADMIN_EMAILS` é exigida pela checagem, configuração parcial faz o deploy falhar.
 
 ## 8. Publicar
 

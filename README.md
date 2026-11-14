@@ -21,3 +21,7 @@ docker compose up --build
 Os dados dos emuladores ficam em `./emulator-data` (importados na subida e exportados ao encerrar). Para parar: `docker compose down`.
 
 Notas: a primeira subida leva ~30–60 s (download dos emuladores, depois em cache) e a função `health` pode levar ~20 s a mais para aparecer. Após mudar o `package-lock.json`, use `docker compose up --build -V` (renova os volumes de `node_modules`).
+
+### Testar login localmente
+
+No popup do emulador de Auth, escolha **Add new account** e use o e-mail `admin@cifras.local` para virar admin. Qualquer outro e-mail entra como Visitante.
