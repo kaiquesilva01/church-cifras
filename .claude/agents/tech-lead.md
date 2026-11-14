@@ -1,7 +1,7 @@
 ---
 name: tech-lead
 description: Líder técnico; use para escrever ou ajustar planos por fase, decidir interfaces entre pacotes e dividir tarefas entre frontend e backend.
-tools: Read, Grep, Glob, Bash, Write, Edit
+tools: Read, Grep, Glob, Bash, Write, Edit, Skill
 model: opus
 ---
 

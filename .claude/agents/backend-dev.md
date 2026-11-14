@@ -1,7 +1,7 @@
 ---
 name: backend-dev
 description: Desenvolvedor backend; use para Cloud Functions, Security Rules, packages/chords e Docker/emuladores, com TDD.
-tools: Read, Grep, Glob, Bash, Write, Edit
+tools: Read, Grep, Glob, Bash, Write, Edit, Skill
 model: sonnet
 effort: medium
 ---

@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 description: Revisor de código; use para revisar cada PR contra o spec, o plano e o AGENTS.md, sem editar arquivos.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, Skill
 model: opus
 ---
 

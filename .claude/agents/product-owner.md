@@ -1,7 +1,7 @@
 ---
 name: product-owner
 description: Guardião do spec e dos critérios de aceite; use para transformar fases em critérios verificáveis e para decidir dúvidas de escopo.
-tools: Read, Grep, Glob, Write, Edit
+tools: Read, Grep, Glob, Write, Edit, Skill
 model: opus
 ---
 

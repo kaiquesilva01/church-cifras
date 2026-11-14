@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Engenheiro de QA; use para testes E2E Playwright contra emuladores, PDFs sintéticos e verificação dos anti-objetivos do spec.
-tools: Read, Grep, Glob, Bash, Write, Edit
+tools: Read, Grep, Glob, Bash, Write, Edit, Skill
 model: sonnet
 effort: medium
 ---

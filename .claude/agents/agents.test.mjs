@@ -61,3 +61,10 @@ test('reviewer cannot edit', () => {
   assert.ok(!/\bWrite\b/.test(fm.tools));
   assert.ok(!/\bEdit\b/.test(fm.tools));
 });
+
+test('agents with tool allowlists can load skills', () => {
+  for (const n of NAMES) {
+    const { fm } = parse(n);
+    if (fm.tools) assert.match(fm.tools, /\bSkill\b/, `${n}: tools sem Skill`);
+  }
+});
