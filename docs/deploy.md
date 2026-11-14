@@ -16,7 +16,7 @@ Cloud Functions exige o plano Blaze (pago conforme o uso, com cota gratuita). Em
 
 ## 3. Ativar os serviços
 
-- **Authentication**: Build > Authentication > Começar > provedor **Google**. Mantenha o provedor **Anonymous** (anônimo) **desativado**: as regras tratam qualquer usuário autenticado como leitor, então o login anônimo daria acesso de leitura a qualquer pessoa.
+- **Authentication**: Build > Authentication > Começar > provedor **Google**. Mantenha **somente** o provedor Google ativo: deixe **E-mail/senha** e **Anonymous** (anônimo) **desativados**. As regras tratam qualquer usuário autenticado como leitor, então o login anônimo daria acesso de leitura a qualquer pessoa; e o papel Admin só é concedido a e-mails verificados, o que o Google garante e o cadastro por e-mail/senha não.
 - **Firestore**: Build > Firestore Database > Criar banco de dados, região **`southamerica-east1`** (São Paulo).
 - **Storage**: Build > Storage > Começar (use a mesma região, `southamerica-east1`). Atenção: um bucket em `southamerica-east1` fica fora da cota gratuita do Storage; o custo é irrisório para PDFs.
 
@@ -62,7 +62,16 @@ Esses valores não são segredos (os `VITE_*` vão para o site publicado; `ADMIN
 
 ## 7. Administradores
 
-Defina `ADMIN_EMAILS` como variável do repositório (seção 5). O workflow de deploy a grava em `apps/functions/.env.<projectId>` antes de publicar as Functions. Quem entra com um desses e-mails no primeiro login vira Admin; os demais entram como Visitante e um admin altera o papel na página Pessoas. Como `ADMIN_EMAILS` é exigida pela checagem, configuração parcial faz o deploy falhar.
+Defina `ADMIN_EMAILS` como variável do repositório (seção 5). O workflow de deploy a grava em `apps/functions/.env.<projectId>` antes de publicar as Functions. Quem entra com um desses e-mails no primeiro login vira Admin; os demais entram como Visitante e um admin altera o papel na página Pessoas. Como `ADMIN_EMAILS` é exigida pela checagem, configuração parcial faz o deploy falhar. O valor não pode conter quebra de linha, aspas, `#`, `\` nem `=`; o workflow rejeita esses caracteres.
+
+`ADMIN_EMAILS` vale **só no primeiro login** de cada pessoa (quando o perfil é criado). Mudar a variável depois não promove nem rebaixa quem já entrou; use a página Pessoas.
+
+### Recuperação sem nenhum admin
+
+Se ninguém tiver o papel Admin (por exemplo, o único admin foi rebaixado), use uma das opções:
+
+- Confirme que o e-mail está em `ADMIN_EMAILS`, apague o usuário em Authentication > Users no console do Firebase, apague também o documento `users/<uid>` no Firestore e entre de novo com Google (o primeiro login cria o perfil como Admin).
+- Ou defina manualmente, pelo console/Admin SDK, o custom claim `role: "admin"` do usuário e o campo `role: "admin"` em `users/<uid>`; depois a pessoa precisa sair e entrar de novo.
 
 ## 8. Publicar
 
