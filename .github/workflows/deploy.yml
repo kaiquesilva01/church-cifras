@@ -39,12 +39,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - uses: actions/setup-java@v4
-        if: steps.config.outputs.configured == 'true'
-        with:
-          distribution: temurin
-          java-version: '21'
-
       - name: Instalar dependências
         if: steps.config.outputs.configured == 'true'
         run: npm ci
@@ -67,4 +61,6 @@ jobs:
 
       - name: Deploy no Firebase
         if: steps.config.outputs.configured == 'true'
-        run: npx firebase deploy --only hosting,functions,firestore,storage --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive --force
+        env:
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: npx firebase deploy --only hosting,functions,firestore,storage --project "$FIREBASE_PROJECT_ID" --non-interactive --force

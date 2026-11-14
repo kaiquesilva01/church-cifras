@@ -19,6 +19,15 @@ Cloud Functions exige o plano Blaze (pago conforme o uso, com cota gratuita). Em
 - **Firestore**: Build > Firestore Database > Criar banco de dados, região **`southamerica-east1`** (São Paulo).
 - **Storage**: Build > Storage > Começar (use a mesma região, `southamerica-east1`).
 
+### APIs do Google Cloud
+
+Para publicar Functions, as seguintes APIs precisam estar ativas: Cloud Functions, Cloud Build, Artifact Registry, Cloud Run e Eventarc (a API de Firebase Extensions não é necessária).
+O primeiro `firebase deploy` pode pedir para ativá-las. Recomendado: rodar um deploy manual uma vez (`npx firebase deploy --project <id>`) ou ativar as APIs pelo console (APIs e serviços > Biblioteca).
+
+### Domínios autorizados
+
+Em Authentication > Settings > **Authorized domains**, adicione o domínio customizado, se houver. `*.web.app` e `*.firebaseapp.com` já vêm por padrão.
+
 ## 4. Criar o app Web
 
 1. Em Configurações do projeto > Seus apps, adicione um app **Web**.
@@ -42,14 +51,14 @@ Esses valores não são segredos (vão para o site publicado).
 ## 6. Service account (`secrets`)
 
 1. No Google Cloud Console do projeto: IAM e administrador > Contas de serviço > Criar conta de serviço.
-2. Conceda os papéis **Firebase Admin**, **Cloud Functions Admin** e **Service Account User**.
+2. Conceda os papéis **Firebase Admin**, **Cloud Functions Admin**, **Service Account User**, **Cloud Build Editor** (`roles/cloudbuild.builds.editor`), **Artifact Registry Administrator** (`roles/artifactregistry.admin`) e **Cloud Run Admin** (`roles/run.admin`). A lista exigida pela documentação do Firebase pode mudar; consulte-a se o deploy falhar por permissão.
 3. Em Chaves > Adicionar chave > JSON, baixe o arquivo.
 4. No GitHub, aba **Secrets**, crie `FIREBASE_SERVICE_ACCOUNT` com o **conteúdo inteiro** do JSON.
 5. Apague o arquivo JSON local. Nunca o commite.
 
 ## 7. Administradores (Fase 2)
 
-Defina `ADMIN_EMAILS` (lista de e-mails separados por vírgula dos administradores). Ele só é usado a partir da Fase 2; nesta fase pode ficar para depois.
+`ADMIN_EMAILS` será uma variável de repositório do GitHub (`vars.ADMIN_EMAILS`), com e-mails separados por vírgula. O workflow de deploy a gravará em `apps/functions/.env.<projectId>` no momento do deploy (implementado na Fase 2). Nesta fase pode ficar para depois.
 
 ## 8. Publicar
 
