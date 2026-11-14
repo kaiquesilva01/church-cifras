@@ -2,6 +2,7 @@ import { Suspense, lazy, useMemo } from 'react';
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router';
 import { AuthProvider, type AuthGateway } from './auth/AuthProvider';
 import type { CatalogApi } from './catalog/catalogApi';
+import { SongsProvider } from './catalog/SongsProvider';
 import type { PeopleApi } from './people/peopleApi';
 import { PeoplePage } from './people/PeoplePage';
 import { LoginPage } from './routes/LoginPage';
@@ -37,9 +38,15 @@ function AppRoutes({
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
-        <Route element={<AppShell />}>
-          <Route index element={<HomePage api={catalogApi} />} />
-          <Route path="/cantores/:artistId" element={<ArtistPage api={catalogApi} />} />
+        <Route
+          element={
+            <SongsProvider api={catalogApi}>
+              <AppShell />
+            </SongsProvider>
+          }
+        >
+          <Route index element={<HomePage />} />
+          <Route path="/cantores/:artistId" element={<ArtistPage />} />
           <Route path="/musicas/:songId" element={<SongPage api={catalogApi} />} />
           <Route element={<RequireRole roles={['member', 'admin']} />}>
             <Route

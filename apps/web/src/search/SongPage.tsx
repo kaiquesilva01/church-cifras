@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import type { CatalogApi } from '../catalog/catalogApi';
 import type { ArrangementSummary } from '../catalog/types';
-import { useSongs } from '../catalog/useSongs';
+import { useSongsContext } from '../catalog/SongsProvider';
 import { KeyChips } from './KeyChips';
 
 type PdfState =
@@ -15,7 +15,7 @@ type PdfState =
 export function SongPage({ api }: { api: CatalogApi }) {
   const { songId } = useParams();
   const [params] = useSearchParams();
-  const { status, songs } = useSongs(api);
+  const { status, songs } = useSongsContext();
   const song = songs.find((s) => s.id === songId);
 
   // Os tons vêm dos arranjos (tempo real); song.keys (Function) pode atrasar após salvar.

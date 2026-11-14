@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrangementExistsError, saveUpload, type CatalogApi } from '../catalog/catalogApi';
 import { deriveArtists } from '../catalog/search';
-import { useSongs } from '../catalog/useSongs';
+import { useSongsContext } from '../catalog/SongsProvider';
 import type { UploadPlan } from '../catalog/types';
 import { decideUpload, type UploadDecision } from './decideUpload';
 import type { PdfSuggestion } from './readPdfSuggestion';
@@ -39,7 +39,7 @@ function Badge({ show }: { show: boolean }) {
 
 export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf }) {
   const navigate = useNavigate();
-  const { songs } = useSongs(api);
+  const { songs } = useSongsContext();
   const artists = useMemo(() => deriveArtists(songs).map((a) => a.name), [songs]);
   // Known race: if the songs finish loading after a PDF was read, the title/artist swap
   // heuristic ran with an incomplete artist list. Accepted; the swap button covers it.

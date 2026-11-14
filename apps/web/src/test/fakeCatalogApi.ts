@@ -75,6 +75,8 @@ export function fakeCatalogApi(
     createSongWithArrangement: vi.fn(() => Promise.resolve('new-id')),
     addArrangement: vi.fn(() => Promise.resolve()),
     replaceArrangement: vi.fn(() => Promise.resolve()),
+    createGeneratedArrangement: vi.fn(() => Promise.resolve()),
+    getPdfBytes: vi.fn(() => Promise.resolve(new Uint8Array([37, 80, 68, 70]))),
     getPdfUrl: vi.fn((path: string) => Promise.resolve(`https://storage.test/${path}`)),
     ...overrides,
   };

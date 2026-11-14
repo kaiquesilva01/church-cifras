@@ -29,12 +29,13 @@ vi.mock('firebase/storage', () => ({
   uploadBytes: vi.fn(() => Promise.resolve()),
   deleteObject: vi.fn(() => Promise.resolve()),
   getDownloadURL: vi.fn(() => Promise.resolve('https://dl')),
+  getBlob: vi.fn(),
 }));
 vi.mock('firebase/functions', () => ({ httpsCallable: vi.fn(() => callable) }));
 
 import { getDoc, getDocs, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { uploadBytes } from 'firebase/storage';
+import { getBlob, uploadBytes } from 'firebase/storage';
 import type { FirebaseServices } from '../lib/firebase';
 import { createCatalogApi } from './catalogApi';
 
@@ -258,5 +259,39 @@ describe('createCatalogApi payloads', () => {
       storagePath: 'songs/s1/G-abc.pdf',
       chordCount: 9,
     });
+  });
+
+  it('createGeneratedArrangement writes a generated overlay arrangement', async () => {
+    await createCatalogApi(services).createGeneratedArrangement('s1', {
+      key: 'A',
+      storagePath: 'songs/s1/A-abc.pdf',
+      derivedFromKey: 'G',
+      chordCount: 14,
+      collisions: 2,
+      createdBy: 'u1',
+    });
+    expect(batchSet).toHaveBeenCalledTimes(1);
+    const [ref, data] = batchSet.mock.calls[0] as [{ path: string }, Record<string, unknown>];
+    expect(ref.path).toBe('songs/s1/arrangements/A');
+    expect(data).toEqual({
+      key: 'A',
+      storagePath: 'songs/s1/A-abc.pdf',
+      source: 'generated',
+      derivedFromKey: 'G',
+      writer: 'overlay',
+      chordCount: 14,
+      collisions: 2,
+      createdBy: 'u1',
+      createdAt: '<ts>',
+    });
+    expect(batchCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('getPdfBytes uses getBlob', async () => {
+    const blob = { arrayBuffer: () => Promise.resolve(new Uint8Array([37, 80, 68, 70]).buffer) };
+    vi.mocked(getBlob).mockResolvedValueOnce(blob as never);
+    const bytes = await createCatalogApi(services).getPdfBytes('songs/s1/G-abc.pdf');
+    expect(getBlob).toHaveBeenCalledWith({ path: 'songs/s1/G-abc.pdf' });
+    expect(bytes).toEqual(new Uint8Array([37, 80, 68, 70]));
   });
 });

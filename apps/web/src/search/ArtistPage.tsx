@@ -1,13 +1,12 @@
 import { useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
-import type { CatalogApi } from '../catalog/catalogApi';
 import { filterSongs } from '../catalog/search';
-import { useSongs } from '../catalog/useSongs';
+import { useSongsContext } from '../catalog/SongsProvider';
 import { SongList } from './SongList';
 
-export function ArtistPage({ api }: { api: CatalogApi }) {
+export function ArtistPage() {
   const { artistId } = useParams();
-  const { status, songs } = useSongs(api);
+  const { status, songs } = useSongsContext();
   const [params, setParams] = useSearchParams();
   const query = params.get('q') ?? '';
   const setQuery = (value: string) => setParams(value ? { q: value } : {}, { replace: true });

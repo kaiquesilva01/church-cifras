@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import type { CatalogApi } from '../catalog/catalogApi';
+import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi, makeSong, sampleSongs } from '../test/fakeCatalogApi';
 import { UploadPage, type ReadPdf } from './UploadPage';
 
@@ -37,7 +38,14 @@ function setup(
   render(
     <MemoryRouter initialEntries={['/nova']}>
       <Routes>
-        <Route path="/nova" element={<UploadPage api={api} readPdf={readPdf} />} />
+        <Route
+          path="/nova"
+          element={
+            <SongsProvider api={api}>
+              <UploadPage api={api} readPdf={readPdf} />
+            </SongsProvider>
+          }
+        />
         <Route path="/musicas/:id" element={<Where />} />
       </Routes>
     </MemoryRouter>,
