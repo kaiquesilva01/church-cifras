@@ -10,6 +10,14 @@ export interface SongSummary {
   handmadeKeys: KeyName[];
 }
 
+export interface ArrangementSummary {
+  key: KeyName;
+  source: 'handmade' | 'generated';
+  storagePath: string;
+  derivedFromKey: KeyName | null;
+  collisions: number;
+}
+
 export interface ArtistSummary {
   id: string;
   name: string;

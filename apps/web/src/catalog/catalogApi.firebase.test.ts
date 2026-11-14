@@ -32,7 +32,7 @@ vi.mock('firebase/storage', () => ({
 }));
 vi.mock('firebase/functions', () => ({ httpsCallable: vi.fn(() => callable) }));
 
-import { getDoc, getDocs, limit, query, where } from 'firebase/firestore';
+import { getDoc, getDocs, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { uploadBytes } from 'firebase/storage';
 import type { FirebaseServices } from '../lib/firebase';
@@ -131,7 +131,60 @@ describe('createCatalogApi payloads', () => {
     expect(uploadBytes).toHaveBeenCalledWith({ path }, file, {
       contentType: 'application/pdf',
       cacheControl: 'public, max-age=31536000, immutable',
+      customMetadata: { uploadedBy: 'u1' },
     });
+  });
+
+  it('deleteFile calls the discardUpload callable', async () => {
+    await createCatalogApi(services).deleteFile('songs/s1/G-abc.pdf');
+    expect(httpsCallable).toHaveBeenCalledWith(services.functions, 'discardUpload');
+    expect(callable).toHaveBeenCalledWith({ storagePath: 'songs/s1/G-abc.pdf' });
+  });
+
+  it('subscribeArrangements maps docs, skips unknown source and sorts by key', () => {
+    const unsubscribe = vi.fn();
+    vi.mocked(onSnapshot).mockImplementationOnce(((
+      _ref: { path: string },
+      next: (snap: unknown) => void,
+    ) => {
+      const docData = (data: Record<string, unknown>) => ({ data: () => data });
+      next({
+        docs: [
+          docData({
+            key: 'A',
+            source: 'generated',
+            storagePath: 'songs/s1/A-x.pdf',
+            derivedFromKey: 'G',
+            collisions: 2,
+          }),
+          docData({ key: 'G', source: 'handmade', storagePath: 'songs/s1/G-x.pdf' }),
+          docData({ key: 'B', source: 'weird', storagePath: 'songs/s1/B-x.pdf' }),
+        ],
+      });
+      return unsubscribe;
+    }) as never);
+    const cb = vi.fn();
+    const stop = createCatalogApi(services).subscribeArrangements('s1', cb);
+    expect(vi.mocked(onSnapshot).mock.calls[0]?.[0]).toMatchObject({
+      path: 'songs/s1/arrangements',
+    });
+    expect(cb).toHaveBeenCalledWith([
+      {
+        key: 'G',
+        source: 'handmade',
+        storagePath: 'songs/s1/G-x.pdf',
+        derivedFromKey: null,
+        collisions: 0,
+      },
+      {
+        key: 'A',
+        source: 'generated',
+        storagePath: 'songs/s1/A-x.pdf',
+        derivedFromKey: 'G',
+        collisions: 2,
+      },
+    ]);
+    expect(stop).toBe(unsubscribe);
   });
 
   it('getArrangement maps missing and known sources, null for unknown', async () => {

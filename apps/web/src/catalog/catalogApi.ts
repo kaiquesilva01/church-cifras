@@ -18,12 +18,23 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import type { FirebaseServices } from '../lib/firebase';
-import type { NewArrangementInput, NewSongInput, SongSummary, UploadPlan } from './types';
+import type {
+  ArrangementSummary,
+  NewArrangementInput,
+  NewSongInput,
+  SongSummary,
+  UploadPlan,
+} from './types';
 
 export interface CatalogApi {
   subscribeSongs(cb: (songs: SongSummary[]) => void, onError: (e: unknown) => void): () => void;
+  subscribeArrangements(
+    songId: string,
+    cb: (arrangements: ArrangementSummary[]) => void,
+    onError?: (e: unknown) => void,
+  ): () => void;
   findSong(titleNormalized: string, artistId: string): Promise<SongSummary | null>;
   getArrangement(
     songId: string,
@@ -32,6 +43,7 @@ export interface CatalogApi {
   /** Reserva o id de uma mÃºsica nova (o arquivo precisa dele antes do batch). */
   newSongId(): string;
   uploadPdf(songId: string, key: KeyName, file: Blob): Promise<string>;
+  /** Descarta um PDF órfão que o próprio usuário enviou (via callable `discardUpload`). */
   deleteFile(path: string): Promise<void>;
   createSongWithArrangement(input: NewSongInput): Promise<string>;
   addArrangement(songId: string, input: NewArrangementInput): Promise<void>;
@@ -60,6 +72,19 @@ function toSongSummary(id: string, data: Record<string, unknown>): SongSummary {
   };
 }
 
+function toArrangement(data: Record<string, unknown>): ArrangementSummary | null {
+  const { source, key, storagePath } = data;
+  if (source !== 'generated' && source !== 'handmade') return null;
+  if (typeof key !== 'string' || typeof storagePath !== 'string' || !storagePath) return null;
+  return {
+    key,
+    source,
+    storagePath,
+    derivedFromKey: typeof data.derivedFromKey === 'string' ? data.derivedFromKey : null,
+    collisions: typeof data.collisions === 'number' ? data.collisions : 0,
+  };
+}
+
 function newFileId(): string {
   return crypto.randomUUID().replace(/-/g, '');
 }
@@ -79,6 +104,8 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
     { songId: string; key: KeyName; storagePath: string; chordCount: number },
     unknown
   >(functions, 'replaceArrangement');
+
+  const callDiscard = httpsCallable<{ storagePath: string }, unknown>(functions, 'discardUpload');
 
   const uid = (): string => {
     const id = auth.currentUser?.uid;
@@ -103,6 +130,18 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
       onSnapshot(
         collection(db, 'songs'),
         (snap) => cb(snap.docs.map((d) => toSongSummary(d.id, d.data()))),
+        onError,
+      ),
+    subscribeArrangements: (songId, cb, onError) =>
+      onSnapshot(
+        collection(doc(db, 'songs', songId), 'arrangements'),
+        (snap) =>
+          cb(
+            snap.docs
+              .map((d) => toArrangement(d.data()))
+              .filter((a): a is ArrangementSummary => a !== null)
+              .sort((a, b) => compareKeys(a.key, b.key)),
+          ),
         onError,
       ),
     findSong: async (titleNormalized, artistId) => {
@@ -131,10 +170,13 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
       await uploadBytes(ref(storage, path), file, {
         contentType: 'application/pdf',
         cacheControl: 'public, max-age=31536000, immutable',
+        customMetadata: { uploadedBy: uid() },
       });
       return path;
     },
-    deleteFile: (path) => deleteObject(ref(storage, path)),
+    deleteFile: async (path) => {
+      await callDiscard({ storagePath: path });
+    },
     createSongWithArrangement: async (input) => {
       const createdBy = uid();
       const songRef = doc(db, 'songs', input.songId);

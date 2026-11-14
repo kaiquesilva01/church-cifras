@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import type { CatalogApi } from '../catalog/catalogApi';
-import type { SongSummary } from '../catalog/types';
+import type { ArrangementSummary, SongSummary } from '../catalog/types';
 
 export function makeSong(overrides: Partial<SongSummary> & { id: string }): SongSummary {
   return {
@@ -51,6 +51,18 @@ export function fakeCatalogApi(
   return {
     subscribeSongs: (cb) => {
       cb(songs);
+      return () => undefined;
+    },
+    subscribeArrangements: (songId, cb) => {
+      const song = songs.find((s) => s.id === songId);
+      const arrangements: ArrangementSummary[] = (song?.keys ?? []).map((key) => ({
+        key,
+        source: song?.handmadeKeys.includes(key) ? 'handmade' : 'generated',
+        storagePath: `songs/${songId}/${key}-abc.pdf`,
+        derivedFromKey: null,
+        collisions: 0,
+      }));
+      cb(arrangements);
       return () => undefined;
     },
     findSong: vi.fn(() => Promise.resolve(null)),

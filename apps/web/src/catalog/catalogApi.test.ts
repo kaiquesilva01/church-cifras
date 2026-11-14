@@ -5,6 +5,7 @@ import type { UploadPlan } from './types';
 function fakeApi(overrides: Partial<CatalogApi> = {}): CatalogApi {
   return {
     subscribeSongs: vi.fn(() => () => undefined),
+    subscribeArrangements: vi.fn(() => () => undefined),
     findSong: vi.fn(() => Promise.resolve(null)),
     getArrangement: vi.fn(() => Promise.resolve(null)),
     newSongId: vi.fn(() => 'song1'),

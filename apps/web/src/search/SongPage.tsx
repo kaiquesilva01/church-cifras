@@ -1,7 +1,8 @@
-import { keyFromSlug } from '@cifras/chords';
-import { useEffect, useState } from 'react';
+import { compareKeys, keyFromSlug } from '@cifras/chords';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import type { CatalogApi } from '../catalog/catalogApi';
+import type { ArrangementSummary } from '../catalog/types';
 import { useSongs } from '../catalog/useSongs';
 import { KeyChips } from './KeyChips';
 
@@ -17,15 +18,37 @@ export function SongPage({ api }: { api: CatalogApi }) {
   const { status, songs } = useSongs(api);
   const song = songs.find((s) => s.id === songId);
 
+  // Os tons v�m dos arranjos (tempo real); song.keys (Function) pode atrasar logo ap�s salvar.
+  const [loaded, setLoaded] = useState<{ songId: string; list: ArrangementSummary[] } | null>(null);
+  useEffect(() => {
+    if (!songId) return;
+    return api.subscribeArrangements(
+      songId,
+      (list) => setLoaded({ songId, list }),
+      () => setLoaded(null),
+    );
+  }, [api, songId]);
+  const arrangements = useMemo(
+    () => (loaded && loaded.songId === songId ? loaded.list : null),
+    [loaded, songId],
+  );
+  const keys = useMemo(
+    () =>
+      arrangements ? [...arrangements.map((a) => a.key)].sort(compareKeys) : (song?.keys ?? []),
+    [arrangements, song],
+  );
+
   const fromUrl = keyFromSlug(params.get('tom') ?? '');
   const selected =
-    song && fromUrl && song.keys.includes(fromUrl)
+    fromUrl && keys.includes(fromUrl)
       ? fromUrl
-      : (song?.handmadeKeys[0] ?? song?.keys[0]);
+      : (arrangements?.find((a) => a.source === 'handmade')?.key ??
+        (arrangements ? keys[0] : (song?.handmadeKeys[0] ?? song?.keys[0])));
+  const knownPath = arrangements?.find((a) => a.key === selected)?.storagePath;
 
   const [pdf, setPdf] = useState<{ for: string; state: PdfState } | null>(null);
   const sid = song?.id;
-  const requestId = sid && selected ? `${sid}:${selected}` : null;
+  const requestId = sid && selected ? `${sid}:${selected}:${knownPath ?? ''}` : null;
 
   useEffect(() => {
     if (!sid || !selected || !requestId) return;
@@ -33,19 +56,18 @@ export function SongPage({ api }: { api: CatalogApi }) {
     const finish = (state: PdfState) => {
       if (!cancelled) setPdf({ for: requestId, state });
     };
-    api
-      .getArrangement(sid, selected)
-      .then((arrangement) => {
-        if (!arrangement) return finish({ status: 'missing' });
-        return api
-          .getPdfUrl(arrangement.storagePath)
-          .then((url) => finish({ status: 'ready', url }));
-      })
-      .catch(() => finish({ status: 'error' }));
+    const open = (path: string) =>
+      api.getPdfUrl(path).then((url) => finish({ status: 'ready', url }));
+    (knownPath
+      ? open(knownPath)
+      : api
+          .getArrangement(sid, selected)
+          .then((a) => (a ? open(a.storagePath) : finish({ status: 'missing' })))
+    ).catch(() => finish({ status: 'error' }));
     return () => {
       cancelled = true;
     };
-  }, [api, sid, selected, requestId]);
+  }, [api, sid, selected, knownPath, requestId]);
 
   if (status === 'loading') {
     return (
@@ -77,7 +99,7 @@ export function SongPage({ api }: { api: CatalogApi }) {
       </Link>
       <h2>{song.title}</h2>
       <p className="muted">{song.artistName}</p>
-      <KeyChips songId={song.id} title={song.title} keys={song.keys} selected={selected} replace />
+      <KeyChips songId={song.id} title={song.title} keys={keys} selected={selected} replace />
       {pdfState.status === 'ready' && (
         <a
           className="btn btn-primary"
