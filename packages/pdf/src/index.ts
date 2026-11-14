@@ -1,1 +1,6 @@
-export { configurePdfWorker, readTextLines } from './readTextLines';
+export {
+  configurePdfWorker,
+  getPdfjs,
+  readTextLines,
+  readTextLinesFromDocument,
+} from './readTextLines';

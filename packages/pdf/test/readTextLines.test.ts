@@ -1,7 +1,12 @@
 import { buildTransposePlan, findKeyIndicator, parseKey } from '@cifras/chords';
 import type { Measure } from '@cifras/chords';
 import { describe, expect, it } from 'vitest';
-import { readTextLines } from '../src/readTextLines';
+import {
+  getPdfjs,
+  readTextLines,
+  readTextLinesFromDocument,
+  resolveFontName,
+} from '../src/readTextLines';
 import { buildSyntheticPdf } from './synthetic';
 import type { SyntheticLine } from './synthetic';
 
@@ -134,5 +139,76 @@ describe('readTextLines', () => {
     const plan = buildTransposePlan({ lines: result, from: key('C'), to: key('D'), measure });
     expect(plan.chords.map((c) => c.replacement).sort()).toEqual(['A', 'Bm', 'D', 'G']);
     expect(plan.chords.some((c) => c.x > 300)).toBe(true);
+  });
+
+  it('exposes font metrics and the user-space page width', async () => {
+    const data = await buildSyntheticPdf({
+      title: 'Cancao Inventada',
+      keyStyle: 'none',
+      chordFont: 'CourierBold',
+      lyricFont: 'Helvetica',
+      lines,
+    });
+    const read = await readTextLines(data);
+    for (const run of read.flatMap((l) => l.runs)) {
+      expect(run.ascent).toBeGreaterThan(0.5);
+      expect(run.ascent).toBeLessThan(1.2);
+      expect(run.descent).toBeLessThan(0);
+      expect(run.descent).toBeGreaterThan(-0.5);
+    }
+    expect(read[0]!.pageWidth).toBe(595);
+  });
+
+  it('reads an already opened document with the shared pdf.js instance', async () => {
+    const data = await buildSyntheticPdf({
+      title: 'Cancao Inventada',
+      keyStyle: 'none',
+      chordFont: 'CourierBold',
+      lyricFont: 'Helvetica',
+      lines,
+    });
+    const task = getPdfjs().getDocument({
+      data: data.slice(),
+      verbosity: 0,
+      fontExtraProperties: true,
+    });
+    const doc = await task.promise;
+    try {
+      const fromDoc = await readTextLinesFromDocument(doc);
+      expect(fromDoc).toEqual(await readTextLines(data));
+      expect(fromDoc.some((l) => l.runs.some((r) => r.bold))).toBe(true);
+    } finally {
+      await task.destroy();
+    }
+  });
+});
+
+describe('resolveFontName', () => {
+  it('waits for the callback when the font is not loaded yet', async () => {
+    const commonObjs = {
+      get(id: string, callback?: (font: unknown) => void) {
+        if (!callback) throw new Error(`Requesting object that isn't resolved yet ${id}`);
+        setTimeout(() => callback({ name: 'ABCDEF+Cifra-Bold' }), 5);
+      },
+    };
+    expect(await resolveFontName(commonObjs, 'g_d0_f1')).toBe('Cifra-Bold');
+  });
+
+  it('falls back to the synchronous get after the timeout', async () => {
+    const commonObjs = {
+      get(_id: string, callback?: (font: unknown) => void) {
+        return callback ? undefined : { name: 'Plain-Regular' };
+      },
+    };
+    expect(await resolveFontName(commonObjs, 'g_d0_f2', 10)).toBe('Plain-Regular');
+  });
+
+  it('falls back to the id when nothing resolves', async () => {
+    const commonObjs = {
+      get(): never {
+        throw new Error('nope');
+      },
+    };
+    expect(await resolveFontName(commonObjs, 'g_d0_f3', 10)).toBe('g_d0_f3');
   });
 });
