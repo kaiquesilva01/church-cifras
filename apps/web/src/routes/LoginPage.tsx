@@ -19,7 +19,11 @@ export function LoginPage() {
     setFailed(false);
     setBusy(true);
     signIn()
-      .catch(() => setFailed(true))
+      .catch((error: unknown) => {
+        const code = (error as { code?: unknown } | null)?.code;
+        if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+        setFailed(true);
+      })
       .finally(() => setBusy(false));
   };
 

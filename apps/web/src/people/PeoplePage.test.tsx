@@ -47,6 +47,22 @@ describe('PeoplePage', () => {
     ).toEqual(['Visitante', 'Membro', 'Admin']);
   });
 
+  it('falls back to the masked email when displayName is empty', async () => {
+    renderPage(
+      fakeApi({
+        listUsers: vi.fn(() =>
+          Promise.resolve([
+            { uid: 'u3', displayName: '', email: 'ana@example.com', role: 'viewer' as const },
+          ]),
+        ),
+      }),
+    );
+    expect(
+      await screen.findByRole('combobox', { name: 'Papel de a•••@example.com' }),
+    ).toBeEnabled();
+    expect(screen.getAllByText('a•••@example.com')).toHaveLength(2);
+  });
+
   it('disables role select on own row and marks it (você)', async () => {
     renderPage(fakeApi());
     await screen.findByText('Kaique Silva');

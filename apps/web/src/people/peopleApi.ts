@@ -1,6 +1,6 @@
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import type { Role } from '../auth/roles';
+import { isRole, type Role } from '../auth/roles';
 import type { FirebaseServices } from '../lib/firebase';
 
 export interface PersonRow {
@@ -15,10 +15,8 @@ export interface PeopleApi {
   setRole(uid: string, role: Role): Promise<void>;
 }
 
-const ROLES: readonly Role[] = ['viewer', 'member', 'admin'];
-
 export function toPersonRow(uid: string, data: Record<string, unknown>): PersonRow {
-  const role = ROLES.find((r) => r === data.role) ?? 'viewer';
+  const role = isRole(data.role) ? data.role : 'viewer';
   return {
     uid,
     displayName: String(data.displayName ?? ''),

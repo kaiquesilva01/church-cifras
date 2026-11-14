@@ -35,6 +35,13 @@ describe('createAuthGateway', () => {
     warn.mockRestore();
   });
 
+  it('treats an unknown role in the users doc as missing', () => {
+    const cb = vi.fn();
+    createAuthGateway(services).onUserDoc('u1', cb);
+    handlers.next({ data: () => ({ role: 'superuser' }) });
+    expect(cb).toHaveBeenCalledWith(undefined);
+  });
+
   it('reports the role from the users doc', () => {
     const cb = vi.fn();
     createAuthGateway(services).onUserDoc('u1', cb);

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from '../App';
 import type { Role } from '../auth/roles';
@@ -38,6 +38,19 @@ describe('routes', () => {
     fireEvent.click(screen.getByText('Entrar com Google'));
     expect(await screen.findByText('Não foi possível entrar. Tente de novo.')).toBeInTheDocument();
   });
+
+  it.each(['auth/popup-closed-by-user', 'auth/cancelled-popup-request'])(
+    'shows no error when the popup is dismissed (%s)',
+    async (code) => {
+      const gateway = createFakeGateway();
+      gateway.signIn = () => Promise.reject(Object.assign(new Error('popup'), { code }));
+      render(<App gateway={gateway} peopleApi={peopleApi} initialPath="/login" />);
+      act(() => gateway.emitUser(null));
+      fireEvent.click(screen.getByText('Entrar com Google'));
+      await waitFor(() => expect(screen.getByText('Entrar com Google')).toBeEnabled());
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    },
+  );
 
   it('shows home for signed-in viewer without Pessoas link', () => {
     setup('/', 'viewer');

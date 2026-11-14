@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ROLE_LABELS, type Role } from '../auth/roles';
+import { ROLE_LABELS, ROLES, type Role } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import type { PeopleApi, PersonRow } from './peopleApi';
-
-const ROLE_OPTIONS = Object.keys(ROLE_LABELS) as Role[];
 
 export function maskEmail(email: string): string {
   const at = email.indexOf('@');
@@ -95,11 +93,12 @@ export function PeoplePage({ api }: { api: PeopleApi }) {
         <tbody>
           {rows.map((p) => {
             const own = p.uid === user?.uid;
+            const name = p.displayName || maskEmail(p.email);
             return (
               <tr key={p.uid}>
                 <td data-label="Nome">
                   <span>
-                    {p.displayName}
+                    {name}
                     {own && <span className="muted"> (você)</span>}
                   </span>
                 </td>
@@ -107,12 +106,12 @@ export function PeoplePage({ api }: { api: PeopleApi }) {
                 <td data-label="Papel">
                   <select
                     className="role-select"
-                    aria-label={`Papel de ${p.displayName}`}
+                    aria-label={`Papel de ${name}`}
                     value={p.role}
                     disabled={own || pending.has(p.uid)}
                     onChange={(e) => void change(p, e.target.value as Role)}
                   >
-                    {ROLE_OPTIONS.map((r) => (
+                    {ROLES.map((r) => (
                       <option key={r} value={r}>
                         {ROLE_LABELS[r]}
                       </option>
