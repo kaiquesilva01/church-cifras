@@ -35,9 +35,18 @@ describe('firebase.json', () => {
   it('hosting serves apps/web/dist as SPA', () => {
     expect(config.hosting.public).toBe('apps/web/dist');
     expect(config.hosting.rewrites).toContainEqual({ source: '**', destination: '/index.html' });
-    expect(config.hosting.headers).toContainEqual({
-      source: '/assets/**',
-      headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
-    });
+  });
+
+  it('serves index with no-cache and assets immutable', () => {
+    // Firebase applies every matching header; later entries override earlier ones.
+    const headers = config.hosting.headers;
+    const all = headers.findIndex((h: { source: string }) => h.source === '**');
+    const assets = headers.findIndex((h: { source: string }) => h.source === '/assets/**');
+    expect(all).toBeGreaterThanOrEqual(0);
+    expect(headers[all].headers).toEqual([{ key: 'Cache-Control', value: 'no-cache' }]);
+    expect(assets).toBeGreaterThan(all);
+    expect(headers[assets].headers).toEqual([
+      { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+    ]);
   });
 });
