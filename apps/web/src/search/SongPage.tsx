@@ -47,7 +47,20 @@ export function SongPage({ api }: { api: CatalogApi }) {
     };
   }, [api, sid, selected, requestId]);
 
-  if (status === 'loading') return <p className="status">Carregando…</p>;
+  if (status === 'loading') {
+    return (
+      <p role="status" className="status">
+        Carregando…
+      </p>
+    );
+  }
+  if (!song && status === 'error') {
+    return (
+      <p role="alert" className="error">
+        Não foi possível carregar as cifras.
+      </p>
+    );
+  }
   if (!song) {
     return (
       <p className="status">
@@ -64,7 +77,7 @@ export function SongPage({ api }: { api: CatalogApi }) {
       </Link>
       <h2>{song.title}</h2>
       <p className="muted">{song.artistName}</p>
-      <KeyChips songId={song.id} keys={song.keys} selected={selected} />
+      <KeyChips songId={song.id} title={song.title} keys={song.keys} selected={selected} replace />
       {pdfState.status === 'ready' && (
         <a
           className="btn btn-primary"
@@ -75,7 +88,11 @@ export function SongPage({ api }: { api: CatalogApi }) {
           Abrir PDF
         </a>
       )}
-      {pdfState.status === 'loading' && selected && <p className="status">Carregando PDF…</p>}
+      {pdfState.status === 'loading' && selected && (
+        <p role="status" className="status">
+          Carregando PDF…
+        </p>
+      )}
       {pdfState.status === 'missing' && <p className="status">PDF indisponível para este tom.</p>}
       {pdfState.status === 'error' && (
         <p role="alert" className="error">

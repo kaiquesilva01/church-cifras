@@ -28,11 +28,14 @@ function renderHome(options: { role?: Role; path?: string; songs?: SongSummary[]
 describe('HomePage', () => {
   it('lists songs with key chips linking to the key', () => {
     renderHome();
-    const row = screen.getByRole('link', { name: /Sonda-me/ });
+    const row = screen.getByText('Sonda-me').closest('a')!;
     expect(row).toHaveAttribute('href', '/musicas/s1');
     expect(within(row).getByText('Aline Barros')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'A' })).toHaveAttribute('href', '/musicas/s1?tom=A');
-    expect(screen.getByRole('link', { name: 'F#m' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Sonda-me, tom A' })).toHaveAttribute(
+      'href',
+      '/musicas/s1?tom=A',
+    );
+    expect(screen.getByRole('link', { name: 'Ressuscita-me, tom F#m' })).toHaveAttribute(
       'href',
       '/musicas/s2?tom=Fsm',
     );
@@ -51,9 +54,9 @@ describe('HomePage', () => {
 
   it('switches to Cantores tab and filters artists', () => {
     renderHome();
-    expect(screen.getByRole('tab', { name: 'Músicas' })).toHaveAttribute('aria-selected', 'true');
-    fireEvent.click(screen.getByRole('tab', { name: 'Cantores' }));
-    expect(screen.getByRole('tab', { name: 'Cantores' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('link', { name: 'Músicas' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(screen.getByRole('link', { name: 'Cantores' }));
+    expect(screen.getByRole('link', { name: 'Cantores' })).toHaveAttribute('aria-current', 'page');
     const aline = screen.getByRole('link', { name: /Aline Barros/ });
     expect(aline).toHaveAttribute('href', '/cantores/aline-barros');
     expect(aline).toHaveTextContent('2 músicas');
@@ -66,7 +69,45 @@ describe('HomePage', () => {
 
   it('opens the Cantores tab from the url', () => {
     renderHome({ path: '/?aba=cantores' });
-    expect(screen.getByRole('tab', { name: 'Cantores' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('link', { name: 'Cantores' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('keeps the search when navigating back', () => {
+    renderHome({ path: '/?q=aline' });
+    expect(screen.getByRole('searchbox')).toHaveValue('aline');
+    expect(screen.queryByText('Grande é o Senhor')).not.toBeInTheDocument();
+    expect(screen.getByText('Sonda-me')).toBeInTheDocument();
+  });
+
+  it('clears the search when switching tabs', () => {
+    renderHome({ path: '/?q=aline' });
+    fireEvent.click(screen.getByRole('link', { name: 'Cantores' }));
+    expect(screen.getByRole('searchbox')).toHaveValue('');
+  });
+
+  it('shows the error copy when loading fails', () => {
+    const api = fakeCatalogApi([], {
+      subscribeSongs: (_cb, onError) => {
+        onError(new Error('x'));
+        return () => undefined;
+      },
+    });
+    render(
+      <AuthContext.Provider
+        value={{
+          status: 'signed-in',
+          user: testUser,
+          role: 'viewer',
+          signIn: () => Promise.resolve(),
+          signOut: () => Promise.resolve(),
+        }}
+      >
+        <MemoryRouter>
+          <HomePage api={api} />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível carregar as cifras.');
   });
 
   it('shows Nova cifra only for editors', () => {

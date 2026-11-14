@@ -122,7 +122,8 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
       if (!snap.exists()) return null;
       const source: unknown = snap.data().source;
       if (source !== 'generated' && source !== 'handmade') return null;
-      return { source, storagePath: String(snap.data().storagePath ?? '') };
+      const storagePath = snap.data().storagePath;
+      return typeof storagePath === 'string' && storagePath ? { source, storagePath } : null;
     },
     newSongId: () => doc(collection(db, 'songs')).id,
     uploadPdf: async (songId, key, file) => {

@@ -20,8 +20,13 @@ describe('SongPage', () => {
     const api = renderSong('/musicas/s1?tom=A');
     expect(screen.getByRole('heading', { name: 'Sonda-me' })).toBeInTheDocument();
     expect(screen.getByText('Aline Barros')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'A' })).toHaveAttribute('aria-current', 'true');
-    expect(screen.getByRole('link', { name: 'G' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Sonda-me, tom A' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(screen.getByRole('link', { name: 'Sonda-me, tom G' })).not.toHaveAttribute(
+      'aria-current',
+    );
     const open = await screen.findByRole('link', { name: 'Abrir PDF' });
     expect(api.getArrangement).toHaveBeenCalledWith('s1', 'A');
     expect(open).toHaveAttribute('href', 'https://storage.test/songs/s1/G-abc.pdf');
@@ -33,7 +38,24 @@ describe('SongPage', () => {
     const api = renderSong('/musicas/s1');
     await screen.findByRole('link', { name: 'Abrir PDF' });
     expect(api.getArrangement).toHaveBeenCalledWith('s1', 'G');
-    expect(screen.getByRole('link', { name: 'G' })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('link', { name: 'Sonda-me, tom G' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+  });
+
+  it('shows the error copy when loading fails', () => {
+    renderSong(
+      '/musicas/s1',
+      fakeCatalogApi([], {
+        subscribeSongs: (_cb, onError) => {
+          onError(new Error('x'));
+          return () => undefined;
+        },
+      }),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível carregar as cifras.');
+    expect(screen.queryByText('Música não encontrada.')).not.toBeInTheDocument();
   });
 
   it('shows not found for unknown song', () => {

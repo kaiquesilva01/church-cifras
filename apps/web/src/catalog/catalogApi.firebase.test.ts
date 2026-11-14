@@ -152,6 +152,11 @@ describe('createCatalogApi payloads', () => {
       source: 'handmade',
       storagePath: 'songs/s1/G-x.pdf',
     });
+    vi.mocked(getDoc).mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ source: 'handmade', storagePath: '' }),
+    } as never);
+    await expect(api.getArrangement('s1', 'G')).resolves.toBeNull();
     vi.mocked(getDoc).mockResolvedValueOnce(snap(true, 'weird') as never);
     await expect(api.getArrangement('s1', 'G')).resolves.toBeNull();
   });

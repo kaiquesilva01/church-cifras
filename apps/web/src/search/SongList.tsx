@@ -11,7 +11,7 @@ export function SongList({ songs }: { songs: SongSummary[] }) {
             <span className="song-title">{song.title}</span>
             <span className="muted">{song.artistName}</span>
           </Link>
-          <KeyChips songId={song.id} keys={song.keys} />
+          <KeyChips songId={song.id} title={song.title} keys={song.keys} />
         </li>
       ))}
     </ul>

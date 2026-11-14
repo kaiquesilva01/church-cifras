@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
@@ -16,16 +16,18 @@ export function HomePage({ api }: { api: CatalogApi }) {
   const { role } = useAuth();
   const { status, songs } = useSongs(api);
   const [params, setParams] = useSearchParams();
-  const [query, setQuery] = useState('');
+  const query = params.get('q') ?? '';
   const tab = params.get('aba') === 'cantores' ? TABS[1] : TABS[0];
 
   const artists = useMemo(() => deriveArtists(songs), [songs]);
   const visibleSongs = useMemo(() => filterSongs(songs, query), [songs, query]);
   const visibleArtists = useMemo(() => filterArtists(artists, query), [artists, query]);
 
-  const selectTab = (id: string) => {
-    setParams(id === 'cantores' ? { aba: 'cantores' } : {}, { replace: true });
-    setQuery('');
+  const setQuery = (value: string) => {
+    const next: Record<string, string> = {};
+    if (tab.id === 'cantores') next.aba = 'cantores';
+    if (value) next.q = value;
+    setParams(next, { replace: true });
   };
 
   const emptyText = query.trim()
@@ -43,24 +45,24 @@ export function HomePage({ api }: { api: CatalogApi }) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-      <div role="tablist" aria-label="Seções" className="tabs">
+      <nav aria-label="Seções" className="tabs">
         {TABS.map((t) => (
-          <button
+          <Link
             key={t.id}
-            type="button"
-            role="tab"
-            id={`tab-${t.id}`}
-            aria-selected={t.id === tab.id}
-            aria-controls="tabpanel"
+            to={t.id === 'cantores' ? '/?aba=cantores' : '/'}
+            aria-current={t.id === tab.id ? 'page' : undefined}
             className="tab"
-            onClick={() => selectTab(t.id)}
           >
             {t.label}
-          </button>
+          </Link>
         ))}
-      </div>
-      <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${tab.id}`}>
-        {status === 'loading' && <p className="status">Carregando…</p>}
+      </nav>
+      <div>
+        {status === 'loading' && (
+          <p role="status" className="status">
+            Carregando…
+          </p>
+        )}
         {status === 'error' && (
           <p role="alert" className="error">
             Não foi possível carregar as cifras.

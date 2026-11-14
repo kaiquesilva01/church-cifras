@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useMemo } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router';
 import type { CatalogApi } from '../catalog/catalogApi';
 import { filterSongs } from '../catalog/search';
 import { useSongs } from '../catalog/useSongs';
@@ -8,7 +8,9 @@ import { SongList } from './SongList';
 export function ArtistPage({ api }: { api: CatalogApi }) {
   const { artistId } = useParams();
   const { status, songs } = useSongs(api);
-  const [query, setQuery] = useState('');
+  const [params, setParams] = useSearchParams();
+  const query = params.get('q') ?? '';
+  const setQuery = (value: string) => setParams(value ? { q: value } : {}, { replace: true });
 
   const artistSongs = useMemo(
     () =>
@@ -19,8 +21,21 @@ export function ArtistPage({ api }: { api: CatalogApi }) {
   );
   const visible = useMemo(() => filterSongs(artistSongs, query), [artistSongs, query]);
 
-  if (status === 'loading') return <p className="status">Carregando…</p>;
+  if (status === 'loading') {
+    return (
+      <p role="status" className="status">
+        Carregando…
+      </p>
+    );
+  }
   const name = artistSongs[0]?.artistName;
+  if (!name && status === 'error') {
+    return (
+      <p role="alert" className="error">
+        Não foi possível carregar as cifras.
+      </p>
+    );
+  }
   if (!name) {
     return (
       <p className="status">
