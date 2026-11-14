@@ -31,8 +31,19 @@ describe('parseChord', () => {
     expect(parseChord('(A9)')?.wrapped).toBe(true);
   });
 
+  it('accepts a slash-digit extension inside the quality', () => {
+    for (const t of ['E7/9', 'G6/9', 'A4/7', 'F#m7/5-', 'C/9', 'E7/9/G']) {
+      expect(parseChord(t), t).not.toBeNull();
+    }
+    expect(parseChord('C/9')).toMatchObject({ quality: '/9', bassPc: null });
+    expect(parseChord('F#m7/5-')).toMatchObject({ quality: 'm7/5-', bassPc: null });
+    expect(parseChord('E7/9/G')).toMatchObject({ quality: '7/9', bassPc: 7 });
+    expect(transpose('G6/9', 'G', 'A')).toBe('A6/9');
+    expect(transpose('E7/9/G', 'E', 'F#')).toBe('F#7/9/A');
+  });
+
   it('rejects non chords', () => {
-    for (const t of ['Intro:', 'Senhor', '2x', 'H7', 'Am7/X', '']) {
+    for (const t of ['Intro:', 'Senhor', '2x', 'H7', 'Am7/X', 'E7/9x', 'C/', '']) {
       expect(parseChord(t), t).toBeNull();
     }
   });

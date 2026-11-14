@@ -138,14 +138,66 @@ describe('buildTransposePlan', () => {
     expect(ok.chords[0]!.collides).toBe(false);
   });
 
-  it('treats [Am] as a label and does not transpose it', () => {
+  it('transposes [Am] and keeps the brackets', () => {
     const plan = buildTransposePlan({
       lines: [line([run('[Am] Am', 10)])],
       from: key('Am'),
       to: key('Cm'),
       measure,
     });
-    expect(plan.chordCount).toBe(1);
-    expect(plan.chords.map((c) => c.original)).toEqual(['Am']);
+    expect(plan.chordCount).toBe(2);
+    expect(plan.chords.map((c) => [c.original, c.replacement])).toEqual([
+      ['[Am]', '[Cm]'],
+      ['Am', 'Cm'],
+    ]);
+  });
+
+  it('transposes a bracketed intro line but leaves a [Refrão] label alone', () => {
+    const plan = buildTransposePlan({
+      lines: [line([run('[Intro: Am G]', 10)]), line([run('[Refrão]', 10)], 1, 600)],
+      from: key('Am'),
+      to: key('Cm'),
+      measure,
+    });
+    expect(plan.chords.map((c) => [c.original, c.replacement])).toEqual([
+      ['Am', 'Cm'],
+      ['G]', 'Bb]'],
+    ]);
+    expect(plan.suspectSegments).toEqual([]);
+  });
+
+  it('transposes slash-digit chords', () => {
+    const plan = buildTransposePlan({
+      lines: [line([run('E7/9 G6/9', 10)])],
+      from: key('E'),
+      to: key('F#'),
+      measure,
+    });
+    expect(plan.chords.map((c) => c.replacement)).toEqual(['F#7/9', 'A6/9']);
+  });
+
+  it('reports bold segments with a chord and an unknown token as suspects', () => {
+    const plan = buildTransposePlan({
+      lines: [line([run('A E7/9x D', 10)], 2, 650)],
+      from: key('A'),
+      to: key('B'),
+      measure,
+    });
+    expect(plan.chordCount).toBe(0);
+    expect(plan.suspectSegments).toEqual([{ page: 2, y: 650, unknown: ['E7/9x'], chords: 2 }]);
+  });
+
+  it('does not flag long bold titles or pure chord lines as suspects', () => {
+    const plan = buildTransposePlan({
+      lines: [
+        line([run('A GRANDE ALEGRIA DO SENHOR', 10)]),
+        line([run('Am G', 10)], 1, 600),
+        line([run('Intro: 2x', 10)], 1, 500),
+      ],
+      from: key('A'),
+      to: key('B'),
+      measure,
+    });
+    expect(plan.suspectSegments).toEqual([]);
   });
 });

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { classifySegment, isLabel, mergeFragments, segmentLine, tokenizeSegment } from './lines';
+import {
+  analyzeSegment,
+  classifySegment,
+  isLabel,
+  mergeFragments,
+  parseChordToken,
+  segmentLine,
+  tokenizeSegment,
+} from './lines';
 import { line, run } from './__tests__/helpers';
 
 describe('lines', () => {
@@ -45,5 +53,26 @@ describe('lines', () => {
 
   it('treats label-only segments as other', () => {
     expect(classifySegment(tokenizeSegment([run('Intro: 2x', 10)]))).toBe('other');
+  });
+
+  it('parses chords wrapped in brackets and keeps the punctuation', () => {
+    expect(parseChordToken('[Am]')).toMatchObject({ prefix: '[', suffix: ']' });
+    expect(parseChordToken('[Am')).toMatchObject({ prefix: '[', suffix: '' });
+    expect(parseChordToken('G]')).toMatchObject({ prefix: '', suffix: ']' });
+    expect(parseChordToken('[Intro:Am]')).toMatchObject({ prefix: '[Intro:', suffix: ']' });
+    expect(parseChordToken('Am')).toMatchObject({ prefix: '', suffix: '' });
+    expect(parseChordToken('[Refrão]')).toBeNull();
+    expect(parseChordToken('[Intro:')).toBeNull();
+  });
+
+  it('classifies a bracketed intro line as chords', () => {
+    expect(classifySegment(tokenizeSegment([run('[Intro: Am G]', 10)]))).toBe('chords');
+    expect(classifySegment(tokenizeSegment([run('[Refrão] 2x', 10)]))).toBe('other');
+  });
+
+  it('reports unknown tokens next to chords', () => {
+    const a = analyzeSegment(tokenizeSegment([run('A E7/9x D', 10)]));
+    expect(a.chords.map((c) => c.token.text)).toEqual(['A', 'D']);
+    expect(a.unknown).toEqual(['E7/9x']);
   });
 });

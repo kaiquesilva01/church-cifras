@@ -1,4 +1,5 @@
 import { parseChord } from './chord';
+import type { Chord } from './chord';
 
 export interface TextRun {
   text: string;
@@ -103,12 +104,52 @@ export function isLabel(token: string): boolean {
   return LABEL_PATTERNS.some((p) => p.test(token));
 }
 
-export function classifySegment(tokens: Token[]): 'chords' | 'other' {
-  let chords = 0;
-  for (const token of tokens) {
-    if (isLabel(token.text)) continue;
-    if (parseChord(token.text) === null) return 'other';
-    chords++;
+export interface ChordToken {
+  chord: Chord;
+  prefix: string;
+  suffix: string;
+}
+
+// Accepts a chord wrapped in bracket punctuation (`[Am]`, `[Intro:Am`, `G]`); the punctuation
+// is returned so the replacement can keep it in place.
+export function parseChordToken(text: string): ChordToken | null {
+  let prefix = '';
+  let core = text;
+  let suffix = '';
+  if (core.startsWith('[')) {
+    prefix = '[';
+    core = core.slice(1);
+    const label = /^\p{L}+:(?=.)/u.exec(core);
+    if (label) {
+      prefix += label[0];
+      core = core.slice(label[0].length);
+    }
   }
-  return chords > 0 ? 'chords' : 'other';
+  if (core.endsWith(']')) {
+    suffix = ']';
+    core = core.slice(0, -1);
+  }
+  const chord = parseChord(core);
+  return chord ? { chord, prefix, suffix } : null;
+}
+
+export interface SegmentAnalysis {
+  chords: Array<ChordToken & { token: Token }>;
+  unknown: string[];
+}
+
+// Chords win over labels: `[Am]` and `G]` are chords even though they look like brackets.
+export function analyzeSegment(tokens: Token[]): SegmentAnalysis {
+  const result: SegmentAnalysis = { chords: [], unknown: [] };
+  for (const token of tokens) {
+    const parsed = parseChordToken(token.text);
+    if (parsed) result.chords.push({ ...parsed, token });
+    else if (!isLabel(token.text)) result.unknown.push(token.text);
+  }
+  return result;
+}
+
+export function classifySegment(tokens: Token[]): 'chords' | 'other' {
+  const { chords, unknown } = analyzeSegment(tokens);
+  return unknown.length === 0 && chords.length > 0 ? 'chords' : 'other';
 }

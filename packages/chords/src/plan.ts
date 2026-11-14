@@ -1,8 +1,8 @@
-import { parseChord, semitonesBetween, transposeChord } from './chord';
+import { semitonesBetween, transposeChord } from './chord';
 import { findKeyIndicator } from './keyIndicator';
 import type { Key } from './keys';
-import { classifySegment, isLabel, segmentLine, tokenizeSegment } from './lines';
-import type { TextLine } from './lines';
+import { analyzeSegment, segmentLine, tokenizeSegment } from './lines';
+import type { TextLine, Token } from './lines';
 
 const RIGHT_MARGIN = 20;
 const TOLERANCE_EM = 0.05;
@@ -29,7 +29,18 @@ export interface TransposePlan {
   keyIndicator: Replacement | null;
   chordCount: number;
   collisions: number;
+  suspectSegments: SuspectSegment[];
 }
+
+// A bold segment with chords plus 1-2 unparseable tokens: probably a chord we could not read.
+export interface SuspectSegment {
+  page: number;
+  y: number;
+  unknown: string[];
+  chords: number;
+}
+
+const MAX_SUSPECT_UNKNOWN = 2;
 
 export function buildTransposePlan(input: {
   lines: TextLine[];
@@ -42,25 +53,36 @@ export function buildTransposePlan(input: {
   const same = from.tonicPc === to.tonicPc && from.minor === to.minor;
   const indicator = findKeyIndicator(lines);
   const chords: Replacement[] = [];
+  const suspectSegments: SuspectSegment[] = [];
   let chordCount = 0;
 
   for (const line of lines) {
     for (const segment of segmentLine(line)) {
       const tokens = tokenizeSegment(segment);
-      if (classifySegment(tokens) !== 'chords') continue;
-      tokens.forEach((token, i) => {
-        if (isLabel(token.text)) return;
-        const isIndicatorToken =
-          indicator !== null &&
-          indicator.page === line.page &&
-          indicator.y === line.y &&
-          Math.abs(indicator.token.x - token.x) < 0.01;
-        if (isIndicatorToken) return;
-        const chord = parseChord(token.text);
-        if (!chord) return;
+      const analysis = analyzeSegment(tokens);
+      const isIndicatorToken = (token: Token): boolean =>
+        indicator !== null &&
+        indicator.page === line.page &&
+        indicator.y === line.y &&
+        Math.abs(indicator.token.x - token.x) < 0.01;
+      const found = analysis.chords.filter((c) => !isIndicatorToken(c.token));
+      if (found.length > 0 && analysis.unknown.length > 0) {
+        if (analysis.unknown.length <= MAX_SUSPECT_UNKNOWN) {
+          suspectSegments.push({
+            page: line.page,
+            y: line.y,
+            unknown: analysis.unknown,
+            chords: found.length,
+          });
+        }
+        continue;
+      }
+      if (analysis.unknown.length > 0 || analysis.chords.length === 0) continue;
+      found.forEach(({ token, chord, prefix, suffix }) => {
+        const i = tokens.indexOf(token);
         chordCount++;
         if (same) return;
-        const replacement = transposeChord(chord, semitones, to);
+        const replacement = `${prefix}${transposeChord(chord, semitones, to)}${suffix}`;
         const { fontSize, fontName } = token.run;
         const newWidth = measure(replacement, fontName, fontSize);
         const next = tokens[i + 1];
@@ -114,5 +136,6 @@ export function buildTransposePlan(input: {
     keyIndicator,
     chordCount,
     collisions: chords.filter((c) => c.collides).length,
+    suspectSegments,
   };
 }

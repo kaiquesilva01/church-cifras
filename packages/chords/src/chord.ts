@@ -10,7 +10,7 @@ export interface Chord {
 }
 
 const CHORD_PATTERN =
-  /^([A-G])([#b]?)((?:maj|min|dim|aug|sus|add|m|M|[0-9]|[°º+ø#b()-])*)(?:\/([A-G])([#b]?))?$/;
+  /^([A-G])([#b]?)((?:maj|min|dim|aug|sus|add|m|M|[0-9]|\/[0-9]|[°º+ø#b()-])*)(?:\/([A-G])([#b]?))?$/;
 
 export function parseChord(token: string): Chord | null {
   const wrapped = token.length > 2 && token.startsWith('(') && token.endsWith(')');
