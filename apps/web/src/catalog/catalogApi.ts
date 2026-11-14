@@ -28,7 +28,7 @@ export interface CatalogApi {
   getArrangement(
     songId: string,
     key: KeyName,
-  ): Promise<{ source: 'handmade' | 'generated' } | null>;
+  ): Promise<{ source: 'handmade' | 'generated'; storagePath: string } | null>;
   /** Reserva o id de uma música nova (o arquivo precisa dele antes do batch). */
   newSongId(): string;
   uploadPdf(songId: string, key: KeyName, file: Blob): Promise<string>;
@@ -121,7 +121,8 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
       const snap = await getDoc(doc(db, 'songs', songId, 'arrangements', keySlug(key)));
       if (!snap.exists()) return null;
       const source: unknown = snap.data().source;
-      return source === 'generated' || source === 'handmade' ? { source } : null;
+      if (source !== 'generated' && source !== 'handmade') return null;
+      return { source, storagePath: String(snap.data().storagePath ?? '') };
     },
     newSongId: () => doc(collection(db, 'songs')).id,
     uploadPdf: async (songId, key, file) => {

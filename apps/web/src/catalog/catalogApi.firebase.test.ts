@@ -138,14 +138,20 @@ describe('createCatalogApi payloads', () => {
     const api = createCatalogApi(services);
     const snap = (exists: boolean, source?: unknown) => ({
       exists: () => exists,
-      data: () => ({ source }),
+      data: () => ({ source, storagePath: 'songs/s1/G-x.pdf' }),
     });
     vi.mocked(getDoc).mockResolvedValueOnce(snap(false) as never);
     await expect(api.getArrangement('s1', 'G')).resolves.toBeNull();
     vi.mocked(getDoc).mockResolvedValueOnce(snap(true, 'generated') as never);
-    await expect(api.getArrangement('s1', 'G')).resolves.toEqual({ source: 'generated' });
+    await expect(api.getArrangement('s1', 'G')).resolves.toEqual({
+      source: 'generated',
+      storagePath: 'songs/s1/G-x.pdf',
+    });
     vi.mocked(getDoc).mockResolvedValueOnce(snap(true, 'handmade') as never);
-    await expect(api.getArrangement('s1', 'G')).resolves.toEqual({ source: 'handmade' });
+    await expect(api.getArrangement('s1', 'G')).resolves.toEqual({
+      source: 'handmade',
+      storagePath: 'songs/s1/G-x.pdf',
+    });
     vi.mocked(getDoc).mockResolvedValueOnce(snap(true, 'weird') as never);
     await expect(api.getArrangement('s1', 'G')).resolves.toBeNull();
   });

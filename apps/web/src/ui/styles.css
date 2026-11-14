@@ -208,3 +208,142 @@ body {
     content: none;
   }
 }
+
+.search {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  font: inherit;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 12px;
+}
+
+.tab {
+  flex: 1;
+  min-height: 44px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.list,
+.chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 80px;
+}
+
+.list-card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.list-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 44px;
+  justify-content: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.song-title {
+  font-weight: 700;
+}
+
+.artist-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.artist-row .song-title {
+  flex: 1;
+}
+
+.avatar-lg {
+  width: 40px;
+  height: 40px;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #e6f4ed;
+  color: var(--color-success);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.chip[aria-current='true'] {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+}
+
+.back {
+  color: var(--color-accent);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.page-title {
+  margin: 0;
+}

@@ -83,7 +83,9 @@ describe('saveUpload', () => {
       const api = fakeApi({
         createSongWithArrangement: vi.fn(() => Promise.reject(denied)),
         addArrangement: vi.fn(() => Promise.reject(denied)),
-        getArrangement: vi.fn(() => Promise.resolve({ source: 'handmade' as const })),
+        getArrangement: vi.fn(() =>
+          Promise.resolve({ source: 'handmade' as const, storagePath: 'p' }),
+        ),
       });
       const plan: UploadPlan =
         action === 'new-song'
