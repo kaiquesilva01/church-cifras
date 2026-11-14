@@ -1,8 +1,8 @@
 import { KEY_OPTIONS, parseKey } from './keys';
 import type { KeyName } from './keys';
 import { parseChord } from './chord';
-import { classifySegment, segmentLine, tokenizeSegment } from './lines';
-import type { TextLine } from './lines';
+import { classifySegment, isLabel, segmentLine, tokenizeRuns, tokenizeSegment } from './lines';
+import type { TextLine, TextRun } from './lines';
 import type { KeyIndicator } from './keyIndicator';
 
 export interface MetadataSuggestion {
@@ -27,31 +27,78 @@ export function normalizeText(s: string): string {
 const FILE_KEY = /[\s_-]([A-G][#b]?m?)(?:-\d+)?\.pdf$/;
 const SEPARATORS = [' - ', ' – ', ' | '];
 
-function titleFromPdfText(lines: TextLine[]): string {
+interface Candidate {
+  text: string;
+  fontSize: number;
+  bold: boolean;
+  y: number;
+}
+
+function assembleText(runs: TextRun[]): string {
+  const sorted = [...runs].sort((a, b) => a.x - b.x);
+  let out = '';
+  let prev: TextRun | undefined;
+  for (const r of sorted) {
+    if (prev) {
+      const gap = r.x - (prev.x + prev.width);
+      if (gap > 0.1 * r.fontSize && !/\s$/.test(out) && !/^\s/.test(r.text)) out += ' ';
+    }
+    out += r.text;
+    prev = r;
+  }
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+const byProminence = (a: Candidate, b: Candidate): number => b.fontSize - a.fontSize || b.y - a.y;
+
+function titleFromPdfText(lines: TextLine[]): { title: string; artist: string } | null {
   const firstPage = lines.reduce((min, l) => Math.min(min, l.page), Infinity);
-  let best = '';
-  let bestSize = -1;
-  for (const l of lines) {
-    if (l.page !== firstPage) continue;
+  const pageLines = lines.filter((l) => l.page === firstPage);
+  const body = median(
+    pageLines.flatMap((l) => l.runs.filter((r) => !r.bold).map((r) => r.fontSize)),
+  );
+  const candidates: Candidate[] = [];
+  for (const l of pageLines) {
     for (const segment of segmentLine(l)) {
-      const tokens = tokenizeSegment(segment);
-      if (tokens.length === 0 || classifySegment(tokens) === 'chords') continue;
+      const tokens = tokenizeRuns([...segment].sort((a, b) => a.x - b.x));
+      if (tokens.length === 0 || tokens.every((t) => isLabel(t.text))) continue;
       if (/^tom:?$/i.test(tokens[0]!.text)) continue;
-      const bold = segment.filter((r) => r.bold);
-      const text = bold
-        .map((r) => r.text)
-        .join('')
+      if (classifySegment(tokenizeSegment(segment)) === 'chords') continue;
+      const text = assembleText(segment)
         .replace(/\s*\([A-G][#b]?m?\)\s*$/, '')
         .trim();
       if (text === '') continue;
-      const size = Math.max(...bold.map((r) => r.fontSize));
-      if (size > bestSize) {
-        best = text;
-        bestSize = size;
-      }
+      candidates.push({
+        text,
+        fontSize: Math.max(...segment.map((r) => r.fontSize)),
+        bold: segment.some((r) => r.bold),
+        y: l.y,
+      });
     }
   }
-  return best;
+  const bold = candidates.filter((c) => c.bold).sort(byProminence);
+  const best = bold[0] ?? candidates.filter((c) => c.fontSize > body).sort(byProminence)[0] ?? null;
+  if (!best) return null;
+  let artist = '';
+  if (best.bold && !SEPARATORS.some((sep) => best.text.includes(sep))) {
+    const below = candidates.filter((c) => c.y < best.y).sort((a, b) => b.y - a.y)[0];
+    if (
+      below &&
+      below.bold &&
+      below.fontSize === best.fontSize &&
+      best.y - below.y <= 2 * best.fontSize
+    ) {
+      artist = below.text;
+    }
+  }
+  return { title: best.text, artist };
 }
 
 function titleFromFileName(fileName: string): string {
@@ -63,10 +110,7 @@ function titleFromFileName(fileName: string): string {
     .trim();
 }
 
-function splitArtist(
-  text: string,
-  knownArtists: string[],
-): { title: string; artist: string; swapped: boolean } {
+function splitText(text: string): { left: string; right: string } | null {
   let at = -1;
   let len = 0;
   for (const sep of SEPARATORS) {
@@ -76,9 +120,15 @@ function splitArtist(
       len = sep.length;
     }
   }
-  if (at < 0) return { title: text, artist: '', swapped: false };
-  const left = text.slice(0, at).trim();
-  const right = text.slice(at + len).trim();
+  if (at < 0) return null;
+  return { left: text.slice(0, at).trim(), right: text.slice(at + len).trim() };
+}
+
+function resolveArtist(
+  left: string,
+  right: string,
+  knownArtists: string[],
+): { title: string; artist: string; swapped: boolean } {
   const known = new Set(knownArtists.map(normalizeText));
   if (known.has(normalizeText(left)) && !known.has(normalizeText(right))) {
     return { title: right, artist: left, swapped: true };
@@ -101,8 +151,12 @@ export function suggestMetadata(input: {
   firstChord: string | null;
   lastChord: string | null;
 }): MetadataSuggestion {
-  const raw = titleFromPdfText(input.lines) || titleFromFileName(input.fileName);
-  const { title, artist, swapped } = splitArtist(raw, input.knownArtists);
+  const found = titleFromPdfText(input.lines);
+  const raw = found?.title ?? titleFromFileName(input.fileName);
+  const parts = found?.artist ? { left: raw, right: found.artist } : splitText(raw);
+  const { title, artist, swapped } = parts
+    ? resolveArtist(parts.left, parts.right, input.knownArtists)
+    : { title: raw, artist: '', swapped: false };
 
   const fileKey = FILE_KEY.exec(input.fileName);
   const fromFile = fileKey ? parseKey(fileKey[1]!)?.name : undefined;
