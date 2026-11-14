@@ -17,6 +17,7 @@
 - Gramática de acorde: raiz `[A-G]`, acidente opcional `#`/`b` logo após a letra, qualidade composta de `maj|min|dim|aug|sus|add|m|M|[0-9]|/[0-9]|[°º+ø#b()\-]` (zero ou mais; `/` só vale dentro da qualidade se seguida de dígito: `E7/9`, `G6/9`, `F#m7/5-`), baixo opcional `/[A-G][#b]?` no fim; o token pode vir entre parênteses `(A9)` ou colchetes `[Am]`, `[Intro:Am`, `G]` (a pontuação é preservada na troca). Qualidade é preservada literalmente.
 - Rótulos permitidos numa linha de acordes (acorde vence rótulo; `[Am]` é acorde): termina com `:` (`Intro:`), `[...]` que não seja acorde (`[Refrão]`), `\d+x`, `x\d+`, `(\d+x)`, `(`, `)`, `-`, `–`, `|`, `/`.
 - Linha de acordes = **todos** os tokens em negrito do segmento são acordes ou rótulos e há ≥ 1 acorde. Texto não-negrito é ignorado.
+- Páginas rotacionadas (`/Rotate`) não são suportadas: posições em espaço de usuário sem rotação.
 - Segmentação: runs da mesma página com `|Δy| ≤ 1pt` formam uma linha; uma linha é quebrada em segmentos onde o espaço entre runs consecutivos é maior que **1/3 da largura da página**.
 - Fragmentos adjacentes (espaço entre runs < 0,1 × tamanho da fonte, ambos em negrito) são unidos antes de tokenizar (`B`+`m`+`7` → `Bm7`).
 - Posição de um token dentro de um run: `x = run.x + run.width × (índiceDoCaractere / run.text.length)` (exato em fonte monoespaçada; aproximação aceita em proporcional).

@@ -60,6 +60,7 @@ export function resolveFontName(
 
 // The document must have been opened with `fontExtraProperties: true` (pdfjs 6.x) so real font
 // names, and therefore bold detection, are available.
+// Rotated pages (/Rotate) are not supported: positions are unrotated user space.
 export async function readTextLinesFromDocument(doc: PDFDocumentProxy): Promise<TextLine[]> {
   const lines: TextLine[] = [];
   for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
@@ -105,6 +106,10 @@ export async function readTextLinesFromDocument(doc: PDFDocumentProxy): Promise<
       row.runs.sort((r1, r2) => r1.x - r2.x);
       lines.push({ page: pageNumber, y: row.y, pageWidth, runs: row.runs });
     }
+  }
+  const names = lines.flatMap((l) => l.runs.map((r) => r.fontName));
+  if (names.length > 0 && names.every((n) => /^g_d\d+_f\d+$/.test(n))) {
+    throw new Error('PDF aberto sem fontExtraProperties: nomes de fonte indisponíveis');
   }
   return lines;
 }

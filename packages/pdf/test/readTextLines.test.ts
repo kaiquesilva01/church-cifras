@@ -183,6 +183,26 @@ describe('readTextLines', () => {
   });
 });
 
+describe('fontExtraProperties guard', () => {
+  it('rejects a document opened without fontExtraProperties', async () => {
+    const data = await buildSyntheticPdf({
+      title: 'Cancao Inventada',
+      keyStyle: 'none',
+      chordFont: 'CourierBold',
+      lyricFont: 'Helvetica',
+      lines,
+    });
+    const task = getPdfjs().getDocument({ data: data.slice(), verbosity: 0 });
+    try {
+      await expect(readTextLinesFromDocument(await task.promise)).rejects.toThrow(
+        'PDF aberto sem fontExtraProperties: nomes de fonte indisponíveis',
+      );
+    } finally {
+      await task.destroy();
+    }
+  });
+});
+
 describe('resolveFontName', () => {
   it('waits for the callback when the font is not loaded yet', async () => {
     const commonObjs = {
