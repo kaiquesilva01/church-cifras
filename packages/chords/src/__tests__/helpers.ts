@@ -12,6 +12,8 @@ export function run(text: string, x: number, bold = true, y = 700): TextRun {
     fontSize: FONT_SIZE,
     fontName: 'Courier',
     bold,
+    ascent: 0.8,
+    descent: -0.2,
   };
 }
 

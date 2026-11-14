@@ -2,12 +2,12 @@ import { semitonesBetween, transposeChord } from './chord';
 import { findKeyIndicator } from './keyIndicator';
 import type { Key } from './keys';
 import { findChords, scanSegments } from './findChords';
-import type { TextLine } from './lines';
+import type { Measure, TextLine } from './lines';
 
 const RIGHT_MARGIN = 20;
 const TOLERANCE_EM = 0.05;
 
-export type Measure = (text: string, fontName: string, fontSize: number) => number;
+export type { Measure };
 
 export interface Replacement {
   page: number;
@@ -16,6 +16,9 @@ export interface Replacement {
   width: number;
   fontSize: number;
   fontName: string;
+  ascent: number;
+  descent: number;
+  bold: boolean;
   original: string;
   replacement: string;
   newWidth: number;
@@ -51,12 +54,12 @@ export function buildTransposePlan(input: {
   const { lines, from, to, measure } = input;
   const semitones = semitonesBetween(from, to);
   const same = from.tonicPc === to.tonicPc && from.minor === to.minor;
-  const indicator = findKeyIndicator(lines);
+  const indicator = findKeyIndicator(lines, measure);
   const chords: Replacement[] = [];
   const suspectSegments: SuspectSegment[] = [];
   let chordCount = 0;
 
-  for (const segment of scanSegments(lines, indicator)) {
+  for (const segment of scanSegments(lines, indicator, measure)) {
     if (segment.chords.length > 0 && segment.unknown.length > 0) {
       if (segment.unknown.length <= MAX_SUSPECT_UNKNOWN) {
         suspectSegments.push({
@@ -69,7 +72,7 @@ export function buildTransposePlan(input: {
     }
   }
 
-  for (const occurrence of findChords(lines, indicator)) {
+  for (const occurrence of findChords(lines, { indicator, measure })) {
     const { token, chord, prefix, suffix, next, page, pageWidth } = occurrence;
     chordCount++;
     if (same) continue;
@@ -88,6 +91,9 @@ export function buildTransposePlan(input: {
       width: token.width,
       fontSize,
       fontName,
+      ascent: token.run.ascent,
+      descent: token.run.descent,
+      bold: token.run.bold,
       original: token.text,
       replacement,
       newWidth,
@@ -105,6 +111,9 @@ export function buildTransposePlan(input: {
       width: token.width,
       fontSize: token.run.fontSize,
       fontName: token.run.fontName,
+      ascent: token.run.ascent,
+      descent: token.run.descent,
+      bold: token.run.bold,
       original: token.text,
       replacement: indicator.kind === 'title' ? `(${to.name})` : to.name,
       newWidth: 0,

@@ -1,6 +1,6 @@
 import { parseKey, type Key } from './keys';
-import { classifySegment, segmentLine, tokenizeRuns, tokenizeSegment } from './lines';
-import type { TextLine, Token } from './lines';
+import { classifySegment, segmentLine, spanInRun, tokenizeRuns, tokenizeSegment } from './lines';
+import type { Measure, TextLine, Token } from './lines';
 
 export interface KeyIndicator {
   page: number;
@@ -12,10 +12,10 @@ export interface KeyIndicator {
 
 const TITLE_KEY = /\(([A-G][#b]?m?)\)\s*$/;
 
-export function findKeyIndicator(lines: TextLine[]): KeyIndicator | null {
+export function findKeyIndicator(lines: TextLine[], measure?: Measure): KeyIndicator | null {
   for (const line of lines) {
     for (const segment of segmentLine(line)) {
-      const tokens = tokenizeRuns(segment);
+      const tokens = tokenizeRuns(segment, measure);
       for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i]!;
         if (!/^tom:?$/i.test(token.text)) continue;
@@ -28,13 +28,13 @@ export function findKeyIndicator(lines: TextLine[]): KeyIndicator | null {
         const match = TITLE_KEY.exec(run.text);
         const key = match ? parseKey(match[1]!) : null;
         if (!match || !key) continue;
-        const perChar = run.width / run.text.length;
-        const token: Token = {
-          text: `(${match[1]})`,
-          x: run.x + perChar * match.index,
-          width: perChar * (match[1]!.length + 2),
+        const { x, width } = spanInRun(
           run,
-        };
+          match.index,
+          match.index + match[1]!.length + 2,
+          measure,
+        );
+        const token: Token = { text: `(${match[1]})`, x, width, run };
         return { page: line.page, y: line.y, kind: 'title', token, key };
       }
     }

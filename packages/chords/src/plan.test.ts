@@ -138,6 +138,42 @@ describe('buildTransposePlan', () => {
     expect(ok.chords[0]!.collides).toBe(false);
   });
 
+  it('carries the overlay data of the original run', () => {
+    const tall = { ...run('Am', 28), ascent: 0.9, descent: -0.3 };
+    const plain = { ...run('G', 80, false), ascent: 0.7, descent: -0.25 };
+    const plan = buildTransposePlan({
+      lines: [line([tall, plain])],
+      from: key('Am'),
+      to: key('Cm'),
+      measure,
+    });
+    expect(plan.chords[0]).toMatchObject({ ascent: 0.9, descent: -0.3, bold: true });
+    const tom = buildTransposePlan({
+      lines: [line([run('Tom:', 10), { ...run('Am', 40, false), ascent: 0.7 }])],
+      from: key('Am'),
+      to: key('Cm'),
+      measure,
+    });
+    expect(tom.keyIndicator).toMatchObject({ ascent: 0.7, descent: -0.2, bold: false });
+  });
+
+  it('places tokens of a proportional run by measured prefix, not by character index', () => {
+    const wide = (text: string) =>
+      [...text].reduce((w, c) => w + (c === 'm' ? 20 : c === ' ' ? 3 : 6), 0);
+    const text = 'Am Cm D';
+    const proportional = { ...run(text, 10), width: wide(text) };
+    const plan = buildTransposePlan({
+      lines: [line([proportional])],
+      from: key('Am'),
+      to: key('Cm'),
+      measure: wide,
+    });
+    expect(plan.chords.map((c) => c.x)).toEqual([10, 10 + wide('Am '), 10 + wide('Am Cm ')]);
+    expect(plan.chords[0]!.width).toBeCloseTo(wide('Am'));
+    // true widths: Am=26, Cm=26, D=6; Cm -> Ebm
+    expect(plan.chords.map((c) => c.newWidth)).toEqual([wide('Cm'), wide('Ebm'), wide('F')]);
+  });
+
   it('transposes [Am] and keeps the brackets', () => {
     const plan = buildTransposePlan({
       lines: [line([run('[Am] Am', 10)])],

@@ -1,6 +1,11 @@
 import { parseChord } from './chord';
 import type { Chord } from './chord';
 
+export type Measure = (text: string, fontName: string, fontSize: number) => number;
+
+// Coordinates are PDF user space: origin at the bottom-left of the page, y grows upward,
+// and `y` is the text baseline. `ascent`/`descent` are font metrics in em units
+// (descent is negative), so the glyph box spans y + descent*fontSize .. y + ascent*fontSize.
 export interface TextRun {
   text: string;
   x: number;
@@ -9,6 +14,8 @@ export interface TextRun {
   fontSize: number;
   fontName: string;
   bold: boolean;
+  ascent: number;
+  descent: number;
 }
 
 export interface TextLine {
@@ -67,26 +74,39 @@ export function mergeFragments(runs: TextRun[]): TextRun[] {
   return merged;
 }
 
-// Splits runs on whitespace; token x comes from the character index within its run.
-export function tokenizeRuns(runs: TextRun[]): Token[] {
+// Horizontal span of run.text[start, end). With a measure the prefix is measured and scaled to the
+// run's real width (proportional fonts); without one, or if it measures 0, characters are equal.
+export function spanInRun(
+  run: TextRun,
+  start: number,
+  end: number,
+  measure?: Measure,
+): { x: number; width: number } {
+  const total = measure ? measure(run.text, run.fontName, run.fontSize) : 0;
+  if (measure && total > 0) {
+    const scale = run.width / total;
+    const from = measure(run.text.slice(0, start), run.fontName, run.fontSize) * scale;
+    const to = measure(run.text.slice(0, end), run.fontName, run.fontSize) * scale;
+    return { x: run.x + from, width: to - from };
+  }
+  const perChar = run.text.length > 0 ? run.width / run.text.length : 0;
+  return { x: run.x + perChar * start, width: perChar * (end - start) };
+}
+
+// Splits runs on whitespace.
+export function tokenizeRuns(runs: TextRun[], measure?: Measure): Token[] {
   const tokens: Token[] = [];
   for (const run of runs) {
-    if (run.text.length === 0) continue;
-    const perChar = run.width / run.text.length;
     for (const match of run.text.matchAll(/\S+/g)) {
-      tokens.push({
-        text: match[0],
-        x: run.x + perChar * match.index,
-        width: perChar * match[0].length,
-        run,
-      });
+      const { x, width } = spanInRun(run, match.index, match.index + match[0].length, measure);
+      tokens.push({ text: match[0], x, width, run });
     }
   }
   return tokens;
 }
 
-export function tokenizeSegment(runs: TextRun[]): Token[] {
-  return tokenizeRuns(mergeFragments(runs.filter((r) => r.bold)));
+export function tokenizeSegment(runs: TextRun[], measure?: Measure): Token[] {
+  return tokenizeRuns(mergeFragments(runs.filter((r) => r.bold)), measure);
 }
 
 const LABEL_PATTERNS = [
