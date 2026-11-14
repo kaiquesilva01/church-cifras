@@ -1,12 +1,15 @@
 import { keySlug, parseKey, type KeyName } from '@cifras/chords';
 import { HttpsError } from 'firebase-functions/v2/https';
 
+export type ReplaceResult = { previousPath: string } | 'missing' | 'handmade' | 'same-file';
+
 export type ReplaceDeps = {
-  getArrangement(
+  // Transacional: lê o tom, confere (existe, é gerado, arquivo diferente) e grava.
+  replaceIfGenerated(
     songId: string,
     slug: string,
-  ): Promise<{ source: string; storagePath: string } | null>;
-  replaceArrangementDoc(songId: string, slug: string, data: Record<string, unknown>): Promise<void>;
+    data: Record<string, unknown>,
+  ): Promise<ReplaceResult>;
   deleteFile(path: string): Promise<void>;
   fileExists(path: string): Promise<boolean>;
   now(): Date;
@@ -25,7 +28,7 @@ export async function replaceArrangement(
   input: ReplaceInput,
 ): Promise<{ songId: string; key: KeyName }> {
   const { uid, songId, key, storagePath, chordCount } = input;
-  if (typeof songId !== 'string' || songId.length === 0 || songId.includes('/')) {
+  if (typeof songId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(songId)) {
     throw new HttpsError('invalid-argument', 'Invalid song.');
   }
   const parsed = typeof key === 'string' ? parseKey(key) : null;
@@ -45,16 +48,11 @@ export async function replaceArrangement(
     throw new HttpsError('invalid-argument', 'Invalid file path.');
   }
 
-  const existing = await deps.getArrangement(songId, slug);
-  if (!existing) throw new HttpsError('not-found', 'Arrangement not found.');
-  if (existing.source === 'handmade') {
-    throw new HttpsError('failed-precondition', 'Handmade arrangement cannot be replaced.');
-  }
   if (!(await deps.fileExists(storagePath))) {
     throw new HttpsError('failed-precondition', 'Uploaded file not found.');
   }
 
-  await deps.replaceArrangementDoc(songId, slug, {
+  const result = await deps.replaceIfGenerated(songId, slug, {
     key: parsed.name,
     storagePath,
     source: 'handmade',
@@ -65,10 +63,17 @@ export async function replaceArrangement(
     createdBy: uid,
     createdAt: deps.now(),
   });
+  if (result === 'missing') throw new HttpsError('not-found', 'Arrangement not found.');
+  if (result === 'handmade') {
+    throw new HttpsError('failed-precondition', 'Handmade arrangement cannot be replaced.');
+  }
+  if (result === 'same-file') {
+    throw new HttpsError('invalid-argument', 'File already in use by this arrangement.');
+  }
   try {
-    await deps.deleteFile(existing.storagePath);
+    await deps.deleteFile(result.previousPath);
   } catch (error) {
-    console.error('Failed to delete replaced arrangement file', existing.storagePath, error);
+    console.error('Failed to delete replaced arrangement file', result.previousPath, error);
   }
   return { songId, key: parsed.name };
 }

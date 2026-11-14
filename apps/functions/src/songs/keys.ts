@@ -24,15 +24,19 @@ export function summarizeArrangements(docs: Array<{ key: string; source: string 
 export const onArrangementWritten = onDocumentWritten(
   { document: 'songs/{songId}/arrangements/{slug}', region: 'southamerica-east1' },
   async (event) => {
-    const songRef = getFirestore().doc(`songs/${event.params.songId}`);
-    if (!(await songRef.get()).exists) return;
-    const snapshot = await songRef.collection('arrangements').get();
-    const summary = summarizeArrangements(
-      snapshot.docs.map((d) => ({
-        key: String(d.data().key ?? ''),
-        source: String(d.data().source ?? ''),
-      })),
-    );
-    await songRef.set({ ...summary, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    const db = getFirestore();
+    const songRef = db.doc(`songs/${event.params.songId}`);
+    await db.runTransaction(async (tx) => {
+      if (!(await tx.get(songRef)).exists) return;
+      const snapshot = await tx.get(songRef.collection('arrangements'));
+      const summary = summarizeArrangements(
+        snapshot.docs.map((d) => ({
+          key: String(d.data().key ?? ''),
+          source: String(d.data().source ?? ''),
+        })),
+      );
+      // update (nunca set merge): música apagada não é recriada.
+      tx.update(songRef, { ...summary, updatedAt: FieldValue.serverTimestamp() });
+    });
   },
 );

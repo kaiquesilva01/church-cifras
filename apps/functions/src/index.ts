@@ -54,13 +54,17 @@ export const onUserCreated = functionsV1
 export { onArrangementWritten } from './songs/keys';
 
 const replaceDeps: ReplaceDeps = {
-  getArrangement: async (songId, slug) => {
-    const data = (await getFirestore().doc(`songs/${songId}/arrangements/${slug}`).get()).data();
-    if (!data) return null;
-    return { source: String(data.source), storagePath: String(data.storagePath) };
-  },
-  replaceArrangementDoc: async (songId, slug, data) => {
-    await getFirestore().doc(`songs/${songId}/arrangements/${slug}`).set(data);
+  replaceIfGenerated: (songId, slug, data) => {
+    const db = getFirestore();
+    const ref = db.doc(`songs/${songId}/arrangements/${slug}`);
+    return db.runTransaction(async (tx) => {
+      const current = (await tx.get(ref)).data();
+      if (!current) return 'missing' as const;
+      if (current.source === 'handmade') return 'handmade' as const;
+      if (current.storagePath === data.storagePath) return 'same-file' as const;
+      tx.set(ref, data);
+      return { previousPath: String(current.storagePath) };
+    });
   },
   deleteFile: async (path) => {
     await getStorage().bucket().file(path).delete({ ignoreNotFound: true });

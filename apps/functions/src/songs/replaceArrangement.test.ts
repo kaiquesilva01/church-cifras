@@ -14,8 +14,13 @@ function setup(
   const writes: Array<[string, string, Record<string, unknown>]> = [];
   const deleted: string[] = [];
   const deps: ReplaceDeps = {
-    getArrangement: async () => existing,
-    replaceArrangementDoc: async (songId, slug, data) => void writes.push([songId, slug, data]),
+    replaceIfGenerated: async (songId, slug, data) => {
+      if (!existing) return 'missing';
+      if (existing.source === 'handmade') return 'handmade';
+      if (existing.storagePath === data.storagePath) return 'same-file';
+      writes.push([songId, slug, data]);
+      return { previousPath: existing.storagePath };
+    },
     deleteFile: async (path) => {
       if (opts.deleteFails) throw new Error('boom');
       deleted.push(path);
@@ -85,6 +90,23 @@ describe('replaceArrangement', () => {
     await expect(replaceArrangement(deps, { ...input, songId: 5 })).rejects.toMatchObject({
       code: 'invalid-argument',
     });
+  });
+
+  it('rejects reusing the existing file', async () => {
+    const { deps, writes } = setup();
+    await expect(
+      replaceArrangement(deps, { ...input, storagePath: 'songs/s1/Fs-old.pdf' }),
+    ).rejects.toMatchObject({ code: 'invalid-argument' });
+    expect(writes).toEqual([]);
+  });
+
+  it('rejects unsafe song ids', async () => {
+    const { deps } = setup();
+    for (const songId of ['.', '..', 'a b', 'a.b']) {
+      await expect(replaceArrangement(deps, { ...input, songId })).rejects.toMatchObject({
+        code: 'invalid-argument',
+      });
+    }
   });
 
   it('rejects missing file', async () => {
