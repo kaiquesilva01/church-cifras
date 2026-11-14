@@ -7,12 +7,15 @@ export interface Key {
 }
 
 const MAJOR_NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-const MINOR_NAMES = MAJOR_NAMES.map((n) => (n === 'Ab' ? 'Abm' : `${n}m`));
+const MINOR_NAMES = ['Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm'];
 
-export const KEY_OPTIONS: { major: KeyName[]; minor: KeyName[] } = {
-  major: MAJOR_NAMES,
-  minor: MINOR_NAMES,
-};
+export const KEY_OPTIONS: {
+  readonly major: readonly KeyName[];
+  readonly minor: readonly KeyName[];
+} = Object.freeze({
+  major: Object.freeze(MAJOR_NAMES),
+  minor: Object.freeze(MINOR_NAMES),
+});
 
 const LETTER_PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 

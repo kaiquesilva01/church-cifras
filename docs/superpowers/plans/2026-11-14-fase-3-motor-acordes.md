@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Nomes de tom canônicos: maiores `C C# D Eb E F F# G Ab A Bb B`; menores com sufixo `m` (`Cm C#m Dm Ebm Em Fm F#m Gm Abm Am Bbm Bm`). Entrada aceita sinônimos (`A#`→`Bb`, `Db`→`C#`, `D#`→`Eb`, `Gb`→`F#`, `G#`→`Ab`, e os menores correspondentes).
+- Nomes de tom canônicos: maiores `C C# D Eb E F F# G Ab A Bb B`; menores com sufixo `m` (`Cm C#m Dm Ebm Em Fm F#m Gm G#m Am Bbm Bm`). Entrada aceita sinônimos (`A#`→`Bb`, `Db`→`C#`, `D#`→`Eb`, `Gb`→`F#`, `G#`→`Ab` (só tons maiores), e os menores correspondentes, ex.: `Abm`→`G#m`).
 - **Grafia** [decisão nossa, refina a §6.2 do spec]: tons com preferência por **bemol**: `F Bb Eb Ab` e menores `Dm Gm Cm Fm Bbm Ebm`; demais preferem **sustenido**. Cada nota (raiz e baixo) é nomeada pelo **grau em relação à tônica maior de referência** (para tom menor, a relativa maior): graus cromáticos ♭II, ♭III, ♭VI, ♭VII (deslocamentos 1, 3, 8, 10 semitons) usam a tabela de **bemóis**; os demais usam a tabela da preferência do tom. Tabelas: sustenidos `C C# D D# E F F# G G# A A# B`; bemóis `C Db D Eb E F Gb G Ab A Bb B`. (Ex.: em C, ♭VII = `Bb`; em E, `C#m`, `F#`.)
 - Gramática de acorde: raiz `[A-G]`, acidente opcional `#`/`b` logo após a letra, qualidade composta de `maj|min|dim|aug|sus|add|m|M|[0-9]|[°º+ø#b()\-]` (zero ou mais), baixo opcional `/[A-G][#b]?`; o token pode vir entre parênteses `(A9)`. Qualidade é preservada literalmente.
 - Rótulos permitidos numa linha de acordes: termina com `:` (`Intro:`), `[...]`, `\d+x`, `x\d+`, `(\d+x)`, `(`, `)`, `-`, `–`, `|`, `/`.
