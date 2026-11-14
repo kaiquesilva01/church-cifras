@@ -1,5 +1,5 @@
 import { KEY_OPTIONS, parseKey, type KeyName } from '@cifras/chords';
-import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { useEffect, useRef } from 'react';
 
 export interface KeyPanelProps {
   sourceKey: KeyName;
@@ -54,29 +54,32 @@ export function KeyPanel({
     onTarget(options[(Math.max(index, 0) + delta + 12) % 12]!);
   };
 
-  const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
-    if (event.key === 'Escape') {
-      event.stopPropagation();
-      onCancel();
-      return;
-    }
-    if (event.key !== 'Tab' || layout !== 'sheet') return;
-    // Modal: keep Tab inside the sheet.
-    const items = [...(root.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])];
-    const first = items[0];
-    const last = items[items.length - 1];
-    if (!first || !last) return;
-    if (
-      event.shiftKey &&
-      (document.activeElement === first || document.activeElement === root.current)
-    ) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
+  // Document-level so Esc/Tab work wherever focus is (the sheet is modal; the page is inert).
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        // Never abandon a PDF that is being generated.
+        if (!busy) onCancel();
+        return;
+      }
+      if (event.key !== 'Tab' || layout !== 'sheet') return;
+      const items = [...(root.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])];
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement;
+      const outside = !root.current?.contains(active) || active === root.current;
+      if (event.shiftKey && (outside || active === first)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (outside || active === last)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [busy, layout, onCancel]);
 
   const disabled = busy || preparing;
   const confirmLabel = busy
@@ -173,7 +176,6 @@ export function KeyPanel({
         className="key-panel"
         data-layout="side"
         aria-labelledby="key-panel-title"
-        onKeyDown={onKeyDown}
       >
         {body}
       </aside>
@@ -190,7 +192,6 @@ export function KeyPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="key-panel-title"
-        onKeyDown={onKeyDown}
       >
         {body}
       </section>

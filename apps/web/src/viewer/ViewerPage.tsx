@@ -174,7 +174,7 @@ export function ViewerPage({
 
   const [busy, setBusy] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ key: string } | null>(null);
   const chordWriter = useMemo(
     () =>
       writer ?? (writerMode === 'rewrite' ? createRewriteWriter() : createOverlayWriter(loadFont)),
@@ -211,9 +211,7 @@ export function ViewerPage({
         collisions,
         uid: user.uid,
       });
-      setNotice(
-        saved.status === 'existing' ? 'Esse tom já tinha sido salvo. Abrimos o existente.' : null,
-      );
+      setNotice(saved.status === 'existing' ? { key: saved.key } : null);
       open(saved.key);
       closePanel();
     } catch {
@@ -257,86 +255,87 @@ export function ViewerPage({
   };
 
   const canChange = canEdit(role);
-  const preparing = prepared?.doc === readyDoc && prepared?.status === 'error' ? false : !ready;
-  const prepareError =
-    prepared?.doc === readyDoc && prepared?.status === 'error'
-      ? 'Não foi possível preparar a troca de tom.'
-      : null;
+  const prepareFailed =
+    current?.status === 'error' || (prepared?.doc === readyDoc && prepared?.status === 'error');
+  const prepareError = prepareFailed ? 'Não foi possível preparar a troca de tom.' : null;
+  const preparing = !prepareFailed && !ready;
   const savedKeys = arrangements.map((a) => a.key);
 
   return (
     <section className={`viewer${panelOpen && wide ? ' has-side' : ''}`}>
-      <header className="viewer-head">
-        <Link to="/" className="back">
-          <span aria-hidden="true">‹ </span>
-          {song.title}
-        </Link>
-        <p className="muted">{song.artistName}</p>
-        <KeyChips
-          songId={song.id}
-          title={song.title}
-          keys={arrangements.length > 0 ? arrangements.map((a) => a.key) : song.keys}
-          selected={selected?.key}
-          replace
-        />
-      </header>
-      {notice && (
-        <p role="status" className="notice">
-          {notice}
-        </p>
-      )}
-      {arrStatus === 'error' || current?.status === 'error' ? (
-        <p role="alert" className="error">
-          Não foi possível abrir o PDF.
-        </p>
-      ) : arrStatus === 'ready' && !selected ? (
-        <p className="status">Esta música ainda não tem PDF.</p>
-      ) : current?.status === 'ready' ? (
-        <>
-          {previewFailed === path && (
-            <p role="alert" className="error">
-              Não foi possível mostrar a prévia.
-            </p>
-          )}
-          <PdfPages
-            doc={current.doc}
-            overlays={panelOpen ? ops : NO_OVERLAYS}
-            onPreviewError={onPreviewError}
+      <div className="viewer-body" inert={panelOpen && !wide}>
+        <header className="viewer-head">
+          <Link to="/" className="back">
+            <span aria-hidden="true">‹ </span>
+            {song.title}
+          </Link>
+          <p className="muted">{song.artistName}</p>
+          <KeyChips
+            songId={song.id}
+            title={song.title}
+            keys={arrangements.length > 0 ? arrangements.map((a) => a.key) : song.keys}
+            selected={selected?.key}
+            replace
           />
-        </>
-      ) : (
-        <p role="status" className="status">
-          Carregando cifra…
-        </p>
-      )}
-      <div className="viewer-bar">
-        <button
-          type="button"
-          className="btn"
-          onClick={download}
-          disabled={current?.status !== 'ready'}
-        >
-          ⬇ PDF
-        </button>
-        {canChange && (
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!source}
-            aria-describedby={!source ? 'no-source' : undefined}
-            onClick={() => {
-              setNotice(null);
-              setPanelOpen(true);
-            }}
-          >
-            ♪ Mudar tom
-          </button>
-        )}
-        {canChange && arrStatus === 'ready' && !source && (
-          <p id="no-source" className="muted">
-            Não há PDF feito à mão para transpor.
+        </header>
+        {notice && notice.key === keyFromSlug(tomSlug ?? '') && (
+          <p role="status" className="notice">
+            Esse tom já tinha sido salvo. Abrimos o existente.
           </p>
         )}
+        {arrStatus === 'error' || current?.status === 'error' ? (
+          <p role="alert" className="error">
+            Não foi possível abrir o PDF.
+          </p>
+        ) : arrStatus === 'ready' && !selected ? (
+          <p className="status">Esta música ainda não tem PDF.</p>
+        ) : current?.status === 'ready' ? (
+          <>
+            {previewFailed === path && (
+              <p role="alert" className="error">
+                Não foi possível mostrar a prévia.
+              </p>
+            )}
+            <PdfPages
+              doc={current.doc}
+              overlays={panelOpen ? ops : NO_OVERLAYS}
+              onPreviewError={onPreviewError}
+            />
+          </>
+        ) : (
+          <p role="status" className="status">
+            Carregando cifra…
+          </p>
+        )}
+        <div className="viewer-bar">
+          <button
+            type="button"
+            className="btn"
+            onClick={download}
+            disabled={current?.status !== 'ready'}
+          >
+            ⬇ PDF
+          </button>
+          {canChange && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!source}
+              aria-describedby={!source ? 'no-source' : undefined}
+              onClick={() => {
+                setNotice(null);
+                setPanelOpen(true);
+              }}
+            >
+              ♪ Mudar tom
+            </button>
+          )}
+          {canChange && arrStatus === 'ready' && !source && (
+            <p id="no-source" className="muted">
+              Não há PDF feito à mão para transpor.
+            </p>
+          )}
+        </div>
       </div>
       {panelOpen && source && (
         <KeyPanel

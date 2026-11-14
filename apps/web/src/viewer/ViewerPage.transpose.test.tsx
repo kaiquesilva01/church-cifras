@@ -108,7 +108,7 @@ function renderViewer(options: Options = {}) {
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),
   };
-  render(
+  const { container } = render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[options.path ?? '/musicas/s1?tom=G']}>
         <Probe />
@@ -133,7 +133,7 @@ function renderViewer(options: Options = {}) {
       </MemoryRouter>
     </AuthContext.Provider>,
   );
-  return { api, writer, readLines, openPdf };
+  return { api, writer, readLines, openPdf, container };
 }
 
 const openPanel = async () => {
@@ -341,6 +341,63 @@ describe('ViewerPage change key', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByTestId('layer')).not.toBeInTheDocument();
     expect(where()).toBe('/musicas/s1?tom=G');
+  });
+
+  it('Escape does not cancel while generating', async () => {
+    let finish: (bytes: Uint8Array) => void = () => undefined;
+    const writer: ChordWriter = {
+      write: vi.fn(() => new Promise<Uint8Array>((resolve) => (finish = resolve))),
+    };
+    renderViewer({ writer });
+    await openPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'D' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar D' }));
+    await screen.findByRole('button', { name: 'Gerando PDF…' });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    finish(new Uint8Array([9]));
+    await waitFor(() => expect(where()).toBe('/musicas/s1?tom=D'));
+  });
+
+  it('shows a prepare error when the source pdf cannot be loaded', async () => {
+    const api = fakeCatalogApi([songG], {
+      getPdfBytes: vi.fn((path: string) =>
+        path.includes('/G-')
+          ? Promise.reject(new Error('boom'))
+          : Promise.resolve(new Uint8Array([1])),
+      ),
+    });
+    renderViewer({ api, path: '/musicas/s1?tom=A' });
+    await waitFor(() => expect(api.getPdfBytes).toHaveBeenCalledWith('songs/s1/A-abc.pdf'));
+    fireEvent.click(await screen.findByRole('button', { name: '♪ Mudar tom' }));
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.map((a) => a.textContent)).toContain('Não foi possível preparar a troca de tom.');
+    expect(screen.queryByText('Preparando…')).not.toBeInTheDocument();
+  });
+
+  it('makes the page inert behind the sheet', async () => {
+    const { container } = renderViewer();
+    await openPanel();
+    expect(container.querySelector('[inert]')).not.toBeNull();
+    expect(screen.getByRole('dialog').closest('[inert]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(container.querySelector('[inert]')).toBeNull();
+  });
+
+  it('clears the existing-key notice when the selected key changes', async () => {
+    const api = fakeCatalogApi([songG], {
+      createGeneratedArrangement: vi.fn(() => Promise.reject(new ArrangementExistsError())),
+    });
+    renderViewer({ api });
+    await openPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'D' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar D' }));
+    await screen.findByText('Esse tom já tinha sido salvo. Abrimos o existente.');
+    fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom A' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Esse tom já tinha sido salvo. Abrimos o existente.')).toBeNull(),
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: '⬇ PDF' })).toBeEnabled());
   });
 
   it('uses the side panel on wide screens', async () => {

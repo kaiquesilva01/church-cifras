@@ -46,8 +46,14 @@ describe('KeyPanel', () => {
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(dialog.contains(document.activeElement)).toBe(true);
-    fireEvent.keyDown(dialog, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  it('ignores Escape while busy', () => {
+    const { onCancel } = setup({ busy: true });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).not.toHaveBeenCalled();
   });
 
   it('is a complementary region in side layout', () => {
