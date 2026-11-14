@@ -219,6 +219,59 @@ describe('firestore.rules', () => {
     await assertFails(setDoc(doc(db, 'songs/n1'), songData({ artistName: 5 })));
   });
 
+  it('denies song ids with regex or odd characters', async () => {
+    const db = memberDb();
+    await assertFails(setDoc(doc(db, 'songs/.*'), songData()));
+    await assertFails(setDoc(doc(db, 'songs/a|b'), songData()));
+    await assertFails(setDoc(doc(db, 'songs/' + 'x'.repeat(101)), songData()));
+  });
+
+  it('denies arrangements under songs with regex ids', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'songs/.*'), { title: 'x' });
+      await setDoc(doc(ctx.firestore(), 'songs/a|b'), { title: 'x' });
+    });
+    const db = memberDb();
+    await assertFails(
+      setDoc(doc(db, 'songs/.*/arrangements/Cs'), arrData({ storagePath: 'songs/s1/Cs-abc.pdf' })),
+    );
+    await assertFails(
+      setDoc(doc(db, 'songs/.*/arrangements/Cs'), arrData({ storagePath: 'songs/.*/Cs-abc.pdf' })),
+    );
+    await assertFails(
+      setDoc(doc(db, 'songs/a|b/arrangements/Cs'), arrData({ storagePath: 'songs/a/Cs-abc.pdf' })),
+    );
+  });
+
+  it('denies artistId outside slug format and oversized storagePath', async () => {
+    const db = memberDb();
+    await assertFails(setDoc(doc(db, 'songs/n1'), songData({ artistId: 'Aline Barros' })));
+    await assertFails(setDoc(doc(db, 'songs/n1'), songData({ artistId: 'a.*' })));
+    const longPath = 'songs/s1/Cs-' + 'a'.repeat(300) + '.pdf';
+    await assertFails(
+      setDoc(doc(db, 'songs/s1/arrangements/Cs'), arrData({ storagePath: longPath })),
+    );
+  });
+
+  it('denies inconsistent source, writer and derivedFromKey', async () => {
+    const db = memberDb();
+    const path = 'songs/s1/arrangements/Cs';
+    const storagePath = 'songs/s1/Cs-abc.pdf';
+    await assertFails(setDoc(doc(db, path), arrData({ storagePath, writer: 'overlay' })));
+    await assertFails(
+      setDoc(
+        doc(db, path),
+        arrData({ storagePath, source: 'generated', derivedFromKey: 'C', writer: 'upload' }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(db, path),
+        arrData({ storagePath, source: 'generated', derivedFromKey: 'C#', writer: 'overlay' }),
+      ),
+    );
+  });
+
   it('denies song updates and deletes', async () => {
     const db = memberDb();
     await assertFails(updateDoc(doc(db, 'songs/s1'), { title: 'y' }));
