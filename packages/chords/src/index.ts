@@ -9,3 +9,5 @@ export { findKeyIndicator } from './keyIndicator';
 export type { KeyIndicator } from './keyIndicator';
 export { buildTransposePlan } from './plan';
 export type { Measure, Replacement, TransposePlan } from './plan';
+export { normalizeText, suggestMetadata } from './metadata';
+export type { MetadataSuggestion } from './metadata';
