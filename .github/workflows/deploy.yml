@@ -14,6 +14,8 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
+    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -22,10 +24,30 @@ jobs:
         env:
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
         run: |
-          if [ -z "$FIREBASE_PROJECT_ID" ] || [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+          total=0
+          missing=""
+          for name in FIREBASE_PROJECT_ID FIREBASE_SERVICE_ACCOUNT VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_STORAGE_BUCKET VITE_FIREBASE_APP_ID; do
+            total=$((total + 1))
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          missing_count=$(echo "$missing" | wc -w)
+          if [ "$missing_count" -eq "$total" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Deploy ignorado: configure FIREBASE_PROJECT_ID e FIREBASE_SERVICE_ACCOUNT (docs/deploy.md)"
+            echo "::notice::Deploy ignorado: produção ainda não configurada (docs/deploy.md)"
+          elif [ "$missing_count" -gt 0 ]; then
+            echo "::error::Configuração de produção incompleta; faltando:$missing (docs/deploy.md)"
+            exit 1
+          elif [ "$VITE_FIREBASE_PROJECT_ID" != "$FIREBASE_PROJECT_ID" ]; then
+            echo "::error::VITE_FIREBASE_PROJECT_ID difere de FIREBASE_PROJECT_ID"
+            exit 1
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
@@ -54,7 +76,7 @@ jobs:
           VITE_USE_EMULATORS: 'false'
         run: npm run build
 
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         if: steps.config.outputs.configured == 'true'
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
