@@ -247,10 +247,41 @@ describe('buildTransposePlan', () => {
     expect(plan.suspectSegments).toEqual([{ page: 2, y: 650, unknown: ['E7/9x'], chords: 2 }]);
   });
 
+  it('does not flag uppercase titles with E/A as suspect', () => {
+    for (const text of [
+      'MEU PRAZER E',
+      'SANTO E DIGNO',
+      'A DEUS',
+      'DEUS E BOM',
+      'Refrão A',
+      'Final: A E (2x) Fim',
+    ]) {
+      const plan = buildTransposePlan({
+        lines: [line([run(text, 10)])],
+        from: key('A'),
+        to: key('B'),
+        measure,
+      });
+      expect(plan.suspectSegments, text).toEqual([]);
+    }
+  });
+
+  it('counts chord attempts as unknown tokens', () => {
+    for (const bad of ['A*', 'Bbx', 'E7/9x']) {
+      const plan = buildTransposePlan({
+        lines: [line([run(`D ${bad}`, 10)])],
+        from: key('A'),
+        to: key('B'),
+        measure,
+      });
+      expect(plan.suspectSegments[0]?.unknown, bad).toEqual([bad]);
+    }
+  });
+
   it('does not flag long bold titles or pure chord lines as suspects', () => {
     const plan = buildTransposePlan({
       lines: [
-        line([run('A GRANDE ALEGRIA DO SENHOR', 10)]),
+        line([run('A GRANDE ALEGRIA NOSSA SENHOR', 10)]),
         line([run('Am G', 10)], 1, 600),
         line([run('Intro: 2x', 10)], 1, 500),
       ],

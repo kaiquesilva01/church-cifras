@@ -45,6 +45,9 @@ export interface SuspectSegment {
 }
 
 const MAX_SUSPECT_UNKNOWN = 2;
+// An unknown token only counts if it looks like a mistyped chord: a chord letter (optionally
+// with an accidental) not followed by two more letters, or followed by a quality word.
+const CHORD_ATTEMPT = /^[[(]?[A-G](?:[#b]?(?![a-z]{2}|[A-Z]{2})|[#b]?(?:maj|min|dim|aug|sus|add))/;
 
 function isCollision(input: {
   x: number;
@@ -77,15 +80,18 @@ export function buildTransposePlan(input: {
   let chordCount = 0;
 
   for (const segment of scanSegments(lines, indicator, measure)) {
-    if (segment.chords.length > 0 && segment.unknown.length > 0) {
-      if (segment.unknown.length <= MAX_SUSPECT_UNKNOWN) {
-        suspectSegments.push({
-          page: segment.line.page,
-          y: segment.line.y,
-          unknown: segment.unknown,
-          chords: segment.chords.length,
-        });
-      }
+    const attempts = segment.unknown.filter((t) => CHORD_ATTEMPT.test(t));
+    if (
+      segment.chords.length > 0 &&
+      attempts.length > 0 &&
+      attempts.length <= MAX_SUSPECT_UNKNOWN
+    ) {
+      suspectSegments.push({
+        page: segment.line.page,
+        y: segment.line.y,
+        unknown: attempts,
+        chords: segment.chords.length,
+      });
     }
   }
 
