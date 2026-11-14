@@ -24,6 +24,12 @@ export interface Replacement {
   replacement: string;
   newWidth: number;
   collides: boolean;
+  // Identity of the pdf text run the original token came from (`page:y:x` of the run).
+  runKey: string;
+  // Width of a space in the font (at fontSize) used by `measure`.
+  spaceWidth: number;
+  // Collides when `x + newWidth` exceeds this (next token minus a letter, or the page edge).
+  limitX: number;
 }
 
 export interface TransposePlan {
@@ -51,21 +57,22 @@ const MAX_SUSPECT_UNKNOWN = 2;
 const ALL_CAPS_WORD = /^[A-G][A-ZÀ-Ý]+$/;
 const CHORD_ATTEMPT = /^[[(]?[A-G](?:[#b]?(?![a-z]{2}|[A-Z]{2})|[#b]?(?:maj|min|dim|aug|sus|add))/;
 
-function isCollision(input: {
-  x: number;
-  newWidth: number;
+function collisionLimit(input: {
   next: Token | null;
   pageWidth: number;
   fontName: string;
   fontSize: number;
   measure: Measure;
-}): boolean {
-  const { x, newWidth, next, pageWidth, fontName, fontSize, measure } = input;
+}): number {
+  const { next, pageWidth, fontName, fontSize, measure } = input;
   const tolerance = TOLERANCE_EM * fontSize;
   return next !== null
-    ? newWidth + measure('n', fontName, fontSize) > next.x - x + tolerance
-    : x + newWidth > pageWidth - RIGHT_MARGIN + tolerance;
+    ? next.x - measure('n', fontName, fontSize) + tolerance
+    : pageWidth - RIGHT_MARGIN + tolerance;
 }
+
+const runKeyOf = (page: number, run: { x: number; y: number }): string =>
+  `${page}:${run.y}:${run.x}`;
 
 export function buildTransposePlan(input: {
   lines: TextLine[];
@@ -104,15 +111,8 @@ export function buildTransposePlan(input: {
     const replacement = `${prefix}${transposeChord(chord, semitones, to)}${suffix}`;
     const { fontSize, fontName } = token.run;
     const newWidth = measure(replacement, fontName, fontSize);
-    const collides = isCollision({
-      x: token.x,
-      newWidth,
-      next,
-      pageWidth,
-      fontName,
-      fontSize,
-      measure,
-    });
+    const limitX = collisionLimit({ next, pageWidth, fontName, fontSize, measure });
+    const collides = token.x + newWidth > limitX;
     chords.push({
       page,
       x: token.x,
@@ -127,6 +127,9 @@ export function buildTransposePlan(input: {
       replacement,
       newWidth,
       collides,
+      runKey: runKeyOf(page, token.run),
+      spaceWidth: measure(' ', fontName, fontSize),
+      limitX,
     });
   }
 
@@ -147,6 +150,9 @@ export function buildTransposePlan(input: {
       replacement: indicator.kind === 'title' ? `(${to.name})` : to.name,
       newWidth: 0,
       collides: false,
+      runKey: runKeyOf(indicator.page, token.run),
+      spaceWidth: measure(' ', token.run.fontName, token.run.fontSize),
+      limitX: 0,
     };
     keyIndicator.newWidth = measure(
       keyIndicator.replacement,
@@ -159,15 +165,14 @@ export function buildTransposePlan(input: {
       .find((segment) => segment.includes(token.run));
     const next = tokenizeRuns(siblings ?? [token.run], measure).find((t) => t.x > token.x + 0.01);
     const pageWidth = lines.find((l) => l.page === indicator.page)?.pageWidth ?? Infinity;
-    keyIndicator.collides = isCollision({
-      x: token.x,
-      newWidth: keyIndicator.newWidth,
+    keyIndicator.limitX = collisionLimit({
       next: next ?? null,
       pageWidth,
       fontName: keyIndicator.fontName,
       fontSize: keyIndicator.fontSize,
       measure,
     });
+    keyIndicator.collides = token.x + keyIndicator.newWidth > keyIndicator.limitX;
   }
 
   return {

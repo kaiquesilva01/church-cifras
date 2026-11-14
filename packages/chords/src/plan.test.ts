@@ -294,4 +294,48 @@ describe('buildTransposePlan', () => {
     });
     expect(plan.suspectSegments).toEqual([]);
   });
+
+  describe('run identity and limits', () => {
+    it('exposes the same runKey for chords of one run and different keys for other runs', () => {
+      const lines = [
+        line([run('A# F/A Gm', 28)]),
+        line([run('Dm', 28, true, 680), run('Gm', 200, true, 680)], 1, 680),
+        line([run('Am', 28)], 2, 700),
+      ];
+      const plan = buildTransposePlan({ lines, from: key('Bb'), to: key('D'), measure });
+      const keys = plan.chords.map((c) => c.runKey);
+      expect(keys[0]).toBe(keys[1]);
+      expect(keys[1]).toBe(keys[2]);
+      expect(new Set(keys).size).toBe(4);
+      expect(keys.every((k) => typeof k === 'string' && k.length > 0)).toBe(true);
+    });
+
+    it('exposes the space width and the collision limit', () => {
+      const plan = buildTransposePlan({
+        lines: [line([run('E7 A', 10)])],
+        from: key('E'),
+        to: key('F#'),
+        measure,
+      });
+      const [first, last] = plan.chords;
+      expect(first!.spaceWidth).toBeCloseTo(6);
+      // next token starts at 10 + 18; limit = next.x - width('n') + tolerance (0.05 em)
+      expect(first!.limitX).toBeCloseTo(28 - 6 + 0.5);
+      // last token: page edge (600 - 20) + tolerance
+      expect(last!.limitX).toBeCloseTo(580.5);
+      expect(first!.collides).toBe(first!.x + first!.newWidth > first!.limitX);
+    });
+
+    it('also carries them on the key indicator', () => {
+      const plan = buildTransposePlan({
+        lines: [line([run('Tom: E', 10, false)]), line([run('E', 10, true, 680)], 1, 680)],
+        from: key('E'),
+        to: key('F#'),
+        measure,
+      });
+      expect(plan.keyIndicator).toMatchObject({ spaceWidth: 6 });
+      expect(typeof plan.keyIndicator!.runKey).toBe('string');
+      expect(plan.keyIndicator!.runKey).not.toBe(plan.chords[0]!.runKey);
+    });
+  });
 });
