@@ -11,6 +11,7 @@ COPY apps/web/package.json apps/web/package.json
 COPY apps/functions/package.json apps/functions/package.json
 COPY packages/chords/package.json packages/chords/package.json
 COPY packages/pdf/package.json packages/pdf/package.json
+COPY packages/overlay/package.json packages/overlay/package.json
 COPY tests/package.json tests/package.json
 
 RUN npm ci
