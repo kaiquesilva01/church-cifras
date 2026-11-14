@@ -17,6 +17,7 @@ describe('firebase.json', () => {
     const { emulators } = config;
     expect(emulators.auth.port).toBe(9099);
     expect(emulators.firestore.port).toBe(8080);
+    expect(emulators.firestore.websocketPort).toBe(9150);
     expect(emulators.storage.port).toBe(9199);
     expect(emulators.functions.port).toBe(5001);
     expect(emulators.ui.port).toBe(4000);
