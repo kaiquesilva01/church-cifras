@@ -41,6 +41,34 @@ describe('createUserProfile', () => {
   });
 });
 
+describe('createUserProfile retries', () => {
+  const user = { uid: 'u1', email: 'a@x.com' };
+
+  it('retries setClaims before writing profile', async () => {
+    const { deps, writes } = fakeDeps();
+    let calls = 0;
+    deps.setClaims = async () => {
+      calls += 1;
+      if (calls === 1) throw new Error('boom');
+    };
+    await createUserProfile(deps, user, []);
+    expect(calls).toBe(2);
+    expect(writes).toHaveLength(1);
+  });
+
+  it('does not write profile when claims keep failing', async () => {
+    const { deps, writes } = fakeDeps();
+    let calls = 0;
+    deps.setClaims = async () => {
+      calls += 1;
+      throw new Error('boom');
+    };
+    await expect(createUserProfile(deps, user, [])).rejects.toThrow('boom');
+    expect(calls).toBe(3);
+    expect(writes).toHaveLength(0);
+  });
+});
+
 describe('changeUserRole', () => {
   const input = { callerUid: 'u1', callerRole: 'admin', targetUid: 'u2', newRole: 'member' };
 
@@ -53,14 +81,27 @@ describe('changeUserRole', () => {
   });
 
   it('throws HttpsError with validation code', async () => {
-    const { deps } = fakeDeps();
+    const { deps, claims, writes } = fakeDeps();
     await expect(changeUserRole(deps, { ...input, callerRole: 'member' })).rejects.toMatchObject({
       code: 'permission-denied',
     });
+    expect(claims).toHaveLength(0);
+    expect(writes).toHaveLength(0);
+  });
+
+  it('rejects self change', async () => {
+    const { deps, claims, writes } = fakeDeps();
+    await expect(changeUserRole(deps, { ...input, targetUid: 'u1' })).rejects.toMatchObject({
+      code: 'failed-precondition',
+    });
+    expect(claims).toHaveLength(0);
+    expect(writes).toHaveLength(0);
   });
 
   it('fails when target user does not exist', async () => {
-    const { deps } = fakeDeps(false);
+    const { deps, claims, writes } = fakeDeps(false);
     await expect(changeUserRole(deps, input)).rejects.toMatchObject({ code: 'not-found' });
+    expect(claims).toHaveLength(0);
+    expect(writes).toHaveLength(0);
   });
 });

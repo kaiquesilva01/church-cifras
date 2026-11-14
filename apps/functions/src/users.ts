@@ -8,12 +8,28 @@ export type UserDeps = {
   now(): Date;
 };
 
+const CLAIM_ATTEMPTS = 3;
+
+async function setClaimsWithRetry(deps: UserDeps, uid: string, role: Role): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < CLAIM_ATTEMPTS; attempt += 1) {
+    try {
+      await deps.setClaims(uid, { role });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
 export async function createUserProfile(
   deps: UserDeps,
   user: { uid: string; email?: string; displayName?: string; photoURL?: string },
   adminEmails: string[],
 ): Promise<Role> {
   const role = roleForNewUser(user.email, adminEmails);
+  await setClaimsWithRetry(deps, user.uid, role);
   await deps.writeUser(
     user.uid,
     {
@@ -25,7 +41,6 @@ export async function createUserProfile(
     },
     false,
   );
-  await deps.setClaims(user.uid, { role });
   return role;
 }
 
