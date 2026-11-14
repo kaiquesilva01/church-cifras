@@ -1,0 +1,11 @@
+node_modules
+dist
+apps/functions/lib
+coverage
+emulator-data
+package-lock.json
+.superpowers
+fixtures/private
+.claude
+docs
+*.md

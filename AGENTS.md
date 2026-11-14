@@ -68,6 +68,11 @@ Um plano por fase da §11 do spec.
 
 ## Comandos
 
-- `node --test ".claude/**/*.test.mjs"` — testes do harness.
-
-A Fase 1 adiciona os comandos do monorepo aqui.
+- `docker compose up --build` — sobe web (5173), functions (build watch) e emuladores (UI 4000).
+- `docker compose down` — encerra o ambiente local.
+- Comandos npm no host exigem Node 22 + Java 21; ou rode dentro do contêiner. No Windows sem Java, os testes das rules: `docker compose run --rm --no-deps emulators npm run test:rules` (não use `exec`: conflita com as portas dos emuladores em execução).
+- `npm test` — testes de todos os workspaces.
+- `npm run lint` — ESLint.
+- `npm run typecheck` — TypeScript.
+- `npm run test:rules` — testes das Security Rules no emulador.
+- `npm run test:harness` — testes do harness (`node --test ".claude/**/*.test.mjs"`).
