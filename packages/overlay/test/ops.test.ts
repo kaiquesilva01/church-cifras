@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseKey } from '@cifras/chords';
 import type { Replacement, TransposePlan } from '@cifras/chords';
-import { overlayOps } from '../src/ops';
+import { countCollisions, overlayOps } from '../src/ops';
 
 const key = (name: string) => parseKey(name)!;
 
@@ -170,5 +170,29 @@ describe('overlayOps', () => {
       // the first two are packed (gap 6) and reflow; the third is aligned and stays
       expect(ops.map((o) => o.text.value)).toEqual(['D G', 'Em']);
     });
+  });
+});
+
+describe('countCollisions', () => {
+  it('counts ops that collide after reflow, not plan collisions', () => {
+    const ops = overlayOps(
+      plan([
+        replacement({ collides: false }),
+        replacement({ x: 200, runKey: '1:700:200', collides: true }),
+        replacement({ x: 300, runKey: '1:700:300', collides: true }),
+      ]),
+    );
+    expect(countCollisions(ops)).toBe(2);
+    expect(countCollisions([])).toBe(0);
+  });
+
+  it('does not count a packed run once reflow resolves it', () => {
+    const packed = [
+      replacement({ x: 100, collides: true, limitX: 400 }),
+      replacement({ x: 112, collides: false, limitX: 400 }),
+    ];
+    const ops = overlayOps(plan(packed));
+    expect(countCollisions(ops)).toBe(ops.filter((o) => o.collides).length);
+    expect(countCollisions(ops)).toBe(0);
   });
 });

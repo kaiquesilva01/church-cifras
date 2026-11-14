@@ -83,3 +83,8 @@ export function overlayOps(plan: TransposePlan): OverlayOp[] {
   if (plan.keyIndicator) ops.push(toOp(plan.keyIndicator, 'key'));
   return ops;
 }
+
+// Collisions as the user sees them: counted on the final ops (after reflow), not on plan.collisions.
+export function countCollisions(ops: OverlayOp[]): number {
+  return ops.filter((op) => op.collides).length;
+}
