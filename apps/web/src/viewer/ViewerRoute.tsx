@@ -1,4 +1,4 @@
-import { getPdfjs } from '@cifras/pdf';
+import { getPdfjs, readTextLinesFromDocument } from '@cifras/pdf';
 import { useParams, useSearchParams } from 'react-router';
 import type { CatalogApi } from '../catalog/catalogApi';
 import '../lib/pdfWorker';
@@ -10,9 +10,20 @@ const openPdf = (bytes: Uint8Array): Promise<PdfDocument> =>
   getPdfjs().getDocument({ data: bytes, verbosity: 0, fontExtraProperties: true })
     .promise as unknown as Promise<PdfDocument>;
 
+const readLines = (doc: PdfDocument) =>
+  readTextLinesFromDocument(doc as unknown as Parameters<typeof readTextLinesFromDocument>[0]);
+
 // Lazy entry point: together with the upload route, the only place that pulls in pdf.js.
 export default function ViewerRoute({ api }: { api: CatalogApi }) {
   const { songId = '' } = useParams();
   const [params] = useSearchParams();
-  return <ViewerPage api={api} songId={songId} tomSlug={params.get('tom')} openPdf={openPdf} />;
+  return (
+    <ViewerPage
+      api={api}
+      songId={songId}
+      tomSlug={params.get('tom')}
+      openPdf={openPdf}
+      readLines={readLines}
+    />
+  );
 }

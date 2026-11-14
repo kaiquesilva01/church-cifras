@@ -1,8 +1,8 @@
-import * as fontkit from '@pdf-lib/fontkit';
 import { PDFDocument, rgb } from 'pdf-lib';
 import type { PDFFont } from 'pdf-lib';
 import type { TransposePlan } from '@cifras/chords';
 import type { FontBytesLoader, FontId } from './fonts';
+import { fontkit } from './fontkit';
 import { overlayOps } from './ops';
 
 export interface ChordWriter {

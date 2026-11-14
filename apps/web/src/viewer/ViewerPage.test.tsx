@@ -1,8 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useParams, useSearchParams } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AuthContext, type AuthState } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi, makeSong } from '../test/fakeCatalogApi';
+import { testUser } from '../test/fakeGateway';
 import { ViewerPage } from './ViewerPage';
 
 vi.mock('./PdfPages', () => ({
@@ -22,24 +24,41 @@ vi.mock('./PdfPages', () => ({
 function Page({ api, openPdf }: { api: ReturnType<typeof fakeCatalogApi>; openPdf: never }) {
   const { songId = '' } = useParams();
   const [params] = useSearchParams();
-  return <ViewerPage api={api} songId={songId} tomSlug={params.get('tom')} openPdf={openPdf} />;
+  return (
+    <ViewerPage
+      api={api}
+      songId={songId}
+      tomSlug={params.get('tom')}
+      openPdf={openPdf}
+      readLines={() => Promise.resolve([])}
+    />
+  );
 }
 
 function renderViewer(path: string, api = fakeCatalogApi()) {
   const openPdf = vi.fn(() => Promise.resolve({ numPages: 3, destroy: vi.fn() }));
+  const auth: AuthState = {
+    status: 'signed-in',
+    user: testUser,
+    role: 'member',
+    signIn: () => Promise.resolve(),
+    signOut: () => Promise.resolve(),
+  };
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route
-          path="/musicas/:songId"
-          element={
-            <SongsProvider api={api}>
-              <Page api={api} openPdf={openPdf as never} />
-            </SongsProvider>
-          }
-        />
-      </Routes>
-    </MemoryRouter>,
+    <AuthContext.Provider value={auth}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/musicas/:songId"
+            element={
+              <SongsProvider api={api}>
+                <Page api={api} openPdf={openPdf as never} />
+              </SongsProvider>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    </AuthContext.Provider>,
   );
   return { api, openPdf };
 }

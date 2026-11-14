@@ -539,3 +539,128 @@ body {
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
 }
+
+.viewer-bar .btn-primary {
+  margin-left: auto;
+}
+
+.viewer-bar .muted {
+  align-self: center;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.notice {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.key-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgb(0 0 0 / 35%);
+}
+
+.key-panel {
+  z-index: 21;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: var(--color-surface);
+  overflow-y: auto;
+}
+
+.key-panel:focus {
+  outline: none;
+}
+
+.key-panel[data-layout='sheet'] {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  max-height: 80vh;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 20%);
+}
+
+.key-panel[data-layout='side'] {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  align-content: start;
+  border-left: 1px solid var(--color-border);
+}
+
+.viewer.has-side {
+  padding-right: 336px;
+}
+
+.key-panel-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.key-legend {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-success);
+}
+
+.key-grid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.key-grid[data-layout='side'] {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.key-btn {
+  padding: 8px 0;
+  font-weight: 600;
+}
+
+.key-btn.saved {
+  border: 2px solid var(--color-success);
+}
+
+.key-btn[aria-pressed='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.key-steps,
+.key-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.key-steps .btn {
+  flex: 1;
+}
+
+.key-actions .btn {
+  flex: 1;
+}
+
+.key-actions .btn-primary {
+  flex: 2;
+}
+
+.key-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: #ffd5d5;
+  color: var(--color-error);
+  font-size: 0.85rem;
+}

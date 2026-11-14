@@ -1,9 +1,9 @@
-import * as fontkit from '@pdf-lib/fontkit';
 import type { Measure } from '@cifras/chords';
 import { FONT_FILES, chooseFont } from './fonts';
+import { fontkit, type FontkitFont } from './fontkit';
 import type { FontBytesLoader, FontId } from './fonts';
 
-export type LoadedFonts = Map<FontId, fontkit.Font>;
+export type LoadedFonts = Map<FontId, FontkitFont>;
 
 const BOLD_FONT = /bold|black|heavy/i;
 
