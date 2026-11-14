@@ -54,10 +54,6 @@ export async function changeUserRole(
     throw new HttpsError('not-found', 'User not found.');
   }
   await deps.setClaims(result.targetUid, { role: result.newRole });
-  await deps.writeUser(
-    result.targetUid,
-    { role: result.newRole, roleUpdatedAt: deps.now() },
-    true,
-  );
+  await deps.writeUser(result.targetUid, { role: result.newRole, roleUpdatedAt: deps.now() }, true);
   return { uid: result.targetUid, role: result.newRole };
 }

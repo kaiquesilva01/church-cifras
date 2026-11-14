@@ -23,10 +23,7 @@ type RoleChangeInput = {
 };
 
 export type RoleChangeErrorCode =
-  | 'unauthenticated'
-  | 'permission-denied'
-  | 'invalid-argument'
-  | 'failed-precondition';
+  'unauthenticated' | 'permission-denied' | 'invalid-argument' | 'failed-precondition';
 
 export type RoleChangeResult =
   | { ok: true; targetUid: string; newRole: Role }

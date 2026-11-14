@@ -26,7 +26,11 @@ describe('createUserProfile', () => {
     expect(role).toBe('viewer');
     expect(claims).toEqual([['u1', { role: 'viewer' }]]);
     expect(writes).toEqual([
-      ['u1', { displayName: 'A', email: 'a@x.com', photoURL: 'p', role: 'viewer', createdAt: NOW }, false],
+      [
+        'u1',
+        { displayName: 'A', email: 'a@x.com', photoURL: 'p', role: 'viewer', createdAt: NOW },
+        false,
+      ],
     ]);
   });
 
