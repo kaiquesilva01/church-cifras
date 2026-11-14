@@ -30,4 +30,24 @@ describe('findKeyIndicator', () => {
     expect(found?.token).toMatchObject({ text: '(Bb)', x: 76 });
     expect(found?.key.name).toBe('Bb');
   });
+
+  it('finds Tom:E written without a space', () => {
+    const found = findKeyIndicator([line([run('Tom:E', 10, false)])]);
+    expect(found?.kind).toBe('tom');
+    expect(found?.key.name).toBe('E');
+    expect(found?.token).toMatchObject({ text: 'E', x: 10 + 4 * 6, width: 6 });
+  });
+
+  it('finds Tom and its colon in separate runs', () => {
+    const found = findKeyIndicator([
+      line([run('Tom', 10, false), run(':', 28, false), run('Gm', 40, false)]),
+    ]);
+    expect(found?.key.name).toBe('Gm');
+    expect(found?.token).toMatchObject({ text: 'Gm', x: 40 });
+  });
+
+  it('does not take words that merely contain tom', () => {
+    expect(findKeyIndicator([line([run('Custom E', 10, false)])])).toBeNull();
+    expect(findKeyIndicator([line([run('Tomorrow E', 10, false)])])).toBeNull();
+  });
 });

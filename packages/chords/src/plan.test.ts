@@ -79,6 +79,30 @@ describe('buildTransposePlan', () => {
     expect(tom.chordCount).toBe(0);
   });
 
+  it('flags a key indicator that would run into the next token', () => {
+    const tight = buildTransposePlan({
+      lines: [line([run('Tom:', 10, false), run('E', 40, false), run('Cifra', 52, false)])],
+      from: key('E'),
+      to: key('F#'),
+      measure,
+    });
+    expect(tight.keyIndicator).toMatchObject({ replacement: 'F#', collides: true });
+    const roomy = buildTransposePlan({
+      lines: [line([run('Tom:', 10, false), run('E', 40, false), run('Cifra', 100, false)])],
+      from: key('E'),
+      to: key('F#'),
+      measure,
+    });
+    expect(roomy.keyIndicator!.collides).toBe(false);
+    const title = buildTransposePlan({
+      lines: [line([run('PRA SEMPRE (E)', 10), run('x', 10 + 14 * 6 + 6, false)])],
+      from: key('E'),
+      to: key('F#'),
+      measure,
+    });
+    expect(title.keyIndicator).toMatchObject({ replacement: '(F#)', collides: true });
+  });
+
   it('does not repaint a bold Tom value as a chord', () => {
     const plan = buildTransposePlan({
       lines: [line([run('Tom: E', 10)])],

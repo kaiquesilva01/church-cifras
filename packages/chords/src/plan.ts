@@ -2,7 +2,8 @@ import { semitonesBetween, transposeChord } from './chord';
 import { findKeyIndicator } from './keyIndicator';
 import type { Key } from './keys';
 import { findChords, scanSegments } from './findChords';
-import type { Measure, TextLine } from './lines';
+import { segmentLine, tokenizeRuns } from './lines';
+import type { Measure, TextLine, Token } from './lines';
 
 const RIGHT_MARGIN = 20;
 const TOLERANCE_EM = 0.05;
@@ -45,6 +46,22 @@ export interface SuspectSegment {
 
 const MAX_SUSPECT_UNKNOWN = 2;
 
+function isCollision(input: {
+  x: number;
+  newWidth: number;
+  next: Token | null;
+  pageWidth: number;
+  fontName: string;
+  fontSize: number;
+  measure: Measure;
+}): boolean {
+  const { x, newWidth, next, pageWidth, fontName, fontSize, measure } = input;
+  const tolerance = TOLERANCE_EM * fontSize;
+  return next !== null
+    ? newWidth + measure('n', fontName, fontSize) > next.x - x + tolerance
+    : x + newWidth > pageWidth - RIGHT_MARGIN + tolerance;
+}
+
 export function buildTransposePlan(input: {
   lines: TextLine[];
   from: Key;
@@ -79,11 +96,15 @@ export function buildTransposePlan(input: {
     const replacement = `${prefix}${transposeChord(chord, semitones, to)}${suffix}`;
     const { fontSize, fontName } = token.run;
     const newWidth = measure(replacement, fontName, fontSize);
-    const tolerance = TOLERANCE_EM * fontSize;
-    const collides =
-      next !== null
-        ? newWidth + measure('n', fontName, fontSize) > next.x - token.x + tolerance
-        : token.x + newWidth > pageWidth - RIGHT_MARGIN + tolerance;
+    const collides = isCollision({
+      x: token.x,
+      newWidth,
+      next,
+      pageWidth,
+      fontName,
+      fontSize,
+      measure,
+    });
     chords.push({
       page,
       x: token.x,
@@ -124,6 +145,21 @@ export function buildTransposePlan(input: {
       keyIndicator.fontName,
       keyIndicator.fontSize,
     );
+    const siblings = lines
+      .filter((l) => l.page === indicator.page && l.y === indicator.y)
+      .flatMap((l) => segmentLine(l))
+      .find((segment) => segment.includes(token.run));
+    const next = tokenizeRuns(siblings ?? [token.run], measure).find((t) => t.x > token.x + 0.01);
+    const pageWidth = lines.find((l) => l.page === indicator.page)?.pageWidth ?? Infinity;
+    keyIndicator.collides = isCollision({
+      x: token.x,
+      newWidth: keyIndicator.newWidth,
+      next: next ?? null,
+      pageWidth,
+      fontName: keyIndicator.fontName,
+      fontSize: keyIndicator.fontSize,
+      measure,
+    });
   }
 
   return {
