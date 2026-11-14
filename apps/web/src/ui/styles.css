@@ -135,3 +135,76 @@ body {
   padding: 16px;
   color: var(--color-muted);
 }
+
+.success {
+  color: var(--color-success);
+}
+
+.people {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.people thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.people tr {
+  display: block;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.people td {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.people td::before {
+  content: attr(data-label);
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+.role-select {
+  font: inherit;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+@media (min-width: 640px) {
+  .people thead {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+  }
+
+  .people tr {
+    display: table-row;
+    padding: 0;
+  }
+
+  .people td,
+  .people th {
+    display: table-cell;
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .people td::before {
+    content: none;
+  }
+}

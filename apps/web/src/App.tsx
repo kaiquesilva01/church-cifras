@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router';
 import { AuthProvider, type AuthGateway } from './auth/AuthProvider';
+import type { PeopleApi } from './people/peopleApi';
+import { PeoplePage } from './people/PeoplePage';
 import { HomePage } from './routes/HomePage';
 import { LoginPage } from './routes/LoginPage';
 import { RequireAuth } from './routes/RequireAuth';
@@ -9,10 +11,11 @@ import { AppShell } from './ui/AppShell';
 
 export interface AppProps {
   gateway: AuthGateway;
+  peopleApi: PeopleApi;
   initialPath?: string;
 }
 
-function AppRoutes() {
+function AppRoutes({ peopleApi }: { peopleApi: PeopleApi }) {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
@@ -20,7 +23,7 @@ function AppRoutes() {
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route element={<RequireAdmin />}>
-            <Route path="/pessoas" element={<h2>Pessoas</h2>} />
+            <Route path="/pessoas" element={<PeoplePage api={peopleApi} />} />
           </Route>
         </Route>
       </Route>
@@ -29,19 +32,19 @@ function AppRoutes() {
   );
 }
 
-export function App({ gateway, initialPath }: AppProps) {
+export function App({ gateway, peopleApi, initialPath }: AppProps) {
   const router = useMemo(
     () =>
       initialPath ? (
         <MemoryRouter initialEntries={[initialPath]}>
-          <AppRoutes />
+          <AppRoutes peopleApi={peopleApi} />
         </MemoryRouter>
       ) : (
         <BrowserRouter>
-          <AppRoutes />
+          <AppRoutes peopleApi={peopleApi} />
         </BrowserRouter>
       ),
-    [initialPath],
+    [initialPath, peopleApi],
   );
   return <AuthProvider gateway={gateway}>{router}</AuthProvider>;
 }

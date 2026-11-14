@@ -3,10 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { App } from '../App';
 import type { Role } from '../auth/roles';
 import { createFakeGateway, testUser } from '../test/fakeGateway';
+import type { PeopleApi } from '../people/peopleApi';
+
+const peopleApi: PeopleApi = {
+  listUsers: () => Promise.resolve([]),
+  setRole: () => Promise.resolve(),
+};
 
 function setup(path: string, signedIn?: Role) {
   const gateway = createFakeGateway();
-  render(<App gateway={gateway} initialPath={path} />);
+  render(<App gateway={gateway} peopleApi={peopleApi} initialPath={path} />);
   act(() => gateway.emitUser(signedIn ? testUser : null));
   if (signedIn) act(() => gateway.emitRole(signedIn));
   return gateway;
@@ -27,7 +33,7 @@ describe('routes', () => {
   it('shows error when signIn fails', async () => {
     const gateway = createFakeGateway();
     gateway.signIn = () => Promise.reject(new Error('popup'));
-    render(<App gateway={gateway} initialPath="/login" />);
+    render(<App gateway={gateway} peopleApi={peopleApi} initialPath="/login" />);
     act(() => gateway.emitUser(null));
     fireEvent.click(screen.getByText('Entrar com Google'));
     expect(await screen.findByText('Não foi possível entrar. Tente de novo.')).toBeInTheDocument();
@@ -52,7 +58,7 @@ describe('routes', () => {
 
   it('waits for the role before deciding on /pessoas', () => {
     const gateway = createFakeGateway();
-    render(<App gateway={gateway} initialPath="/pessoas" />);
+    render(<App gateway={gateway} peopleApi={peopleApi} initialPath="/pessoas" />);
     act(() => gateway.emitUser(testUser));
     expect(screen.getByText('Carregando…')).toBeInTheDocument();
     act(() => gateway.emitRole('admin'));
@@ -62,7 +68,7 @@ describe('routes', () => {
   it('disables the login button while the popup is open', () => {
     const gateway = createFakeGateway();
     gateway.signIn = () => new Promise(() => undefined);
-    render(<App gateway={gateway} initialPath="/login" />);
+    render(<App gateway={gateway} peopleApi={peopleApi} initialPath="/login" />);
     act(() => gateway.emitUser(null));
     fireEvent.click(screen.getByText('Entrar com Google'));
     expect(screen.getByRole('button', { name: 'Entrar com Google' })).toBeDisabled();
