@@ -68,6 +68,10 @@ Um plano por fase da §11 do spec.
 
 ## Comandos
 
-- `node --test ".claude/**/*.test.mjs"` — testes do harness.
-
-A Fase 1 adiciona os comandos do monorepo aqui.
+- `docker compose up --build` — sobe web (5173), functions (build watch) e emuladores (UI 4000).
+- `docker compose down` — encerra o ambiente local.
+- `npm test` — testes de todos os workspaces.
+- `npm run lint` — ESLint.
+- `npm run typecheck` — TypeScript.
+- `npm run test:rules` — testes das Security Rules no emulador.
+- `npm run test:harness` — testes do harness (`node --test ".claude/**/*.test.mjs"`).
