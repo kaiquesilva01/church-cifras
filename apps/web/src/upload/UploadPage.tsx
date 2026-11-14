@@ -68,8 +68,17 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
 
   const titleTrim = title.trim();
   const artistTrim = artist.trim();
-  const titleError = titleTrim ? null : 'Informe o nome da música.';
-  const artistError = artistTrim ? null : 'Informe o cantor.';
+  const NO_TEXT = 'Use letras ou números no nome.';
+  const titleError = !titleTrim
+    ? 'Informe o nome da música.'
+    : normalizeText(titleTrim) === ''
+      ? NO_TEXT
+      : null;
+  const artistError = !artistTrim
+    ? 'Informe o cantor.'
+    : normalizeText(artistTrim) === ''
+      ? NO_TEXT
+      : null;
   const keyError = key ? null : 'Escolha o tom.';
   const valid = !titleError && !artistError && !keyError;
   const ready = fileState.status === 'ready';
@@ -163,6 +172,11 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
         ? `Substituir tom ${keyLabel}`
         : 'Salvar cifra';
 
+  const retryLookup = () => {
+    immediate.current = true;
+    setRecheck((n) => n + 1);
+  };
+
   const submit = async () => {
     setAttempted(true);
     if (!valid || !file || lookup.status !== 'done' || lookup.decision === 'blocked') return;
@@ -178,10 +192,10 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     } catch (error) {
       if (error instanceof ArrangementExistsError) {
         setSave('conflict');
-        immediate.current = true;
-        setRecheck((n) => n + 1);
+        retryLookup();
       } else {
         setSave('failed');
+        retryLookup();
       }
     }
   };
@@ -257,7 +271,8 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   const keys = minor ? KEY_OPTIONS.minor : KEY_OPTIONS.major;
   const saving = save === 'saving';
   const lookingUp = lookup.status === 'checking';
-  const disabled = saving || decision === 'blocked' || (valid && lookup.status !== 'done');
+  const disabled =
+    saving || reading || decision === 'blocked' || (valid && lookup.status !== 'done');
   const blockedKey = key;
 
   return (
@@ -430,9 +445,12 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           </p>
         )}
         {lookup.status === 'error' && (
-          <p role="alert" className="error">
-            Não foi possível verificar a música. Tente de novo.
-          </p>
+          <div role="alert" className="error">
+            <p>Não foi possível verificar a música.</p>
+            <button type="button" className="link-btn" onClick={retryLookup}>
+              Tentar de novo
+            </button>
+          </div>
         )}
         {save === 'conflict' && (
           <p role="alert" className="error">
@@ -447,9 +465,8 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
 
         <div className="sticky-bar">
           <button type="submit" className="btn btn-primary btn-block" disabled={disabled}>
-            {saving ? 'Salvando…' : buttonLabel}
+            {saving ? 'Salvando…' : lookingUp ? 'Verificando…' : buttonLabel}
           </button>
-          {lookingUp && <span className="sr-only">Verificando…</span>}
         </div>
       </form>
     </section>

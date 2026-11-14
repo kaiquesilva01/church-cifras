@@ -119,6 +119,17 @@ describe('UploadPage', () => {
     expect(screen.getByText('Escolha o tom.')).toBeInTheDocument();
   });
 
+  it('rejects titles and artists with no letters or digits', async () => {
+    setup();
+    pick();
+    await screen.findByLabelText('Música');
+    fireEvent.change(screen.getByLabelText('Música'), { target: { value: '!!! ---' } });
+    fireEvent.change(screen.getByLabelText('Cantor'), { target: { value: '???' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar cifra' }));
+    expect(screen.getAllByText('Use letras ou números no nome.')).toHaveLength(2);
+    expect(screen.getByLabelText('Música')).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('limits title and artist to 120 characters', async () => {
     setup();
     pick();
@@ -225,6 +236,58 @@ describe('UploadPage', () => {
     pick();
     fireEvent.click(await enabledButton('Salvar cifra'));
     expect(await screen.findByText('Não foi possível salvar. Tente de novo.')).toBeInTheDocument();
+  });
+
+  it('offers a retry when the lookup fails and recovers', async () => {
+    const findSong = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(null);
+    setup({ api: { findSong } });
+    pick();
+    expect(await screen.findByText('Não foi possível verificar a música.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salvar cifra' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    await enabledButton('Salvar cifra');
+    expect(findSong).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('Não foi possível verificar a música.')).not.toBeInTheDocument();
+  });
+
+  it('rechecks the lookup after a failed save', async () => {
+    const findSong = vi.fn(() => Promise.resolve(null));
+    const createSongWithArrangement = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValue('new-id');
+    setup({ api: { findSong, createSongWithArrangement } });
+    pick();
+    fireEvent.click(await enabledButton('Salvar cifra'));
+    expect(await screen.findByText('Não foi possível salvar. Tente de novo.')).toBeInTheDocument();
+    await waitFor(() => expect(findSong).toHaveBeenCalledTimes(2));
+    fireEvent.click(await enabledButton('Salvar cifra'));
+    await waitFor(() => expect(createSongWithArrangement).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows the lookup state on the button', async () => {
+    let finish: (song: null) => void = () => undefined;
+    const findSong = vi.fn(() => new Promise<null>((resolve) => (finish = resolve)));
+    setup({ api: { findSong } });
+    pick();
+    const button = await screen.findByRole('button', { name: 'Verificando…' });
+    expect(button).toBeDisabled();
+    await waitFor(() => expect(findSong).toHaveBeenCalled());
+    finish(null);
+    await enabledButton('Salvar cifra');
+  });
+
+  it('disables saving while a second pdf is being read', async () => {
+    const { readPdf } = setup();
+    pick();
+    await enabledButton('Salvar cifra');
+    let release: (value: typeof baseResult) => void = () => undefined;
+    vi.mocked(readPdf).mockReturnValueOnce(new Promise((resolve) => (release = resolve)));
+    pick('b.pdf');
+    expect(await screen.findByText('Lendo PDF…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salvar cifra' })).toBeDisabled();
+    release(baseResult);
+    await enabledButton('Salvar cifra');
   });
 
   it('rejects files over 10 MB', async () => {
