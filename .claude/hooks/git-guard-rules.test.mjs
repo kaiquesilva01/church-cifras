@@ -3,20 +3,20 @@ import assert from 'node:assert/strict';
 import { evaluateCommand } from './git-guard-rules.mjs';
 
 const cases = [
-  ['blocks commit on main', 'git commit -m "x"', 'main', [], false, 'origin/develop'],
-  ['blocks commit on develop', 'git commit -am "x"', 'develop', [], false, 'origin/develop'],
+  ['blocks commit on main', 'git commit -m "x"', 'main', [], false, 'Commit direto'],
+  ['blocks commit on develop', 'git commit -am "x"', 'develop', [], false, 'Commit direto'],
   ['allows commit on feature branch', 'git commit -m "x"', 'feat/a', [], true],
   ['allows commit after checkout -b in same command', 'git checkout -b feat/x origin/develop && git commit -m "x"', 'develop', [], true],
   ['allows commit after switch -c in same command', 'git switch -c fix/y && git commit -m y', 'main', [], true],
   ['blocks commit with staged pdf', 'git commit -m x', 'feat/a', ['fixtures/a.pdf'], false, 'PDF'],
   ['blocks pdf case-insensitively', 'git commit -m x', 'feat/a', ['A.PDF'], false, 'PDF'],
-  ['blocks push to main refspec', 'git push origin main', 'feat/a', [], false, 'develop'],
-  ['blocks push HEAD:develop', 'git push origin HEAD:develop', 'feat/a', [], false, 'develop'],
-  ['blocks push refs/heads/main', 'git push origin feat/a:refs/heads/main', 'feat/a', [], false, 'develop'],
-  ['blocks bare push on protected branch', 'git push', 'develop', [], false, 'develop'],
-  ['blocks push HEAD on protected branch', 'git push -u origin HEAD', 'develop', [], false, 'develop'],
+  ['blocks push to main refspec', 'git push origin main', 'feat/a', [], false, 'Push para'],
+  ['blocks push HEAD:develop', 'git push origin HEAD:develop', 'feat/a', [], false, 'Push para'],
+  ['blocks push refs/heads/main', 'git push origin feat/a:refs/heads/main', 'feat/a', [], false, 'Push para'],
+  ['blocks bare push on protected branch', 'git push', 'develop', [], false, 'Push para'],
+  ['blocks push HEAD on protected branch', 'git push -u origin HEAD', 'develop', [], false, 'Push para'],
   ['allows push of feature branch', 'git push -u origin feat/a', 'feat/a', [], true],
-  ['blocks force push to protected', 'git push --force origin develop', 'feat/a', [], false, 'develop'],
+  ['blocks force push to protected', 'git push --force origin develop', 'feat/a', [], false, 'Push para'],
   ['blocks pr create without explicit base', 'gh pr create --title t --body b', 'feat/a', [], false, '--base develop'],
   ['allows pr create to develop', 'gh pr create --base develop --title t', 'feat/a', [], true],
   ['allows pr create with -B develop', 'gh pr create -B develop -t t', 'feat/a', [], true],
@@ -25,14 +25,14 @@ const cases = [
   ['allows pr develop to main', 'gh pr create --base main --head develop', 'feat/a', [], true],
   ['allows pr to main when on develop', 'gh pr create --base main', 'develop', [], true],
   ['blocks gh pr merge', 'gh pr merge 12 --squash', 'feat/a', [], false, 'humana'],
-  ['handles powershell separators and quotes', "git add .; git commit -m 'msg; with semicolon'", 'main', [], false, 'origin/develop'],
+  ['handles powershell separators and quotes', "git add .; git commit -m 'msg; with semicolon'", 'main', [], false, 'Commit direto'],
   ['ignores git words inside quoted text', 'echo "git commit on main" && ls', 'main', [], true],
-  ['blocks commit with git -C on main', 'git -C . commit -m x', 'main', [], false, 'origin/develop'],
-  ['blocks push with -c option to develop', 'git -c core.x=y push origin develop', 'feat/a', [], false, 'develop'],
-  ['blocks commit with env prefix', 'GIT_AUTHOR_NAME=x git commit -m y', 'develop', [], false, 'origin/develop'],
+  ['blocks commit with git -C on main', 'git -C . commit -m x', 'main', [], false, 'Commit direto'],
+  ['blocks push with -c option to develop', 'git -c core.x=y push origin develop', 'feat/a', [], false, 'Push para'],
+  ['blocks commit with env prefix', 'GIT_AUTHOR_NAME=x git commit -m y', 'develop', [], false, 'Commit direto'],
   ['blocks commit after checkout of a path', 'git checkout README.md && git commit -m x', 'main', [], false, 'checkout'],
   ['blocks commit after checkout dot', 'git checkout . && git commit -m x', 'main', [], false, 'checkout'],
-  ['blocks commit after checkout -q main', 'git checkout -q main && git commit -m x', 'feat/a', [], false, 'origin/develop'],
+  ['blocks commit after checkout -q main', 'git checkout -q main && git commit -m x', 'feat/a', [], false, 'Commit direto'],
   ['allows commit after switch to feature', 'git switch feat/b && git commit -m x', 'main', [], true],
   ['blocks git add of pdf', 'git add -f docs/a.PDF', 'feat/a', [], false, 'PDF'],
   ['blocks add pdf then commit', 'git add a.pdf && git commit -m x', 'feat/a', [], false, 'PDF'],
@@ -40,12 +40,44 @@ const cases = [
   ['allows commit message mentioning pdf', 'git commit -m "remove a.pdf"', 'feat/a', [], true],
   ['blocks gh pr merge with -R', 'gh -R o/r pr merge 1', 'feat/a', [], false, 'humana'],
   ['blocks pr to main with --repo', 'gh --repo o/r pr create --base main', 'feat/a', [], false, 'develop'],
-  ['blocks commit in subshell parens', '(git commit -m x)', 'main', [], false, 'origin/develop'],
-  ['blocks commit after if then', 'if true; then git commit -m x; fi', 'main', [], false, 'origin/develop'],
-  ['blocks git.exe commit', 'git.exe commit -m x', 'main', [], false, 'origin/develop'],
-  ['blocks absolute path git', '/usr/bin/git push origin main', 'feat/a', [], false, 'develop'],
-  ['blocks bash -c commit', 'bash -c "git commit -m x"', 'develop', [], false, 'origin/develop'],
+  ['blocks commit in subshell parens', '(git commit -m x)', 'main', [], false, 'Commit direto'],
+  ['blocks commit after if then', 'if true; then git commit -m x; fi', 'main', [], false, 'Commit direto'],
+  ['blocks git.exe commit', 'git.exe commit -m x', 'main', [], false, 'Commit direto'],
+  ['blocks absolute path git', '/usr/bin/git push origin main', 'feat/a', [], false, 'Push para'],
+  ['blocks bash -c commit', 'bash -c "git commit -m x"', 'develop', [], false, 'Commit direto'],
   ['allows unrelated commands', 'npm test', 'main', [], true],
+  // PowerShell 5.1 / subshells: chaves e parênteses separam segmentos
+  ['blocks commit in if ($?) block', 'git add .; if ($?) { git commit -m "x" }', 'develop', [], false, 'Commit direto'],
+  ['blocks push after commit in if block', 'git commit -m x; if ($?) { git push origin develop }', 'feat/a', [], false, 'Push para'],
+  ['blocks push in LASTEXITCODE block', 'if ($LASTEXITCODE -eq 0) { git push origin main }', 'feat/a', [], false, 'Push para'],
+  ['blocks push in try block', 'try { git push origin develop } catch {}', 'feat/a', [], false, 'Push para'],
+  ['blocks pr merge in braces', 'if ($?) { gh pr merge 3 }', 'feat/a', [], false, 'humana'],
+  ['blocks push inside command substitution', 'echo $(git push origin main)', 'feat/a', [], false, 'Push para'],
+  // switch --track, push options, --all/--mirror
+  ['blocks commit after switch --track', 'git switch --track origin/develop && git commit -m x', 'feat/a', [], false, 'checkout/switch'],
+  ['blocks push with -o value on protected branch', 'git push -o ci.skip origin', 'develop', [], false, 'Push para'],
+  ['blocks push with --push-option= on protected branch', 'git push --push-option=ci.skip origin', 'develop', [], false, 'Push para'],
+  ['blocks push --all', 'git push --all origin', 'feat/a', [], false, 'Push para'],
+  ['blocks push --mirror', 'git push --mirror', 'feat/a', [], false, 'Push para'],
+  // gh pr edit / head com owner
+  ['blocks pr edit base main', 'gh pr edit 5 --base main', 'feat/a', [], false, 'develop'],
+  ['allows pr edit base develop', 'gh pr edit 5 --base develop', 'feat/a', [], true],
+  ['allows pr to main with owner:develop head', 'gh pr create --base main --head owner:develop', 'feat/a', [], true],
+  ['blocks pr to main with owner:feature head', 'gh pr create --base main --head owner:feat/a', 'develop', [], false, 'develop'],
+  // here-strings e heredocs são opacos
+  ['detects push after powershell here-string', "git commit -m @'\ndon't\n'@; git push origin develop", 'feat/a', [], false, 'Push para'],
+  ['detects push after bash heredoc', "cat <<'EOF'\ndon't\nEOF\ngit push origin develop", 'feat/a', [], false, 'Push para'],
+  ['allows heredoc commit message mentioning main', "git commit -m \"$(cat <<'EOF'\ndon't push to main\nEOF\n)\"", 'feat/a', [], true],
+  ['allows unquoted heredoc body mentioning push', 'cat <<-EOF\n\tgit push origin main\n\tEOF\nls', 'feat/a', [], true],
+  // casos permitidos (travados)
+  ['allows git diff main', 'git diff main', 'feat/a', [], true],
+  ['allows git log origin/main..develop', 'git log origin/main..develop', 'feat/a', [], true],
+  ['allows git fetch origin develop', 'git fetch origin develop', 'feat/a', [], true],
+  ['allows git pull origin develop', 'git pull origin develop', 'feat/a', [], true],
+  ['allows gh pr view', 'gh pr view 3', 'feat/a', [], true],
+  ['allows git rebase origin/develop', 'git rebase origin/develop', 'feat/a', [], true],
+  ['allows pr create main from develop explicit head', 'gh pr create --base main --head develop', 'feat/a', [], true],
+  ['allows commit message mentioning main and develop', 'git commit -m "merge main into develop"', 'feat/a', [], true],
 ];
 
 for (const [name, command, branch, stagedFiles, allow, snippet] of cases) {
@@ -55,3 +87,14 @@ for (const [name, command, branch, stagedFiles, allow, snippet] of cases) {
     if (!allow) assert.ok(result.reason.includes(snippet), `reason sem "${snippet}": ${result.reason}`);
   });
 }
+
+test('pr create to develop carries a test reminder', () => {
+  const r = evaluateCommand({ command: 'gh pr create --base develop --title t', branch: 'feat/a', stagedFiles: [] });
+  assert.equal(r.allow, true);
+  assert.ok(r.reminder.includes('testes'), r.reminder);
+});
+
+test('non pr-create allowed commands carry no reminder', () => {
+  const r = evaluateCommand({ command: 'git status', branch: 'feat/a', stagedFiles: [] });
+  assert.deepEqual(r, { allow: true });
+});

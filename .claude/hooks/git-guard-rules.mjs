@@ -1,18 +1,56 @@
 // Regras puras do guard de Git: decide se um comando de shell pode rodar
 // sob o fluxo de branches do projeto. Sem dependências, sem I/O.
+//
+// evaluateCommand({ command, branch, stagedFiles }) devolve:
+//   { allow: false, reason }     comando bloqueado;
+//   { allow: true, reminder }    permitido, com lembrete (ex.: `gh pr create` -> rodar testes);
+//   { allow: true }              permitido.
 
 export const PROTECTED_BRANCHES = ['main', 'develop'];
 
 const isProtected = (b) => PROTECTED_BRANCHES.includes(b);
 
-// Divide o comando em segmentos (separados por &&, ||, ;, |, & e quebras de
-// linha fora de aspas); cada segmento é uma lista de tokens sem as aspas.
+const SEPARATORS = new Set([';', '\n', '\r', '|', '&', '{', '}', '(', ')']);
+
+// Fim de um here-string do PowerShell (`@'...'@` / `@"..."@`) que começa em `start`,
+// ou -1 se `start` não abre um. Se não terminar, consome o resto do comando.
+function hereStringEnd(command, start) {
+  const m = /^@(['"])\r?\n/.exec(command.slice(start, start + 4));
+  if (!m) return -1;
+  const close = command.indexOf(`\n${m[1]}@`, start + m[0].length - 1);
+  return close === -1 ? command.length : close + 3;
+}
+
+// Delimitador de um heredoc (`<<WORD`, `<<-'WORD'`) que começa em `start`.
+function heredocAt(command, start) {
+  const m = /^<<(-?)\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/.exec(command.slice(start));
+  return m ? { length: m[0].length, dashed: m[1] === '-', word: m[3] } : null;
+}
+
+// Índice do fim da linha terminadora do heredoc, a partir do início do corpo.
+function skipHeredocBody(command, from, { dashed, word }) {
+  let pos = from;
+  while (pos < command.length) {
+    let end = command.indexOf('\n', pos);
+    if (end === -1) end = command.length;
+    let line = command.slice(pos, end).replace(/\r$/, '');
+    if (dashed) line = line.replace(/^\t+/, '');
+    if (line === word) return end;
+    pos = end + 1;
+  }
+  return command.length;
+}
+
+// Divide o comando em segmentos (separados por &&, ||, ;, |, &, quebras de linha,
+// chaves e parênteses fora de aspas); cada segmento é uma lista de tokens sem as aspas.
+// Here-strings e corpos de heredoc são opacos.
 export function splitSegments(command) {
   const segments = [];
   let tokens = [];
   let cur = '';
   let has = false; // token em andamento (permite string vazia entre aspas)
   let quote = null;
+  const pendingHeredocs = [];
 
   const endToken = () => {
     if (has) tokens.push(cur);
@@ -30,11 +68,25 @@ export function splitSegments(command) {
     if (quote) {
       if (c === quote) quote = null;
       else cur += c;
+      continue;
+    }
+    const hereEnd = c === '@' ? hereStringEnd(command, i) : -1;
+    const heredoc = c === '<' && command[i - 1] !== '<' ? heredocAt(command, i) : null;
+    if (hereEnd !== -1) {
+      has = true;
+      i = hereEnd - 1;
+    } else if (heredoc) {
+      pendingHeredocs.push(heredoc);
+      endToken();
+      i += heredoc.length - 1;
     } else if (c === '"' || c === "'") {
       quote = c;
       has = true;
-    } else if (c === ';' || c === '\n' || c === '\r' || c === '|' || c === '&') {
+    } else if (SEPARATORS.has(c)) {
       endSegment();
+      if (c === '\n') {
+        for (const h of pendingHeredocs.splice(0)) i = skipHeredocBody(command, i + 1, h);
+      }
     } else if (/\s/.test(c)) {
       endToken();
     } else {
@@ -53,14 +105,15 @@ const UNKNOWN = '<desconhecida>';
 
 const unknownBranchBlock = () =>
   block(
-    'Não foi possível determinar a branch após `git checkout`; ' +
-      'rode o checkout em um comando separado e só então faça commit/push.'
+    'Não foi possível determinar a branch após trocar de branch (checkout/switch); ' +
+      'rode a troca em um comando separado e só então faça commit/push.'
   );
 
 const pdfBlock = (files) =>
   block(
     `Nunca commite arquivos PDF (repositório público, letras protegidas por direitos autorais): ${files.join(', ')}. ` +
-      'Remova do stage com `git restore --staged <arquivo>` e adicione o padrão ao .gitignore.'
+      'Remova do stage com `git restore --staged <arquivo>` em um comando separado, ' +
+      'adicione o padrão ao .gitignore e tente de novo.'
   );
 
 const isPdf = (f) => /\.pdf$/i.test(f);
@@ -101,9 +154,27 @@ function refspecDestination(refspec) {
   return dest.replace(/^refs\/heads\//, '');
 }
 
+const PUSH_VALUE_FLAGS = ['-o', '--push-option', '--receive-pack', '--exec', '--repo'];
+
+// Argumentos posicionais de `git push` (ignora flags e os valores das que recebem um).
+function pushPositionals(args) {
+  const positional = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (PUSH_VALUE_FLAGS.includes(a)) i++;
+    else if (!a.startsWith('-')) positional.push(a);
+  }
+  return positional;
+}
+
 function checkPush(args, branch) {
-  const positional = args.filter((a) => !a.startsWith('-'));
-  const refspecs = positional.slice(1); // primeiro posicional é o remote
+  if (args.some((a) => a === '--all' || a === '--mirror')) {
+    return block(
+      'Push para todas as branches (`--all`/`--mirror`) é proibido: enviaria main/develop. ' +
+        'Publique apenas sua branch de feature (`git push -u origin <tipo>/<nome>`).'
+    );
+  }
+  const refspecs = pushPositionals(args).slice(1); // primeiro posicional é o remote
   const targets = refspecs.length ? refspecs.map(refspecDestination) : ['HEAD'];
   for (const t of targets) {
     const implicit = t === 'HEAD' || t === '';
@@ -138,7 +209,7 @@ function checkPrCreate(args, branch) {
     );
   }
   if (base === 'main') {
-    const head = optionValue(args, ['--head', '-H']) ?? branch;
+    const head = (optionValue(args, ['--head', '-H']) ?? branch).replace(/^[^:]+:/, ''); // sem `owner:`
     if (head === UNKNOWN) return unknownBranchBlock();
     if (head !== 'develop') {
       return block(
@@ -169,6 +240,9 @@ function firstTarget(args) {
   return undefined;
 }
 
+// `git switch --track origin/x` troca para uma branch local cujo nome não aparece no comando.
+const tracksRemote = (args) => args.some((a) => a === '--track' || a === '-t');
+
 // Atualiza a branch efetiva após checkout/switch.
 function trackBranch(sub, args, state) {
   const createFlags = sub === 'checkout' ? ['-b', '-B'] : ['-c', '-C', '--create', '--force-create'];
@@ -179,7 +253,7 @@ function trackBranch(sub, args, state) {
   }
   const target = firstTarget(args);
   if (target === undefined) return; // ex.: `git checkout -- arquivo`
-  if (sub === 'switch') state.branch = target === '-' ? UNKNOWN : target;
+  if (sub === 'switch') state.branch = target === '-' || tracksRemote(args) ? UNKNOWN : target;
   else state.branch = isProtected(target) ? target : UNKNOWN;
 }
 
@@ -204,13 +278,23 @@ function checkGh(tokens, state) {
         'Deixe o PR aberto (`gh pr create --base develop`) e avise a pessoa responsável.'
     );
   }
-  if (action === 'create') return checkPrCreate(args, state.branch);
+  if (action === 'edit' && optionValue(args, ['--base', '-B']) === 'main') {
+    return block(
+      'Base main só via PR develop → main criado com `gh pr create --base main --head develop`; ' +
+        'não altere a base de um PR existente para main.'
+    );
+  }
+  if (action === 'create') {
+    const blocked = checkPrCreate(args, state.branch);
+    if (!blocked) state.prCreate = true;
+    return blocked;
+  }
   return null;
 }
 
 const WRAPPERS = new Set([
   '(', '{', '!', 'then', 'do', 'else', 'elif', 'if', 'while', 'until',
-  'time', 'command', 'env', 'sudo', 'nohup',
+  'time', 'command', 'env', 'sudo', 'nohup', 'try', 'catch', 'finally', 'elseif', 'foreach',
 ]);
 const SHELLS = new Set(['bash', 'sh', 'zsh', 'pwsh', 'powershell']);
 
@@ -251,6 +335,13 @@ function evaluateSegments(command, state, stagedFiles) {
   return null;
 }
 
+const PR_REMINDER =
+  '[git-guard] Lembrete: rode os testes (node --test ".claude/**/*.test.mjs" e os do monorepo) ' +
+  'e confirme que passam antes de abrir o PR.';
+
 export function evaluateCommand({ command, branch, stagedFiles = [] }) {
-  return evaluateSegments(command, { branch }, stagedFiles) ?? { allow: true };
+  const state = { branch, prCreate: false };
+  const blocked = evaluateSegments(command, state, stagedFiles);
+  if (blocked) return blocked;
+  return state.prCreate ? { allow: true, reminder: PR_REMINDER } : { allow: true };
 }
