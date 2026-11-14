@@ -56,13 +56,13 @@ describe('loadFontBytes', () => {
       .mockResolvedValue(okResponse([1]));
     vi.stubGlobal('fetch', fetchMock);
     const first = loadFontBytes('mono-bold');
-    const firstSettled = first.catch(() => undefined);
-    // let the first download reach fetch before the cache is reset
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    const firstRejection = expect(first).rejects.toThrow('late failure');
+    // the first download must really be in flight (fetch called) before the cache is reset
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     resetFontCache();
     const second = loadFontBytes('mono-bold');
     rejectFirst(new Error('late failure'));
-    await firstSettled;
+    await firstRejection;
     await second;
     expect(loadFontBytes('mono-bold')).toBe(second);
     expect(fetchMock).toHaveBeenCalledTimes(2);
