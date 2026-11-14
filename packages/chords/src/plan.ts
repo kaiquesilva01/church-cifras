@@ -1,8 +1,8 @@
 import { semitonesBetween, transposeChord } from './chord';
 import { findKeyIndicator } from './keyIndicator';
 import type { Key } from './keys';
-import { analyzeSegment, segmentLine, tokenizeSegment } from './lines';
-import type { TextLine, Token } from './lines';
+import { findChords, scanSegments } from './findChords';
+import type { TextLine } from './lines';
 
 const RIGHT_MARGIN = 20;
 const TOLERANCE_EM = 0.05;
@@ -56,55 +56,43 @@ export function buildTransposePlan(input: {
   const suspectSegments: SuspectSegment[] = [];
   let chordCount = 0;
 
-  for (const line of lines) {
-    for (const segment of segmentLine(line)) {
-      const tokens = tokenizeSegment(segment);
-      const analysis = analyzeSegment(tokens);
-      const isIndicatorToken = (token: Token): boolean =>
-        indicator !== null &&
-        indicator.page === line.page &&
-        indicator.y === line.y &&
-        Math.abs(indicator.token.x - token.x) < 0.01;
-      const found = analysis.chords.filter((c) => !isIndicatorToken(c.token));
-      if (found.length > 0 && analysis.unknown.length > 0) {
-        if (analysis.unknown.length <= MAX_SUSPECT_UNKNOWN) {
-          suspectSegments.push({
-            page: line.page,
-            y: line.y,
-            unknown: analysis.unknown,
-            chords: found.length,
-          });
-        }
-        continue;
-      }
-      if (analysis.unknown.length > 0 || analysis.chords.length === 0) continue;
-      found.forEach(({ token, chord, prefix, suffix }) => {
-        const i = tokens.indexOf(token);
-        chordCount++;
-        if (same) return;
-        const replacement = `${prefix}${transposeChord(chord, semitones, to)}${suffix}`;
-        const { fontSize, fontName } = token.run;
-        const newWidth = measure(replacement, fontName, fontSize);
-        const next = tokens[i + 1];
-        const tolerance = TOLERANCE_EM * fontSize;
-        const collides =
-          next !== undefined
-            ? newWidth + measure('n', fontName, fontSize) > next.x - token.x + tolerance
-            : token.x + newWidth > line.pageWidth - RIGHT_MARGIN + tolerance;
-        chords.push({
-          page: line.page,
-          x: token.x,
-          y: token.run.y,
-          width: token.width,
-          fontSize,
-          fontName,
-          original: token.text,
-          replacement,
-          newWidth,
-          collides,
+  for (const segment of scanSegments(lines, indicator)) {
+    if (segment.chords.length > 0 && segment.unknown.length > 0) {
+      if (segment.unknown.length <= MAX_SUSPECT_UNKNOWN) {
+        suspectSegments.push({
+          page: segment.line.page,
+          y: segment.line.y,
+          unknown: segment.unknown,
+          chords: segment.chords.length,
         });
-      });
+      }
     }
+  }
+
+  for (const occurrence of findChords(lines, indicator)) {
+    const { token, chord, prefix, suffix, next, page, pageWidth } = occurrence;
+    chordCount++;
+    if (same) continue;
+    const replacement = `${prefix}${transposeChord(chord, semitones, to)}${suffix}`;
+    const { fontSize, fontName } = token.run;
+    const newWidth = measure(replacement, fontName, fontSize);
+    const tolerance = TOLERANCE_EM * fontSize;
+    const collides =
+      next !== null
+        ? newWidth + measure('n', fontName, fontSize) > next.x - token.x + tolerance
+        : token.x + newWidth > pageWidth - RIGHT_MARGIN + tolerance;
+    chords.push({
+      page,
+      x: token.x,
+      y: token.run.y,
+      width: token.width,
+      fontSize,
+      fontName,
+      original: token.text,
+      replacement,
+      newWidth,
+      collides,
+    });
   }
 
   let keyIndicator: Replacement | null = null;

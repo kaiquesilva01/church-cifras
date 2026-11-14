@@ -15,6 +15,8 @@ export {
 export type { ChordToken, SegmentAnalysis, TextLine, TextRun, Token } from './lines';
 export { findKeyIndicator } from './keyIndicator';
 export type { KeyIndicator } from './keyIndicator';
+export { findChords } from './findChords';
+export type { ChordOccurrence } from './findChords';
 export { buildTransposePlan } from './plan';
 export type { Measure, Replacement, SuspectSegment, TransposePlan } from './plan';
 export { normalizeText, suggestMetadata } from './metadata';
