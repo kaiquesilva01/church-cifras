@@ -18,4 +18,11 @@ describe('workspace packaging', () => {
     const dockerfile = readFileSync(resolve(root, 'docker/dev.Dockerfile'), 'utf8');
     expect(dockerfile).toContain('COPY packages/chords/package.json packages/chords/package.json');
   });
+
+  it('dev image copies the pdf package manifest and compose isolates its node_modules', () => {
+    const dockerfile = readFileSync(resolve(root, 'docker/dev.Dockerfile'), 'utf8');
+    const compose = readFileSync(resolve(root, 'docker-compose.yml'), 'utf8');
+    expect(dockerfile).toContain('COPY packages/pdf/package.json packages/pdf/package.json');
+    expect(compose).toContain('/app/packages/pdf/node_modules');
+  });
 });

@@ -12,6 +12,7 @@ x-dev: &dev
     - /app/apps/web/node_modules
     - /app/apps/functions/node_modules
     - /app/packages/chords/node_modules
+    - /app/packages/pdf/node_modules
     - /app/tests/node_modules
     - firebase-emulator-cache:/root/.cache/firebase/emulators
 
