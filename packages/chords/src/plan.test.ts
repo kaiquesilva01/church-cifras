@@ -247,7 +247,7 @@ describe('buildTransposePlan', () => {
     expect(plan.suspectSegments).toEqual([{ page: 2, y: 650, unknown: ['E7/9x'], chords: 2 }]);
   });
 
-  it('does not flag uppercase titles with E/A as suspect', () => {
+  it('does not flag uppercase titles with E/A as suspect (does not flag A CASA DE DEUS)', () => {
     for (const text of [
       'MEU PRAZER E',
       'SANTO E DIGNO',
@@ -255,6 +255,9 @@ describe('buildTransposePlan', () => {
       'DEUS E BOM',
       'Refrão A',
       'Final: A E (2x) Fim',
+      'A CASA DE DEUS',
+      'A GRANDE ALEGRIA DO SENHOR',
+      'E EM ADORAÇÃO DA IGREJA',
     ]) {
       const plan = buildTransposePlan({
         lines: [line([run(text, 10)])],

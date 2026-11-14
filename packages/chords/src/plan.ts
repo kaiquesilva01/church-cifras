@@ -47,6 +47,8 @@ export interface SuspectSegment {
 const MAX_SUSPECT_UNKNOWN = 2;
 // An unknown token only counts if it looks like a mistyped chord: a chord letter (optionally
 // with an accidental) not followed by two more letters, or followed by a quality word.
+// All-caps words (DE, DO, EM, ADORAÇÃO) are title text, never a chord attempt.
+const ALL_CAPS_WORD = /^[A-G][A-ZÀ-Ý]+$/;
 const CHORD_ATTEMPT = /^[[(]?[A-G](?:[#b]?(?![a-z]{2}|[A-Z]{2})|[#b]?(?:maj|min|dim|aug|sus|add))/;
 
 function isCollision(input: {
@@ -80,7 +82,7 @@ export function buildTransposePlan(input: {
   let chordCount = 0;
 
   for (const segment of scanSegments(lines, indicator, measure)) {
-    const attempts = segment.unknown.filter((t) => CHORD_ATTEMPT.test(t));
+    const attempts = segment.unknown.filter((t) => CHORD_ATTEMPT.test(t) && !ALL_CAPS_WORD.test(t));
     if (
       segment.chords.length > 0 &&
       attempts.length > 0 &&
