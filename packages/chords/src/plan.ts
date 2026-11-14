@@ -4,6 +4,8 @@ import type { Key } from './keys';
 import { classifySegment, isLabel, segmentLine, tokenizeSegment } from './lines';
 import type { TextLine } from './lines';
 
+const RIGHT_MARGIN = 20;
+
 export type Measure = (text: string, fontName: string, fontSize: number) => number;
 
 export interface Replacement {
@@ -62,7 +64,9 @@ export function buildTransposePlan(input: {
         const newWidth = measure(replacement, fontName, fontSize);
         const next = tokens[i + 1];
         const collides =
-          next !== undefined && newWidth + measure('n', fontName, fontSize) > next.x - token.x;
+          next !== undefined
+            ? newWidth + measure('n', fontName, fontSize) > next.x - token.x
+            : token.x + newWidth > line.pageWidth - RIGHT_MARGIN;
         chords.push({
           page: line.page,
           x: token.x,

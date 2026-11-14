@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseKey } from './keys';
 import { buildTransposePlan } from './plan';
-import { line, measure, run } from './testing';
+import { line, measure, run } from './__tests__/helpers';
 
 const key = (n: string) => parseKey(n)!;
 
@@ -23,7 +23,7 @@ describe('buildTransposePlan', () => {
     expect(plan.chords.map((c) => c.collides)).toEqual([false, true, false]);
   });
 
-  it('flags collision when new chord overflows the gap', () => {
+  it('tight spacing collides', () => {
     const plan = buildTransposePlan({
       lines: [line([run('E7', 10), run('A', 10 + 3 * 6)])],
       from: key('E'),
@@ -90,5 +90,51 @@ describe('buildTransposePlan', () => {
     expect(plan.keyIndicator).toBeNull();
     expect(plan.chordCount).toBe(2);
     expect(plan.collisions).toBe(0);
+  });
+
+  it.each([true, false])('does not collide on the real sample layout (bold spaces: %s)', (bold) => {
+    const sp = (x: number, n: number) => run(' '.repeat(n), x, bold);
+    const lines = [
+      line([
+        run('A#', 28.3),
+        sp(40.3, 12),
+        run('F/A', 112.3),
+        sp(130.3, 4),
+        run('Gm', 154.3),
+        sp(166.3, 6),
+        run('Gm7/F', 202.3),
+      ]),
+    ];
+    const plan = buildTransposePlan({ lines, from: key('Bb'), to: key('D'), measure });
+    expect(plan.chords.map((c) => c.replacement)).toEqual(['D', 'A/C#', 'Bm', 'Bm7/A']);
+    expect(plan.chords.map((c) => c.collides)).toEqual([false, false, false, false]);
+  });
+
+  it('flags the last token when it overflows the right margin', () => {
+    const plan = buildTransposePlan({
+      lines: [line([run('E', 575)])],
+      from: key('E'),
+      to: key('F#'),
+      measure,
+    });
+    expect(plan.chords[0]).toMatchObject({ replacement: 'F#', collides: true });
+    const ok = buildTransposePlan({
+      lines: [line([run('E', 500)])],
+      from: key('E'),
+      to: key('F#'),
+      measure,
+    });
+    expect(ok.chords[0]!.collides).toBe(false);
+  });
+
+  it('treats [Am] as a label and does not transpose it', () => {
+    const plan = buildTransposePlan({
+      lines: [line([run('[Am] Am', 10)])],
+      from: key('Am'),
+      to: key('Cm'),
+      measure,
+    });
+    expect(plan.chordCount).toBe(1);
+    expect(plan.chords.map((c) => c.original)).toEqual(['Am']);
   });
 });

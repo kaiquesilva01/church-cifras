@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findKeyIndicator } from './keyIndicator';
-import { line, run } from './testing';
+import { line, run } from './__tests__/helpers';
 
 describe('findKeyIndicator', () => {
   it('finds key in title parentheses', () => {
@@ -22,5 +22,12 @@ describe('findKeyIndicator', () => {
   it('returns null without indicator', () => {
     expect(findKeyIndicator([line([run('Am', 10), run('(A9)', 60)])])).toBeNull();
     expect(findKeyIndicator([])).toBeNull();
+  });
+
+  it('finds a standalone key run after the title', () => {
+    const found = findKeyIndicator([line([run('PRA SEMPRE ', 10), run('(Bb)', 76, false)])]);
+    expect(found?.kind).toBe('title');
+    expect(found?.token).toMatchObject({ text: '(Bb)', x: 76 });
+    expect(found?.key.name).toBe('Bb');
   });
 });

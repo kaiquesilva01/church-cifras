@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifySegment, isLabel, mergeFragments, segmentLine, tokenizeSegment } from './lines';
-import { line, run } from './testing';
+import { line, run } from './__tests__/helpers';
 
 describe('lines', () => {
   it('merges adjacent bold fragments', () => {

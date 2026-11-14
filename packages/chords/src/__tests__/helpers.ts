@@ -1,4 +1,4 @@
-import type { TextLine, TextRun } from './lines';
+import type { TextLine, TextRun } from '../lines';
 
 export const FONT_SIZE = 10;
 

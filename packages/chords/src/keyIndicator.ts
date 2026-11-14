@@ -27,7 +27,7 @@ export function findKeyIndicator(lines: TextLine[]): KeyIndicator | null {
       for (const run of segment) {
         const match = TITLE_KEY.exec(run.text);
         const key = match ? parseKey(match[1]!) : null;
-        if (!match || !key || match.index === 0) continue;
+        if (!match || !key) continue;
         const perChar = run.width / run.text.length;
         const token: Token = {
           text: `(${match[1]})`,
