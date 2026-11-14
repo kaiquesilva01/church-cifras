@@ -40,6 +40,7 @@ jobs:
             firebase-emulators-${{ runner.os }}-
 
       - run: npm ci
+      - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test

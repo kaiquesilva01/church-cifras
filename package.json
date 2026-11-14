@@ -18,6 +18,7 @@
     "test:harness": "node --test \".claude/**/*.test.mjs\"",
     "build": "npm run build --workspaces --if-present",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-church-cifras \"npm run test:rules -w @cifras/tests\""
   },
   "devDependencies": {
