@@ -1,0 +1,124 @@
+:root {
+  --color-accent: #4f46e5;
+  --color-bg: #f2f2f4;
+  --color-surface: #ffffff;
+  --color-text: #111111;
+  --color-muted: #666666;
+  --color-success: #167a4f;
+  --color-error: #b42318;
+  --radius: 10px;
+  --max-width: 960px;
+  font-family: system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.header {
+  background: var(--color-surface);
+  border-bottom: 1px solid #e3e3e8;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 8px 16px;
+}
+
+.brand {
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.nav-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.role {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 8px 12px;
+  border: 1px solid #d4d4da;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+  padding: 12px 20px;
+}
+
+.page {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.card h2 {
+  margin: 0 0 4px;
+}
+
+.muted {
+  color: var(--color-muted);
+}
+
+.login {
+  max-width: 360px;
+  margin: 15vh auto 0;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.error {
+  color: var(--color-error);
+}
+
+.status {
+  padding: 16px;
+  color: var(--color-muted);
+}
