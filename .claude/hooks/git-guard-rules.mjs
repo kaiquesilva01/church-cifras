@@ -327,7 +327,7 @@ function checkMerge(args, state, leadingRepo) {
 // segmentos, então o texto é varrido direto). Aspas agrupam; `;`, `|`, `&` e quebra de linha terminam.
 function apiInvocations(command) {
   const calls = [];
-  const re = /(?:^|[\s;|&(){}"'\/])gh(?:\.exe)?["']?\s+(?:-\S+\s+)*api(?=\s|$)/gi;
+  const re = /(?:^|[\s;|&(){}"'/])gh(?:\.exe)?["']?\s+(?:-\S+\s+)*api(?=\s|$)/gi;
   for (let m; (m = re.exec(command)); ) {
     const tokens = [];
     let cur = '';

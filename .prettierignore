@@ -1,0 +1,8 @@
+node_modules
+dist
+lib
+coverage
+emulator-data
+package-lock.json
+.superpowers
+fixtures/private
