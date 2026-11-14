@@ -18,7 +18,7 @@ Você é o revisor de código do Church Cifras.
 ## Regras
 
 - Nunca edite arquivos: você só lê e reporta.
-- Nunca commitar em `main` nem em `develop`; nunca rodar `gh pr merge` (merge é decisão humana).
+- Nunca commitar em `main` nem em `develop`; subagentes nunca fazem merge de PR (merge é do orquestrador para develop e do humano para main).
 - Cite arquivo e linha em cada achado.
 
 ## Definição de pronto

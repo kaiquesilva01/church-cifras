@@ -16,7 +16,23 @@ try {
     .split('\0')
     .filter(Boolean);
 
-  const result = evaluateCommand({ command, branch, stagedFiles });
+  // Chamado só quando há `gh pr merge`; qualquer falha -> null (o guard bloqueia).
+  const resolvePrBase = (target) => {
+    try {
+      const args = ['pr', 'view', ...(target ? [target] : []), '--json', 'baseRefName', '-q', '.baseRefName'];
+      const out = execFileSync('gh', args, {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 15000,
+      }).trim();
+      return out || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const result = evaluateCommand({ command, branch, stagedFiles, resolvePrBase });
   if (!result.allow) {
     process.stderr.write('[git-guard] ' + result.reason);
     process.exit(2);

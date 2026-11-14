@@ -15,7 +15,8 @@ Stack: React + Node + Firebase, em monorepo. Documento de design: [docs/superpow
 - Release: `gh pr create --base main --head develop`.
 - Após `git checkout <branch>` (sem `-b`), rode commit/push em outro comando — o hook bloqueia na mesma linha. `git checkout -b` / `git switch -c` podem ser encadeados com commit/push.
 - Prefixos de branch: `feat/`, `fix/`, `chore/`, `docs/`, `test/`, `refactor/`.
-- Merge de PR é decisão humana — agentes nunca rodam `gh pr merge`.
+- PRs para `develop`: revisados pelo agente `code-reviewer`; após aprovação, **somente o orquestrador** (sessão principal) faz o merge (`gh pr merge <n> --squash --delete-branch`). Subagentes nunca fazem merge.
+- PR para `main` (`develop → main`): só o humano aprova e faz o merge. O hook bloqueia `gh pr merge` de PR com base `main` ou com base indeterminada.
 
 ## Modelos e esforço
 

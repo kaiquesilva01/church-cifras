@@ -1,7 +1,8 @@
 // Regras puras do guard de Git: decide se um comando de shell pode rodar
 // sob o fluxo de branches do projeto. Sem dependências, sem I/O.
 //
-// evaluateCommand({ command, branch, stagedFiles }) devolve:
+// evaluateCommand({ command, branch, stagedFiles, resolvePrBase }) devolve
+// (resolvePrBase(alvo) -> base do PR ou null; injetado pelo entrypoint, só chamado em `gh pr merge`):
 //   { allow: false, reason }     comando bloqueado;
 //   { allow: true, reminder }    permitido, com lembrete (ex.: `gh pr create` -> rodar testes);
 //   { allow: true }              permitido.
@@ -268,16 +269,41 @@ function checkGit(tokens, state, stagedFiles) {
   return null;
 }
 
+const MERGE_VALUE_FLAGS = [
+  '--subject', '-t', '--body', '-b', '--body-file', '-F', '--match-head-commit', '-R', '--repo',
+];
+
+// Alvo do `gh pr merge` (número, URL ou branch): primeiro posicional, ignorando flags e seus valores.
+function mergeTarget(args) {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (MERGE_VALUE_FLAGS.includes(a)) i++;
+    else if (!a.startsWith('-')) return a;
+  }
+  return null;
+}
+
+// Merge só para PRs com base develop (fail closed: base desconhecida bloqueia).
+function checkMerge(args, state) {
+  const target = mergeTarget(args);
+  const base = state.resolvePrBase(target);
+  if (base === 'develop') return null;
+  if (base === 'main') {
+    return block(
+      'Merge de PR para main é decisão humana: só a pessoa responsável aprova e faz o merge do PR develop → main.'
+    );
+  }
+  return block(
+    'Não foi possível determinar a base do PR; merge bloqueado. ' +
+      `Confira com \`gh pr view ${target ?? '<n>'} --json baseRefName\` e só faça merge de PRs com base develop.`
+  );
+}
+
 function checkGh(tokens, state) {
   const [area, afterArea] = skipLeadingFlags(tokens.slice(1), ['-R', '--repo']);
   const [action, ...args] = afterArea;
   if (area !== 'pr') return null;
-  if (action === 'merge') {
-    return block(
-      'Agentes nunca executam `gh pr merge`: o merge é decisão humana. ' +
-        'Deixe o PR aberto (`gh pr create --base develop`) e avise a pessoa responsável.'
-    );
-  }
+  if (action === 'merge') return checkMerge(args, state);
   if (action === 'edit' && optionValue(args, ['--base', '-B']) === 'main') {
     return block(
       'Base main só via PR develop → main criado com `gh pr create --base main --head develop`; ' +
@@ -339,8 +365,8 @@ const PR_REMINDER =
   '[git-guard] Lembrete: rode os testes (node --test ".claude/**/*.test.mjs" e os do monorepo) ' +
   'e confirme que passam antes de abrir o PR.';
 
-export function evaluateCommand({ command, branch, stagedFiles = [] }) {
-  const state = { branch, prCreate: false };
+export function evaluateCommand({ command, branch, stagedFiles = [], resolvePrBase = () => null }) {
+  const state = { branch, prCreate: false, resolvePrBase };
   const blocked = evaluateSegments(command, state, stagedFiles);
   if (blocked) return blocked;
   return state.prCreate ? { allow: true, reminder: PR_REMINDER } : { allow: true };

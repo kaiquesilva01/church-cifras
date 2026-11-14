@@ -24,7 +24,7 @@ const cases = [
   ['blocks pr to main with --head feature', 'gh pr create --base=main --head feat/a', 'develop', [], false, 'develop'],
   ['allows pr develop to main', 'gh pr create --base main --head develop', 'feat/a', [], true],
   ['allows pr to main when on develop', 'gh pr create --base main', 'develop', [], true],
-  ['blocks gh pr merge', 'gh pr merge 12 --squash', 'feat/a', [], false, 'humana'],
+  ['blocks gh pr merge when base unresolved by default', 'gh pr merge 12 --squash', 'feat/a', [], false, 'base do PR'],
   ['handles powershell separators and quotes', "git add .; git commit -m 'msg; with semicolon'", 'main', [], false, 'Commit direto'],
   ['ignores git words inside quoted text', 'echo "git commit on main" && ls', 'main', [], true],
   ['blocks commit with git -C on main', 'git -C . commit -m x', 'main', [], false, 'Commit direto'],
@@ -38,7 +38,7 @@ const cases = [
   ['blocks add pdf then commit', 'git add a.pdf && git commit -m x', 'feat/a', [], false, 'PDF'],
   ['blocks commit with pdf pathspec', 'git commit -m x a.pdf', 'feat/a', [], false, 'PDF'],
   ['allows commit message mentioning pdf', 'git commit -m "remove a.pdf"', 'feat/a', [], true],
-  ['blocks gh pr merge with -R', 'gh -R o/r pr merge 1', 'feat/a', [], false, 'humana'],
+  ['blocks gh pr merge with -R when base unresolved by default', 'gh -R o/r pr merge 1', 'feat/a', [], false, 'base do PR'],
   ['blocks pr to main with --repo', 'gh --repo o/r pr create --base main', 'feat/a', [], false, 'develop'],
   ['blocks commit in subshell parens', '(git commit -m x)', 'main', [], false, 'Commit direto'],
   ['blocks commit after if then', 'if true; then git commit -m x; fi', 'main', [], false, 'Commit direto'],
@@ -51,7 +51,7 @@ const cases = [
   ['blocks push after commit in if block', 'git commit -m x; if ($?) { git push origin develop }', 'feat/a', [], false, 'Push para'],
   ['blocks push in LASTEXITCODE block', 'if ($LASTEXITCODE -eq 0) { git push origin main }', 'feat/a', [], false, 'Push para'],
   ['blocks push in try block', 'try { git push origin develop } catch {}', 'feat/a', [], false, 'Push para'],
-  ['blocks pr merge in braces', 'if ($?) { gh pr merge 3 }', 'feat/a', [], false, 'humana'],
+  ['blocks pr merge in braces when base unresolved', 'if ($?) { gh pr merge 3 }', 'feat/a', [], false, 'base do PR'],
   ['blocks push inside command substitution', 'echo $(git push origin main)', 'feat/a', [], false, 'Push para'],
   // switch --track, push options, --all/--mirror
   ['blocks commit after switch --track', 'git switch --track origin/develop && git commit -m x', 'feat/a', [], false, 'checkout/switch'],
@@ -97,4 +97,45 @@ test('pr create to develop carries a test reminder', () => {
 test('non pr-create allowed commands carry no reminder', () => {
   const r = evaluateCommand({ command: 'git status', branch: 'feat/a', stagedFiles: [] });
   assert.deepEqual(r, { allow: true });
+});
+
+const merge = (command, resolvePrBase) =>
+  evaluateCommand({ command, branch: 'feat/a', stagedFiles: [], resolvePrBase });
+
+test('allows merge when base is develop', () => {
+  let received;
+  const r = merge('gh pr merge 2 --squash --delete-branch', (t) => ((received = t), 'develop'));
+  assert.equal(r.allow, true);
+  assert.equal(received, '2');
+});
+
+test('blocks merge when base is main', () => {
+  const r = merge('gh pr merge 2 --squash', () => 'main');
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('humana'), r.reason);
+});
+
+test('blocks merge when base unknown', () => {
+  const r = merge('gh pr merge 2 --squash', () => null);
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('gh pr view'), r.reason);
+});
+
+test('blocks merge with -R when base main', () => {
+  const r = merge('gh -R o/r pr merge 3', () => 'main');
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('humana'), r.reason);
+});
+
+test('passes null target when merge has no positional', () => {
+  let received = 'unset';
+  const r = merge('gh pr merge --squash', (t) => ((received = t), 'develop'));
+  assert.equal(r.allow, true);
+  assert.equal(received, null);
+});
+
+test('skips flag values when finding the merge target', () => {
+  let received;
+  merge('gh pr merge --subject "x y" -b body --match-head-commit abc -R o/r 7 --auto', (t) => ((received = t), 'develop'));
+  assert.equal(received, '7');
 });

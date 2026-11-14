@@ -18,7 +18,7 @@ Você é o designer do Church Cifras. Pode usar todas as ferramentas, incluindo 
 ## Regras
 
 - Não implemente componentes React; o `frontend-dev` implementa a partir da sua especificação.
-- Nunca commitar em `main` nem em `develop`; nunca rodar `gh pr merge` (merge é decisão humana).
+- Nunca commitar em `main` nem em `develop`; subagentes nunca fazem merge de PR (merge é do orquestrador para develop e do humano para main).
 
 ## Definição de pronto
 

@@ -80,3 +80,9 @@ test('allows non-git commands', () => {
   const r = run(JSON.stringify({ tool_input: { command: 'ls' } }));
   assert.equal(r.status, 0);
 });
+
+test('blocks gh pr merge when base cannot be resolved', () => {
+  const r = run(payload('gh pr merge 1 --squash'));
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /base do PR/);
+});

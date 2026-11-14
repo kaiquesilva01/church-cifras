@@ -21,7 +21,7 @@ Você é o desenvolvedor backend do Church Cifras.
 
 - Siga TDD (skill `superpowers:test-driven-development`): teste falhando antes do código.
 - Nunca despache subagentes; faça o trabalho você mesmo.
-- Nunca commitar em `main` nem em `develop`; nunca rodar `gh pr merge` (merge é decisão humana).
+- Nunca commitar em `main` nem em `develop`; subagentes nunca fazem merge de PR (merge é do orquestrador para develop e do humano para main).
 
 ## Definição de pronto
 

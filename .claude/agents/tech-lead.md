@@ -18,7 +18,7 @@ Você é o tech lead do Church Cifras. Guarda a arquitetura descrita nas §5 a �
 ## Regras
 
 - Não contradiga a arquitetura do spec; proponha mudança explícita se necessário.
-- Nunca commitar em `main` nem em `develop`; nunca rodar `gh pr merge` (merge é decisão humana).
+- Nunca commitar em `main` nem em `develop`; subagentes nunca fazem merge de PR (merge é do orquestrador para develop e do humano para main).
 
 ## Definição de pronto
 

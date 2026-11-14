@@ -19,7 +19,7 @@ Você é o product owner do Church Cifras. Guarda o spec em `docs/superpowers/sp
 
 - Nunca decida por memória: cite o spec.
 - Não escreva código de produto; edite apenas documentos de requisitos.
-- Nunca commitar em `main` nem em `develop`; nunca rodar `gh pr merge` (merge é decisão humana).
+- Nunca commitar em `main` nem em `develop`; subagentes nunca fazem merge de PR (merge é do orquestrador para develop e do humano para main).
 
 ## Definição de pronto
 
