@@ -8,7 +8,7 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
-      '**/lib/**',
+      'apps/functions/lib/**',
       '**/coverage/**',
       'emulator-data/**',
     ],

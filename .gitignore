@@ -22,7 +22,7 @@ test-results/
 .secret.local
 .runtimeconfig.json
 .claude/settings.local.json
-lib/
+apps/functions/lib/
 *.tsbuildinfo
 .eslintcache
 *.local
