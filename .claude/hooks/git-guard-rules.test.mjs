@@ -27,6 +27,9 @@ const cases = [
   ['blocks gh pr merge', 'gh pr merge 12 --squash', 'feat/a', [], false, 'humana'],
   ['handles powershell separators and quotes', "git add .; git commit -m 'msg; with semicolon'", 'main', [], false, 'origin/develop'],
   ['ignores git words inside quoted text', 'echo "git commit on main" && ls', 'main', [], true],
+  ['blocks commit with git -C on main', 'git -C . commit -m x', 'main', [], false, 'origin/develop'],
+  ['blocks push with -c option to develop', 'git -c core.x=y push origin develop', 'feat/a', [], false, 'develop'],
+  ['blocks commit with env prefix', 'GIT_AUTHOR_NAME=x git commit -m y', 'develop', [], false, 'origin/develop'],
   ['allows unrelated commands', 'npm test', 'main', [], true],
 ];
 

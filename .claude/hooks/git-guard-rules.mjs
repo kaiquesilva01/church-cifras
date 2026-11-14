@@ -117,10 +117,20 @@ function checkPrCreate(args, branch) {
   return null;
 }
 
+// Pula opções globais do git (-C <dir>, -c <k=v>, --git-dir, --work-tree, ...)
+// e devolve [subcomando, argumentos restantes].
+function parseGitArgs(args) {
+  let i = 0;
+  while (i < args.length && args[i].startsWith('-')) {
+    const a = args[i];
+    const takesValue = a === '-C' || a === '-c' || a === '--git-dir' || a === '--work-tree';
+    i += takesValue ? 2 : 1;
+  }
+  return [args[i], args.slice(i + 1)];
+}
+
 function checkGit(tokens, state, stagedFiles) {
-  const args = tokens.slice(1);
-  const sub = args.find((a) => !a.startsWith('-'));
-  const rest = args.slice(args.indexOf(sub) + 1);
+  const [sub, rest] = parseGitArgs(tokens.slice(1));
   if (!sub) return null;
 
   if (sub === 'commit') return checkCommit(state.branch, stagedFiles);
@@ -148,9 +158,17 @@ function checkGh(tokens, state) {
   return null;
 }
 
+// Remove atribuições de ambiente iniciais (FOO=1 git commit).
+function skipEnvAssignments(tokens) {
+  let i = 0;
+  while (i < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[i])) i++;
+  return tokens.slice(i);
+}
+
 export function evaluateCommand({ command, branch, stagedFiles = [] }) {
   const state = { branch };
-  for (const tokens of splitSegments(command)) {
+  for (const segment of splitSegments(command)) {
+    const tokens = skipEnvAssignments(segment);
     const program = tokens[0];
     let result = null;
     if (program === 'git') result = checkGit(tokens, state, stagedFiles);
