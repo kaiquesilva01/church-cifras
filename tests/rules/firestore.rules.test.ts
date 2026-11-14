@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, orderBy, query, setDoc } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
 let env: RulesTestEnvironment;
@@ -76,6 +76,24 @@ describe('firestore.rules', () => {
 
   it('denies unauthenticated read of songs', async () => {
     const db = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'songs/s1')));
+  });
+
+  it('allows admin to list users', async () => {
+    const db = env.authenticatedContext('a1', { role: 'admin' }).firestore();
+    await assertSucceeds(getDocs(query(collection(db, 'users'), orderBy('displayName'))));
+  });
+
+  it('denies viewer listing users', async () => {
+    const db = env.authenticatedContext('u1', { role: 'viewer' }).firestore();
+    await assertFails(getDocs(query(collection(db, 'users'), orderBy('displayName'))));
+  });
+
+  it('denies unauthenticated reads of users, artists and arrangements', async () => {
+    const db = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'users/u1')));
+    await assertFails(getDoc(doc(db, 'artists/ar1')));
+    await assertFails(getDoc(doc(db, 'songs/s1/arrangements/a1')));
     await assertFails(getDoc(doc(db, 'songs/s1')));
   });
 
