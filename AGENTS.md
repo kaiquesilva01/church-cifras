@@ -64,6 +64,6 @@ Um plano por fase da §11 do spec.
 
 ## Comandos
 
-- `node --test .claude/` — testes do harness.
+- `node --test ".claude/**/*.test.mjs"` — testes do harness.
 
 A Fase 1 adiciona os comandos do monorepo aqui.
