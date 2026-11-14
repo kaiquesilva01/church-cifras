@@ -25,3 +25,20 @@ Notas: a primeira subida leva ~30–60 s (download dos emuladores, depois em cac
 ### Testar login localmente
 
 No popup do emulador de Auth, escolha **Add new account** e use o e-mail `admin@cifras.local` para virar admin. Qualquer outro e-mail entra como Visitante.
+
+### Subir uma cifra localmente
+
+1. Entre como `admin@cifras.local` (veja acima); só membros e admins podem subir cifras.
+2. Clique em **Nova cifra** e escolha um PDF próprio, de uma cifra que você tenha o direito de usar.
+3. Confira título, artista e tom sugeridos, ajuste se precisar e salve.
+4. A música aparece na busca; o campo de tons da música é atualizado em alguns segundos pela função `onArrangementWritten`.
+
+Nunca commite PDFs reais (veja [AGENTS.md](AGENTS.md)).
+
+Para verificar o fluxo de ponta a ponta contra os emuladores (upload, regras, gatilho e `replaceArrangement`), com o ambiente no ar (`docker compose up -d --build`):
+
+```bash
+npm run smoke:upload
+```
+
+O script imprime `OK` e sai com 0, ou o passo que falhou e sai com 1.
