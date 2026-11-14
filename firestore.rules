@@ -10,6 +10,77 @@ service cloud.firestore {
       return request.auth.token.get('role', 'viewer');
     }
 
+    function isEditor() {
+      return signedIn() && role() in ['member', 'admin'];
+    }
+
+    // Mantenha igual a KEY_OPTIONS (packages/chords/src/keys.ts): maiores e depois menores.
+    function keyNames() {
+      return [
+        'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B',
+        'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm'
+      ];
+    }
+
+    function boundedString(value) {
+      return value is string && value.size() >= 1 && value.size() <= 120;
+    }
+
+    function validId(id) {
+      return id.matches('[A-Za-z0-9_-]{1,100}');
+    }
+
+    function validSong(data, songId) {
+      return validId(songId)
+        && data.keys().hasOnly([
+          'title', 'titleNormalized', 'artistId', 'artistName',
+          'keys', 'handmadeKeys', 'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'title', 'titleNormalized', 'artistId', 'artistName',
+          'keys', 'handmadeKeys', 'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && boundedString(data.title)
+        && boundedString(data.titleNormalized)
+        && boundedString(data.artistId)
+        && data.artistId.matches('[a-z0-9-]{1,120}')
+        && boundedString(data.artistName)
+        && data.keys == []
+        && data.handmadeKeys == []
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function validArrangement(data, songId, slug) {
+      return validId(songId)
+        && data.keys().hasOnly([
+          'key', 'storagePath', 'source', 'derivedFromKey', 'writer',
+          'chordCount', 'collisions', 'createdBy', 'createdAt'
+        ])
+        && data.keys().hasAll([
+          'key', 'storagePath', 'source', 'derivedFromKey', 'writer',
+          'chordCount', 'collisions', 'createdBy', 'createdAt'
+        ])
+        && data.key is string
+        && data.key in keyNames()
+        && slug == data.key.replace('#', 's')
+        && data.source in ['handmade', 'generated']
+        && (data.source == 'handmade'
+          ? (data.derivedFromKey == null && data.writer == 'upload')
+          : (data.derivedFromKey is string
+            && data.derivedFromKey in keyNames()
+            && data.derivedFromKey != data.key
+            && data.writer == 'overlay'))
+        && data.storagePath is string
+        && data.storagePath.size() <= 300
+        && data.storagePath.matches('songs/' + songId + '/' + slug + '-[A-Za-z0-9_-]+[.]pdf')
+        && data.chordCount is int && data.chordCount >= 1
+        && data.collisions is int && data.collisions >= 0
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time;
+    }
+
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || role() == 'admin');
       allow write: if false;
@@ -20,13 +91,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /songs/{id} {
+    match /songs/{songId} {
       allow read: if signedIn();
-      allow write: if false;
+      allow create: if isEditor() && validSong(request.resource.data, songId);
+      allow update, delete: if false;
 
-      match /arrangements/{key} {
+      match /arrangements/{slug} {
         allow read: if signedIn();
-        allow write: if false;
+        allow create: if isEditor()
+          && existsAfter(/databases/$(database)/documents/songs/$(songId))
+          && validArrangement(request.resource.data, songId, slug);
+        allow update, delete: if false;
       }
     }
 

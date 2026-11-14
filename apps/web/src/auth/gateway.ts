@@ -6,12 +6,15 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { clearIndexedDbPersistence, doc, onSnapshot, terminate } from 'firebase/firestore';
 import type { FirebaseServices } from '../lib/firebase';
 import type { AuthGateway } from './AuthProvider';
 import { isRole } from './roles';
 
-export function createAuthGateway({ auth, db }: FirebaseServices): AuthGateway {
+export function createAuthGateway(
+  { auth, db }: FirebaseServices,
+  { reload = () => window.location.reload() }: { reload?: () => void } = {},
+): AuthGateway {
   return {
     onUser: (cb) =>
       onAuthStateChanged(auth, (u) =>
@@ -47,6 +50,16 @@ export function createAuthGateway({ auth, db }: FirebaseServices): AuthGateway {
     signIn: async () => {
       await signInWithPopup(auth, new GoogleAuthProvider());
     },
-    signOut: () => signOut(auth),
+    // O cache persistente do Firestore guarda dados da pessoa anterior: apaga e recarrega.
+    signOut: async () => {
+      await signOut(auth);
+      try {
+        await terminate(db);
+        await clearIndexedDbPersistence(db);
+      } catch (error) {
+        console.warn('Falha ao limpar o cache local', error);
+      }
+      reload();
+    },
   };
 }

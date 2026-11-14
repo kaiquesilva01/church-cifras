@@ -1,6 +1,12 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
-import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
+import {
+  connectFirestoreEmulator,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
 import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
 
@@ -33,7 +39,13 @@ export function createFirebase(env: WebEnv): FirebaseServices {
     appId: env.VITE_FIREBASE_APP_ID,
   });
   const auth = getAuth(app);
-  const db = getFirestore(app);
+  // Cache persistente só onde há IndexedDB (navegador); jsdom/SSR usam o cache em memória.
+  const db = initializeFirestore(
+    app,
+    typeof indexedDB === 'undefined'
+      ? {}
+      : { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) },
+  );
   const storage = getStorage(app);
   const functions = getFunctions(app, FUNCTIONS_REGION);
 

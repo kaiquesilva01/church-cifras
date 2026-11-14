@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FirebaseServices } from '../lib/firebase';
+import { signOut } from 'firebase/auth';
+import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
 import { createAuthGateway } from './gateway';
 
 type Next = (snap: { data: () => unknown }) => void;
@@ -15,6 +17,8 @@ vi.mock('firebase/auth', () => ({
   signOut: vi.fn(),
 }));
 vi.mock('firebase/firestore', () => ({
+  terminate: vi.fn(() => Promise.resolve()),
+  clearIndexedDbPersistence: vi.fn(() => Promise.resolve()),
   doc: vi.fn(() => ({})),
   onSnapshot: vi.fn((_ref: unknown, next: Next, fail: Fail) => {
     handlers = { next, fail };
@@ -47,5 +51,31 @@ describe('createAuthGateway', () => {
     createAuthGateway(services).onUserDoc('u1', cb);
     handlers.next({ data: () => ({ role: 'member' }) });
     expect(cb).toHaveBeenCalledWith('member');
+  });
+
+  it('sign-out ends the session, wipes the local cache and reloads', async () => {
+    const calls: string[] = [];
+    vi.mocked(signOut).mockImplementationOnce(() => {
+      calls.push('signOut');
+      return Promise.resolve();
+    });
+    vi.mocked(terminate).mockImplementationOnce(() => {
+      calls.push('terminate');
+      return Promise.resolve();
+    });
+    vi.mocked(clearIndexedDbPersistence).mockImplementationOnce(() => {
+      calls.push('clear');
+      return Promise.resolve();
+    });
+    const reload = vi.fn(() => calls.push('reload'));
+    await createAuthGateway(services, { reload }).signOut();
+    expect(calls).toEqual(['signOut', 'terminate', 'clear', 'reload']);
+  });
+
+  it('still reloads when clearing the cache fails', async () => {
+    vi.mocked(clearIndexedDbPersistence).mockRejectedValueOnce(new Error('busy'));
+    const reload = vi.fn();
+    await createAuthGateway(services, { reload }).signOut();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });

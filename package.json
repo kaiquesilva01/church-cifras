@@ -19,6 +19,7 @@
     "build": "npm run build --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "smoke:upload": "node scripts/smoke/upload.mjs",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-church-cifras \"npm run test:rules -w @cifras/tests\""
   },
   "devDependencies": {

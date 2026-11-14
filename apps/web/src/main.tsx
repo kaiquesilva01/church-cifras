@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { createCatalogApi } from './catalog/catalogApi';
 import { createAuthGateway } from './auth/gateway';
 import { readWebEnv } from './lib/env';
 import { createFirebase } from './lib/firebase';
@@ -14,9 +15,10 @@ try {
   const services = createFirebase(env);
   const gateway = createAuthGateway(services);
   const peopleApi = createPeopleApi(services);
+  const catalogApi = createCatalogApi(services);
   root.render(
     <StrictMode>
-      <App gateway={gateway} peopleApi={peopleApi} />
+      <App gateway={gateway} peopleApi={peopleApi} catalogApi={catalogApi} />
     </StrictMode>,
   );
 } catch (error) {
