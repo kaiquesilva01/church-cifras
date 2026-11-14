@@ -73,6 +73,20 @@ Se ninguém tiver o papel Admin (por exemplo, o único admin foi rebaixado), use
 - Confirme que o e-mail está em `ADMIN_EMAILS`, apague o usuário em Authentication > Users no console do Firebase, apague também o documento `users/<uid>` no Firestore e entre de novo com Google (o primeiro login cria o perfil como Admin).
 - Ou defina manualmente, pelo console/Admin SDK, o custom claim `role: "admin"` do usuário e o campo `role: "admin"` em `users/<uid>`; depois a pessoa precisa sair e entrar de novo.
 
-## 8. Publicar
+## 8. CORS do bucket do Storage
+
+A Fase 5 lê os bytes dos PDFs no navegador (pdf.js), o que exige CORS no bucket de produção. O bucket padrão vem de `VITE_FIREBASE_STORAGE_BUCKET`.
+
+1. Copie `cors.json` (raiz do repositório) e troque `https://<projeto>.web.app` pela origem do Hosting (inclua também `https://<projeto>.firebaseapp.com` ou o domínio próprio, se houver).
+2. Autentique com `gcloud auth login` e aplique:
+
+```bash
+gsutil cors set cors.json gs://<bucket>
+gsutil cors get gs://<bucket>
+```
+
+Só é preciso repetir se a origem mudar. Os emuladores locais não precisam disso.
+
+## 9. Publicar
 
 Faça o PR `develop` -> `main` e aprove o merge. O workflow **Deploy** publica hosting, functions, regras do Firestore e regras do Storage.

@@ -26,7 +26,7 @@
 ## Review Focus
 
 1. **Dois membros subindo o mesmo tom ao mesmo tempo** → o segundo `create` do arrangement falha (doc já existe) e a UI mostra `Esse tom acabou de ser salvo por outra pessoa.` — teste de regra `denies creating an arrangement that already exists` e teste de UI (Task 5).
-2. **Upload interrompido** (arquivo no Storage, batch falha) → arquivo órfão é apagado pelo cliente no `catch` — teste `deletes uploaded file when saving fails` (Task 3).
+2. **Upload interrompido** (arquivo no Storage, batch falha) → o cliente chama o callable `discardUpload` no `catch` (o Storage nega `delete` ao cliente; a function só apaga arquivo enviado pelo próprio usuário, via metadado `uploadedBy`, e que nenhum arranjo referencia) — testes `deletes uploaded file when saving fails` (Task 3), `discardUpload` (functions) e a regra `denies upload without or with someone else as uploadedBy`.
 3. **Visitante tentando subir** (UI esconde, mas API/console) → regras negam Storage e Firestore — testes de regra (Task 2).
 4. **Busca com acento/caixa** (`sonda me` acha `Sonda-me`; `aline` acha por cantor) — teste `filters songs by title or artist ignoring accents` (Task 4).
 5. **PDF fora do padrão ou com linhas suspeitas** → bloqueio (0 acordes) ou aviso listando os tokens não reconhecidos — testes da Task 5.
