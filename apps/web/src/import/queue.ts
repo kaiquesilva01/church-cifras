@@ -6,6 +6,8 @@ export type RowResult =
 export interface RunOptions {
   concurrency: number;
   onProgress(done: number, total: number): void;
+  /** Called as soon as each row finishes. */
+  onResult?(rowId: string, result: RowResult): void;
   signal?: AbortSignal;
 }
 
@@ -29,12 +31,15 @@ export async function runImport(
       const group = groups[next++]!;
       for (const row of group.rows) {
         if (opts.signal?.aborted) return;
+        let result: RowResult;
         try {
-          results.set(row.id, { status: await worker(row) });
+          result = { status: await worker(row) };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          results.set(row.id, { status: 'error', message });
+          result = { status: 'error', message };
         }
+        results.set(row.id, result);
+        opts.onResult?.(row.id, result);
         done += 1;
         opts.onProgress(done, total);
       }

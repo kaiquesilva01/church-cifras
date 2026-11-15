@@ -196,6 +196,118 @@ describe('ImportPage', () => {
     await act(async () => pending.forEach((resolve) => resolve()));
     expect(await screen.findByText('2 importados · 0 já existiam · 0 com erro')).toBeVisible();
     expect(api.createSongWithArrangement).toHaveBeenCalledTimes(2);
-    expect(screen.getByText('Importação cancelada.')).toBeVisible();
+    expect(screen.getByText(/Importação cancelada\./)).toBeVisible();
+  });
+
+  it('keeps live per-row results when the catalog changes mid-import', async () => {
+    let emit!: (songs: typeof sampleSongs) => void;
+    const pending = new Map<string, () => void>();
+    setup({
+      reads: { 'a.pdf': result({ title: 'A' }), 'b.pdf': result({ title: 'B' }) },
+      api: {
+        subscribeSongs: (cb) => {
+          emit = cb;
+          cb(sampleSongs);
+          return () => undefined;
+        },
+        getArrangement: vi.fn(() => Promise.resolve(null)),
+        createSongWithArrangement: vi.fn(
+          (input: { title: string }) =>
+            new Promise<string>((resolve) => {
+              pending.set(input.title, () => resolve('id'));
+            }),
+        ),
+      },
+    });
+    addFiles([pdf('a.pdf'), pdf('b.pdf')]);
+    const button = await screen.findByRole('button', { name: 'Importar 2 prontos' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await waitFor(() => expect(pending.size).toBe(2));
+    await act(async () => pending.get('A')!());
+    await waitFor(() => expect(within(rowOf('a.pdf')).getByText('importado')).toBeVisible());
+    const landed = {
+      ...sampleSongs[0]!,
+      id: 'idA',
+      title: 'A',
+      titleNormalized: 'a',
+      artistId: 'cantor-novo',
+      artistName: 'Cantor Novo',
+      keys: ['G' as const],
+      handmadeKeys: ['G' as const],
+    };
+    await act(async () => emit([...sampleSongs, landed]));
+    await new Promise((r) => setTimeout(r, 400));
+    expect(within(rowOf('a.pdf')).getByText('importado')).toBeVisible();
+    expect(screen.getByText('2 arquivos · 2 prontos')).toBeInTheDocument();
+    await act(async () => pending.get('B')!());
+    expect(await screen.findByText('2 importados · 0 já existiam · 0 com erro')).toBeVisible();
+    expect(within(rowOf('b.pdf')).getByText('importado')).toBeVisible();
+  });
+
+  it('shows Cancelando and clears the cancelled notice on new files', async () => {
+    const pending: Array<() => void> = [];
+    setup({
+      reads: { 'a.pdf': result({ title: 'A' }), 'b.pdf': result({ title: 'B' }) },
+      api: {
+        getArrangement: vi.fn(() => Promise.resolve(null)),
+        createSongWithArrangement: vi.fn(
+          () =>
+            new Promise<string>((resolve) => {
+              pending.push(() => resolve('id'));
+            }),
+        ),
+      },
+    });
+    addFiles([pdf('a.pdf'), pdf('b.pdf')]);
+    const button = await screen.findByRole('button', { name: 'Importar 2 prontos' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await waitFor(() => expect(pending).toHaveLength(2));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.getByRole('button', { name: 'Cancelando…' })).toBeDisabled();
+    await act(async () => pending.forEach((resolve) => resolve()));
+    expect(
+      await screen.findByText(/As linhas não importadas continuam prontas para tentar de novo\./),
+    ).toBeVisible();
+    addFiles([pdf('c.pdf')]);
+    await waitFor(() => expect(screen.queryByText(/Importação cancelada/)).not.toBeInTheDocument());
+  });
+
+  it('marks unreadable pdfs as fora do padrão with a reason', async () => {
+    const { readPdf } = setup();
+    vi.mocked(readPdf).mockRejectedValue(new Error('x'));
+    addFiles([pdf('bad.pdf')]);
+    await waitFor(() => expect(within(rowOf('bad.pdf')).getByText('fora do padrão')).toBeVisible());
+    expect(within(rowOf('bad.pdf')).getByText('não foi possível ler o PDF')).toBeVisible();
+  });
+
+  it('labels rows from a folder with their relative path', async () => {
+    setup();
+    const file = pdf('a.pdf');
+    Object.defineProperty(file, 'webkitRelativePath', { value: 'pasta/sub/a.pdf' });
+    addFiles([file]);
+    expect(await screen.findByLabelText('Música de pasta/sub/a.pdf')).toBeInTheDocument();
+  });
+
+  it('disables the dropzone while busy and says so', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const { readPdf } = setup();
+    vi.mocked(readPdf).mockImplementation(async (f: File) => {
+      await gate;
+      return result({ title: f.name });
+    });
+    addFiles([pdf('a.pdf')]);
+    expect(await screen.findByText('Aguarde terminar antes de adicionar arquivos.')).toBeVisible();
+    expect(screen.getByLabelText('Escolher arquivos')).toBeDisabled();
+    await act(async () => release());
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Aguarde terminar antes de adicionar arquivos.'),
+      ).not.toBeInTheDocument(),
+    );
   });
 });

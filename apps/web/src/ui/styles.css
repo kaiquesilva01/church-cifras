@@ -10,6 +10,13 @@
   --color-border: #e3e3e8;
   --color-border-strong: #d4d4da;
   --color-error: #b42318;
+  --color-error-soft: #fdecea;
+  --color-warn: #7a4b00;
+  --color-warn-soft: #fff4d6;
+  --color-info: #1d4ba8;
+  --color-info-soft: #e3edfd;
+  --color-purple: #5b2a9e;
+  --color-purple-soft: #efe5fb;
   --radius: 10px;
   --header-height: 56px;
   --max-width: 960px;
@@ -851,7 +858,7 @@ body {
 }
 
 .cell-warning {
-  color: #7a4b00;
+  color: var(--color-warn);
 }
 
 .btn-icon {
@@ -873,22 +880,22 @@ body {
 }
 
 .pill-blue {
-  background: #e3edfd;
-  color: #1d4ba8;
+  background: var(--color-info-soft);
+  color: var(--color-info);
 }
 
 .pill-purple {
-  background: #efe5fb;
-  color: #5b2a9e;
+  background: var(--color-purple-soft);
+  color: var(--color-purple);
 }
 
 .pill-amber {
-  background: #fff4d6;
-  color: #7a4b00;
+  background: var(--color-warn-soft);
+  color: var(--color-warn);
 }
 
 .pill-red {
-  background: #fdecea;
+  background: var(--color-error-soft);
   color: var(--color-error);
 }
 
@@ -898,4 +905,22 @@ body {
   justify-content: flex-end;
   gap: 12px;
   margin-top: 16px;
+}
+
+.dropzone-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dropzone-note {
+  font-size: 0.85rem;
+}
+
+.table-wrap:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.cancel-btn {
+  margin-right: auto;
 }

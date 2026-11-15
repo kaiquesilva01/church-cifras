@@ -14,6 +14,8 @@ export interface BatchRow {
   suspects: string[];
   ignoredChordLines: number;
   sizeOk: boolean;
+  /** The PDF could not be read at all. */
+  readError?: boolean;
 }
 
 /** Ordered by priority: the first matching status wins. */
@@ -75,6 +77,7 @@ export function classifyRows(rows: BatchRow[], catalog: BatchCatalog): Classifie
       warnings,
     });
 
+    if (row.readError) return done('fora do padrão', 'não foi possível ler o PDF');
     if (row.chordCount === 0) return done('fora do padrão', 'nenhum acorde encontrado');
     if (!row.sizeOk) return done('grande demais', `o arquivo passa de ${MAX_MB} MB`);
     const titleError = validateTitle(row.title);

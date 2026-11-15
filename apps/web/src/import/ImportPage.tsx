@@ -23,7 +23,11 @@ import { runImport, type RowResult } from './queue';
 const DEBOUNCE_MS = 300;
 const READ_CONCURRENCY = 2;
 
-type Classified = { source: BatchRow[]; list: ClassifiedRow[] };
+type Classified = {
+  source: BatchRow[];
+  index: ReadonlyMap<string, SongSummary> | null;
+  list: ClassifiedRow[];
+};
 type Progress = { done: number; total: number };
 
 const PILL: Record<BatchStatus, string> = {
@@ -68,7 +72,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   const catalogArtists = useMemo(() => deriveArtists(songs).map((a) => a.name), [songs]);
 
   const [rows, setRows] = useState<BatchRow[]>([]);
-  const [classified, setClassified] = useState<Classified>({ source: [], list: [] });
+  const [classified, setClassified] = useState<Classified>({ source: [], index: null, list: [] });
   const [lookupFailed, setLookupFailed] = useState(false);
   const [reading, setReading] = useState<Progress | null>(null);
   const [nonPdf, setNonPdf] = useState(0);
@@ -76,14 +80,26 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   const [results, setResults] = useState<Map<string, RowResult> | undefined>(undefined);
   const [queued, setQueued] = useState<ReadonlySet<string>>(new Set());
   const [cancelled, setCancelled] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [frozenReady, setFrozenReady] = useState(0);
   const [dragging, setDragging] = useState(false);
 
   const cache = useRef(new Map<string, 'handmade' | 'generated' | null>());
   const nextId = useRef(0);
   const abort = useRef<AbortController | null>(null);
+  const rowsRef = useRef(rows);
+  const artistsRef = useRef(catalogArtists);
+  const busyRef = useRef(false);
+  const importingNow = importing !== null;
+  useEffect(() => {
+    rowsRef.current = rows;
+    artistsRef.current = catalogArtists;
+  }, [rows, catalogArtists]);
 
   // Classification: looks up the arrangements of rows whose song exists, then classifies.
+  // Paused while importing: the catalog changes under us and results are tracked per row.
   useEffect(() => {
+    if (importingNow) return;
     let stale = false;
     const timer = setTimeout(() => {
       void (async () => {
@@ -100,7 +116,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           [...needed].map(async ([cacheKey, { songId, key }]) => {
             try {
               const found = await api.getArrangement(songId, key);
-              cache.current.set(cacheKey, found?.source ?? null);
+              if (!stale) cache.current.set(cacheKey, found?.source ?? null);
             } catch {
               failed = true;
             }
@@ -113,34 +129,48 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           arrangementSource: (songId, key) => cache.current.get(`${songId}|${key}`) ?? null,
         });
         setLookupFailed(failed);
-        setClassified({ source: rows, list });
+        setClassified({ source: rows, index, list });
       })();
     }, DEBOUNCE_MS);
     return () => {
       stale = true;
       clearTimeout(timer);
     };
-  }, [rows, index, api]);
+  }, [rows, index, api, importingNow]);
 
-  const busy = reading !== null || importing !== null;
-  const upToDate = classified.source === rows;
+  const busy = reading !== null || importingNow;
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+  const sameRows = classified.source === rows;
+  const upToDate = sameRows && classified.index === index && !importingNow;
+  const classifiedById = useMemo(
+    () => new Map(classified.list.map((item) => [item.id, item])),
+    [classified.list],
+  );
   const done = (row: ClassifiedRow) => {
     const status = results?.get(row.id)?.status;
     return status === 'imported' || status === 'existing';
   };
   const readyRows = classified.list.filter((row) => isImportable(row) && !done(row));
-  const ready = upToDate ? readyRows.length : 0;
+  const ready = importingNow ? frozenReady : sameRows ? readyRows.length : 0;
 
   const addFiles = (picked: File[]) => {
     const pdfs = picked.filter(isPdf);
+    if (busyRef.current) return;
     setNonPdf(picked.length - pdfs.length);
-    if (pdfs.length === 0 || busy) return;
-    const base = rows;
+    if (pdfs.length === 0) return;
+    busyRef.current = true;
+    setCancelled(false);
     const slots: Array<BatchRow | undefined> = Array.from({ length: pdfs.length });
-    const known = new Set([...catalogArtists, ...base.map((r) => r.artist).filter(Boolean)]);
+    const known = new Set([
+      ...artistsRef.current,
+      ...rowsRef.current.map((r) => r.artist).filter(Boolean),
+    ]);
     let finished = 0;
     setReading({ done: 0, total: pdfs.length });
     void runPool(pdfs, READ_CONCURRENCY, async (file, i) => {
+      const label = file.webkitRelativePath || file.name;
       let row: BatchRow;
       try {
         const read = await readPdf(file, [...known]);
@@ -148,7 +178,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
         if (suggestion.artist) known.add(suggestion.artist);
         row = {
           id: `row-${++nextId.current}`,
-          fileName: file.name,
+          fileName: label,
           file,
           title: suggestion.title.slice(0, MAX_TEXT),
           artist: suggestion.artist.slice(0, MAX_TEXT),
@@ -162,7 +192,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
         // Unreadable PDF: shows up as "fora do padrão" so it lands in the report.
         row = {
           id: `row-${++nextId.current}`,
-          fileName: file.name,
+          fileName: label,
           file,
           title: '',
           artist: '',
@@ -171,13 +201,15 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           suspects: [],
           ignoredChordLines: 0,
           sizeOk: file.size <= MAX_BYTES,
+          readError: true,
         };
       }
       slots[i] = row;
       finished += 1;
       setReading({ done: finished, total: pdfs.length });
     }).then(() => {
-      setRows([...base, ...slots.filter((r): r is BatchRow => r !== undefined)]);
+      const added = slots.filter((r): r is BatchRow => r !== undefined);
+      setRows((prev) => [...prev, ...added]);
       setReading(null);
     });
   };
@@ -186,12 +218,17 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
 
   const startImport = async () => {
+    if (abort.current || busyRef.current) return;
     const groups = planImport(readyRows);
     const total = groups.reduce((sum, g) => sum + g.rows.length, 0);
     const created = new Map<string, string>();
     const controller = new AbortController();
     abort.current = controller;
+    busyRef.current = true;
     setCancelled(false);
+    setCancelling(false);
+    setFrozenReady(readyRows.length);
+    setResults((prev) => prev ?? new Map());
     setQueued(new Set(groups.flatMap((g) => g.rows.map((r) => r.id))));
     setImporting({ done: 0, total });
     const worker = async (row: ClassifiedRow): Promise<'imported' | 'existing'> => {
@@ -212,15 +249,17 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
         throw error;
       }
     };
-    const outcome = await runImport(groups, worker, {
+    await runImport(groups, worker, {
       concurrency: 2,
       signal: controller.signal,
       onProgress: (d, t) => setImporting({ done: d, total: t }),
+      onResult: (id, result) => setResults((prev) => new Map(prev).set(id, result)),
     });
     abort.current = null;
+    // Lookups were paused during the import, so nothing in flight can repopulate this.
     cache.current.clear();
-    setResults((prev) => new Map([...(prev ?? []), ...outcome]));
     setCancelled(controller.signal.aborted);
+    setCancelling(false);
     setImporting(null);
     // Re-run the classification against the updated catalog.
     setRows((prev) => [...prev]);
@@ -229,6 +268,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
     setDragging(false);
+    if (busyRef.current) return;
     void filesFromDrop(event.dataTransfer).then(addFiles);
   };
 
@@ -286,15 +326,17 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
       </header>
 
       <div
-        className={`dropzone${dragging ? ' dropzone-active' : ''}`}
+        className={`dropzone${dragging && !busy ? ' dropzone-active' : ''}${busy ? ' dropzone-disabled' : ''}`}
+        aria-disabled={busy}
         onDragOver={(e) => {
           e.preventDefault();
-          setDragging(true);
+          if (!busy) setDragging(true);
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
       >
         <p>Arraste PDFs ou uma pasta aqui</p>
+        {busy && <p className="dropzone-note">Aguarde terminar antes de adicionar arquivos.</p>}
         <div className="dropzone-actions">
           {picker('Escolher arquivos', false)}
           {picker('Escolher pasta', true)}
@@ -319,7 +361,12 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
 
       {rows.length > 0 && (
         <>
-          <div className="table-wrap">
+          <div
+            className="table-wrap"
+            role="region"
+            tabIndex={0}
+            aria-label="Tabela de arquivos para importar"
+          >
             <table className="import-table">
               <caption className="sr-only">Arquivos para importar</caption>
               <thead>
@@ -338,7 +385,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const c = classified.list.find((item) => item.id === row.id);
+                  const c = classifiedById.get(row.id);
                   const result = results?.get(row.id);
                   const shown = result && result.status !== 'error' ? describeResult(result) : null;
                   const errored = result?.status === 'error' ? describeResult(result) : null;
@@ -397,7 +444,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
                       <td>
                         {pill ? (
                           <span className={`pill ${pill.className}`}>{pill.label}</span>
-                        ) : c && upToDate ? (
+                        ) : c && sameRows ? (
                           <>
                             <span className={`pill ${PILL[c.status]}`}>{c.status}</span>
                             {c.detail && <span className="cell-detail">{c.detail}</span>}
@@ -430,29 +477,38 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           )}
           {cancelled && !importing && (
             <p role="status" className="banner banner-warn">
-              Importação cancelada.
+              Importação cancelada. As linhas não importadas continuam prontas para tentar de novo.
             </p>
           )}
 
           <div className="import-actions">
             {importing ? (
               <>
+                <button
+                  type="button"
+                  className="btn cancel-btn"
+                  disabled={cancelling}
+                  onClick={() => {
+                    setCancelling(true);
+                    abort.current?.abort();
+                  }}
+                >
+                  {cancelling ? 'Cancelando…' : 'Cancelar'}
+                </button>
                 <p role="status" className="status">
                   Importando {importing.done} de {importing.total}…
                 </p>
-                <button type="button" className="btn" onClick={() => abort.current?.abort()}>
-                  Cancelar
-                </button>
               </>
             ) : (
               <>
                 <button
                   type="button"
                   className="btn"
+                  disabled={!upToDate}
                   onClick={() =>
                     downloadCsv(
                       toCsv(
-                        upToDate ? classified.list.filter((row) => !done(row)) : [],
+                        classified.list.filter((row) => !done(row)),
                         results,
                         results ? queued : undefined,
                       ),
@@ -464,7 +520,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={busy || !upToDate || ready === 0}
+                  disabled={busy || !upToDate || readyRows.length === 0}
                   onClick={() => void startImport()}
                 >
                   Importar {ready} prontos

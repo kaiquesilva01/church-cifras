@@ -89,4 +89,21 @@ describe('runImport', () => {
     expect(started).toEqual(['a1']);
     expect([...results.keys()]).toEqual(['a1']);
   });
+
+  it('reports each result as soon as the row finishes', async () => {
+    const seen: Array<[string, string]> = [];
+    await runImport(
+      [group('A', 'a1', 'a2')],
+      async (r) => (r.id === 'a1' ? 'imported' : 'existing'),
+      {
+        concurrency: 2,
+        onProgress: () => {},
+        onResult: (id, result) => seen.push([id, result.status]),
+      },
+    );
+    expect(seen).toEqual([
+      ['a1', 'imported'],
+      ['a2', 'existing'],
+    ]);
+  });
 });

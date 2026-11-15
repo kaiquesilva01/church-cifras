@@ -136,3 +136,11 @@ describe('planImport', () => {
     expect(groups[0]!.identity).toBe('a|cantor');
   });
 });
+
+describe('unreadable pdf', () => {
+  it('is fora do padrão with its own detail', () => {
+    const [result] = classifyRows([row({ readError: true, chordCount: 0 })], emptyCatalog);
+    expect(result!.status).toBe('fora do padrão');
+    expect(result!.detail).toBe('não foi possível ler o PDF');
+  });
+});
