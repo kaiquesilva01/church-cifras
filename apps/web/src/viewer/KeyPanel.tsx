@@ -158,12 +158,14 @@ export function KeyPanel({
         </button>
       </div>
       {collisions > 0 && (
-        <p className="key-warning">
+        <p role="status" className="key-warning">
           {`⚠ ${collisions} ${collisions === 1 ? 'acorde pode' : 'acordes podem'} encostar no vizinho (em vermelho)`}
         </p>
       )}
       {suspects.length > 0 && (
-        <p className="key-warning">{`Confira: não reconhecemos ${suspects.join(', ')} como acorde.`}</p>
+        <p role="status" className="key-warning">
+          {`Confira: não reconhecemos ${suspects.join(', ')} como acorde.`}
+        </p>
       )}
       {unavailable && <p className="key-warning">Modo de reescrita ainda não disponível.</p>}
       {error && (

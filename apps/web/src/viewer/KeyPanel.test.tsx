@@ -123,6 +123,8 @@ describe('KeyPanel', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Confira: não reconhecemos Xm7, Y como acorde.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Gerando PDF…' })).toBeDisabled();
+    // Announced to screen readers as they appear.
+    expect(screen.getAllByRole('status')).toHaveLength(2);
   });
 
   it('uses the singular for one collision', () => {

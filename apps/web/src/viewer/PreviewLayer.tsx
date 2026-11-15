@@ -1,4 +1,4 @@
-import type { OverlayOp } from '@cifras/overlay';
+import type { OverlayOp } from '@cifras/overlay/ops';
 import { useEffect, useRef } from 'react';
 import { ensurePreviewFonts, fontFamily } from './previewFonts';
 
@@ -90,6 +90,8 @@ export function PreviewLayer({ page, viewport, ops, highlight = false, onError }
         ctx.fillStyle = '#000000';
         ctx.font = op.text.font;
         ctx.textBaseline = 'alphabetic';
+        // The measure (fontkit advances) ignores kerning; so must the preview.
+        ctx.fontKerning = 'none';
         ctx.fillText(op.text.value, op.text.x, op.text.y);
       }
     };

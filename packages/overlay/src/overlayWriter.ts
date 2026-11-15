@@ -15,7 +15,7 @@ const BLACK = rgb(0, 0, 0);
 export function createOverlayWriter(loadFont: FontBytesLoader): ChordWriter {
   return {
     async write(pdfBytes, plan) {
-      const doc = await PDFDocument.load(pdfBytes);
+      const doc = await PDFDocument.load(pdfBytes, { updateMetadata: false });
       doc.registerFontkit(fontkit);
       const ops = overlayOps(plan);
       const embedded = new Map<FontId, PDFFont>();

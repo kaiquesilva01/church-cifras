@@ -76,6 +76,32 @@ describe('overlay writer', () => {
     expect(doc.getPage(0).getSize()).toEqual({ width: 595, height: 842 });
   });
 
+  it('leaves the document metadata untouched', async () => {
+    const original = await buildSyntheticPdf({
+      title: 'X',
+      keyStyle: 'none',
+      chordFont: 'HelveticaBold',
+      lyricFont: 'Helvetica',
+      lines: [{ chords: [[40, 'C']], lyric: 'texto' }],
+    });
+    const source = await PDFDocument.load(original, { updateMetadata: false });
+    source.setProducer('Editor de cifras');
+    source.setCreator('Autor original');
+    source.setModificationDate(new Date('2020-01-02T03:04:05Z'));
+    const input = await source.save();
+    const plan = buildTransposePlan({
+      lines: await readTextLines(input),
+      from: key('C'),
+      to: key('D'),
+      measure: createMeasure(await loadAllFonts()),
+    });
+    const written = await createOverlayWriter(loadFontFromDisk).write(input, plan);
+    const doc = await PDFDocument.load(written, { updateMetadata: false });
+    expect(doc.getProducer()).toBe('Editor de cifras');
+    expect(doc.getCreator()).toBe('Autor original');
+    expect(doc.getModificationDate()?.toISOString()).toBe('2020-01-02T03:04:05.000Z');
+  });
+
   it('rewrite writer is not available', async () => {
     const writer = createRewriteWriter();
     await expect(writer.write(new Uint8Array(), {} as never)).rejects.toThrow(
