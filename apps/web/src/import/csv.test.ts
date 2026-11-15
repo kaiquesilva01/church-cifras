@@ -44,4 +44,41 @@ describe('toCsv', () => {
     );
     expect(csv).toContain('e.pdf;Música;Cantor;G;erro;boom');
   });
+
+  it('marks rows never run after a cancel as cancelado', () => {
+    const csv = toCsv(
+      [
+        mk({ id: 'a', status: 'pronto', fileName: 'a.pdf' }),
+        mk({ id: 'b', status: 'pronto', fileName: 'b.pdf' }),
+      ],
+      new Map([['a', { status: 'imported' as const }]]),
+    );
+    expect(csv).not.toContain('a.pdf');
+    expect(csv).toContain('b.pdf;Música;Cantor;G;cancelado;');
+  });
+
+  it('does not report importable rows before any import ran', () => {
+    expect(toCsv([mk({ status: 'pronto', fileName: 'p.pdf' })])).not.toContain('p.pdf');
+  });
+
+  it('prefixes cells that start with formula characters', () => {
+    const csv = toCsv([
+      mk({ fileName: '=HYPERLINK("x").pdf', title: '+1', artist: '-2', detail: '@cmd' }),
+    ]);
+    expect(csv).toContain(`"'=HYPERLINK(""x"").pdf";'+1;'-2;G;fora do padrão;'@cmd`);
+  });
+
+  it('appends warnings to the detail', () => {
+    const csv = toCsv([mk({ detail: 'sem acordes', warnings: ['revisar: Xyz', 'linhas: 2'] })]);
+    expect(csv).toContain('"sem acordes; revisar: Xyz; linhas: 2"');
+  });
+
+  it('does not mark rows outside the queue as cancelado', () => {
+    const csv = toCsv(
+      [mk({ id: 'late', status: 'pronto', fileName: 'late.pdf' })],
+      new Map(),
+      new Set(['other']),
+    );
+    expect(csv).not.toContain('late.pdf');
+  });
 });

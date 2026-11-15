@@ -49,7 +49,8 @@ export const IMPORTABLE: ReadonlySet<BatchStatus> = new Set<BatchStatus>([
 
 export const isImportable = (row: { status: BatchStatus }): boolean => IMPORTABLE.has(row.status);
 
-const MAX_MB = 10;
+export const MAX_MB = 10;
+export const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 export const identityOf = (title: string, artist: string): string =>
   `${normalizeText(title)}|${artistIdFromName(artist)}`;

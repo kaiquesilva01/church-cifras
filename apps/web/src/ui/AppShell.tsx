@@ -23,9 +23,14 @@ export function AppShell() {
           </Link>
           <nav aria-label="Principal">
             {isAdmin(role) && (
-              <Link to="/pessoas" className="nav-link">
-                Pessoas
-              </Link>
+              <>
+                <Link to="/pessoas" className="nav-link">
+                  Pessoas
+                </Link>
+                <Link to="/importar" className="nav-link">
+                  Importar
+                </Link>
+              </>
             )}
           </nav>
           <span className="spacer" />
