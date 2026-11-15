@@ -9,7 +9,9 @@ import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { testUser } from '../test/fakeGateway';
 import { HomePage } from './HomePage';
 
-function renderHome(options: { role?: Role; path?: string; songs?: SongSummary[] } = {}) {
+function renderHome(
+  options: { role?: Role; path?: string; songs?: SongSummary[]; state?: unknown } = {},
+) {
   const auth: AuthState = {
     status: 'signed-in',
     user: testUser,
@@ -19,7 +21,13 @@ function renderHome(options: { role?: Role; path?: string; songs?: SongSummary[]
   };
   return render(
     <AuthContext.Provider value={auth}>
-      <MemoryRouter initialEntries={[options.path ?? '/']}>
+      <MemoryRouter
+        initialEntries={[
+          options.state === undefined
+            ? (options.path ?? '/')
+            : { pathname: options.path ?? '/', state: options.state },
+        ]}
+      >
         <SongsProvider api={fakeCatalogApi(options.songs)}>
           <HomePage />
         </SongsProvider>
@@ -29,6 +37,16 @@ function renderHome(options: { role?: Role; path?: string; songs?: SongSummary[]
 }
 
 describe('HomePage', () => {
+  it('shows the notice passed by navigation state once', async () => {
+    renderHome({ state: { notice: 'Música apagada.' } });
+    expect(screen.getByText('Música apagada.').closest('[role="status"]')).not.toBeNull();
+  });
+
+  it('shows no notice without navigation state', () => {
+    renderHome();
+    expect(screen.queryByText('Música apagada.')).not.toBeInTheDocument();
+  });
+
   it('lists songs with key chips linking to the key', () => {
     renderHome();
     const row = screen.getByText('Sonda-me').closest('a')!;

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import { deriveArtists, filterArtists, filterSongs } from '../catalog/search';
@@ -15,6 +15,18 @@ export function HomePage() {
   const { role } = useAuth();
   const { status, songs } = useSongsContext();
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  // One-time notice passed by navigation state (e.g. after deleting a song).
+  const [notice] = useState(() => {
+    const value = (location.state as { notice?: unknown } | null)?.notice;
+    return typeof value === 'string' ? value : null;
+  });
+  useEffect(() => {
+    if (notice) navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    // Runs once on arrival: drops the state so a reload or back does not show it again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const query = params.get('q') ?? '';
   const tab = params.get('aba') === 'cantores' ? TABS[1] : TABS[0];
 
@@ -42,6 +54,11 @@ export function HomePage() {
 
   return (
     <section>
+      {notice && (
+        <p role="status" className="notice">
+          {notice}
+        </p>
+      )}
       <input
         type="search"
         className="search"

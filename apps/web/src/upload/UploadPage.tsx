@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrangementExistsError, saveUpload, type CatalogApi } from '../catalog/catalogApi';
 import { deriveArtists } from '../catalog/search';
+import { MAX_TEXT, validateArtist, validateTitle } from '../catalog/songText';
 import { useSongsContext } from '../catalog/SongsProvider';
 import type { UploadPlan } from '../catalog/types';
 import { decideUpload, type UploadDecision } from './decideUpload';
@@ -11,7 +12,6 @@ import type { PdfSuggestion } from './readPdfSuggestion';
 export type ReadPdf = (file: File, knownArtists: string[]) => Promise<PdfSuggestion>;
 
 const MAX_BYTES = 10 * 1024 * 1024;
-const MAX_TEXT = 120;
 const DEBOUNCE_MS = 300;
 
 type PickError = 'too-big' | 'unreadable' | 'no-chords';
@@ -68,17 +68,8 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
 
   const titleTrim = title.trim();
   const artistTrim = artist.trim();
-  const NO_TEXT = 'Use letras ou números no nome.';
-  const titleError = !titleTrim
-    ? 'Informe o nome da música.'
-    : normalizeText(titleTrim) === ''
-      ? NO_TEXT
-      : null;
-  const artistError = !artistTrim
-    ? 'Informe o cantor.'
-    : normalizeText(artistTrim) === ''
-      ? NO_TEXT
-      : null;
+  const titleError = validateTitle(title);
+  const artistError = validateArtist(artist);
   const keyError = key ? null : 'Escolha o tom.';
   const valid = !titleError && !artistError && !keyError;
   const ready = fileState.status === 'ready';

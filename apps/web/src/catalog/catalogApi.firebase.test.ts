@@ -261,6 +261,31 @@ describe('createCatalogApi payloads', () => {
     });
   });
 
+  it('updateSongMeta calls the callable with the payload', async () => {
+    await createCatalogApi(services).updateSongMeta('s1', {
+      title: 'Nova',
+      artistName: 'Outra Pessoa',
+    });
+    expect(httpsCallable).toHaveBeenCalledWith(services.functions, 'updateSongMeta');
+    expect(callable).toHaveBeenCalledWith({
+      songId: 's1',
+      title: 'Nova',
+      artistName: 'Outra Pessoa',
+    });
+  });
+
+  it('deleteArrangement calls the callable with song and key', async () => {
+    await createCatalogApi(services).deleteArrangement('s1', 'F#m');
+    expect(httpsCallable).toHaveBeenCalledWith(services.functions, 'deleteArrangement');
+    expect(callable).toHaveBeenCalledWith({ songId: 's1', key: 'F#m' });
+  });
+
+  it('deleteSong calls the callable with the song id', async () => {
+    await createCatalogApi(services).deleteSong('s1');
+    expect(httpsCallable).toHaveBeenCalledWith(services.functions, 'deleteSong');
+    expect(callable).toHaveBeenCalledWith({ songId: 's1' });
+  });
+
   it('createGeneratedArrangement writes a generated overlay arrangement', async () => {
     await createCatalogApi(services).createGeneratedArrangement('s1', {
       key: 'A',
