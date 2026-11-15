@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
@@ -22,11 +22,14 @@ export function HomePage() {
     const value = (location.state as { notice?: unknown } | null)?.notice;
     return typeof value === 'string' ? value : null;
   });
+  const cleared = useRef(false);
+  const { pathname, search } = location;
   useEffect(() => {
-    if (notice) navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-    // Runs once on arrival: drops the state so a reload or back does not show it again.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Drops the state so a reload or going back does not show the notice again.
+    if (!notice || cleared.current) return;
+    cleared.current = true;
+    navigate(`${pathname}${search}`, { replace: true, state: null });
+  }, [notice, navigate, pathname, search]);
   const query = params.get('q') ?? '';
   const tab = params.get('aba') === 'cantores' ? TABS[1] : TABS[0];
 

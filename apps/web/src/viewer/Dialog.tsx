@@ -1,6 +1,5 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-
-const FOCUSABLE = 'button:not([disabled]), input:not([disabled])';
+import { useRef, type ReactNode } from 'react';
+import { useFocusTrap } from './useFocusTrap';
 
 export interface DialogProps {
   titleId: string;
@@ -14,36 +13,7 @@ export interface DialogProps {
 export function Dialog({ titleId, onClose, busy = false, children }: DialogProps) {
   const root = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    root.current?.focus();
-    return () => opener?.focus?.();
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        if (!busy) onClose();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const items = [...(root.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])];
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (!first || !last) return;
-      const active = document.activeElement;
-      const outside = !root.current?.contains(active) || active === root.current;
-      if (event.shiftKey && (outside || active === first)) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (outside || active === last)) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [busy, onClose]);
+  useFocusTrap(root, { onEscape: onClose, busy });
 
   return (
     <div className="dialog-backdrop">

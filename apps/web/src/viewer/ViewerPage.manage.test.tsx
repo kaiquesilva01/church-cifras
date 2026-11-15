@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
@@ -12,7 +12,19 @@ vi.mock('./PdfPages', () => ({
   PdfPages: () => <div data-testid="pdf-pages" />,
 }));
 
-afterEach(() => vi.restoreAllMocks());
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 function Probe() {
   const where = useLocation();
@@ -86,7 +98,7 @@ function setup(role: Role = 'admin', overrides: Parameters<typeof fakeCatalogApi
 
 const openMenu = async (item: string) => {
   fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar' }));
-  fireEvent.click(screen.getByRole('menuitem', { name: item }));
+  fireEvent.click(screen.getByRole('button', { name: item }));
   return screen.findByRole('dialog');
 };
 
@@ -102,7 +114,10 @@ describe('ViewerPage manage', () => {
   it('admin sees the menu items', async () => {
     setup();
     fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar' }));
-    const items = screen.getAllByRole('menuitem').map((i) => i.textContent);
+    const group = screen.getByRole('group', { name: 'Gerenciar música' });
+    const items = within(group)
+      .getAllByRole('button')
+      .map((i) => i.textContent);
     expect(items).toEqual(['Editar nome e cantor', 'Apagar tom G', 'Apagar música']);
   });
 
@@ -134,6 +149,7 @@ describe('ViewerPage manage', () => {
       updateSongMeta: vi.fn(() => Promise.reject(codeError('functions/already-exists', 'x'))),
     });
     const dialog = await openMenu('Editar nome e cantor');
+    fireEvent.change(within(dialog).getByLabelText('Cantor'), { target: { value: 'Outra' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Já existe uma música com esse nome e cantor.',
@@ -186,7 +202,7 @@ describe('ViewerPage manage', () => {
       </AuthContext.Provider>,
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Apagar tom G' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apagar tom G' }));
     fireEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Apagar tom' }),
     );
@@ -238,5 +254,71 @@ describe('ViewerPage manage', () => {
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/));
     expect(api.deleteSong).toHaveBeenCalledWith('s1');
     expect(screen.getByTestId('location')).toHaveAttribute('data-notice', 'Música apagada.');
+  });
+  it('viewer role does not see the menu', async () => {
+    setup('viewer');
+    await screen.findByTestId('pdf-pages');
+    expect(screen.queryByRole('button', { name: 'Gerenciar' })).not.toBeInTheDocument();
+  });
+
+  it('menu is a disclosure and closes on outside click, focus leaving and Escape', async () => {
+    setup();
+    const trigger = await screen.findByRole('button', { name: 'Gerenciar' });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.pointerDown(document.body);
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(trigger);
+    fireEvent.blur(screen.getByRole('button', { name: 'Apagar música' }), {
+      relatedTarget: screen.getByRole('button', { name: 'PDF' }),
+    });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(trigger);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
+  });
+
+  it('skips the server call when the edit is unchanged', async () => {
+    const api = setup();
+    const dialog = await openMenu('Editar nome e cantor');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(api.updateSongMeta).not.toHaveBeenCalled();
+    expect(screen.queryByText('Dados atualizados.')).not.toBeInTheDocument();
+  });
+
+  it('ignores Escape and keeps focus inside while busy', async () => {
+    let finish: () => void = () => undefined;
+    setup('admin', {
+      deleteArrangement: vi.fn(() => new Promise<void>((resolve) => (finish = resolve))),
+    });
+    const dialog = await openMenu('Apagar tom G');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Apagar tom' }));
+    expect(await within(dialog).findByRole('button', { name: 'Apagando…' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(dialog).toHaveFocus();
+    expect(fireEvent.keyDown(document, { key: 'Tab' })).toBe(false);
+    expect(dialog).toHaveFocus();
+    finish();
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('?tom=A'));
+  });
+
+  it('Gerenciar and Mudar tom cannot be open together', async () => {
+    setup();
+    const manageButton = await screen.findByRole('button', { name: 'Gerenciar' });
+    const changeKey = await screen.findByRole('button', { name: 'Mudar tom' });
+    await waitFor(() => expect(changeKey).toBeEnabled());
+    fireEvent.click(manageButton);
+    expect(changeKey).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Editar nome e cantor' }));
+    expect(changeKey).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(changeKey).toBeEnabled();
+    fireEvent.click(changeKey);
+    await screen.findByText('Mudar tom · original', { exact: false });
+    expect(manageButton).toBeDisabled();
   });
 });

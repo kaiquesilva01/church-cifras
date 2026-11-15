@@ -205,6 +205,7 @@ export function ViewerPage({
   const [notice, setNotice] = useState<{ key: string } | null>(null);
   const [manage, setManage] = useState<ManageState | null>(null);
   const [metaSaved, setMetaSaved] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const chordWriter = useMemo<ChordWriter>(
     () =>
       writer ?? {
@@ -294,6 +295,8 @@ export function ViewerPage({
   };
 
   const admin = isAdmin(role);
+  // The Mudar tom panel and the manage menu/dialogs are never open together.
+  const managing = menuOpen || manage !== null;
   const closeManage = (): void => setManage(null);
   const startManage = (action: ManageAction): void => {
     setMetaSaved(false);
@@ -310,6 +313,10 @@ export function ViewerPage({
     });
 
   const saveMeta = async (value: { title: string; artistName: string }): Promise<void> => {
+    if (value.title === song.title && value.artistName === song.artistName) {
+      setManage(null);
+      return;
+    }
     setManage({ action: 'edit', busy: true, error: null });
     try {
       await api.updateSongMeta(songId, value);
@@ -374,7 +381,15 @@ export function ViewerPage({
             {song.title}
           </Link>
           <p className="muted">{song.artistName}</p>
-          {admin && <ManageMenu keyName={selected?.key ?? null} onSelect={startManage} />}
+          {admin && (
+            <ManageMenu
+              keyName={selected?.key ?? null}
+              open={menuOpen}
+              onOpenChange={setMenuOpen}
+              disabled={panelOpen}
+              onSelect={startManage}
+            />
+          )}
           <KeyChips
             songId={song.id}
             title={song.title}
@@ -430,9 +445,10 @@ export function ViewerPage({
             <button
               type="button"
               className="btn btn-primary"
-              disabled={!source}
+              disabled={!source || managing}
               aria-describedby={!source ? 'no-source' : undefined}
               onClick={() => {
+                if (managing) return;
                 setNotice(null);
                 setPanelOpen(true);
               }}

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
@@ -8,6 +8,11 @@ import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { testUser } from '../test/fakeGateway';
 import { HomePage } from './HomePage';
+
+function StateProbe() {
+  const { state } = useLocation();
+  return <output data-testid="state">{JSON.stringify(state)}</output>;
+}
 
 function renderHome(
   options: { role?: Role; path?: string; songs?: SongSummary[]; state?: unknown } = {},
@@ -30,6 +35,7 @@ function renderHome(
       >
         <SongsProvider api={fakeCatalogApi(options.songs)}>
           <HomePage />
+          <StateProbe />
         </SongsProvider>
       </MemoryRouter>
     </AuthContext.Provider>,
@@ -40,6 +46,12 @@ describe('HomePage', () => {
   it('shows the notice passed by navigation state once', async () => {
     renderHome({ state: { notice: 'Música apagada.' } });
     expect(screen.getByText('Música apagada.').closest('[role="status"]')).not.toBeNull();
+  });
+
+  it('clears the navigation state after showing the notice', async () => {
+    renderHome({ state: { notice: 'Música apagada.' } });
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
+    expect(screen.getByText('Música apagada.')).toBeInTheDocument();
   });
 
   it('shows no notice without navigation state', () => {
@@ -135,6 +147,7 @@ describe('HomePage', () => {
         <MemoryRouter>
           <SongsProvider api={api}>
             <HomePage />
+            <StateProbe />
           </SongsProvider>
         </MemoryRouter>
       </AuthContext.Provider>,
