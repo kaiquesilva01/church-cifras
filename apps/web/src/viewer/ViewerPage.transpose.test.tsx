@@ -1,5 +1,5 @@
 import type { ChordWriter, OverlayOp } from '@cifras/overlay';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Role } from '../auth/roles';
@@ -11,6 +11,10 @@ import { fakeCatalogApi, makeSong } from '../test/fakeCatalogApi';
 import { testUser } from '../test/fakeGateway';
 import { loadFontFromDisk, sheetInG } from './transposeFixtures';
 import { ViewerPage, type ViewerPageProps } from './ViewerPage';
+
+// Every step here awaits real font parsing and pdf-lib-free but CPU-heavy planning: under a loaded
+// machine (parallel workspaces in `npm test`) the 1 s default made these waits flaky.
+configure({ asyncUtilTimeout: 8000 });
 
 vi.mock('./PreviewLayer', () => ({
   PreviewLayer: ({ ops, highlight }: { ops: OverlayOp[]; highlight?: boolean }) => (
