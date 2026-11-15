@@ -60,6 +60,8 @@ const MIN_TITLE_WORDS = 3;
 // All-caps words (DE, DO, EM, ADORAÇÃO) are title text, never a chord attempt.
 const ALL_CAPS_WORD = /^[A-G][A-ZÀ-Ý]+$/;
 // An all-caps word beside a chord-like letter (`MEU PRAZER E`) marks a bold title.
+// An opening bracket marks an annotation (`(repete`, `(BIS)`) beside chords, never a title.
+const ANNOTATION = /^[([]/;
 const ALL_CAPS_TITLE_WORD = /^[A-ZÀ-Ý]{2,}$/;
 const CHORD_ATTEMPT = /^[[(]?[A-G](?:[#b]?(?![a-z]{2}|[A-Z]{2})|[#b]?(?:maj|min|dim|aug|sus|add))/;
 
@@ -111,8 +113,9 @@ export function buildTransposePlan(input: {
     } else if (
       segment.chords.length > 0 &&
       !segment.isChordLine &&
-      segment.unknown.length < MIN_TITLE_WORDS &&
-      !segment.unknown.some((t) => ALL_CAPS_TITLE_WORD.test(t))
+      (segment.unknown.some((t) => ANNOTATION.test(t)) ||
+        (segment.unknown.length < MIN_TITLE_WORDS &&
+          !segment.unknown.some((t) => ALL_CAPS_TITLE_WORD.test(t))))
     ) {
       ignoredChordLines++;
     }

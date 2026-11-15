@@ -299,7 +299,7 @@ describe('buildTransposePlan', () => {
     const plan = buildTransposePlan({
       lines: [
         line([run('Am G (repete', 10)], 1, 700),
-        line([run('D Em (volta ao início', 10)], 1, 650),
+        line([run('D Em volta ao início', 10)], 1, 650),
         line([run('Am G', 10)], 1, 600),
       ],
       from: key('A'),
@@ -325,6 +325,20 @@ describe('buildTransposePlan', () => {
     });
     expect(plan.ignoredChordLines).toBe(0);
     expect(plan.suspectSegments).toHaveLength(1);
+  });
+
+  it('counts annotated chord lines as ignored', () => {
+    const count = (text: string) =>
+      buildTransposePlan({
+        lines: [line([run(text, 10)])],
+        from: key('A'),
+        to: key('B'),
+        measure,
+      }).ignoredChordLines;
+    expect(count('A E (volta ao início)')).toBe(1);
+    expect(count('A D (BIS)')).toBe(1);
+    expect(count('Deus é Fiel A')).toBe(0);
+    expect(count('MEU PRAZER E')).toBe(0);
   });
 
   describe('run identity and limits', () => {
