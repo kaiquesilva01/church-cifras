@@ -17,6 +17,8 @@ export interface KeyPanelProps {
   error?: string | null;
   /** The configured writer cannot generate PDFs (rewrite mode). */
   unavailable?: boolean;
+  /** Sheet layout: height of the sheet in px (null when it goes away), so the page can leave room. */
+  onSheetHeight?: (height: number | null) => void;
 }
 
 const FOCUSABLE = 'button:not([disabled])';
@@ -35,6 +37,7 @@ export function KeyPanel({
   preparing = false,
   error = null,
   unavailable = false,
+  onSheetHeight,
 }: KeyPanelProps) {
   const root = useRef<HTMLElement>(null);
   const source = parseKey(sourceKey);
@@ -47,6 +50,20 @@ export function KeyPanel({
     root.current?.focus();
     return () => opener?.focus?.();
   }, []);
+
+  // The sheet has no backdrop (the preview stays visible); the page keeps room below the last page.
+  useEffect(() => {
+    const el = root.current;
+    if (layout !== 'sheet' || !el || !onSheetHeight) return;
+    const measure = (): void => onSheetHeight(el.offsetHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      onSheetHeight(null);
+    };
+  }, [layout, onSheetHeight]);
 
   const step = (delta: number): void => {
     const from = target ?? source?.name ?? options[0]!;
@@ -94,7 +111,9 @@ export function KeyPanel({
       <h2 id="key-panel-title" className="key-panel-title">
         Mudar tom · original {sourceKey}
       </h2>
-      <p className="key-legend">▢ salvo</p>
+      <p className="key-legend">
+        <span aria-hidden="true">▢ </span>salvo
+      </p>
       {preparing && (
         <p role="status" className="status">
           Preparando…
@@ -182,19 +201,16 @@ export function KeyPanel({
     );
   }
   return (
-    <>
-      <div className="key-backdrop" aria-hidden="true" onClick={busy ? undefined : onCancel} />
-      <section
-        ref={root}
-        tabIndex={-1}
-        className="key-panel"
-        data-layout="sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="key-panel-title"
-      >
-        {body}
-      </section>
-    </>
+    <section
+      ref={root}
+      tabIndex={-1}
+      className="key-panel"
+      data-layout="sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="key-panel-title"
+    >
+      {body}
+    </section>
   );
 }

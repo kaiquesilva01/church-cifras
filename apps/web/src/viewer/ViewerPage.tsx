@@ -1,6 +1,7 @@
 import { chooseFont, createOverlayWriter, createRewriteWriter, loadFonts } from '@cifras/overlay';
 import type { ChordWriter, FontBytesLoader, FontId, LoadedFonts } from '@cifras/overlay';
 import { keyFromSlug, keySlug, parseKey, type TextLine } from '@cifras/chords';
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { canEdit } from '../auth/roles';
@@ -172,6 +173,7 @@ export function ViewerPage({
     fonts: ready?.fonts ?? null,
   });
 
+  const [sheetHeight, setSheetHeight] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ key: string } | null>(null);
@@ -262,7 +264,12 @@ export function ViewerPage({
   const savedKeys = arrangements.map((a) => a.key);
 
   return (
-    <section className={`viewer${panelOpen && wide ? ' has-side' : ''}`}>
+    <section
+      className={`viewer${panelOpen && wide ? ' has-side' : ''}${sheetHeight !== null ? ' has-sheet' : ''}`}
+      style={
+        sheetHeight !== null ? ({ '--sheet-height': `${sheetHeight}px` } as CSSProperties) : undefined
+      }
+    >
       <div className="viewer-body" inert={panelOpen && !wide}>
         <header className="viewer-head">
           <Link to="/" className="back">
@@ -349,6 +356,7 @@ export function ViewerPage({
           suspects={suspects}
           busy={busy}
           layout={wide ? 'side' : 'sheet'}
+          onSheetHeight={setSheetHeight}
           preparing={preparing}
           error={generateError ?? prepareError}
           unavailable={writerMode === 'rewrite'}

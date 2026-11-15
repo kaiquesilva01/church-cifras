@@ -384,6 +384,17 @@ describe('ViewerPage change key', () => {
     expect(container.querySelector('[inert]')).toBeNull();
   });
 
+  it('reserves room under the last page while the sheet is open', async () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(240);
+    const { container } = renderViewer();
+    const viewer = container.querySelector('.viewer') as HTMLElement;
+    expect(viewer.style.getPropertyValue('--sheet-height')).toBe('');
+    await openPanel();
+    expect(viewer.style.getPropertyValue('--sheet-height')).toBe('240px');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(viewer.style.getPropertyValue('--sheet-height')).toBe('');
+  });
+
   it('clears the existing-key notice when the selected key changes', async () => {
     const api = fakeCatalogApi([songG], {
       createGeneratedArrangement: vi.fn(() => Promise.reject(new ArrangementExistsError())),

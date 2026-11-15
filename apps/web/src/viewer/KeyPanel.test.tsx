@@ -24,7 +24,7 @@ describe('KeyPanel', () => {
   it('shows the source key in the title and the 12 major keys', () => {
     setup();
     expect(screen.getByText('Mudar tom · original G')).toBeInTheDocument();
-    expect(screen.getByText('▢ salvo')).toBeInTheDocument();
+    expect(screen.getByText('salvo')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { pressed: false })).toHaveLength(12);
   });
 
@@ -48,6 +48,45 @@ describe('KeyPanel', () => {
     expect(dialog.contains(document.activeElement)).toBe(true);
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  it('has no dimming backdrop: tapping outside the sheet does not close it', () => {
+    const { onCancel } = setup();
+    expect(document.querySelector('.key-backdrop')).toBeNull();
+    fireEvent.click(document.body);
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it('reports the measured sheet height and clears it on unmount', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(240);
+    const onSheetHeight = vi.fn();
+    const { unmount } = render(
+      <KeyPanel
+        sourceKey="G"
+        savedKeys={[]}
+        target={null}
+        collisions={0}
+        suspects={[]}
+        busy={false}
+        layout="sheet"
+        onTarget={vi.fn()}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        onSheetHeight={onSheetHeight}
+      />,
+    );
+    expect(onSheetHeight).toHaveBeenLastCalledWith(240);
+    unmount();
+    expect(onSheetHeight).toHaveBeenLastCalledWith(null);
+    height.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('ignores Escape while busy', () => {
