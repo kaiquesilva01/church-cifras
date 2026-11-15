@@ -313,6 +313,85 @@ async function main() {
   const keptStatus = await fileStatus(admin, cPath);
   if (keptStatus !== 200) fail(`referenced file expected 200, got ${keptStatus}`);
   log('discardUpload on referenced file -> FAILED_PRECONDITION');
+
+  await generatedKeysScenario(admin, adminSdk, adminUid);
+  await foreignFileScenario(admin, adminSdk, adminUid);
+}
+
+// Tom gerado pelo cliente (viewer de transposição): derivedFromKey precisa ser um
+// handmade existente do mesmo modo.
+async function generatedKeysScenario(admin, adminSdk, adminUid) {
+  step = 'admin adds generated E from handmade C';
+  const ePath = `songs/${songId}/E-file${runId}e.pdf`;
+  let response = await uploadFile(adminSdk, ePath, adminUid);
+  if (!response.ok) fail(`upload E: ${response.status} ${response.error?.message}`);
+  response = await commit(admin, [arrangementWrite(adminUid, 'E', 'E', ePath, 'generated', 'C')]);
+  if (!response.ok) fail(`commit generated E: ${response.status} ${await response.text()}`);
+  await waitForSong(admin, { keys: ['C', 'D', 'E'], handmadeKeys: ['C', 'D'] }, 'generated E');
+  log('generated E from handmade C -> OK');
+
+  step = 'generated from a generated source is rejected';
+  const fPath = `songs/${songId}/F-file${runId}f.pdf`;
+  response = await uploadFile(adminSdk, fPath, adminUid);
+  if (!response.ok) fail(`upload F: ${response.status} ${response.error?.message}`);
+  response = await commit(admin, [arrangementWrite(adminUid, 'F', 'F', fPath, 'generated', 'E')]);
+  if (response.status !== 403)
+    fail(`generated from generated expected 403, got ${response.status}`);
+  log('generated F from generated E -> 403');
+
+  step = 'generated of a different mode is rejected';
+  const amPath = `songs/${songId}/Am-file${runId}a.pdf`;
+  response = await uploadFile(adminSdk, amPath, adminUid);
+  if (!response.ok) fail(`upload Am: ${response.status} ${response.error?.message}`);
+  response = await commit(admin, [
+    arrangementWrite(adminUid, 'Am', 'Am', amPath, 'generated', 'C'),
+  ]);
+  if (response.status !== 403) fail(`generated Am from C expected 403, got ${response.status}`);
+  log('generated Am from major C -> 403');
+}
+
+// replaceArrangement só aceita arquivo enviado pelo próprio chamador.
+async function foreignFileScenario(admin, adminSdk, adminUid) {
+  step = 'promote a second user to member';
+  await signIn('member@cifras.local', 'smoke-member');
+  let member = await signIn('member@cifras.local', 'smoke-member');
+  const memberUid = claims(member).user_id;
+  // O doc users/{uid} nasce no trigger onUserCreated: tenta de novo enquanto NOT_FOUND.
+  let result;
+  const retryUntil = Date.now() + 30_000;
+  do {
+    result = await callFunction('setUserRole', admin, { uid: memberUid, role: 'member' });
+    if (result.body?.error?.status !== 'NOT_FOUND') break;
+    await sleep(1000);
+  } while (Date.now() < retryUntil);
+  if (result.status !== 200) fail(`setUserRole: ${result.status} ${JSON.stringify(result.body)}`);
+  // Novo login para renovar as claims.
+  member = await signIn('member@cifras.local', 'smoke-member');
+  if (claims(member).role !== 'member') fail(`member claim missing: ${claims(member).role}`);
+  const memberSdk = await signInSdk('member@cifras.local', 'smoke-member', `member-${runId}`);
+
+  step = 'admin adds generated G, member uploads a file for it';
+  const gOld = `songs/${songId}/G-file${runId}g.pdf`;
+  let response = await uploadFile(adminSdk, gOld, adminUid);
+  if (!response.ok) fail(`upload G: ${response.status} ${response.error?.message}`);
+  response = await commit(admin, [arrangementWrite(adminUid, 'G', 'G', gOld, 'generated', 'C')]);
+  if (!response.ok) fail(`commit generated G: ${response.status} ${await response.text()}`);
+  const foreign = `songs/${songId}/G-file${runId}m.pdf`;
+  response = await uploadFile(memberSdk, foreign, memberUid);
+  if (!response.ok) fail(`member upload: ${response.status} ${response.error?.message}`);
+
+  step = 'admin replaceArrangement with the member file is PERMISSION_DENIED';
+  result = await callReplace(admin, { songId, key: 'G', storagePath: foreign, chordCount: 9 });
+  if (result.body?.error?.status !== 'PERMISSION_DENIED') {
+    fail(
+      `foreign file expected PERMISSION_DENIED, got ${result.status} ${JSON.stringify(result.body)}`,
+    );
+  }
+  const g = await getDoc(admin, `songs/${songId}/arrangements/G`);
+  if (g.source.stringValue !== 'generated' || g.storagePath.stringValue !== gOld) {
+    fail(`G changed after denied replace: ${JSON.stringify(g)}`);
+  }
+  log('replaceArrangement with another user file -> PERMISSION_DENIED');
 }
 
 try {

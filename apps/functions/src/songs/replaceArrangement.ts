@@ -12,6 +12,8 @@ export type ReplaceDeps = {
   ): Promise<ReplaceResult>;
   deleteFile(path: string): Promise<void>;
   fileExists(path: string): Promise<boolean>;
+  // Dono (metadata.uploadedBy) do arquivo; null quando ausente.
+  getFileOwner(path: string): Promise<string | null>;
   now(): Date;
 };
 
@@ -52,6 +54,10 @@ export async function replaceArrangement(
     throw new HttpsError('invalid-argument', 'Uploaded file not found.');
   }
 
+  if ((await deps.getFileOwner(storagePath)) !== uid) {
+    throw new HttpsError('permission-denied', 'File was not uploaded by the caller.');
+  }
+
   const result = await deps.replaceIfGenerated(songId, slug, {
     key: parsed.name,
     storagePath,
@@ -74,6 +80,13 @@ export async function replaceArrangement(
     await deps.deleteFile(result.previousPath);
   } catch (error) {
     console.error('Failed to delete replaced arrangement file', result.previousPath, error);
+  }
+  try {
+    if (!(await deps.fileExists(storagePath))) {
+      console.error('New arrangement file vanished after the transaction', storagePath);
+    }
+  } catch (error) {
+    console.error('Failed to re-check new arrangement file', storagePath, error);
   }
   return { songId, key: parsed.name };
 }

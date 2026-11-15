@@ -30,6 +30,13 @@ export interface NewArrangementInput {
   chordCount: number;
 }
 
+export interface NewGeneratedArrangementInput extends NewArrangementInput {
+  /** Tom feito à mão de onde o PDF foi gerado. */
+  derivedFromKey: KeyName;
+  collisions: number;
+  createdBy: string;
+}
+
 export interface NewSongInput extends NewArrangementInput {
   /** Id reservado com `newSongId()`; o arquivo já foi enviado para `songs/{songId}/`. */
   songId: string;

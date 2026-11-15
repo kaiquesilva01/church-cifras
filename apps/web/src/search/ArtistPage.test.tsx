@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it } from 'vitest';
+import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { ArtistPage } from './ArtistPage';
 
@@ -8,7 +9,14 @@ function renderArtist(id: string, api = fakeCatalogApi(), search = '') {
   return render(
     <MemoryRouter initialEntries={[`/cantores/${id}${search}`]}>
       <Routes>
-        <Route path="/cantores/:artistId" element={<ArtistPage api={api} />} />
+        <Route
+          path="/cantores/:artistId"
+          element={
+            <SongsProvider api={api}>
+              <ArtistPage />
+            </SongsProvider>
+          }
+        />
       </Routes>
     </MemoryRouter>,
   );

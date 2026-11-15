@@ -18,11 +18,12 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { getBlob, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import type { FirebaseServices } from '../lib/firebase';
 import type {
   ArrangementSummary,
   NewArrangementInput,
+  NewGeneratedArrangementInput,
   NewSongInput,
   SongSummary,
   UploadPlan,
@@ -53,7 +54,11 @@ export interface CatalogApi {
     storagePath: string,
     chordCount: number,
   ): Promise<void>;
+  /** Cria um tom gerado (writer overlay); as regras exigem o tom de origem feito à mão. */
+  createGeneratedArrangement(songId: string, input: NewGeneratedArrangementInput): Promise<void>;
   getPdfUrl(storagePath: string): Promise<string>;
+  /** Baixa o PDF via getBlob (SDK autenticado, sem CORS de URL assinada). */
+  getPdfBytes(storagePath: string): Promise<Uint8Array>;
 }
 
 function toKeys(value: unknown): KeyName[] {
@@ -210,7 +215,24 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
     replaceArrangement: async (songId, key, storagePath, chordCount) => {
       await callReplace({ songId, key, storagePath, chordCount });
     },
+    createGeneratedArrangement: async (songId, input) => {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'songs', songId, 'arrangements', keySlug(input.key)), {
+        key: input.key,
+        storagePath: input.storagePath,
+        source: 'generated',
+        derivedFromKey: input.derivedFromKey,
+        writer: 'overlay',
+        chordCount: input.chordCount,
+        collisions: input.collisions,
+        createdBy: input.createdBy,
+        createdAt: serverTimestamp(),
+      });
+      await batch.commit();
+    },
     getPdfUrl: (storagePath) => getDownloadURL(ref(storage, storagePath)),
+    getPdfBytes: async (storagePath) =>
+      new Uint8Array(await (await getBlob(ref(storage, storagePath))).arrayBuffer()),
   };
 }
 

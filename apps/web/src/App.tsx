@@ -2,6 +2,7 @@ import { Suspense, lazy, useMemo } from 'react';
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router';
 import { AuthProvider, type AuthGateway } from './auth/AuthProvider';
 import type { CatalogApi } from './catalog/catalogApi';
+import { SongsProvider } from './catalog/SongsProvider';
 import type { PeopleApi } from './people/peopleApi';
 import { PeoplePage } from './people/PeoplePage';
 import { LoginPage } from './routes/LoginPage';
@@ -10,10 +11,10 @@ import { ErrorBoundary } from './routes/ErrorBoundary';
 import { RequireRole } from './routes/RequireRole';
 import { ArtistPage } from './search/ArtistPage';
 import { HomePage } from './search/HomePage';
-import { SongPage } from './search/SongPage';
 import { AppShell } from './ui/AppShell';
 
 const UploadRoute = lazy(() => import('./upload/UploadRoute'));
+const ViewerRoute = lazy(() => import('./viewer/ViewerRoute'));
 
 export interface AppProps {
   gateway: AuthGateway;
@@ -37,10 +38,31 @@ function AppRoutes({
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
-        <Route element={<AppShell />}>
-          <Route index element={<HomePage api={catalogApi} />} />
-          <Route path="/cantores/:artistId" element={<ArtistPage api={catalogApi} />} />
-          <Route path="/musicas/:songId" element={<SongPage api={catalogApi} />} />
+        <Route
+          element={
+            <SongsProvider api={catalogApi}>
+              <AppShell />
+            </SongsProvider>
+          }
+        >
+          <Route index element={<HomePage />} />
+          <Route path="/cantores/:artistId" element={<ArtistPage />} />
+          <Route
+            path="/musicas/:songId"
+            element={
+              <ErrorBoundary onReload={onReload}>
+                <Suspense
+                  fallback={
+                    <p role="status" className="status">
+                      Carregando cifra…
+                    </p>
+                  }
+                >
+                  <ViewerRoute api={catalogApi} />
+                </Suspense>
+              </ErrorBoundary>
+            }
+          />
           <Route element={<RequireRole roles={['member', 'admin']} />}>
             <Route
               path="/nova"

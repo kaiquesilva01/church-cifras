@@ -162,6 +162,9 @@ carregadas sob demanda só para a família usada no PDF.
   novo texto na fonte de substituição equivalente à original (§6.1), embutida com subset via `@pdf-lib/fontkit`.
 - **`RewriteWriter`** (abordagem B, em observação): esqueleto + flag; implementação pode vir depois.
 - Seleção do writer por flag de configuração (`VITE_CHORD_WRITER=overlay|rewrite`), para comparação lado a lado.
+- **Atualização 2026-11-15:** na Fase 5 as fontes de substituição são embutidas **completas**, não em subset: o subsetter
+  do `@pdf-lib/fontkit` descarta glifos (D, F, #, ...) nas fontes usadas e o acorde novo some. Os PDFs gerados ficam de
+  ~7 a 13× maiores que o original. A Fase 7 entrega TTFs pré-reduzidos (charset de acordes + Latin-1) para voltar ao tamanho pequeno.
 
 ### 6.5 Modelo de dados (Firestore)
 ```

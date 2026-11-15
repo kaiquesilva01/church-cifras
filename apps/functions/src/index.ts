@@ -71,6 +71,13 @@ const replaceDeps: ReplaceDeps = {
     await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
   },
   fileExists: async (path) => (await getStorage().bucket().file(path).exists())[0],
+  getFileOwner: async (path) => {
+    const file = getStorage().bucket().file(path);
+    if (!(await file.exists())[0]) return null;
+    const [metadata] = await file.getMetadata();
+    const uploadedBy = metadata.metadata?.uploadedBy;
+    return typeof uploadedBy === 'string' ? uploadedBy : null;
+  },
   now: () => new Date(),
 };
 

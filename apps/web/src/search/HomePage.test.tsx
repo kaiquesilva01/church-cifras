@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import type { SongSummary } from '../catalog/types';
+import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { testUser } from '../test/fakeGateway';
 import { HomePage } from './HomePage';
@@ -19,7 +20,9 @@ function renderHome(options: { role?: Role; path?: string; songs?: SongSummary[]
   return render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[options.path ?? '/']}>
-        <HomePage api={fakeCatalogApi(options.songs)} />
+        <SongsProvider api={fakeCatalogApi(options.songs)}>
+          <HomePage />
+        </SongsProvider>
       </MemoryRouter>
     </AuthContext.Provider>,
   );
@@ -112,7 +115,9 @@ describe('HomePage', () => {
         }}
       >
         <MemoryRouter>
-          <HomePage api={api} />
+          <SongsProvider api={api}>
+            <HomePage />
+          </SongsProvider>
         </MemoryRouter>
       </AuthContext.Provider>,
     );

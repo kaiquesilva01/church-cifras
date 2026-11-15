@@ -14,6 +14,8 @@ function fakeApi(overrides: Partial<CatalogApi> = {}): CatalogApi {
     createSongWithArrangement: vi.fn((input) => Promise.resolve(input.songId)),
     addArrangement: vi.fn(() => Promise.resolve()),
     replaceArrangement: vi.fn(() => Promise.resolve()),
+    createGeneratedArrangement: vi.fn(() => Promise.resolve()),
+    getPdfBytes: vi.fn(() => Promise.resolve(new Uint8Array([37, 80, 68, 70]))),
     getPdfUrl: vi.fn(() => Promise.resolve('https://x')),
     ...overrides,
   };

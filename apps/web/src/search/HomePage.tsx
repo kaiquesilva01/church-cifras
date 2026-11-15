@@ -2,9 +2,8 @@ import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
-import type { CatalogApi } from '../catalog/catalogApi';
 import { deriveArtists, filterArtists, filterSongs } from '../catalog/search';
-import { useSongs } from '../catalog/useSongs';
+import { useSongsContext } from '../catalog/SongsProvider';
 import { SongList } from './SongList';
 
 const TABS = [
@@ -12,9 +11,9 @@ const TABS = [
   { id: 'cantores', label: 'Cantores', placeholder: 'Buscar cantor…' },
 ] as const;
 
-export function HomePage({ api }: { api: CatalogApi }) {
+export function HomePage() {
   const { role } = useAuth();
-  const { status, songs } = useSongs(api);
+  const { status, songs } = useSongsContext();
   const [params, setParams] = useSearchParams();
   const query = params.get('q') ?? '';
   const tab = params.get('aba') === 'cantores' ? TABS[1] : TABS[0];
