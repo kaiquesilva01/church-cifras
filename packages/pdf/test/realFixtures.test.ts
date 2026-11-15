@@ -46,6 +46,7 @@ describe.skipIf(files.length === 0)('real fixtures', () => {
     expect(plan.chordCount).toBeGreaterThan(0);
     // a bold line with chords plus an unreadable token would be a silently skipped chord
     expect(plan.suspectSegments).toEqual([]);
+    expect(plan.ignoredChordLines).toBe(0);
     if (name.startsWith('Gabriela Rocha')) expect(plan.collisions).toBe(0);
     if (name.startsWith('Sonda-me')) {
       for (const c of plan.chords.filter((x) => x.collides)) {

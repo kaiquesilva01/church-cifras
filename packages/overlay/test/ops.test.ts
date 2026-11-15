@@ -36,6 +36,7 @@ function plan(chords: Replacement[], keyIndicator: Replacement | null = null): T
     chordCount: chords.length,
     collisions: chords.filter((c) => c.collides).length,
     suspectSegments: [],
+    ignoredChordLines: 0,
   };
 }
 

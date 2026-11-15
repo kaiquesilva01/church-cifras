@@ -70,6 +70,7 @@ describe('embedded glyphs', () => {
         chordCount: 1,
         collisions: 0,
         suspectSegments: [],
+        ignoredChordLines: 0,
       };
       const out = await PDFDocument.load(
         await createOverlayWriter(loadFontFromDisk).write(base, plan),

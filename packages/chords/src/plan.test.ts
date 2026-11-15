@@ -295,6 +295,38 @@ describe('buildTransposePlan', () => {
     expect(plan.suspectSegments).toEqual([]);
   });
 
+  it('counts chord lines skipped because of non chord-like words', () => {
+    const plan = buildTransposePlan({
+      lines: [
+        line([run('Am G (repete', 10)], 1, 700),
+        line([run('D Em (volta ao início', 10)], 1, 650),
+        line([run('Am G', 10)], 1, 600),
+      ],
+      from: key('A'),
+      to: key('B'),
+      measure,
+    });
+    expect(plan.ignoredChordLines).toBe(1);
+    expect(plan.suspectSegments).toEqual([]);
+  });
+
+  it('does not count titles without chords', () => {
+    const plan = buildTransposePlan({
+      lines: [
+        line([run('Louvor ao Senhor', 10)], 1, 700),
+        line([run('MEU PRAZER E', 10)], 1, 650),
+        line([run('A GRANDE ALEGRIA NOSSA SENHOR', 10)], 1, 600),
+        line([run('Am G', 10)], 1, 550),
+        line([run('A E7/9x D', 10)], 1, 500),
+      ],
+      from: key('A'),
+      to: key('B'),
+      measure,
+    });
+    expect(plan.ignoredChordLines).toBe(0);
+    expect(plan.suspectSegments).toHaveLength(1);
+  });
+
   describe('run identity and limits', () => {
     it('exposes the same runKey for chords of one run and different keys for other runs', () => {
       const lines = [
