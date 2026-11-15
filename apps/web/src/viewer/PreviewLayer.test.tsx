@@ -1,5 +1,5 @@
 import { render, waitFor } from '@testing-library/react';
-import type { OverlayOp } from '@cifras/overlay';
+import type { OverlayOp } from '@cifras/overlay/ops';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PreviewLayer, toCanvasOps } from './PreviewLayer';
 
@@ -62,6 +62,7 @@ describe('PreviewLayer', () => {
       lineWidth: 0,
       font: '',
       textBaseline: '',
+      fontKerning: 'auto',
     };
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
       ctx as unknown as CanvasRenderingContext2D,
@@ -77,6 +78,8 @@ describe('PreviewLayer', () => {
     await waitFor(() => expect(ctx.fillText).toHaveBeenCalledTimes(1));
     expect(ctx.fillText).toHaveBeenCalledWith('D', 22, 756);
     expect(ctx.fillRect).toHaveBeenCalledWith(20, 736, 60, 24);
+    // Widths are measured without kerning: the canvas must not apply it either.
+    expect(ctx.fontKerning).toBe('none');
     expect(container.querySelector('canvas')).toHaveAttribute('aria-hidden', 'true');
   });
 

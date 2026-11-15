@@ -1,6 +1,6 @@
-import { chooseFont, createOverlayWriter, createRewriteWriter, loadFonts } from '@cifras/overlay';
-import type { ChordWriter, FontBytesLoader, FontId, LoadedFonts } from '@cifras/overlay';
-import { keyFromSlug, keySlug, parseKey, type TextLine } from '@cifras/chords';
+import { chooseFont, type FontBytesLoader, type FontId } from '@cifras/overlay/ops';
+import type { ChordWriter } from '@cifras/overlay';
+import { keyFromSlug, keySlug, parseKey, type Measure, type TextLine } from '@cifras/chords';
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -49,10 +49,18 @@ const BOLD_FONT = /bold|black|heavy/i;
 const defaultMode = (): 'overlay' | 'rewrite' =>
   import.meta.env.VITE_CHORD_WRITER === 'rewrite' ? 'rewrite' : 'overlay';
 
+// pdf-lib and fontkit stay out of the initial bundle: they load when the panel prepares or confirms.
+const loadOverlay = () => import('@cifras/overlay');
+
 // Side panel from 900px wide up; a bottom sheet below.
 function useWide(matchMedia?: ViewerPageProps['matchMedia']): boolean {
-  const query =
-    matchMedia ?? (typeof window.matchMedia === 'function' ? window.matchMedia.bind(window) : null);
+  // Memoized: a new bound function every render would resubscribe the listener every render.
+  const query = useMemo(
+    () =>
+      matchMedia ??
+      (typeof window.matchMedia === 'function' ? window.matchMedia.bind(window) : null),
+    [matchMedia],
+  );
   const [wide, setWide] = useState(() => query?.(WIDE_QUERY).matches ?? false);
   useEffect(() => {
     if (!query) return;
@@ -78,7 +86,7 @@ function neededFonts(lines: TextLine[]): FontId[] {
 }
 
 type Prepared =
-  | { doc: PdfDocument; status: 'ready'; lines: TextLine[]; fonts: LoadedFonts }
+  | { doc: PdfDocument; status: 'ready'; lines: TextLine[]; measure: Measure }
   | { doc: PdfDocument; status: 'error' };
 
 export function ViewerPage({
@@ -141,6 +149,8 @@ export function ViewerPage({
     return () => {
       cancelled = true;
       void opened?.destroy?.();
+      // The document is destroyed: coming back to this path must reload, not show it.
+      setLoaded((prev) => (prev?.path === path ? null : prev));
     };
   }, [api, openPdf, path]);
 
@@ -153,9 +163,13 @@ export function ViewerPage({
     if (!panelOpen || !readyDoc || prepared?.doc === readyDoc) return;
     let cancelled = false;
     readLines(readyDoc)
-      .then(async (lines) => ({ lines, fonts: await loadFonts(loadFont, neededFonts(lines)) }))
-      .then(({ lines, fonts }) => {
-        if (!cancelled) setPrepared({ doc: readyDoc, status: 'ready', lines, fonts });
+      .then(async (lines) => {
+        const { createMeasure, loadFonts } = await loadOverlay();
+        const fonts = await loadFonts(loadFont, neededFonts(lines));
+        return { lines, measure: createMeasure(fonts) };
+      })
+      .then(({ lines, measure }) => {
+        if (!cancelled) setPrepared({ doc: readyDoc, status: 'ready', lines, measure });
       })
       .catch(() => {
         if (!cancelled) setPrepared({ doc: readyDoc, status: 'error' });
@@ -170,16 +184,25 @@ export function ViewerPage({
   const { target, setTarget, plan, ops, collisions, suspects } = useTranspose({
     sourceLines: ready?.lines ?? null,
     sourceKey,
-    fonts: ready?.fonts ?? null,
+    measure: ready?.measure ?? null,
   });
 
   const [sheetHeight, setSheetHeight] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ key: string } | null>(null);
-  const chordWriter = useMemo(
+  const chordWriter = useMemo<ChordWriter>(
     () =>
-      writer ?? (writerMode === 'rewrite' ? createRewriteWriter() : createOverlayWriter(loadFont)),
+      writer ?? {
+        async write(bytes, plan) {
+          const overlay = await loadOverlay();
+          const real =
+            writerMode === 'rewrite'
+              ? overlay.createRewriteWriter()
+              : overlay.createOverlayWriter(loadFont);
+          return real.write(bytes, plan);
+        },
+      },
     [writer, writerMode, loadFont],
   );
 
@@ -267,7 +290,9 @@ export function ViewerPage({
     <section
       className={`viewer${panelOpen && wide ? ' has-side' : ''}${sheetHeight !== null ? ' has-sheet' : ''}`}
       style={
-        sheetHeight !== null ? ({ '--sheet-height': `${sheetHeight}px` } as CSSProperties) : undefined
+        sheetHeight !== null
+          ? ({ '--sheet-height': `${sheetHeight}px` } as CSSProperties)
+          : undefined
       }
     >
       <div className="viewer-body" inert={panelOpen && !wide}>
@@ -321,7 +346,7 @@ export function ViewerPage({
             onClick={download}
             disabled={current?.status !== 'ready'}
           >
-            ⬇ PDF
+            <span aria-hidden="true">⬇ </span>PDF
           </button>
           {canChange && (
             <button
@@ -334,7 +359,7 @@ export function ViewerPage({
                 setPanelOpen(true);
               }}
             >
-              ♪ Mudar tom
+              <span aria-hidden="true">♪ </span>Mudar tom
             </button>
           )}
           {canChange && arrStatus === 'ready' && !source && (

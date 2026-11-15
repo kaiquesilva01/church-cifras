@@ -1,17 +1,17 @@
 import { parseKey } from '@cifras/chords';
-import { loadFonts } from '@cifras/overlay';
+import { createMeasure, loadFonts } from '@cifras/overlay';
 import { act, renderHook } from '@testing-library/react';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadFontFromDisk, sheetInG } from './transposeFixtures';
 import { useTranspose } from './useTranspose';
 
-let fonts: Awaited<ReturnType<typeof loadFonts>>;
+let measure: ReturnType<typeof createMeasure>;
 beforeAll(async () => {
-  fonts = await loadFonts(loadFontFromDisk);
+  measure = createMeasure(await loadFonts(loadFontFromDisk));
 });
 
 const setup = (lines = sheetInG()) =>
-  renderHook(() => useTranspose({ sourceLines: lines, sourceKey: parseKey('G'), fonts }));
+  renderHook(() => useTranspose({ sourceLines: lines, sourceKey: parseKey('G'), measure }));
 
 describe('useTranspose', () => {
   it('has no plan until a target is chosen', () => {
@@ -55,7 +55,7 @@ describe('useTranspose', () => {
 
   it('stays empty while fonts or lines are missing', () => {
     const { result } = renderHook(() =>
-      useTranspose({ sourceLines: null, sourceKey: parseKey('G'), fonts: null }),
+      useTranspose({ sourceLines: null, sourceKey: parseKey('G'), measure: null }),
     );
     act(() => result.current.setTarget('D'));
     expect(result.current.plan).toBeNull();

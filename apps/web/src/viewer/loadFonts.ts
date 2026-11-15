@@ -1,4 +1,4 @@
-import type { FontId } from '@cifras/overlay';
+import type { FontId } from '@cifras/overlay/ops';
 
 // One dynamic import per font: Vite emits each TTF as an asset and nothing lands in the main bundle.
 const FONT_URLS: Record<FontId, () => Promise<{ default: string }>> = {

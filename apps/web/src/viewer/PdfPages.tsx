@@ -1,4 +1,4 @@
-import type { OverlayOp } from '@cifras/overlay';
+import type { OverlayOp } from '@cifras/overlay/ops';
 import { useEffect, useRef, useState } from 'react';
 import { PreviewLayer, type ViewportLike } from './PreviewLayer';
 

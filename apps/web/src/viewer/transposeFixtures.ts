@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import type { TextLine, TextRun } from '@cifras/chords';
-import { FONT_FILES, type FontId } from '@cifras/overlay';
+import { FONT_FILES, type FontId } from '@cifras/overlay/ops';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 

@@ -103,7 +103,7 @@ describe('ViewerPage', () => {
     renderViewer('/musicas/s1?tom=G');
     await screen.findByTestId('pdf-pages');
     vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: '⬇ PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
     expect(downloads).toEqual(['Sonda-me - Aline Barros (G).pdf|blob:cifra|true']);
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).not.toHaveBeenCalled();

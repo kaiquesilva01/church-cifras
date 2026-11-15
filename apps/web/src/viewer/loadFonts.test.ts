@@ -1,4 +1,4 @@
-import { FONT_FILES, type FontId } from '@cifras/overlay';
+import { FONT_FILES, type FontId } from '@cifras/overlay/ops';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadFontBytes, resetFontCache } from './loadFonts';
 

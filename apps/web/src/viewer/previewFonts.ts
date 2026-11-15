@@ -1,4 +1,4 @@
-import type { FontId } from '@cifras/overlay';
+import type { FontId } from '@cifras/overlay/ops';
 import { loadFontBytes } from './loadFonts';
 
 export const fontFamily = (id: FontId): string => `cifras-${id}`;

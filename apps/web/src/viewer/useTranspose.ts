@@ -3,16 +3,11 @@ import {
   parseKey,
   type Key,
   type KeyName,
+  type Measure,
   type TextLine,
   type TransposePlan,
 } from '@cifras/chords';
-import {
-  countCollisions,
-  createMeasure,
-  overlayOps,
-  type LoadedFonts,
-  type OverlayOp,
-} from '@cifras/overlay';
+import { countCollisions, overlayOps, type OverlayOp } from '@cifras/overlay/ops';
 import { useCallback, useMemo, useState } from 'react';
 
 export interface TransposeResult {
@@ -25,7 +20,8 @@ export interface TransposeResult {
 export interface UseTransposeInput {
   sourceLines: TextLine[] | null;
   sourceKey: Key | null;
-  fonts: LoadedFonts | null;
+  /** Text measure backed by the loaded fonts (built lazily: it needs fontkit). */
+  measure: Measure | null;
 }
 
 const EMPTY_OPS: OverlayOp[] = [];
@@ -47,10 +43,9 @@ function createCache() {
 }
 
 // Pure and in memory: plan + overlay ops per target (the plan alone takes a few milliseconds).
-export function useTranspose({ sourceLines, sourceKey, fonts }: UseTransposeInput) {
+export function useTranspose({ sourceLines, sourceKey, measure }: UseTransposeInput) {
   const [target, setTargetState] = useState<KeyName | null>(null);
   const setTarget = useCallback((key: KeyName | null) => setTargetState(key), []);
-  const measure = useMemo(() => (fonts ? createMeasure(fonts) : null), [fonts]);
   const sourceName = sourceKey?.name;
   const cache = useMemo(
     () => createCache(),

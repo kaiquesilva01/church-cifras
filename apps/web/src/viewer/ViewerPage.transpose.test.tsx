@@ -89,6 +89,8 @@ interface Options {
   writer?: ChordWriter;
   writerMode?: 'overlay' | 'rewrite';
   wide?: boolean;
+  /** Use `window.matchMedia` instead of the injected prop. */
+  windowMedia?: boolean;
   readLines?: () => Promise<ReturnType<typeof sheetInG>>;
 }
 
@@ -124,7 +126,7 @@ function renderViewer(options: Options = {}) {
                   loadFont={loadFontFromDisk}
                   writer={writer}
                   writerMode={options.writerMode ?? 'overlay'}
-                  matchMedia={media(options.wide ?? false)}
+                  matchMedia={options.windowMedia ? undefined : media(options.wide ?? false)}
                 />
               </SongsProvider>
             }
@@ -137,7 +139,7 @@ function renderViewer(options: Options = {}) {
 }
 
 const openPanel = async () => {
-  fireEvent.click(await screen.findByRole('button', { name: '♪ Mudar tom' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Mudar tom' }));
   await screen.findByText('Mudar tom · original', { exact: false });
   await waitFor(() => expect(screen.queryByText('Preparando…')).not.toBeInTheDocument());
 };
@@ -146,14 +148,14 @@ const where = () => screen.getByTestId('location').textContent;
 describe('ViewerPage change key', () => {
   it('visitor does not see Mudar tom', async () => {
     renderViewer({ role: 'viewer' });
-    await waitFor(() => expect(screen.getByRole('button', { name: '⬇ PDF' })).toBeEnabled());
-    expect(screen.queryByRole('button', { name: '♪ Mudar tom' })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' })).toBeEnabled());
+    expect(screen.queryByRole('button', { name: 'Mudar tom' })).not.toBeInTheDocument();
   });
 
   it('opens panel with source key title', async () => {
     let release: (lines: ReturnType<typeof sheetInG>) => void = () => undefined;
     renderViewer({ readLines: () => new Promise((resolve) => (release = resolve)) });
-    fireEvent.click(await screen.findByRole('button', { name: '♪ Mudar tom' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Mudar tom' }));
     expect(await screen.findByText('Preparando…')).toBeInTheDocument();
     release(sheetInG());
     await waitFor(() => expect(screen.queryByText('Preparando…')).not.toBeInTheDocument());
@@ -303,8 +305,8 @@ describe('ViewerPage change key', () => {
   it('disabled when there is no handmade source', async () => {
     const song = makeSong({ id: 's3', title: 'Só gerada', keys: ['C'], handmadeKeys: [] });
     renderViewer({ songs: [song], path: '/musicas/s3' });
-    const button = await screen.findByRole('button', { name: '♪ Mudar tom' });
-    await waitFor(() => expect(screen.getByRole('button', { name: '⬇ PDF' })).toBeEnabled());
+    const button = await screen.findByRole('button', { name: 'Mudar tom' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' })).toBeEnabled());
     expect(button).toBeDisabled();
     expect(screen.getByText('Não há PDF feito à mão para transpor.')).toBeInTheDocument();
   });
@@ -321,14 +323,14 @@ describe('ViewerPage change key', () => {
   it('shows the source pdf during the preview when a generated key is open', async () => {
     const { api } = renderViewer({ path: '/musicas/s1?tom=A' });
     await waitFor(() => expect(api.getPdfBytes).toHaveBeenCalledWith('songs/s1/A-abc.pdf'));
-    fireEvent.click(await screen.findByRole('button', { name: '♪ Mudar tom' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Mudar tom' }));
     await waitFor(() => expect(api.getPdfBytes).toHaveBeenCalledWith('songs/s1/G-abc.pdf'));
     await waitFor(() => expect(screen.queryByText('Preparando…')).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'D' }));
     expect(await screen.findByTestId('layer')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(api.getPdfBytes).toHaveBeenLastCalledWith('songs/s1/A-abc.pdf'));
-    await waitFor(() => expect(screen.getByRole('button', { name: '⬇ PDF' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' })).toBeEnabled());
     expect(screen.queryByTestId('layer')).not.toBeInTheDocument();
   });
 
@@ -369,7 +371,7 @@ describe('ViewerPage change key', () => {
     });
     renderViewer({ api, path: '/musicas/s1?tom=A' });
     await waitFor(() => expect(api.getPdfBytes).toHaveBeenCalledWith('songs/s1/A-abc.pdf'));
-    fireEvent.click(await screen.findByRole('button', { name: '♪ Mudar tom' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Mudar tom' }));
     const alerts = await screen.findAllByRole('alert');
     expect(alerts.map((a) => a.textContent)).toContain('Não foi possível preparar a troca de tom.');
     expect(screen.queryByText('Preparando…')).not.toBeInTheDocument();
@@ -395,6 +397,39 @@ describe('ViewerPage change key', () => {
     expect(viewer.style.getPropertyValue('--sheet-height')).toBe('');
   });
 
+  it('does not show a destroyed document when the panel is cancelled before the source loads', async () => {
+    let release: (bytes: Uint8Array) => void = () => undefined;
+    const api = fakeCatalogApi([songG], {
+      getPdfBytes: vi.fn((path: string) =>
+        path.includes('/G-')
+          ? new Promise<Uint8Array>((resolve) => (release = resolve))
+          : Promise.resolve(new Uint8Array([1])),
+      ),
+    });
+    const { container } = renderViewer({ api, path: '/musicas/s1?tom=A' });
+    await waitFor(() => expect(container.querySelector('.pdf-pages')).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Mudar tom' }));
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    // Tom A's first document was destroyed when the panel opened: it must not be on screen.
+    expect(container.querySelector('.pdf-pages')).toBeNull();
+    release(new Uint8Array([2]));
+    await waitFor(() => expect(container.querySelector('.pdf-pages')).not.toBeNull());
+  });
+
+  it('subscribes to the media query once, not on every render', async () => {
+    const addEventListener = vi.fn();
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false, addEventListener, removeEventListener: vi.fn() })),
+    );
+    renderViewer({ windowMedia: true });
+    await openPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'D' }));
+    await screen.findByTestId('layer');
+    expect(addEventListener).toHaveBeenCalledTimes(1);
+  });
+
   it('clears the existing-key notice when the selected key changes', async () => {
     const api = fakeCatalogApi([songG], {
       createGeneratedArrangement: vi.fn(() => Promise.reject(new ArrangementExistsError())),
@@ -408,7 +443,7 @@ describe('ViewerPage change key', () => {
     await waitFor(() =>
       expect(screen.queryByText('Esse tom já tinha sido salvo. Abrimos o existente.')).toBeNull(),
     );
-    await waitFor(() => expect(screen.getByRole('button', { name: '⬇ PDF' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' })).toBeEnabled());
   });
 
   it('uses the side panel on wide screens', async () => {
