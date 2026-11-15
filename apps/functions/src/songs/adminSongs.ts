@@ -9,8 +9,8 @@ export type AdminDeps = {
   deleteArrangementDoc(songId: string, slug: string): Promise<void>;
   deleteSongDoc(songId: string): Promise<void>;
   deleteFile(path: string): Promise<void>;
-  /** Id da música com essa identidade (título normalizado + cantor), ou null. */
-  findSongByIdentity(titleNormalized: string, artistId: string): Promise<string | null>;
+  /** Ids (até 2) das músicas com essa identidade (título normalizado + cantor). */
+  findSongsByIdentity(titleNormalized: string, artistId: string): Promise<string[]>;
   updateSong(songId: string, data: Record<string, unknown>): Promise<void>;
   now(): Date;
 };
@@ -51,8 +51,8 @@ export async function updateSongMeta(
   const artistId = artistIdFromName(artistName);
 
   if (!(await deps.getSong(songId))) throw new HttpsError('not-found', 'Song not found.');
-  const owner = await deps.findSongByIdentity(titleNormalized, artistId);
-  if (owner !== null && owner !== songId) {
+  const owners = await deps.findSongsByIdentity(titleNormalized, artistId);
+  if (owners.some((id) => id !== songId)) {
     throw new HttpsError('already-exists', 'Já existe uma música com esse nome e cantor.');
   }
   await deps.updateSong(songId, {

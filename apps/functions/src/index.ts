@@ -147,14 +147,14 @@ const adminDeps: AdminDeps = {
   deleteFile: async (path) => {
     await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
   },
-  findSongByIdentity: async (titleNormalized, artistId) => {
+  findSongsByIdentity: async (titleNormalized, artistId) => {
     const snap = await getFirestore()
       .collection('songs')
       .where('titleNormalized', '==', titleNormalized)
       .where('artistId', '==', artistId)
-      .limit(1)
+      .limit(2)
       .get();
-    return snap.docs[0]?.id ?? null;
+    return snap.docs.map((d) => d.id);
   },
   updateSong: async (songId, data) => {
     await getFirestore().doc(`songs/${songId}`).update(data);

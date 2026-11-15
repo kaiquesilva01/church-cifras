@@ -19,7 +19,7 @@ function setup(
   opts: {
     song?: boolean;
     arrangements?: ArrangementInfo[];
-    identityOwner?: string | null;
+    identityOwners?: string[];
     failFileDelete?: boolean;
   } = {},
 ) {
@@ -38,7 +38,7 @@ function setup(
       if (opts.failFileDelete) throw new Error('boom');
       log.push(`file:${path}`);
     },
-    findSongByIdentity: async () => opts.identityOwner ?? null,
+    findSongsByIdentity: async () => opts.identityOwners ?? [],
     updateSong: async (songId, data) => {
       updates.push([songId, data]);
     },
@@ -84,7 +84,7 @@ describe('updateSongMeta', () => {
   });
 
   it('rejects identity of another song', async () => {
-    const { deps, updates } = setup({ identityOwner: 's2' });
+    const { deps, updates } = setup({ identityOwners: ['s2'] });
     await expect(
       updateSongMeta(deps, { songId: 's1', title: 'T', artistName: 'A' }),
     ).rejects.toMatchObject({
@@ -94,8 +94,16 @@ describe('updateSongMeta', () => {
     expect(updates).toEqual([]);
   });
 
+  it('rejects when duplicates already exist, even if the song itself is listed', async () => {
+    const { deps, updates } = setup({ identityOwners: ['s1', 's2'] });
+    await expect(
+      updateSongMeta(deps, { songId: 's1', title: 'T', artistName: 'A' }),
+    ).rejects.toMatchObject({ code: 'already-exists' });
+    expect(updates).toEqual([]);
+  });
+
   it('allows keeping the same identity', async () => {
-    const { deps, updates } = setup({ identityOwner: 's1' });
+    const { deps, updates } = setup({ identityOwners: ['s1'] });
     await updateSongMeta(deps, { songId: 's1', title: 'OLD', artistName: 'old' });
     expect(updates).toHaveLength(1);
   });
