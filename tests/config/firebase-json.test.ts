@@ -45,7 +45,17 @@ describe('firebase.json', () => {
     // missing /assets/*.js (or any other file) gets a real 404 instead of HTML with status 200.
     expect(rewrite.regex).not.toContain('(?');
     const re = new RegExp(rewrite.regex);
-    for (const route of ['/', '/songs/s1', '/import', '/pessoas']) {
+    const routes = [
+      '/',
+      '/musicas/s1',
+      '/cantores/joao-silva',
+      '/importar',
+      '/nova',
+      '/pessoas',
+      '/login',
+      '/__/auth/handler',
+    ];
+    for (const route of routes) {
       expect(re.test(route), route).toBe(true);
     }
     for (const asset of ['/assets/index-gone.js', '/assets/x/y.css', '/sw.js']) {
