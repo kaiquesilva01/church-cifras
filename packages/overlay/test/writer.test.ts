@@ -127,6 +127,10 @@ describe.skipIf(files.length === 0)('real fixtures', () => {
     expect(plan.chordCount).toBeGreaterThan(0);
 
     const written = await createOverlayWriter(loadFontFromDisk).write(data, plan);
+    // subset fonts keep the generated pdf close to the original (full fonts made it 7-13x)
+    const ratio = written.length / data.length;
+    console.info(`size ${file}: ${data.length} -> ${written.length} (${ratio.toFixed(2)}x)`);
+    expect(ratio).toBeLessThanOrEqual(3);
     const outDir = resolve(privateDir, 'out');
     mkdirSync(outDir, { recursive: true });
     writeFileSync(resolve(outDir, `${file.replace(/\.pdf$/i, '')} → D.pdf`), written);
