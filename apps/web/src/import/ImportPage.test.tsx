@@ -72,6 +72,36 @@ describe('ImportPage', () => {
     expect(screen.getByRole('button', { name: 'Importar 1 prontos' })).toBeEnabled();
   });
 
+  it('classifies from the catalog summaries without per-row lookups', async () => {
+    const { api } = setup({
+      reads: {
+        'a.pdf': result({ title: 'Sonda-me', artist: 'Aline Barros', key: 'A' }),
+        'b.pdf': result({ title: 'Sonda-me', artist: 'Aline Barros', key: 'D' }),
+      },
+    });
+    addFiles([pdf('a.pdf'), pdf('b.pdf')]);
+    await waitFor(() => expect(within(rowOf('a.pdf')).getByText('substitui gerado')).toBeVisible());
+    expect(within(rowOf('b.pdf')).getByText('já existe — novo tom')).toBeVisible();
+    expect(api.getArrangement).not.toHaveBeenCalled();
+  });
+
+  it('editing one row keeps the others and the counts while reclassifying', async () => {
+    setup({
+      reads: { 'a.pdf': result({ title: 'A' }), 'b.pdf': result({ title: 'B' }) },
+    });
+    addFiles([pdf('a.pdf'), pdf('b.pdf')]);
+    await waitFor(() => expect(within(rowOf('b.pdf')).getByText('pronto')).toBeVisible());
+    expect(within(rowOf('a.pdf')).getByText('pronto')).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Música de a.pdf'), { target: { value: 'A2' } });
+    expect(within(rowOf('a.pdf')).getByText('Verificando…')).toBeVisible();
+    expect(within(rowOf('b.pdf')).getByText('pronto')).toBeVisible();
+    expect(within(rowOf('b.pdf')).queryByText('Verificando…')).not.toBeInTheDocument();
+    expect(screen.getByText('2 arquivos · 2 prontos')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Importar 2 prontos' })).toBeDisabled();
+    await waitFor(() => expect(within(rowOf('a.pdf')).getByText('pronto')).toBeVisible());
+    expect(screen.getByRole('button', { name: 'Importar 2 prontos' })).toBeEnabled();
+  });
+
   it('shows reading progress', async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => {
@@ -116,7 +146,6 @@ describe('ImportPage', () => {
         'c.pdf': result({ title: 'Música C', key: 'F' }),
       },
       api: {
-        getArrangement: vi.fn(() => Promise.resolve(null)),
         createSongWithArrangement: vi.fn((input: { title: string }) =>
           input.title === 'Música C' ? Promise.reject(new Error('falhou')) : Promise.resolve('id'),
         ),
@@ -177,7 +206,6 @@ describe('ImportPage', () => {
         'd.pdf': result({ title: 'D' }),
       },
       api: {
-        getArrangement: vi.fn(() => Promise.resolve(null)),
         createSongWithArrangement: vi.fn(
           () =>
             new Promise<string>((resolve) => {
@@ -210,7 +238,6 @@ describe('ImportPage', () => {
           cb(sampleSongs);
           return () => undefined;
         },
-        getArrangement: vi.fn(() => Promise.resolve(null)),
         createSongWithArrangement: vi.fn(
           (input: { title: string }) =>
             new Promise<string>((resolve) => {
@@ -250,7 +277,6 @@ describe('ImportPage', () => {
     setup({
       reads: { 'a.pdf': result({ title: 'A' }), 'b.pdf': result({ title: 'B' }) },
       api: {
-        getArrangement: vi.fn(() => Promise.resolve(null)),
         createSongWithArrangement: vi.fn(
           () =>
             new Promise<string>((resolve) => {

@@ -94,9 +94,11 @@ describe('classifyRows', () => {
 
   it('applies the priority order', () => {
     const catalog = withSource('handmade');
+    // Oversized files are not read, so their chord count is unknown (0): size wins.
     expect(status(row({ chordCount: 0, sizeOk: false, title: '' }), catalog).status).toBe(
-      'fora do padrão',
+      'grande demais',
     );
+    expect(status(row({ chordCount: 0, title: '' }), catalog).status).toBe('fora do padrão');
     expect(status(row({ sizeOk: false, title: '' }), catalog).status).toBe('grande demais');
     expect(status(row({ title: '', key: null }), catalog).status).toBe('falta a música');
     const dup = classifyRows(
@@ -139,7 +141,10 @@ describe('planImport', () => {
 
 describe('unreadable pdf', () => {
   it('is fora do padrão with its own detail', () => {
-    const [result] = classifyRows([row({ readError: true, chordCount: 0 })], emptyCatalog);
+    const [result] = classifyRows(
+      [row({ readError: 'não foi possível ler o PDF', chordCount: 0 })],
+      emptyCatalog,
+    );
     expect(result!.status).toBe('fora do padrão');
     expect(result!.detail).toBe('não foi possível ler o PDF');
   });

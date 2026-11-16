@@ -2,6 +2,7 @@ import { artistIdFromName, normalizeText, type KeyName } from '@cifras/chords';
 import type { SongSummary } from '../catalog/types';
 import { validateArtist, validateTitle } from '../catalog/songText';
 import { decideUpload } from '../upload/decideUpload';
+import { MAX_MB } from '../upload/limits';
 
 export interface BatchRow {
   id: string;
@@ -14,8 +15,8 @@ export interface BatchRow {
   suspects: string[];
   ignoredChordLines: number;
   sizeOk: boolean;
-  /** The PDF could not be read at all. */
-  readError?: boolean;
+  /** The PDF could not be read at all: the reason shown as the row detail. */
+  readError?: string;
 }
 
 /** Ordered by priority: the first matching status wins. */
@@ -51,9 +52,6 @@ export const IMPORTABLE: ReadonlySet<BatchStatus> = new Set<BatchStatus>([
 
 export const isImportable = (row: { status: BatchStatus }): boolean => IMPORTABLE.has(row.status);
 
-export const MAX_MB = 10;
-export const MAX_BYTES = MAX_MB * 1024 * 1024;
-
 export const identityOf = (title: string, artist: string): string =>
   `${normalizeText(title)}|${artistIdFromName(artist)}`;
 
@@ -64,6 +62,15 @@ function warningsOf(row: BatchRow): string[] {
     warnings.push(`linhas de acorde ignoradas: ${row.ignoredChordLines}`);
   }
   return warnings;
+}
+
+/** Source of the arrangement in `key`, read from the catalog summary (no network). */
+export function sourceFromSummary(
+  song: SongSummary,
+  key: KeyName,
+): 'handmade' | 'generated' | null {
+  if (song.handmadeKeys.includes(key)) return 'handmade';
+  return song.keys.includes(key) ? 'generated' : null;
 }
 
 export function classifyRows(rows: BatchRow[], catalog: BatchCatalog): ClassifiedRow[] {
@@ -77,9 +84,9 @@ export function classifyRows(rows: BatchRow[], catalog: BatchCatalog): Classifie
       warnings,
     });
 
-    if (row.readError) return done('fora do padrão', 'não foi possível ler o PDF');
-    if (row.chordCount === 0) return done('fora do padrão', 'nenhum acorde encontrado');
+    if (row.readError) return done('fora do padrão', row.readError);
     if (!row.sizeOk) return done('grande demais', `o arquivo passa de ${MAX_MB} MB`);
+    if (row.chordCount === 0) return done('fora do padrão', 'nenhum acorde encontrado');
     const titleError = validateTitle(row.title);
     if (titleError) return done('falta a música', titleError);
     const artistError = validateArtist(row.artist);

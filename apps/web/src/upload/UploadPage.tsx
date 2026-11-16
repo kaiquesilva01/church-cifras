@@ -7,11 +7,11 @@ import { MAX_TEXT, validateArtist, validateTitle } from '../catalog/songText';
 import { useSongsContext } from '../catalog/SongsProvider';
 import type { UploadPlan } from '../catalog/types';
 import { decideUpload, type UploadDecision } from './decideUpload';
+import { MAX_BYTES } from './limits';
 import type { PdfSuggestion } from './readPdfSuggestion';
 
 export type ReadPdf = (file: File, knownArtists: string[]) => Promise<PdfSuggestion>;
 
-const MAX_BYTES = 10 * 1024 * 1024;
 const DEBOUNCE_MS = 300;
 
 type PickError = 'too-big' | 'unreadable' | 'no-chords';

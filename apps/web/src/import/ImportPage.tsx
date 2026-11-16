@@ -1,21 +1,22 @@
-import { KEY_OPTIONS, parseKey, type KeyName } from '@cifras/chords';
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { parseKey } from '@cifras/chords';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { ArrangementExistsError, saveUpload, type CatalogApi } from '../catalog/catalogApi';
 import { deriveArtists } from '../catalog/search';
 import { MAX_TEXT } from '../catalog/songText';
 import { useSongsContext } from '../catalog/SongsProvider';
 import type { SongSummary, UploadPlan } from '../catalog/types';
 import type { ReadPdf } from '../upload/UploadPage';
+import { MAX_BYTES } from '../upload/limits';
 import {
-  MAX_BYTES,
   classifyRows,
   identityOf,
   isImportable,
   planImport,
+  sourceFromSummary,
   type BatchRow,
-  type BatchStatus,
   type ClassifiedRow,
 } from './batch';
+import { ImportRow } from './ImportRow';
 import { toCsv } from './csv';
 import { filesFromDrop, isPdf, runPool } from './readFiles';
 import { runImport, type RowResult } from './queue';
@@ -24,32 +25,13 @@ const DEBOUNCE_MS = 300;
 const READ_CONCURRENCY = 2;
 
 type Classified = {
-  source: BatchRow[];
+  /** The row objects that were classified: an edited row is a new object. */
+  source: ReadonlyMap<string, BatchRow>;
   index: ReadonlyMap<string, SongSummary> | null;
   list: ClassifiedRow[];
+  byId: ReadonlyMap<string, ClassifiedRow>;
 };
 type Progress = { done: number; total: number };
-
-const PILL: Record<BatchStatus, string> = {
-  pronto: 'pill-green',
-  'já existe — novo tom': 'pill-blue',
-  'substitui gerado': 'pill-purple',
-  'conflito: tom feito à mão já existe': 'pill-amber',
-  'duplicado no lote': 'pill-amber',
-  'falta a música': 'pill-amber',
-  'falta o cantor': 'pill-amber',
-  'falta o tom': 'pill-amber',
-  'grande demais': 'pill-red',
-  'fora do padrão': 'pill-red',
-};
-
-function describeResult(result: RowResult): { label: string; className: string; detail: string } {
-  if (result.status === 'imported')
-    return { label: 'importado', className: 'pill-green', detail: '' };
-  if (result.status === 'existing')
-    return { label: 'já existia', className: 'pill-blue', detail: '' };
-  return { label: `erro: ${result.message}`, className: 'pill-red', detail: '' };
-}
 
 function downloadCsv(text: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
@@ -72,8 +54,12 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   const catalogArtists = useMemo(() => deriveArtists(songs).map((a) => a.name), [songs]);
 
   const [rows, setRows] = useState<BatchRow[]>([]);
-  const [classified, setClassified] = useState<Classified>({ source: [], index: null, list: [] });
-  const [lookupFailed, setLookupFailed] = useState(false);
+  const [classified, setClassified] = useState<Classified>({
+    source: new Map(),
+    index: null,
+    list: [],
+    byId: new Map(),
+  });
   const [reading, setReading] = useState<Progress | null>(null);
   const [nonPdf, setNonPdf] = useState(0);
   const [importing, setImporting] = useState<Progress | null>(null);
@@ -84,7 +70,6 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   const [frozenReady, setFrozenReady] = useState(0);
   const [dragging, setDragging] = useState(false);
 
-  const cache = useRef(new Map<string, 'handmade' | 'generated' | null>());
   const nextId = useRef(0);
   const abort = useRef<AbortController | null>(null);
   const rowsRef = useRef(rows);
@@ -96,64 +81,49 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     artistsRef.current = catalogArtists;
   }, [rows, catalogArtists]);
 
-  // Classification: looks up the arrangements of rows whose song exists, then classifies.
-  // Paused while importing: the catalog changes under us and results are tracked per row.
+  // Classification is synchronous (the catalog summaries carry the key sources); only the
+  // debounce is async. Paused while importing: the catalog changes under us and results
+  // are tracked per row. The race with other admins is settled by the worker (it handles
+  // ArrangementExistsError and the replace precondition).
   useEffect(() => {
     if (importingNow) return;
-    let stale = false;
     const timer = setTimeout(() => {
-      void (async () => {
-        const needed = new Map<string, { songId: string; key: KeyName }>();
-        for (const row of rows) {
-          if (!row.key) continue;
-          const song = index.get(identityOf(row.title, row.artist));
-          if (song && !cache.current.has(`${song.id}|${row.key}`)) {
-            needed.set(`${song.id}|${row.key}`, { songId: song.id, key: row.key });
-          }
-        }
-        let failed = false;
-        await Promise.all(
-          [...needed].map(async ([cacheKey, { songId, key }]) => {
-            try {
-              const found = await api.getArrangement(songId, key);
-              if (!stale) cache.current.set(cacheKey, found?.source ?? null);
-            } catch {
-              failed = true;
-            }
-          }),
-        );
-        if (stale) return;
-        const list = classifyRows(rows, {
-          findSong: (titleNormalized, artistId) =>
-            index.get(`${titleNormalized}|${artistId}`) ?? null,
-          arrangementSource: (songId, key) => cache.current.get(`${songId}|${key}`) ?? null,
-        });
-        setLookupFailed(failed);
-        setClassified({ source: rows, index, list });
-      })();
+      const byId = new Map(songs.map((song) => [song.id, song]));
+      const list = classifyRows(rows, {
+        findSong: (titleNormalized, artistId) =>
+          index.get(`${titleNormalized}|${artistId}`) ?? null,
+        arrangementSource: (songId, key) => {
+          const song = byId.get(songId);
+          return song ? sourceFromSummary(song, key) : null;
+        },
+      });
+      setClassified({
+        source: new Map(rows.map((row) => [row.id, row])),
+        index,
+        list,
+        byId: new Map(list.map((item) => [item.id, item])),
+      });
     }, DEBOUNCE_MS);
-    return () => {
-      stale = true;
-      clearTimeout(timer);
-    };
-  }, [rows, index, api, importingNow]);
+    return () => clearTimeout(timer);
+  }, [rows, index, songs, importingNow]);
 
   const busy = reading !== null || importingNow;
   useEffect(() => {
     busyRef.current = busy;
   }, [busy]);
-  const sameRows = classified.source === rows;
-  const upToDate = sameRows && classified.index === index && !importingNow;
-  const classifiedById = useMemo(
-    () => new Map(classified.list.map((item) => [item.id, item])),
-    [classified.list],
-  );
+  // Counts and the previous classification stay on screen while a debounce is pending;
+  // actions that act on the classification wait until it is current.
+  const upToDate =
+    classified.index === index &&
+    rows.length === classified.source.size &&
+    rows.every((row) => classified.source.get(row.id) === row) &&
+    !importingNow;
   const done = (row: ClassifiedRow) => {
     const status = results?.get(row.id)?.status;
     return status === 'imported' || status === 'existing';
   };
   const readyRows = classified.list.filter((row) => isImportable(row) && !done(row));
-  const ready = importingNow ? frozenReady : sameRows ? readyRows.length : 0;
+  const ready = importingNow ? frozenReady : readyRows.length;
 
   const addFiles = (picked: File[]) => {
     const pdfs = picked.filter(isPdf);
@@ -201,7 +171,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           suspects: [],
           ignoredChordLines: 0,
           sizeOk: file.size <= MAX_BYTES,
-          readError: true,
+          readError: 'não foi possível ler o PDF',
         };
       }
       slots[i] = row;
@@ -214,8 +184,11 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     });
   };
 
-  const edit = (id: string, patch: Partial<BatchRow>) =>
-    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  const edit = useCallback(
+    (id: string, patch: Partial<BatchRow>) =>
+      setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row))),
+    [],
+  );
 
   const startImport = async () => {
     if (abort.current || busyRef.current) return;
@@ -256,8 +229,6 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
       onResult: (id, result) => setResults((prev) => new Map(prev).set(id, result)),
     });
     abort.current = null;
-    // Lookups were paused during the import, so nothing in flight can repopulate this.
-    cache.current.clear();
     setCancelled(controller.signal.aborted);
     setCancelling(false);
     setImporting(null);
@@ -294,26 +265,6 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
         }}
       />
     </label>
-  );
-
-  const keyOptions = (
-    <>
-      <option value="">—</option>
-      <optgroup label="Maiores">
-        {KEY_OPTIONS.major.map((k) => (
-          <option key={k} value={k}>
-            {k}
-          </option>
-        ))}
-      </optgroup>
-      <optgroup label="Menores">
-        {KEY_OPTIONS.minor.map((k) => (
-          <option key={k} value={k}>
-            {k}
-          </option>
-        ))}
-      </optgroup>
-    </>
   );
 
   return (
@@ -353,12 +304,6 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           Lendo {reading.done} de {reading.total}…
         </p>
       )}
-      {lookupFailed && (
-        <p role="alert" className="error">
-          Não foi possível verificar alguns tons no catálogo. Confira o resultado antes de importar.
-        </p>
-      )}
-
       {rows.length > 0 && (
         <>
           <div
@@ -385,80 +330,16 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const c = classifiedById.get(row.id);
-                  const result = results?.get(row.id);
-                  const shown = result && result.status !== 'error' ? describeResult(result) : null;
-                  const errored = result?.status === 'error' ? describeResult(result) : null;
-                  const pill = shown ?? errored;
+                  const item = classified.byId.get(row.id);
                   return (
-                    <tr key={row.id} aria-label={row.fileName}>
-                      <th scope="row" className="cell-file" title={row.fileName}>
-                        {row.fileName}
-                      </th>
-                      <td>
-                        <input
-                          className="input"
-                          aria-label={`Música de ${row.fileName}`}
-                          maxLength={MAX_TEXT}
-                          value={row.title}
-                          disabled={busy}
-                          onChange={(e) => edit(row.id, { title: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-icon"
-                          aria-label={`Inverter música e cantor de ${row.fileName}`}
-                          disabled={busy}
-                          onClick={() => edit(row.id, { title: row.artist, artist: row.title })}
-                        >
-                          ⇄
-                        </button>
-                      </td>
-                      <td>
-                        <input
-                          className="input"
-                          list="import-artists"
-                          aria-label={`Cantor de ${row.fileName}`}
-                          maxLength={MAX_TEXT}
-                          value={row.artist}
-                          disabled={busy}
-                          onChange={(e) => edit(row.id, { artist: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <select
-                          className="input"
-                          aria-label={`Tom de ${row.fileName}`}
-                          value={row.key ?? ''}
-                          disabled={busy}
-                          onChange={(e) =>
-                            edit(row.id, { key: (e.target.value || null) as KeyName | null })
-                          }
-                        >
-                          {keyOptions}
-                        </select>
-                      </td>
-                      <td className="cell-num">{row.chordCount}</td>
-                      <td>
-                        {pill ? (
-                          <span className={`pill ${pill.className}`}>{pill.label}</span>
-                        ) : c && sameRows ? (
-                          <>
-                            <span className={`pill ${PILL[c.status]}`}>{c.status}</span>
-                            {c.detail && <span className="cell-detail">{c.detail}</span>}
-                            {c.warnings.map((warning) => (
-                              <span key={warning} className="cell-detail cell-warning">
-                                {warning}
-                              </span>
-                            ))}
-                          </>
-                        ) : (
-                          <span className="muted">Verificando…</span>
-                        )}
-                      </td>
-                    </tr>
+                    <ImportRow
+                      key={row.id}
+                      row={row}
+                      classified={item && classified.source.get(row.id) === row ? item : null}
+                      result={results?.get(row.id)}
+                      busy={busy}
+                      onEdit={edit}
+                    />
                   );
                 })}
               </tbody>
