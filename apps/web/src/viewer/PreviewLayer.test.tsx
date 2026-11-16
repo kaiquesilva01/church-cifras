@@ -83,6 +83,38 @@ describe('PreviewLayer', () => {
     expect(container.querySelector('canvas')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('draws every rectangle before any text so a later cover never erases an earlier chord', async () => {
+    const ctx = {
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      fillText: vi.fn(),
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 0,
+      font: '',
+      textBaseline: '',
+      fontKerning: 'auto',
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      ctx as unknown as CanvasRenderingContext2D,
+    );
+    const overlapping = op({
+      rect: { x: 30, y: 20, width: 30, height: 12 },
+      text: { ...op().text, value: 'A', x: 40 },
+    });
+    render(<PreviewLayer page={1} viewport={viewport} ops={[op(), overlapping]} />);
+    await waitFor(() => expect(ctx.fillText).toHaveBeenCalledTimes(2));
+    const order = [
+      ...ctx.fillRect.mock.invocationCallOrder.map((n) => [n, 'rect'] as const),
+      ...ctx.fillText.mock.invocationCallOrder.map((n) => [n, 'text'] as const),
+    ]
+      .sort((x, y) => x[0] - y[0])
+      .map(([, kind]) => kind);
+    expect(order).toEqual(['rect', 'rect', 'text', 'text']);
+  });
+
   it('reports a font load failure through onError', async () => {
     const { ensurePreviewFonts } = await import('./previewFonts');
     vi.mocked(ensurePreviewFonts).mockRejectedValueOnce(new Error('no font'));

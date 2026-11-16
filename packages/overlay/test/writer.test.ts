@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { PDFDocument } from 'pdf-lib';
+import { PDFArray, PDFDocument, PDFRawStream, decodePDFRawStream } from 'pdf-lib';
 import { buildTransposePlan, findKeyIndicator, parseKey } from '@cifras/chords';
 import { readTextLines } from '@cifras/pdf';
 import { describe, expect, it } from 'vitest';
@@ -100,6 +100,54 @@ describe('overlay writer', () => {
     expect(doc.getProducer()).toBe('Editor de cifras');
     expect(doc.getCreator()).toBe('Autor original');
     expect(doc.getModificationDate()?.toISOString()).toBe('2020-01-02T03:04:05.000Z');
+  });
+
+  it('draws every cover rectangle before any new chord text', async () => {
+    const original = await buildSyntheticPdf({
+      title: 'X',
+      keyStyle: 'none',
+      chordFont: 'CourierBold',
+      lyricFont: 'Courier',
+      lines: [
+        {
+          chords: [
+            [40, 'Cmaj7'],
+            [76, 'G'],
+          ],
+          lyric: 'texto de apoio',
+        },
+      ],
+    });
+    const plan = buildTransposePlan({
+      lines: await readTextLines(original),
+      from: key('C'),
+      to: key('F#'),
+      measure: createMeasure(await loadAllFonts()),
+    });
+    const ops = overlayOps(plan);
+    expect(ops).toHaveLength(2);
+    const [a, b] = ops.map((o) => o.rect);
+    // precondition: the second rectangle reaches back over the first chord's new text
+    expect(b!.x).toBeLessThan(a!.x + a!.width);
+
+    const written = await createOverlayWriter(loadFontFromDisk).write(original, plan);
+    const doc = await PDFDocument.load(written);
+    const contents = doc.getPage(0).node.Contents();
+    const refs = contents instanceof PDFArray ? contents.asArray() : [contents!];
+    const stream = refs
+      .map((ref) => {
+        const raw = doc.context.lookup(ref);
+        return raw instanceof PDFRawStream
+          ? Buffer.from(decodePDFRawStream(raw).decode()).toString('latin1')
+          : '';
+      })
+      .join(String.fromCharCode(10));
+    // pdf-lib paints rectangles as m/l/h paths closed by a lone `f`; new chords select a Cifras font.
+    const fills = [...stream.matchAll(/^f$/gm)].map((m) => m.index!);
+    const shows = [...stream.matchAll(/\/Cifras\S+ [\d.]+ Tf/g)].map((m) => m.index!);
+    expect(fills.length).toBeGreaterThanOrEqual(2);
+    expect(shows.length).toBeGreaterThanOrEqual(2);
+    expect(Math.max(...fills)).toBeLessThan(Math.min(...shows));
   });
 
   it('rewrite writer is not available', async () => {
