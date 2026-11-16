@@ -171,9 +171,8 @@ carregadas sob demanda só para a família usada no PDF.
 users/{uid}
   displayName, email, photoURL, role: 'viewer'|'member'|'admin', createdAt
 
-artists/{artistId}                 // artistId = slug normalizado do nome
-  name, nameNormalized, songCount
-
+// Não há coleção `artists`: a lista de cantores é derivada no cliente a partir de `songs`
+// (artistId = slug normalizado do nome; contagem calculada em memória).
 songs/{songId}                     // songId aleatório
   title, titleNormalized, artistId, artistName,
   keys: string[]                   // tons salvos, desnormalizado p/ listagem
@@ -208,24 +207,33 @@ songs/{songId}/arrangements/{key}  // id do doc = tom normalizado ('D', 'Bb', 'A
 | `onUserCreated` | Auth onCreate | Cria `users/{uid}` com `role: viewer` (ou `admin` se e-mail em `ADMIN_EMAILS`) e define custom claim |
 | `setUserRole` | Callable (admin) | Altera papel no doc e no custom claim; o cliente força refresh do token |
 | `onArrangementWritten` | Firestore | Mantém `songs.keys` sincronizado |
-| `onSongWritten` | Firestore | Mantém `artists` (criação, `songCount`, remoção quando zera) |
-| `onSongDeleted` | Firestore | Apaga subcoleção `arrangements` e arquivos do Storage |
-| `deleteArrangement` | Callable (admin) | Apaga um tom e seu arquivo; **recusa** apagar o último `handmade` se houver `generated` |
-| `replaceArrangement` | Callable (membro/admin) | Substitui um tom `generated` por um `handmade` recém-enviado (troca doc + apaga arquivo antigo); recusa se o existente for `handmade` |
-| `updateSongMeta` | Callable (admin) | Corrige título/cantor (recalcula normalizados e move entre cantores); **não altera PDFs** |
+| `deleteSong` | Callable (admin) | [implementada] Apaga a música, todos os `arrangements` e os arquivos do Storage; idempotente (substitui o antigo gatilho `onSongDeleted`) |
+| `deleteArrangement` | Callable (admin) | [implementada] Apaga um tom e seu arquivo; **recusa** apagar o último `handmade` se houver `generated` (checagem e exclusão do doc numa transação; arquivo apagado após o commit) |
+| `replaceArrangement` | Callable (membro/admin) | [implementada] Substitui um tom `generated` por um `handmade` recém-enviado (troca doc + apaga arquivo antigo); recusa se o existente for `handmade` |
+| `updateSongMeta` | Callable (admin) | [implementada] Corrige título/cantor (recalcula `titleNormalized`/`artistId`; recusa identidade já usada por outra música); **não altera PDFs** |
+| `discardUpload` | Callable (membro/admin) | [implementada] Descarta um arquivo enviado e ainda não referenciado por nenhum `arrangement`; só o autor do upload (metadado `uploadedBy`) |
 
 Papéis lidos nas Security Rules via `request.auth.token.role`. O cliente observa `users/{uid}` e, ao mudar o papel,
 chama `getIdToken(true)`.
 
 ### 6.8 Security Rules (resumo)
 - Leitura de tudo: apenas autenticado.
-- `songs`/`arrangements` create: `member|admin`; delete de `songs`: `admin`; arrangements sem update/delete pelo cliente
-  (substituição, exclusão de tom e edição de metadados passam pelas callables da §6.7, que aplicam as regras de negócio).
+- `songs`/`arrangements` create: `member|admin`; `songs` e `arrangements` sem update/delete pelo cliente. A exclusão de
+  música só ocorre pela callable admin `deleteSong`; o delete direto do cliente é negado (substituição, exclusão de tom e
+  edição de metadados também passam pelas callables da §6.7, que aplicam as regras de negócio).
 - `users`: cada um lê o próprio; admin lê todos; escrita só via Functions.
-- `artists`: só leitura no cliente (escrita via Functions).
+- Não há coleção `artists` (cantores derivados no cliente); a regra, se existir, nega qualquer escrita.
 - Storage `songs/**`: leitura autenticado; escrita `member|admin`, `contentType == application/pdf`, tamanho ≤ 10 MB,
   sem sobrescrever arquivo existente.
 - Regras cobertas por testes com `@firebase/rules-unit-testing` no emulador.
+
+**Riscos aceitos** (conhecidos e tolerados nesta versão):
+- Corridas de identidade: renomear (`updateSongMeta`) ou criar músicas ao mesmo tempo pode gerar duas músicas com a mesma
+  identidade (`titleNormalized + artistId`); a checagem não é transacional. Resolve-se manualmente pelo admin.
+- Atraso do custom claim: mudança de papel só vale para escritas após o refresh do token (até ~1 h se o cliente não
+  forçar `getIdToken(true)`).
+- Texto antigo sob o overlay: ao sobrescrever acordes de um PDF `generated`, o texto original dos acordes pode continuar
+  no conteúdo do PDF sob a camada desenhada.
 
 ### 6.9 Fluxos
 **Upload (membro/admin):** escolher PDF → `pdf.js` lê no navegador → pré-preenche música/cantor/tom pelo título e conta
