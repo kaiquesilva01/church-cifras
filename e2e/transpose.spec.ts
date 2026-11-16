@@ -1,5 +1,5 @@
 import { chip, expect, expectPdfRendered, shot, signInAs, ADMIN, test } from './fixtures/app';
-import { COLLIDING_LINES } from './fixtures/pdf';
+import { COLLIDING_LINES, UNRESOLVABLE_LINES } from './fixtures/pdf';
 import { seedSong } from './fixtures/emulator';
 import { lettersTag } from './fixtures/names';
 
@@ -65,12 +65,27 @@ test('Mudar tom opens a key that is already saved instead of generating it', asy
 const CHORD_WARNING = '⚠ 1 acorde pode encostar no vizinho (em vermelho)';
 const KEY_WARNING = '⚠ O tom no título pode encostar no texto ao lado (em vermelho)';
 
+test('Mudar tom spreads colliding chords instead of warning', async ({ page }) => {
+  const tag = lettersTag();
+  const song = await seedSong(`Canto Afastado ${tag}`, `Cantor Teste ${tag}`, [
+    { key: 'C', chordLines: COLLIDING_LINES, heading: 'Canto Afastado - Cantor (C)' },
+  ]);
+  await signInAs(page, ADMIN, 'Admin');
+  await page.goto(`/musicas/${song.id}`);
+  await expectPdfRendered(page);
+
+  await openPanel(page, 'C');
+  await keyButton(page, 'C#').click();
+  await expect(page.getByText(/encostar no vizinho/)).toHaveCount(0);
+  await expect(page.getByText(KEY_WARNING)).toHaveCount(0);
+});
+
 test('Mudar tom warns about a chord that would touch its neighbour', async ({ page }, testInfo) => {
   const tag = lettersTag();
   // The PDF heading is short and fixed, so the key indicator "(C#)" never reaches the margin; the
   // song title in the app stays unique.
   const song = await seedSong(`Canto Apertado ${tag}`, `Cantor Teste ${tag}`, [
-    { key: 'C', chordLines: COLLIDING_LINES, heading: 'Canto Apertado - Cantor (C)' },
+    { key: 'C', chordLines: UNRESOLVABLE_LINES, heading: 'Canto Apertado - Cantor (C)' },
   ]);
   await signInAs(page, ADMIN, 'Admin');
   await page.goto(`/musicas/${song.id}`);
