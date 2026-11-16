@@ -6,6 +6,7 @@ import {
   createPwaOptions,
   isFontRequest,
   isPdfObjectRequest,
+  rejectHtmlResponse,
   pwaOptions,
   cacheEmulatorStorage,
 } from './pwaConfig';
@@ -130,5 +131,46 @@ describe('runtime request matchers', () => {
   it('matches font files', () => {
     expect(isFontRequest(url('https://app.test/assets/NotoSans-abc123.ttf'))).toBe(true);
     expect(isFontRequest(url('https://app.test/assets/index-abc.js'))).toBe(false);
+  });
+});
+
+describe('emulator host', () => {
+  const object = (host: string) =>
+    new URL(`http://${host}:9199/v0/b/b/o/songs%2Fs1%2FG.pdf?alt=media`);
+
+  it('matches the configured emulator host, escaped, and not others', () => {
+    expect(isPdfObjectRequest(object('storage.local'), 'GET', true, 'storage.local')).toBe(true);
+    expect(isPdfObjectRequest(object('storageXlocal'), 'GET', true, 'storage.local')).toBe(false);
+    expect(isPdfObjectRequest(object('localhost'), 'GET', true, 'storage.local')).toBe(false);
+    expect(isPdfObjectRequest(object('localhost'), 'GET', true)).toBe(true);
+  });
+
+  it('passes the host into the runtime caching rule', () => {
+    const patterns = createPwaOptions(true, 'storage.local')
+      .workbox!.runtimeCaching!.map((r) => String(r.urlPattern))
+      .join(' ');
+    expect(patterns).toContain('storage\\.local:9199');
+  });
+});
+
+describe('chunk runtime caching', () => {
+  const chunks = () =>
+    pwaOptions.workbox!.runtimeCaching!.find((r) =>
+      (r.urlPattern as RegExp).test('https://app.test/assets/x-1.js'),
+    )!;
+
+  it('caches only status 200 and refuses HTML served under a chunk URL', async () => {
+    const options = chunks().options!;
+    expect(options.cacheableResponse).toEqual({ statuses: [200] });
+    expect(options.plugins).toHaveLength(1);
+    const html = new Response('<!doctype html>', {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    });
+    const js = new Response('export{}', { headers: { 'content-type': 'text/javascript' } });
+    await expect(rejectHtmlResponse({ response: html })).resolves.toBeNull();
+    await expect(rejectHtmlResponse({ response: js })).resolves.toBe(js);
+    await expect(
+      options.plugins![0]!.cacheWillUpdate!({ response: html } as never),
+    ).resolves.toBeNull();
   });
 });

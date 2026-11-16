@@ -9,7 +9,12 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     preloadHints(['bootstrap', 'firebase-core']),
-    VitePWA(createPwaOptions(cacheEmulatorStorage(mode, loadEnv(mode, process.cwd(), 'VITE_')))),
+    VitePWA(
+      createPwaOptions(
+        cacheEmulatorStorage(mode, loadEnv(mode, process.cwd(), 'VITE_')),
+        loadEnv(mode, process.cwd(), 'VITE_').VITE_EMULATOR_HOST || 'localhost',
+      ),
+    ),
   ],
   build: {
     rolldownOptions: {

@@ -35,7 +35,22 @@ describe('firebase.json', () => {
 
   it('hosting serves apps/web/dist as SPA', () => {
     expect(config.hosting.public).toBe('apps/web/dist');
-    expect(config.hosting.rewrites).toContainEqual({ source: '**', destination: '/index.html' });
+    expect(config.hosting.rewrites).toHaveLength(1);
+  });
+
+  it('rewrites app routes to index.html but never missing assets', () => {
+    const [rewrite] = config.hosting.rewrites as Array<{ regex: string; destination: string }>;
+    expect(rewrite.destination).toBe('/index.html');
+    // Firebase regex rewrites use RE2 (no lookahead): only extensionless paths are app routes, so a
+    // missing /assets/*.js (or any other file) gets a real 404 instead of HTML with status 200.
+    expect(rewrite.regex).not.toContain('(?');
+    const re = new RegExp(rewrite.regex);
+    for (const route of ['/', '/songs/s1', '/import', '/pessoas']) {
+      expect(re.test(route), route).toBe(true);
+    }
+    for (const asset of ['/assets/index-gone.js', '/assets/x/y.css', '/sw.js']) {
+      expect(re.test(asset), asset).toBe(false);
+    }
   });
 
   it('firebase.json serves sw and index without cache', () => {
