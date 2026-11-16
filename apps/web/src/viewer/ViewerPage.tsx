@@ -3,7 +3,6 @@ import type { ChordWriter } from '@cifras/overlay';
 import {
   findKeyIndicator,
   keyFromSlug,
-  keySlug,
   parseKey,
   type KeyName,
   type Measure,
@@ -19,6 +18,7 @@ import type { CatalogApi } from '../catalog/catalogApi';
 import { deriveArtists } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { KeyChips } from '../search/KeyChips';
+import { SetlistBar } from '../setlists/SetlistBar';
 import { pdfFileName } from './fileName';
 import { createDocCache } from './docCache';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -29,8 +29,11 @@ import { ManageMenu, type ManageAction } from './ManageMenu';
 import { PdfPages, type PdfDocument } from './PdfPages';
 import { saveGenerated } from './saveGenerated';
 import { pickTransposeSource } from './transposeSource';
+import { SetlistNotices } from './SetlistNotices';
+import { useNextPreload } from './useNextPreload';
 import { useSongArrangements } from './useSongArrangements';
 import { useTranspose } from './useTranspose';
+import { useViewerSetlist, viewerUrl } from './useViewerSetlist';
 
 type Loaded = { status: 'ready'; doc: PdfDocument; bytes: Uint8Array } | { status: 'error' };
 
@@ -47,6 +50,9 @@ export interface ViewerPageProps {
   songId: string;
   /** `?tom` slug of the open key, if any. */
   tomSlug: string | null;
+  /** `?repertorio` and `?item`: set when the cifra was opened from a setlist. */
+  setlistId?: string | null;
+  itemId?: string | null;
   /** Opens the PDF bytes (pdf.js lives in the lazy route, not here). */
   openPdf: (bytes: Uint8Array) => Promise<PdfDocument>;
   /** Reads the text lines of an open document (pdf.js side, injected by the route). */
@@ -126,6 +132,8 @@ export function ViewerPage({
   api,
   songId,
   tomSlug,
+  setlistId = null,
+  itemId = null,
   openPdf,
   readLines,
   loadFont = loadFontBytes,
@@ -150,6 +158,16 @@ export function ViewerPage({
       null
     );
   }, [arrangements, tomSlug]);
+
+  const setlist = useViewerSetlist({
+    songId,
+    setlistId,
+    itemId,
+    tomSlug,
+    arrStatus,
+    arrangementKeys: useMemo(() => arrangements.map((a) => a.key), [arrangements]),
+    selectedKey: selected?.key ?? null,
+  });
 
   const source = useMemo(
     () => pickTransposeSource(arrangements, selected?.key ?? null),
@@ -206,6 +224,16 @@ export function ViewerPage({
       ? { status: 'error' }
       : null;
   const readyDoc = current?.status === 'ready' ? current.doc : null;
+  useNextPreload({
+    api,
+    openPdf,
+    docCache,
+    alive,
+    shownPath,
+    enabled: readyDoc !== null,
+    next: setlist.next,
+    onLoaded: refresh,
+  });
 
   // Panel open: read the source's chords and load the fonts they need (once per document).
   const [prepared, setPrepared] = useState<Prepared | null>(null);
@@ -271,8 +299,20 @@ export function ViewerPage({
     // A failed preparation must not stick: opening the panel again tries again.
     setPrepared((prev) => (prev?.status === 'error' ? null : prev));
   };
+  // Next/previous in a setlist keeps this component mounted (its doc cache feeds the preload), so
+  // the per-song UI state is dropped here when the song changes.
+  const [stateSongId, setStateSongId] = useState(songId);
+  if (stateSongId !== songId) {
+    setStateSongId(songId);
+    closePanel();
+    setPreviewFailed(null);
+    setNotice(null);
+    setManage(null);
+    setMetaSaved(false);
+    setMenuOpen(false);
+  }
   const open = (key: string): void => {
-    navigate(`/musicas/${songId}?tom=${keySlug(key)}`, { replace: true });
+    navigate(viewerUrl(songId, key, setlist.extraQuery), { replace: true });
   };
 
   const confirm = async (): Promise<void> => {
@@ -393,7 +433,9 @@ export function ViewerPage({
     const leave = (): void => {
       const next = arrangements.find((a) => a.key !== removed);
       setManage(null);
-      navigate(next ? `/musicas/${songId}?tom=${keySlug(next.key)}` : '/', { replace: true });
+      navigate(next ? viewerUrl(songId, next.key, setlist.extraQuery) : setlist.backHref, {
+        replace: true,
+      });
     };
     try {
       await api.deleteArrangement(songId, removed);
@@ -424,7 +466,7 @@ export function ViewerPage({
 
   return (
     <section
-      className={`viewer${panelOpen && wide ? ' has-side' : ''}${sheetHeight !== null ? ' has-sheet' : ''}`}
+      className={`viewer${panelOpen && wide ? ' has-side' : ''}${sheetHeight !== null ? ' has-sheet' : ''}${setlist.nav ? ' has-setlist' : ''}`}
       style={
         sheetHeight !== null
           ? ({ '--sheet-height': `${sheetHeight}px` } as CSSProperties)
@@ -434,7 +476,7 @@ export function ViewerPage({
       <div className="viewer-body" inert={panelOpen && !wide}>
         <header className="viewer-head">
           <div className="viewer-title">
-            <Link to="/" className="back-icon" aria-label="Voltar">
+            <Link to={setlist.backHref} className="back-icon" aria-label="Voltar">
               <span aria-hidden="true">‹</span>
             </Link>
             <h1>{song.title}</h1>
@@ -454,6 +496,7 @@ export function ViewerPage({
             title={song.title}
             keys={arrangements.length > 0 ? arrangements.map((a) => a.key) : song.keys}
             selected={selected?.key}
+            extraQuery={setlist.extraQuery}
             replace
           />
         </header>
@@ -467,6 +510,7 @@ export function ViewerPage({
             Esse tom já tinha sido salvo. Abrimos o existente.
           </p>
         )}
+        <SetlistNotices setlist={setlist} songId={songId} />
         {arrStatus === 'error' || current?.status === 'error' ? (
           <p role="alert" className="error">
             Não foi possível abrir o PDF.
@@ -492,6 +536,9 @@ export function ViewerPage({
           </p>
         )}
         <div className="viewer-bar">
+          {setlist.nav && (
+            <SetlistBar nav={setlist.nav} onGo={setlist.go} backHref={setlist.backHref} />
+          )}
           <button
             type="button"
             className="btn"

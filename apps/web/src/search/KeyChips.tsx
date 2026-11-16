@@ -7,12 +7,15 @@ export function KeyChips({
   keys,
   selected,
   replace,
+  extraQuery,
 }: {
   songId: string;
   title: string;
   keys: KeyName[];
   selected?: KeyName;
   replace?: boolean;
+  /** Extra `a=b&c=d` appended to the `?tom=` link (e.g. the setlist context). */
+  extraQuery?: string;
 }) {
   if (keys.length === 0) return null;
   return (
@@ -20,7 +23,7 @@ export function KeyChips({
       {keys.map((key) => (
         <li key={key}>
           <Link
-            to={`/musicas/${songId}?tom=${keySlug(key)}`}
+            to={`/musicas/${songId}?tom=${keySlug(key)}${extraQuery ? `&${extraQuery}` : ''}`}
             className="chip"
             replace={replace}
             aria-label={`${title}, tom ${key}`}

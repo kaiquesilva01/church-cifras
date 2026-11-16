@@ -619,6 +619,7 @@ button.fab {
 }
 
 .viewer-bar {
+  flex-wrap: wrap;
   position: fixed;
   right: 0;
   bottom: 0;
@@ -628,6 +629,14 @@ button.fab {
   padding: 8px 16px;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
+}
+
+.setlist-bar {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .viewer-bar .btn-primary {
@@ -679,6 +688,11 @@ button.fab {
   width: 320px;
   align-content: start;
   border-left: 1px solid var(--color-border);
+}
+
+/* The setlist bar adds a row to the fixed bottom bar: clear both rows. Before .has-sheet, which wins. */
+.viewer.has-setlist {
+  padding-bottom: 136px;
 }
 
 .viewer.has-sheet {

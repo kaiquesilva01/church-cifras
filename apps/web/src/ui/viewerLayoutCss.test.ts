@@ -17,4 +17,11 @@ describe('viewer layout css', () => {
     expect(rule('.pdf-pages')).toMatch(/min-width:\s*0/);
     expect(rule('.viewer.has-side')).toMatch(/padding-right:\s*336px/);
   });
+
+  it('clears the taller bottom bar of a setlist, without overriding the sheet padding', () => {
+    const px = (selector: string): number =>
+      Number(/padding-bottom:\s*(\d+)px/.exec(rule(selector))?.[1] ?? 0);
+    expect(px('.viewer.has-setlist')).toBeGreaterThan(px('.viewer'));
+    expect(css.indexOf('.viewer.has-setlist {')).toBeLessThan(css.indexOf('.viewer.has-sheet {'));
+  });
 });
