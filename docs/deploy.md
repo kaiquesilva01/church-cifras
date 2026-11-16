@@ -33,7 +33,11 @@ Em Authentication > Settings > **Authorized domains**, adicione `haja-luz-louvor
 
 ### Sites do Hosting
 
-O app é publicado no site **`haja-luz-louvor`** (`https://haja-luz-louvor.web.app`), criado em Hosting > **Adicionar outro site** (ou `firebase hosting:sites:create haja-luz-louvor`). O site padrão do projeto (`<projeto>.web.app`) só redireciona (301) para o novo, para os links antigos continuarem funcionando; ele não pode ser apagado ou renomeado.
+O app é publicado no site **`haja-luz-louvor`** (`https://haja-luz-louvor.web.app`), criado em Hosting > **Adicionar outro site** (ou `firebase hosting:sites:create haja-luz-louvor`). **Crie o site antes do primeiro push para `main`**: sem ele o `firebase deploy` do workflow falha.
+
+O site padrão do projeto (`<projeto>.web.app`) só redireciona (301) para o novo, mantendo o caminho, para os links antigos continuarem funcionando; ele não pode ser apagado ou renomeado. O `firebase.json` traz o ID desse site (`cifras-louvor-5dd50`) fixo: para publicar em outro projeto, troque-o pelo ID do novo projeto.
+
+Quem já visitou o endereço antigo tem o service worker do app registrado nele, que serviria o `index.html` em cache e impediria o redirecionamento. Por isso o `/sw.js` do site padrão **não** é redirecionado: ele serve `hosting/legacy/sw.js`, um worker que se desinstala, limpa os caches e recarrega as abas abertas, que então seguem o 301 para o site novo. Não remova esse arquivo enquanto houver clientes no endereço antigo.
 
 Mantenha `VITE_FIREBASE_AUTH_DOMAIN` apontando para `<projeto>.firebaseapp.com`: o popup do login Google usa as páginas reservadas `/__/auth/*` desse domínio, que o Firebase atende antes dos redirecionamentos.
 

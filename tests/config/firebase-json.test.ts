@@ -56,11 +56,65 @@ describe('firebase.json', () => {
     expect(app.rewrites).toHaveLength(1);
   });
 
-  it('legacy site only redirects every path to the friendly site', () => {
-    expect(legacy.rewrites).toBeUndefined();
-    expect(legacy.redirects).toEqual([
-      { source: '**', destination: `https://${APP_SITE}.web.app`, type: 301 },
-    ]);
+  describe('legacy site', () => {
+    const redirects = (legacy.redirects ?? []) as Array<{
+      regex: string;
+      destination: string;
+      type: number;
+    }>;
+    // Firebase regex redirects use RE2 with (?P<name>...); JS spells named groups (?<name>...).
+    const redirect = redirects[0]!;
+    const re = new RegExp(redirect.regex.replace('(?P<', '(?<'));
+    const target = (path: string) => {
+      const m = re.exec(path);
+      return m ? redirect.destination.replace(':path', m.groups!.path!) : null;
+    };
+
+    it('has a single permanent redirect and never rewrites', () => {
+      expect(legacy.rewrites).toBeUndefined();
+      expect(redirects).toHaveLength(1);
+      expect(redirect.type).toBe(301);
+      // RE2 has no lookahead.
+      expect(redirect.regex).not.toContain('(?=');
+      expect(redirect.regex).not.toContain('(?!');
+    });
+
+    it('redirects every path to the friendly site keeping the path', () => {
+      const base = `https://${APP_SITE}.web.app`;
+      expect(target('/')).toBe(`${base}/`);
+      expect(target('/musicas/s1')).toBe(`${base}/musicas/s1`);
+      expect(target('/cantores/joao-silva')).toBe(`${base}/cantores/joao-silva`);
+      expect(target('/assets/index-abc.js')).toBe(`${base}/assets/index-abc.js`);
+    });
+
+    it('never redirects /sw.js, so old clients can fetch the self-unregistering worker', () => {
+      expect(re.test('/sw.js')).toBe(false);
+      // Prefixes and look-alikes still redirect.
+      for (const path of [
+        '/s',
+        '/sw',
+        '/sw.',
+        '/sw.j',
+        '/sw.json',
+        '/sw.js/x',
+        '/swXjs',
+        '/sw.jsx',
+      ]) {
+        expect(re.test(path), path).toBe(true);
+      }
+    });
+
+    it('serves /sw.js from a minimal public dir that unregisters the worker', () => {
+      expect(legacy.public).toBe('hosting/legacy');
+      const sw = readFileSync(resolve(root, 'hosting/legacy/sw.js'), 'utf8');
+      expect(sw).toContain('registration.unregister()');
+      expect(sw).toContain('caches.delete');
+      expect(sw).toContain('client.navigate');
+      const swHeaders = legacy.headers.filter((h) => h.source === '/sw.js');
+      expect(swHeaders.flatMap((h) => h.headers)).toEqual([
+        { key: 'Cache-Control', value: 'no-cache' },
+      ]);
+    });
   });
 
   it('rewrites app routes to index.html but never missing assets', () => {

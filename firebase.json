@@ -26,9 +26,19 @@
     },
     {
       "site": "cifras-louvor-5dd50",
-      "public": "apps/web/dist",
+      "public": "hosting/legacy",
+      "headers": [
+        {
+          "source": "/sw.js",
+          "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+        }
+      ],
       "redirects": [
-        { "source": "**", "destination": "https://haja-luz-louvor.web.app", "type": 301 }
+        {
+          "regex": "^/(?P<path>(?:[^s].*|s(?:[^w].*)?|sw(?:[^.].*)?|sw[.](?:[^j].*)?|sw[.]j(?:[^s].*)?|sw[.]js.+)?)$",
+          "destination": "https://haja-luz-louvor.web.app/:path",
+          "type": 301
+        }
       ]
     }
   ],
