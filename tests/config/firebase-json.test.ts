@@ -5,6 +5,20 @@ import { describe, expect, it } from 'vitest';
 const root = resolve(import.meta.dirname, '../..');
 const config = JSON.parse(readFileSync(resolve(root, 'firebase.json'), 'utf8'));
 
+const APP_SITE = 'haja-luz-louvor';
+const LEGACY_SITE = 'cifras-louvor-5dd50';
+type Site = {
+  site: string;
+  rewrites?: unknown[];
+  redirects?: unknown[];
+  public?: string;
+  headers: Array<{ source: string; headers: Array<{ key: string; value: string }> }>;
+};
+const sites: Site[] = config.hosting;
+// The app is served from the friendly site; the project's default site only redirects to it.
+const app = sites.find((s) => s.site === APP_SITE)!;
+const legacy = sites.find((s) => s.site === LEGACY_SITE)!;
+
 describe('firebase.json', () => {
   it('binds every emulator to 0.0.0.0', () => {
     const { emulators } = config;
@@ -33,13 +47,24 @@ describe('firebase.json', () => {
     expect(config.functions.predeploy).toEqual(['npm run build -w @cifras/functions']);
   });
 
-  it('hosting serves apps/web/dist as SPA', () => {
-    expect(config.hosting.public).toBe('apps/web/dist');
-    expect(config.hosting.rewrites).toHaveLength(1);
+  it('hosting has exactly the friendly app site and the legacy redirect site', () => {
+    expect(sites.map((s) => s.site).sort()).toEqual([APP_SITE, LEGACY_SITE].sort());
+  });
+
+  it('hosting serves apps/web/dist as SPA on the friendly site', () => {
+    expect(app.public).toBe('apps/web/dist');
+    expect(app.rewrites).toHaveLength(1);
+  });
+
+  it('legacy site only redirects every path to the friendly site', () => {
+    expect(legacy.rewrites).toBeUndefined();
+    expect(legacy.redirects).toEqual([
+      { source: '**', destination: `https://${APP_SITE}.web.app`, type: 301 },
+    ]);
   });
 
   it('rewrites app routes to index.html but never missing assets', () => {
-    const rewrite = (config.hosting.rewrites as Array<{ regex: string; destination: string }>)[0]!;
+    const rewrite = (app.rewrites as Array<{ regex: string; destination: string }>)[0]!;
     expect(rewrite.destination).toBe('/index.html');
     // Firebase regex rewrites use RE2 (no lookahead): only extensionless paths are app routes, so a
     // missing /assets/*.js (or any other file) gets a real 404 instead of HTML with status 200.
@@ -64,7 +89,7 @@ describe('firebase.json', () => {
 
   it('firebase.json serves sw and index without cache', () => {
     const headers: Array<{ source: string; headers: Array<{ key: string; value: string }> }> =
-      config.hosting.headers;
+      app.headers;
     // Firebase applies every matching header; the last Cache-Control wins.
     const cacheControl = (path: string) =>
       headers
@@ -87,13 +112,13 @@ describe('firebase.json', () => {
 
   it('serves index with no-cache and assets immutable', () => {
     // Firebase applies every matching header; later entries override earlier ones.
-    const headers = config.hosting.headers;
+    const headers = app.headers;
     const all = headers.findIndex((h: { source: string }) => h.source === '**');
     const assets = headers.findIndex((h: { source: string }) => h.source === '/assets/**');
     expect(all).toBeGreaterThanOrEqual(0);
-    expect(headers[all].headers).toEqual([{ key: 'Cache-Control', value: 'no-cache' }]);
+    expect(headers[all]?.headers).toEqual([{ key: 'Cache-Control', value: 'no-cache' }]);
     expect(assets).toBeGreaterThan(all);
-    expect(headers[assets].headers).toEqual([
+    expect(headers[assets]?.headers).toEqual([
       { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
     ]);
   });
