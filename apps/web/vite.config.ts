@@ -1,11 +1,16 @@
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 import { preloadHints } from './build/preloadHints';
-import { pwaOptions } from './build/pwaConfig';
+import { createPwaOptions, cacheEmulatorStorage } from './build/pwaConfig';
 
-export default defineConfig({
-  plugins: [react(), preloadHints(['bootstrap', 'firebase-core']), VitePWA(pwaOptions)],
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    react(),
+    preloadHints(['bootstrap', 'firebase-core']),
+    VitePWA(createPwaOptions(cacheEmulatorStorage(mode, loadEnv(mode, process.cwd(), 'VITE_')))),
+  ],
   build: {
     rolldownOptions: {
       output: {
@@ -41,4 +46,4 @@ export default defineConfig({
     // and a pending passive effect (PdfPages) could flush in between and throw under load.
     sequence: { hooks: 'list' },
   },
-});
+}));

@@ -2,7 +2,13 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { isFontRequest, isPdfObjectRequest, pwaOptions } from './pwaConfig';
+import {
+  createPwaOptions,
+  isFontRequest,
+  isPdfObjectRequest,
+  pwaOptions,
+  cacheEmulatorStorage,
+} from './pwaConfig';
 
 const publicDir = resolve(import.meta.dirname, '../public');
 
@@ -65,13 +71,7 @@ describe('runtime request matchers', () => {
 
   it('matches only GET downloads of song objects from Storage', () => {
     expect(isPdfObjectRequest(url(`${object}?alt=media&token=x`), 'GET')).toBe(true);
-    expect(isPdfObjectRequest(url(object), 'GET')).toBe(true);
-    expect(
-      isPdfObjectRequest(
-        url('http://localhost:9199/v0/b/b/o/songs%2Fs1%2FG-abc.pdf?alt=media'),
-        'GET',
-      ),
-    ).toBe(true);
+    expect(isPdfObjectRequest(url(`${object}?token=x&alt=media`), 'GET')).toBe(true);
     expect(isPdfObjectRequest(url(object), 'POST')).toBe(false);
     expect(isPdfObjectRequest(url(object), 'DELETE')).toBe(false);
     expect(
@@ -86,6 +86,34 @@ describe('runtime request matchers', () => {
         'GET',
       ),
     ).toBe(false);
+  });
+
+  it('requires alt=media: metadata and token-only requests are not cached', () => {
+    expect(isPdfObjectRequest(url(object), 'GET')).toBe(false);
+    expect(isPdfObjectRequest(url(`${object}?token=x`), 'GET')).toBe(false);
+    expect(isPdfObjectRequest(url(`${object}?alt=json`), 'GET')).toBe(false);
+    expect(isPdfObjectRequest(url(`${object}?xalt=media`), 'GET')).toBe(false);
+    expect(isPdfObjectRequest(url(`${object}?alt=mediax`), 'GET')).toBe(false);
+  });
+
+  it('matches the Storage emulator only when built for emulators', () => {
+    const emulator = url('http://localhost:9199/v0/b/b/o/songs%2Fs1%2FG-abc.pdf?alt=media');
+    expect(isPdfObjectRequest(emulator, 'GET')).toBe(false);
+    expect(isPdfObjectRequest(emulator, 'GET', true)).toBe(true);
+    expect(
+      isPdfObjectRequest(url('http://localhost:9199/v0/b/b/o/songs%2Fs1%2FG.pdf'), 'GET', true),
+    ).toBe(false);
+    const patterns = (options: typeof pwaOptions) =>
+      options.workbox!.runtimeCaching!.map((r) => String(r.urlPattern));
+    expect(patterns(pwaOptions).join(' ')).not.toContain('9199');
+    expect(patterns(createPwaOptions(true)).join(' ')).toContain('9199');
+  });
+
+  it('includes the emulator host outside production or with VITE_USE_EMULATORS', () => {
+    expect(cacheEmulatorStorage('production', {})).toBe(false);
+    expect(cacheEmulatorStorage('production', { VITE_USE_EMULATORS: 'false' })).toBe(false);
+    expect(cacheEmulatorStorage('production', { VITE_USE_EMULATORS: 'true' })).toBe(true);
+    expect(cacheEmulatorStorage('development', {})).toBe(true);
   });
 
   it('never matches Firestore, Functions or Auth hosts', () => {

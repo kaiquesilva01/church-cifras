@@ -2,23 +2,26 @@ import type { VitePWAOptions } from 'vite-plugin-pwa';
 
 const DAY = 24 * 60 * 60;
 
-// Object downloads (`?alt=media`, also what getBlob requests) of song PDFs: the real bucket and the
-// Storage emulator. The match starts at the origin (Workbox requires that for cross-origin patterns)
-// and only covers `songs%2F...` objects: listings, uploads and other folders never match.
-export const PDF_OBJECT_PATTERN =
-  /^https?:\/\/(?:firebasestorage\.googleapis\.com|localhost:9199)\/v0\/b\/[^/]+\/o\/songs%2F/;
+// Media downloads (`?alt=media`, also what getBlob requests) of song PDFs from the real bucket. The
+// match starts at the origin (Workbox requires that for cross-origin patterns) and only covers
+// `songs%2F...` objects: listings, metadata calls, uploads and other folders never match. The Storage
+// emulator host is accepted only in builds meant for local development.
+export const pdfObjectPattern = (includeEmulator: boolean): RegExp =>
+  includeEmulator
+    ? /^https?:\/\/(?:firebasestorage\.googleapis\.com|localhost:9199)\/v0\/b\/[^/]+\/o\/songs%2F[^?]*\?(?:[^#]*&)?alt=media(?:&|#|$)/
+    : /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/[^/]+\/o\/songs%2F[^?]*\?(?:[^#]*&)?alt=media(?:&|#|$)/;
 export const FONT_PATTERN = /\.ttf(?:\?.*)?$/;
 // Lazy chunks, stylesheets and the pdf.js worker (all hashed files under /assets/).
 export const CHUNK_PATTERN = /\/assets\/.+\.(?:m?js|css)(?:\?.*)?$/;
 
-export const isPdfObjectRequest = (url: URL, method: string): boolean =>
-  method === 'GET' && PDF_OBJECT_PATTERN.test(url.href);
+export const isPdfObjectRequest = (url: URL, method: string, includeEmulator = false): boolean =>
+  method === 'GET' && pdfObjectPattern(includeEmulator).test(url.href);
 export const isFontRequest = (url: URL): boolean => FONT_PATTERN.test(url.pathname);
 
 export const PDF_CACHE = 'cifras-pdfs';
 
 // Firestore, Functions and Auth are deliberately absent: no rule here ever matches them.
-export const pwaOptions: Partial<VitePWAOptions> = {
+export const createPwaOptions = (includeEmulator: boolean): Partial<VitePWAOptions> => ({
   registerType: 'prompt',
   injectRegister: false,
   includeAssets: ['icons/*.{png,svg}'],
@@ -62,7 +65,7 @@ export const pwaOptions: Partial<VitePWAOptions> = {
     cleanupOutdatedCaches: true,
     runtimeCaching: [
       {
-        urlPattern: PDF_OBJECT_PATTERN,
+        urlPattern: pdfObjectPattern(includeEmulator),
         method: 'GET',
         handler: 'CacheFirst',
         options: {
@@ -93,4 +96,12 @@ export const pwaOptions: Partial<VitePWAOptions> = {
       },
     ],
   },
-};
+});
+
+/** Production builds never cache the Storage emulator; dev and emulator builds do. */
+export const cacheEmulatorStorage = (
+  mode: string,
+  env: Record<string, string | undefined>,
+): boolean => mode !== 'production' || env.VITE_USE_EMULATORS === 'true';
+
+export const pwaOptions = createPwaOptions(false);
