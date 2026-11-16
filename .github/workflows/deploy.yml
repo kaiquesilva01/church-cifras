@@ -1,0 +1,95 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Verificar configuração de produção
+        id: config
+        env:
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+        run: |
+          total=0
+          missing=""
+          for name in FIREBASE_PROJECT_ID FIREBASE_SERVICE_ACCOUNT VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_STORAGE_BUCKET VITE_FIREBASE_APP_ID ADMIN_EMAILS; do
+            total=$((total + 1))
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          missing_count=$(echo "$missing" | wc -w)
+          if [ "$missing_count" -eq "$total" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Deploy ignorado: produção ainda não configurada (docs/deploy.md)"
+          elif [ "$missing_count" -gt 0 ]; then
+            echo "::error::Configuração de produção incompleta; faltando:$missing (docs/deploy.md)"
+            exit 1
+          elif [ "$VITE_FIREBASE_PROJECT_ID" != "$FIREBASE_PROJECT_ID" ]; then
+            echo "::error::VITE_FIREBASE_PROJECT_ID difere de FIREBASE_PROJECT_ID"
+            exit 1
+          elif [[ "$ADMIN_EMAILS" == *[$'\r\n"'\''#\=']* ]]; then
+            echo "::error::ADMIN_EMAILS contém caractere inválido (quebra de linha, aspas, #, \ ou =); use apenas e-mails separados por vírgula"
+            exit 1
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.configured == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.config.outputs.configured == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependências
+        if: steps.config.outputs.configured == 'true'
+        run: npm ci
+
+      - name: Build
+        if: steps.config.outputs.configured == 'true'
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_USE_EMULATORS: 'false'
+        run: npm run build
+
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        if: steps.config.outputs.configured == 'true'
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy no Firebase
+        if: steps.config.outputs.configured == 'true'
+        env:
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+        run: |
+          printf 'ADMIN_EMAILS=%s\n' "$ADMIN_EMAILS" > "apps/functions/.env.$FIREBASE_PROJECT_ID"
+          npx firebase deploy --only hosting,functions,firestore,storage --project "$FIREBASE_PROJECT_ID" --non-interactive --force

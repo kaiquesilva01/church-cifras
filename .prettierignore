@@ -1,0 +1,14 @@
+node_modules
+dist
+apps/functions/lib
+coverage
+emulator-data
+package-lock.json
+.superpowers
+fixtures/private
+.claude
+docs
+*.md
+e2e/artifacts
+playwright-report
+test-results

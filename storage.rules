@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isEditor() {
+      return request.auth != null && request.auth.token.get('role', 'viewer') in ['member', 'admin'];
+    }
+
+    match /songs/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    // Arquivos imutáveis: só criação, nunca sobrescrita (create exige que o objeto não exista).
+    match /songs/{songId}/{fileName} {
+      allow create: if isEditor()
+        && resource == null
+        && request.resource.contentType == 'application/pdf'
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.metadata.get('uploadedBy', '') == request.auth.uid
+        && fileName.matches('[A-Za-z]+-[A-Za-z0-9_-]+[.]pdf');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

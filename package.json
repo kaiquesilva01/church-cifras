@@ -1,0 +1,37 @@
+{
+  "name": "church-cifras",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tests",
+    "e2e"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:harness": "node --test \".claude/**/*.test.mjs\"",
+    "build": "npm run build --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "smoke:upload": "node scripts/smoke/upload.mjs",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-church-cifras \"npm run test:rules -w @cifras/tests\"",
+    "test:e2e": "npm run build -w @cifras/functions && firebase emulators:exec --only auth,firestore,storage,functions --project demo-church-cifras \"npm run e2e -w @cifras/e2e\""
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.15.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "firebase-tools": "15.36.0",
+    "globals": "17.14.0",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2"
+  }
+}

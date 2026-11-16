@@ -1,0 +1,54 @@
+x-dev: &dev
+  image: church-cifras-dev
+  build:
+    context: .
+    dockerfile: docker/dev.Dockerfile
+  working_dir: /app
+  environment:
+    CHOKIDAR_USEPOLLING: 'true'
+  volumes:
+    - .:/app
+    - /app/node_modules
+    - /app/apps/web/node_modules
+    - /app/apps/functions/node_modules
+    - /app/packages/chords/node_modules
+    - /app/packages/pdf/node_modules
+    - /app/packages/overlay/node_modules
+    - /app/tests/node_modules
+    - firebase-emulator-cache:/root/.cache/firebase/emulators
+
+services:
+  functions:
+    <<: *dev
+    command: npm run build:watch -w @cifras/functions
+
+  emulators:
+    <<: *dev
+    command: >
+      sh -c "until [ -f apps/functions/lib/index.js ]; do sleep 1; done;
+      exec node_modules/.bin/firebase emulators:start --project demo-church-cifras
+      --import=./emulator-data --export-on-exit=./emulator-data"
+    stop_grace_period: 30s
+    ports:
+      - '4000:4000'
+      - '9099:9099'
+      - '8080:8080'
+      - '9150:9150'
+      - '9199:9199'
+      - '5001:5001'
+      - '4400:4400'
+      - '4500:4500'
+    depends_on:
+      - functions
+
+  web:
+    <<: *dev
+    command: npm run dev -w @cifras/web
+    env_file: apps/web/.env.docker
+    ports:
+      - '5173:5173'
+    depends_on:
+      - emulators
+
+volumes:
+  firebase-emulator-cache: {}

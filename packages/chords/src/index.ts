@@ -1,0 +1,25 @@
+export { KEY_OPTIONS, parseKey, prefersFlats, relativeMajorPc } from './keys';
+export type { Key, KeyName } from './keys';
+export { noteName, pitchClass } from './notes';
+export { parseChord, semitonesBetween, transposeChord } from './chord';
+export type { Chord } from './chord';
+export {
+  analyzeSegment,
+  classifySegment,
+  isLabel,
+  mergeFragments,
+  parseChordToken,
+  segmentLine,
+  spanInRun,
+  tokenizeSegment,
+} from './lines';
+export type { ChordToken, SegmentAnalysis, Measure, TextLine, TextRun, Token } from './lines';
+export { findKeyIndicator } from './keyIndicator';
+export type { KeyIndicator } from './keyIndicator';
+export { findChords } from './findChords';
+export type { ChordOccurrence } from './findChords';
+export { buildTransposePlan } from './plan';
+export type { Replacement, SuspectSegment, TransposePlan } from './plan';
+export { artistIdFromName, compareKeys, keyFromSlug, keySlug } from './catalog';
+export { normalizeText, suggestMetadata } from './metadata';
+export type { MetadataSuggestion } from './metadata';
