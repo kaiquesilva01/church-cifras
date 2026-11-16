@@ -19,6 +19,7 @@ import {
   replaceArrangement as replaceArrangementLogic,
   type ReplaceDeps,
 } from './songs/replaceArrangement';
+import { readUploader } from './songs/storageMetadata';
 import { changeUserRole, createUserProfile, type UserDeps } from './users';
 
 if (getApps().length === 0) initializeApp();
@@ -78,11 +79,8 @@ const replaceDeps: ReplaceDeps = {
   },
   fileExists: async (path) => (await getStorage().bucket().file(path).exists())[0],
   getFileOwner: async (path) => {
-    const file = getStorage().bucket().file(path);
-    if (!(await file.exists())[0]) return null;
-    const [metadata] = await file.getMetadata();
-    const uploadedBy = metadata.metadata?.uploadedBy;
-    return typeof uploadedBy === 'string' ? uploadedBy : null;
+    const found = await readUploader(getStorage().bucket().file(path));
+    return found === 'missing' ? null : (found.uploadedBy ?? null);
   },
   now: () => new Date(),
 };
@@ -102,11 +100,7 @@ export const replaceArrangement = onCall({ region: REGION }, async (request) => 
 
 const discardDeps: DiscardDeps = {
   getUploader: async (path) => {
-    const file = getStorage().bucket().file(path);
-    if (!(await file.exists())[0]) return 'missing' as const;
-    const [metadata] = await file.getMetadata();
-    const uploadedBy = metadata.metadata?.uploadedBy;
-    return { uploadedBy: typeof uploadedBy === 'string' ? uploadedBy : undefined };
+    return readUploader(getStorage().bucket().file(path));
   },
   isReferenced: async (songId, slug, path) => {
     const data = (await getFirestore().doc(`songs/${songId}/arrangements/${slug}`).get()).data();
