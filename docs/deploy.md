@@ -29,7 +29,17 @@ O primeiro deploy pode pedir para ativá-las. Recomendado: ativar as APIs pelo c
 
 ### Domínios autorizados
 
-Em Authentication > Settings > **Authorized domains**, adicione o domínio customizado, se houver. `*.web.app` e `*.firebaseapp.com` já vêm por padrão.
+Em Authentication > Settings > **Authorized domains**, adicione `louvor-hajaluz.web.app` e `louvor-hajaluz.firebaseapp.com` (e o domínio customizado, se houver). Só os domínios do site padrão do projeto (`<projeto>.web.app` e `<projeto>.firebaseapp.com`) vêm autorizados; sites extras do Hosting não.
+
+### Sites do Hosting
+
+O app é publicado no site **`louvor-hajaluz`** (`https://louvor-hajaluz.web.app`), criado em Hosting > **Adicionar outro site** (ou `firebase hosting:sites:create louvor-hajaluz`). **Crie o site antes do primeiro push para `main`**: sem ele o `firebase deploy` do workflow falha.
+
+O site padrão do projeto (`<projeto>.web.app`) só redireciona (301) para o novo, mantendo o caminho, para os links antigos continuarem funcionando; ele não pode ser apagado ou renomeado. O `firebase.json` traz o ID desse site (`cifras-louvor-5dd50`) fixo: para publicar em outro projeto, troque-o pelo ID do novo projeto.
+
+Quem já visitou o endereço antigo tem o service worker do app registrado nele, que serviria o `index.html` em cache e impediria o redirecionamento. Por isso o `/sw.js` do site padrão **não** é redirecionado: ele serve `hosting/legacy/sw.js`, um worker que se desinstala, limpa os caches e recarrega as abas abertas, que então seguem o 301 para o site novo. Não remova esse arquivo enquanto houver clientes no endereço antigo. No `firebase.json`, a raiz `/` tem uma regra própria (um grupo de captura vazio quebraria o destino) e o regex das demais rotas significa "qualquer caminho não vazio, exceto `/sw.js`" (o RE2 do Firebase não tem lookahead).
+
+Mantenha `VITE_FIREBASE_AUTH_DOMAIN` apontando para `<projeto>.firebaseapp.com`: o popup do login Google usa as páginas reservadas `/__/auth/*` desse domínio, que o Firebase atende antes dos redirecionamentos.
 
 ## 4. Criar o app Web
 
@@ -77,7 +87,7 @@ Se ninguém tiver o papel Admin (por exemplo, o único admin foi rebaixado), use
 
 A Fase 5 lê os bytes dos PDFs no navegador (pdf.js), o que exige CORS no bucket de produção. O bucket padrão vem de `VITE_FIREBASE_STORAGE_BUCKET`.
 
-1. Copie `cors.json` (raiz do repositório) e troque `https://<projeto>.web.app` pela origem do Hosting (inclua também `https://<projeto>.firebaseapp.com` ou o domínio próprio, se houver).
+1. Copie `cors.json` (raiz do repositório) e troque `<projeto>` pelo ID do projeto. A lista já inclui as origens do site `louvor-hajaluz` e do site padrão; acrescente o domínio próprio, se houver.
 2. Autentique com `gcloud auth login` e aplique:
 
 ```bash

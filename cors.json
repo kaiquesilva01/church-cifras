@@ -1,6 +1,11 @@
 [
   {
-    "origin": ["https://<projeto>.web.app"],
+    "origin": [
+      "https://louvor-hajaluz.web.app",
+      "https://louvor-hajaluz.firebaseapp.com",
+      "https://<projeto>.web.app",
+      "https://<projeto>.firebaseapp.com"
+    ],
     "method": ["GET", "HEAD"],
     "responseHeader": ["Content-Type", "Content-Length", "Range"],
     "maxAgeSeconds": 3600
