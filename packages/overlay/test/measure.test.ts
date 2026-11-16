@@ -40,4 +40,23 @@ describe('createMeasure', () => {
     expect(warnings).toEqual(['Fonte não carregada: sans-bold; largura estimada.']);
     expect(() => createMeasure(new Map())('A', 'Courier', 10)).not.toThrow();
   });
+
+  it('warns once per font when a character has no glyph (notdef)', async () => {
+    const warnings: string[] = [];
+    const measure = createMeasure(await loadAllFonts(), (message) => warnings.push(message));
+    measure('A中B', 'Arial-BoldMT', 10);
+    measure('中', 'Arial-BoldMT', 10);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('sans-bold');
+    expect(warnings[0]).toContain('U+4E2D');
+    measure('Gm7', 'Courier', 10);
+    expect(warnings).toHaveLength(1);
+  });
+
+  it('does not warn for characters covered by the font', async () => {
+    const warnings: string[] = [];
+    const measure = createMeasure(await loadAllFonts(), (message) => warnings.push(message));
+    measure('F#m7(b5)/C° Tom: E', 'Arial-BoldMT', 10);
+    expect(warnings).toEqual([]);
+  });
 });

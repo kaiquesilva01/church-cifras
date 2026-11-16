@@ -28,6 +28,7 @@ const FALLBACK_ADVANCE_EM = 0.6;
 
 export function createMeasure(fonts: LoadedFonts, onWarn?: (message: string) => void): Measure {
   const warned = new Set<FontId>();
+  const warnedGlyphs = new Set<FontId>();
   return (text, fontName, fontSize) => {
     const id = chooseFont(fontName, BOLD_FONT.test(fontName));
     const font = fonts.get(id);
@@ -40,7 +41,16 @@ export function createMeasure(fonts: LoadedFonts, onWarn?: (message: string) => 
     }
     const { glyphs } = font.layout(text);
     let units = 0;
-    for (const glyph of glyphs) units += glyph.advanceWidth;
+    for (const glyph of glyphs) {
+      units += glyph.advanceWidth;
+      // Glyph id 0 is .notdef: the substitute font lacks the character, so the PDF would draw a box.
+      if (glyph.id === 0 && !warnedGlyphs.has(id)) {
+        warnedGlyphs.add(id);
+        const cp = glyph.codePoints?.[0];
+        const label = cp === undefined ? '?' : `U+${cp.toString(16).toUpperCase().padStart(4, '0')}`;
+        onWarn?.(`Caractere sem glifo na fonte ${id}: ${label}; será desenhado como .notdef.`);
+      }
+    }
     return (units / font.unitsPerEm) * fontSize;
   };
 }
