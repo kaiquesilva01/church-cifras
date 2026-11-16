@@ -47,7 +47,8 @@ export function createMeasure(fonts: LoadedFonts, onWarn?: (message: string) => 
       if (glyph.id === 0 && !warnedGlyphs.has(id)) {
         warnedGlyphs.add(id);
         const cp = glyph.codePoints?.[0];
-        const label = cp === undefined ? '?' : `U+${cp.toString(16).toUpperCase().padStart(4, '0')}`;
+        const label =
+          cp === undefined ? '?' : `U+${cp.toString(16).toUpperCase().padStart(4, '0')}`;
         onWarn?.(`Caractere sem glifo na fonte ${id}: ${label}; será desenhado como .notdef.`);
       }
     }
