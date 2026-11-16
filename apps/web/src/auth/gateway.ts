@@ -1,5 +1,6 @@
 import {
   GoogleAuthProvider,
+  browserPopupRedirectResolver,
   getIdToken,
   getIdTokenResult,
   onAuthStateChanged,
@@ -48,7 +49,7 @@ export function createAuthGateway(
       if (auth.currentUser) await getIdToken(auth.currentUser, true);
     },
     signIn: async () => {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      await signInWithPopup(auth, new GoogleAuthProvider(), browserPopupRedirectResolver);
     },
     // O cache persistente do Firestore guarda dados da pessoa anterior: apaga e recarrega.
     signOut: async () => {

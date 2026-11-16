@@ -4,10 +4,13 @@ import {
   installPreloadErrorReload,
   scheduleClearReloadMarker,
 } from './lib/preloadError';
+import { prefetchForPath } from './lib/prefetch';
 import './ui/styles.css';
 
 const storage = getSessionStorage(window);
 installPreloadErrorReload(window, storage);
+
+prefetchForPath(window.location.pathname);
 
 const root = createRoot(document.getElementById('root')!);
 

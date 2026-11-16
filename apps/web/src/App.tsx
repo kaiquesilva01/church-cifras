@@ -5,6 +5,7 @@ import type { CatalogApi } from './catalog/catalogApi';
 import { SongsProvider } from './catalog/SongsProvider';
 import type { PeopleApi } from './people/peopleApi';
 import { PeoplePage } from './people/PeoplePage';
+import { loadViewerRoute } from './lib/prefetch';
 import { LoginPage } from './routes/LoginPage';
 import { RequireAuth } from './routes/RequireAuth';
 import { ErrorBoundary } from './routes/ErrorBoundary';
@@ -15,7 +16,7 @@ import { AppShell } from './ui/AppShell';
 
 const UploadRoute = lazy(() => import('./upload/UploadRoute'));
 const ImportRoute = lazy(() => import('./import/ImportRoute'));
-const ViewerRoute = lazy(() => import('./viewer/ViewerRoute'));
+const ViewerRoute = lazy(loadViewerRoute);
 
 export interface AppProps {
   gateway: AuthGateway;

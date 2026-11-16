@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('firebase/app', () => ({ initializeApp: vi.fn(() => ({ name: 'app' })) }));
 vi.mock('firebase/auth', () => ({
-  getAuth: vi.fn(() => ({ name: 'auth' })),
+  initializeAuth: vi.fn(() => ({ name: 'auth' })),
+  indexedDBLocalPersistence: { type: 'idb' },
+  browserLocalPersistence: { type: 'local' },
   connectAuthEmulator: vi.fn(),
 }));
 vi.mock('firebase/firestore', () => ({
@@ -20,7 +22,7 @@ vi.mock('firebase/functions', () => ({
   connectFunctionsEmulator: vi.fn(),
 }));
 
-import { connectAuthEmulator, getAuth } from 'firebase/auth';
+import { connectAuthEmulator, initializeAuth } from 'firebase/auth';
 import {
   connectFirestoreEmulator,
   initializeFirestore,
@@ -97,8 +99,16 @@ describe('createFirebase', () => {
 
   it('creates auth and firestore eagerly', () => {
     createFirebase(baseEnv);
-    expect(getAuth).toHaveBeenCalled();
+    expect(initializeAuth).toHaveBeenCalled();
     expect(initializeFirestore).toHaveBeenCalled();
+  });
+
+  it('creates auth without a popup resolver so the gapi iframe stays off the startup path', () => {
+    createFirebase(baseEnv);
+    expect(initializeAuth).toHaveBeenCalledWith(
+      { name: 'app' },
+      { persistence: [{ type: 'idb' }, { type: 'local' }] },
+    );
   });
 
   it('uses memory cache without IndexedDB and persistent cache with it', () => {

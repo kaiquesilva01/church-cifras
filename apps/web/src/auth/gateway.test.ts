@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FirebaseServices } from '../lib/firebase';
-import { signOut } from 'firebase/auth';
+import { browserPopupRedirectResolver, signInWithPopup, signOut } from 'firebase/auth';
 import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
 import { createAuthGateway } from './gateway';
 
@@ -10,6 +10,7 @@ let handlers: { next: Next; fail: Fail };
 
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {},
+  browserPopupRedirectResolver: { resolver: true },
   getIdToken: vi.fn(),
   getIdTokenResult: vi.fn(),
   onAuthStateChanged: vi.fn(),
@@ -31,6 +32,15 @@ const services = { auth: {}, db: {} } as unknown as FirebaseServices;
 afterEach(() => vi.unstubAllGlobals());
 
 describe('createAuthGateway', () => {
+  it('signs in with the popup resolver passed explicitly (auth is created without one)', async () => {
+    await createAuthGateway(services).signIn();
+    expect(signInWithPopup).toHaveBeenCalledWith(
+      services.auth,
+      expect.anything(),
+      browserPopupRedirectResolver,
+    );
+  });
+
   it('clears pdf cache on sign out', async () => {
     const calls: string[] = [];
     const deleteCache = vi.fn((name: string) => {

@@ -558,6 +558,8 @@ body {
   justify-content: center;
   min-width: 44px;
   min-height: 44px;
+  /* The glyph is centred in the 44 px target: pull the box left so the chevron meets the content edge. */
+  margin-left: -12px;
   color: var(--color-accent);
   font-size: 1.75rem;
   line-height: 1;

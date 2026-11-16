@@ -1,5 +1,11 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  connectAuthEmulator,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  type Auth,
+} from 'firebase/auth';
 import {
   connectFirestoreEmulator,
   initializeFirestore,
@@ -39,7 +45,11 @@ export function createFirebase(env: WebEnv): FirebaseServices {
     storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
     appId: env.VITE_FIREBASE_APP_ID,
   });
-  const auth = getAuth(app);
+  // No popupRedirectResolver here: getAuth wires it in and loads the Google API iframe (apis.google.com)
+  // at startup, which delays the first auth state. signInWithPopup receives the resolver explicitly.
+  const auth = initializeAuth(app, {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+  });
   // Cache persistente só onde há IndexedDB (navegador); jsdom/SSR usam o cache em memória.
   const db = initializeFirestore(
     app,
