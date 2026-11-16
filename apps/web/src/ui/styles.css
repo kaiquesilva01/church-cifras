@@ -367,6 +367,34 @@ body {
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
 }
 
+button.fab {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.next-culto {
+  margin: 12px 0;
+}
+
+.next-culto-title,
+.section-title {
+  margin: 12px 0 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted, inherit);
+}
+
+.setlist-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .back {
   color: var(--color-accent);
   text-decoration: none;

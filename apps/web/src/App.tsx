@@ -57,7 +57,7 @@ function AppRoutes({
             </SongsProvider>
           }
         >
-          <Route index element={<HomePage />} />
+          <Route index element={<HomePage setlistApi={setlistApi} />} />
           <Route path="/cantores/:artistId" element={<ArtistPage />} />
           <Route
             path="/musicas/:songId"
