@@ -7,13 +7,15 @@ import {
   type TextLine,
   type TransposePlan,
 } from '@cifras/chords';
-import { countCollisions, overlayOps, type OverlayOp } from '@cifras/overlay/ops';
+import { overlayOps, type OverlayOp } from '@cifras/overlay/ops';
 import { useCallback, useMemo, useState } from 'react';
 
 export interface TransposeResult {
   plan: TransposePlan | null;
   ops: OverlayOp[];
+  /** Chords that may touch a neighbour (the key indicator is counted in `keyCollision`). */
   collisions: number;
+  keyCollision: boolean;
   suspects: string[];
 }
 
@@ -25,7 +27,13 @@ export interface UseTransposeInput {
 }
 
 const EMPTY_OPS: OverlayOp[] = [];
-const EMPTY: TransposeResult = { plan: null, ops: EMPTY_OPS, collisions: 0, suspects: [] };
+const EMPTY: TransposeResult = {
+  plan: null,
+  ops: EMPTY_OPS,
+  collisions: 0,
+  keyCollision: false,
+  suspects: [],
+};
 
 // Results per target for one source; going back to a key already tried is free.
 function createCache() {
@@ -64,7 +72,8 @@ export function useTranspose({ sourceLines, sourceKey, measure }: UseTransposeIn
         plan,
         ops,
         // What the user sees (after reflow), not plan.collisions.
-        collisions: countCollisions(ops),
+        collisions: ops.filter((op) => op.kind === 'chord' && op.collides).length,
+        keyCollision: ops.some((op) => op.kind === 'key' && op.collides),
         suspects: [...new Set(plan.suspectSegments.flatMap((s) => s.unknown))],
       };
     });

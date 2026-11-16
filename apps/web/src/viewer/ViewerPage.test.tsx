@@ -70,7 +70,8 @@ describe('ViewerPage', () => {
     const { api } = renderViewer('/musicas/s1?tom=A');
     expect(screen.getByRole('status')).toHaveTextContent('Carregando cifra…');
     expect(screen.getByText('Aline Barros')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Sonda-me' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sonda-me' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Voltar' })).toHaveAttribute('href', '/');
     expect(screen.getByRole('link', { name: 'Sonda-me, tom A' })).toHaveAttribute(
       'aria-current',
       'true',

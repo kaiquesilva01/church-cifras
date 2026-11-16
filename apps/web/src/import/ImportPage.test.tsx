@@ -532,6 +532,25 @@ describe('ImportPage', () => {
     expect(screen.queryByRole('button', { name: 'Limpar lista' })).not.toBeInTheDocument();
   });
 
+  it('removing the last row resets the batch state like Limpar lista', async () => {
+    setup({
+      reads: { 'a.pdf': result({ title: 'A' }), 'b.pdf': result({ title: 'B' }) },
+    });
+    addFiles([pdf('a.pdf'), new File(['x'], 'n.txt', { type: 'text/plain' })]);
+    const button = await screen.findByRole('button', { name: 'Importar 1 prontos' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await screen.findByText('1 importados · 0 já existiam · 0 com erro');
+    fireEvent.click(screen.getByRole('button', { name: 'Remover a.pdf' }));
+    expect(screen.queryByText(/importados/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ignoramos/)).not.toBeInTheDocument();
+    addFiles([pdf('b.pdf')]);
+    await screen.findByLabelText('Música de b.pdf');
+    expect(screen.queryByText(/importados/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ignoramos/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Importação cancelada/)).not.toBeInTheDocument();
+  });
+
   it('does not mark the dropzone aria-disabled', async () => {
     setup();
     const zone = screen.getByText('Arraste PDFs ou uma pasta aqui').parentElement!;

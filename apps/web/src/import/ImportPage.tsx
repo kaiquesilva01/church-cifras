@@ -229,23 +229,41 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     [],
   );
 
-  const remove = useCallback((id: string) => {
-    setRows((prev) => prev.filter((row) => row.id !== id));
-    setResults((prev) => {
-      if (!prev?.has(id)) return prev;
-      const next = new Map(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
-
-  const clearList = () => {
-    if (busyRef.current) return;
+  const resetBatch = useCallback(() => {
     setRows([]);
     setResults(undefined);
     setQueued(new Set());
     setCancelled(false);
     setNonPdf(0);
+  }, []);
+
+  const remove = useCallback(
+    (id: string) => {
+      // The last row going away leaves nothing for the old summary or notices to describe.
+      if (rowsRef.current.every((row) => row.id === id)) {
+        resetBatch();
+        return;
+      }
+      setRows((prev) => prev.filter((row) => row.id !== id));
+      setQueued((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      setResults((prev) => {
+        if (!prev?.has(id)) return prev;
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    },
+    [resetBatch],
+  );
+
+  const clearList = () => {
+    if (busyRef.current) return;
+    resetBatch();
   };
 
   const startImport = async () => {

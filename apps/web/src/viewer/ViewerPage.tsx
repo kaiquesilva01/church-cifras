@@ -231,7 +231,7 @@ export function ViewerPage({
 
   const ready = prepared?.doc === readyDoc && prepared?.status === 'ready' ? prepared : null;
   const sourceKey = useMemo(() => (source ? parseKey(source.key) : null), [source]);
-  const { target, setTarget, plan, ops, collisions, suspects } = useTranspose({
+  const { target, setTarget, plan, ops, collisions, keyCollision, suspects } = useTranspose({
     sourceLines: ready?.lines ?? null,
     sourceKey,
     measure: ready?.measure ?? null,
@@ -433,10 +433,12 @@ export function ViewerPage({
     >
       <div className="viewer-body" inert={panelOpen && !wide}>
         <header className="viewer-head">
-          <Link to="/" className="back">
-            <span aria-hidden="true">‹ </span>
-            {song.title}
-          </Link>
+          <div className="viewer-title">
+            <Link to="/" className="back-icon" aria-label="Voltar">
+              <span aria-hidden="true">‹</span>
+            </Link>
+            <h1>{song.title}</h1>
+          </div>
           <p className="muted">{song.artistName}</p>
           {admin && (
             <ManageMenu
@@ -565,6 +567,7 @@ export function ViewerPage({
           onCancel={closePanel}
           onConfirm={() => void confirm()}
           collisions={collisions}
+          keyCollision={keyCollision}
           suspects={suspects}
           busy={busy}
           layout={wide ? 'side' : 'sheet'}

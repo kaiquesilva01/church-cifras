@@ -39,7 +39,7 @@ describe('firebase.json', () => {
   });
 
   it('rewrites app routes to index.html but never missing assets', () => {
-    const [rewrite] = config.hosting.rewrites as Array<{ regex: string; destination: string }>;
+    const rewrite = (config.hosting.rewrites as Array<{ regex: string; destination: string }>)[0]!;
     expect(rewrite.destination).toBe('/index.html');
     // Firebase regex rewrites use RE2 (no lookahead): only extensionless paths are app routes, so a
     // missing /assets/*.js (or any other file) gets a real 404 instead of HTML with status 200.
