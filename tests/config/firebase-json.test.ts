@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const root = resolve(import.meta.dirname, '../..');
 const config = JSON.parse(readFileSync(resolve(root, 'firebase.json'), 'utf8'));
 
-const APP_SITE = 'haja-luz-louvor';
+const APP_SITE = 'louvor-hajaluz';
 const LEGACY_SITE = 'cifras-louvor-5dd50';
 type Site = {
   site: string;

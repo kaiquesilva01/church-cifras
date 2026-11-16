@@ -29,11 +29,11 @@ O primeiro deploy pode pedir para ativá-las. Recomendado: ativar as APIs pelo c
 
 ### Domínios autorizados
 
-Em Authentication > Settings > **Authorized domains**, adicione `haja-luz-louvor.web.app` e `haja-luz-louvor.firebaseapp.com` (e o domínio customizado, se houver). Só os domínios do site padrão do projeto (`<projeto>.web.app` e `<projeto>.firebaseapp.com`) vêm autorizados; sites extras do Hosting não.
+Em Authentication > Settings > **Authorized domains**, adicione `louvor-hajaluz.web.app` e `louvor-hajaluz.firebaseapp.com` (e o domínio customizado, se houver). Só os domínios do site padrão do projeto (`<projeto>.web.app` e `<projeto>.firebaseapp.com`) vêm autorizados; sites extras do Hosting não.
 
 ### Sites do Hosting
 
-O app é publicado no site **`haja-luz-louvor`** (`https://haja-luz-louvor.web.app`), criado em Hosting > **Adicionar outro site** (ou `firebase hosting:sites:create haja-luz-louvor`). **Crie o site antes do primeiro push para `main`**: sem ele o `firebase deploy` do workflow falha.
+O app é publicado no site **`louvor-hajaluz`** (`https://louvor-hajaluz.web.app`), criado em Hosting > **Adicionar outro site** (ou `firebase hosting:sites:create louvor-hajaluz`). **Crie o site antes do primeiro push para `main`**: sem ele o `firebase deploy` do workflow falha.
 
 O site padrão do projeto (`<projeto>.web.app`) só redireciona (301) para o novo, mantendo o caminho, para os links antigos continuarem funcionando; ele não pode ser apagado ou renomeado. O `firebase.json` traz o ID desse site (`cifras-louvor-5dd50`) fixo: para publicar em outro projeto, troque-o pelo ID do novo projeto.
 
@@ -87,7 +87,7 @@ Se ninguém tiver o papel Admin (por exemplo, o único admin foi rebaixado), use
 
 A Fase 5 lê os bytes dos PDFs no navegador (pdf.js), o que exige CORS no bucket de produção. O bucket padrão vem de `VITE_FIREBASE_STORAGE_BUCKET`.
 
-1. Copie `cors.json` (raiz do repositório) e troque `<projeto>` pelo ID do projeto. A lista já inclui as origens do site `haja-luz-louvor` e do site padrão; acrescente o domínio próprio, se houver.
+1. Copie `cors.json` (raiz do repositório) e troque `<projeto>` pelo ID do projeto. A lista já inclui as origens do site `louvor-hajaluz` e do site padrão; acrescente o domínio próprio, se houver.
 2. Autentique com `gcloud auth login` e aplique:
 
 ```bash
