@@ -20,6 +20,7 @@ import { AppShell } from './ui/AppShell';
 const UploadRoute = lazy(() => import('./upload/UploadRoute'));
 const ImportRoute = lazy(() => import('./import/ImportRoute'));
 const ViewerRoute = lazy(loadViewerRoute);
+const SetlistRoute = lazy(() => import('./setlists/SetlistRoute'));
 
 export interface AppProps {
   gateway: AuthGateway;
@@ -57,7 +58,7 @@ function AppRoutes({
             </SongsProvider>
           }
         >
-          <Route index element={<HomePage />} />
+          <Route index element={<HomePage setlistApi={setlistApi} />} />
           <Route path="/cantores/:artistId" element={<ArtistPage />} />
           <Route
             path="/musicas/:songId"
@@ -71,6 +72,22 @@ function AppRoutes({
                   }
                 >
                   <ViewerRoute api={catalogApi} />
+                </Suspense>
+              </ErrorBoundary>
+            }
+          />
+          <Route
+            path="/repertorios/:id"
+            element={
+              <ErrorBoundary onReload={onReload}>
+                <Suspense
+                  fallback={
+                    <p role="status" className="status">
+                      Carregando…
+                    </p>
+                  }
+                >
+                  <SetlistRoute api={setlistApi} />
                 </Suspense>
               </ErrorBoundary>
             }

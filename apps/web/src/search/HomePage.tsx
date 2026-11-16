@@ -4,16 +4,31 @@ import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import { deriveArtists, filterArtists, filterSongs } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
+import { NextCultoCard } from '../setlists/NextCultoCard';
+import { todayLocal } from '../setlists/dates';
+import type { SetlistApi } from '../setlists/setlistApi';
+import { SetlistFormDialog } from '../setlists/SetlistFormDialog';
+import { useSetlistsContext } from '../setlists/SetlistsProvider';
+import { SetlistsTab } from '../setlists/SetlistsTab';
 import { SongList } from './SongList';
 
 const TABS = [
   { id: 'musicas', label: 'Músicas', placeholder: 'Buscar música ou cantor…' },
   { id: 'cantores', label: 'Cantores', placeholder: 'Buscar cantor…' },
+  { id: 'repertorios', label: 'Repertórios', placeholder: '' },
 ] as const;
 
-export function HomePage() {
+const TAB_PATHS = { musicas: '/', cantores: '/?aba=cantores', repertorios: '/?aba=repertorios' };
+
+export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
   const { role } = useAuth();
   const { status, songs } = useSongsContext();
+  const { setlists, status: setlistsStatus } = useSetlistsContext();
+  const [now] = useState(() => new Date());
+  const today = todayLocal(now);
+  const [creating, setCreating] = useState(false);
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -31,7 +46,8 @@ export function HomePage() {
     navigate(`${pathname}${search}`, { replace: true, state: null });
   }, [notice, navigate, pathname, search]);
   const query = params.get('q') ?? '';
-  const tab = params.get('aba') === 'cantores' ? TABS[1] : TABS[0];
+  const abaParam = params.get('aba');
+  const tab = TABS.find((t) => t.id === abaParam) ?? TABS[0];
 
   const artists = useMemo(() => deriveArtists(songs), [songs]);
   const visibleSongs = useMemo(
@@ -55,6 +71,18 @@ export function HomePage() {
     : 'Nenhuma cifra ainda.';
   const items = tab.id === 'musicas' ? visibleSongs : visibleArtists;
 
+  const createSetlist = async (value: { date: string; label: string }): Promise<void> => {
+    setCreateBusy(true);
+    setCreateError(null);
+    try {
+      const id = await setlistApi.createSetlist({ ...value, items: [] });
+      navigate(`/repertorios/${id}`);
+    } catch {
+      setCreateError('Não foi possível criar o repertório.');
+      setCreateBusy(false);
+    }
+  };
+
   return (
     <section>
       {notice && (
@@ -62,19 +90,22 @@ export function HomePage() {
           {notice}
         </p>
       )}
-      <input
-        type="search"
-        className="search"
-        aria-label={tab.placeholder}
-        placeholder={tab.placeholder}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      {tab.id !== 'repertorios' && (
+        <input
+          type="search"
+          className="search"
+          aria-label={tab.placeholder}
+          placeholder={tab.placeholder}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      )}
+      <NextCultoCard setlists={setlists} today={today} now={now} />
       <nav aria-label="Seções" className="tabs">
         {TABS.map((t) => (
           <Link
             key={t.id}
-            to={t.id === 'cantores' ? '/?aba=cantores' : '/'}
+            to={TAB_PATHS[t.id]}
             aria-current={t.id === tab.id ? 'page' : undefined}
             className="tab"
           >
@@ -82,42 +113,81 @@ export function HomePage() {
           </Link>
         ))}
       </nav>
-      <div>
-        {status === 'loading' && (
-          <p role="status" className="status">
-            Carregando…
-          </p>
-        )}
-        {status === 'error' && (
-          <p role="alert" className="error">
-            Não foi possível carregar as cifras.
-          </p>
-        )}
-        {status === 'ready' && items.length === 0 && <p className="status">{emptyText}</p>}
-        {tab.id === 'musicas' ? (
-          <SongList songs={visibleSongs} />
+      {tab.id === 'repertorios' ? (
+        <div>
+          {setlistsStatus === 'loading' && (
+            <p role="status" className="status">
+              Carregando…
+            </p>
+          )}
+          {setlistsStatus === 'error' && (
+            <p role="alert" className="error">
+              Não foi possível carregar os repertórios.
+            </p>
+          )}
+          {setlistsStatus === 'ready' && (
+            <SetlistsTab setlists={setlists} today={today} now={now} />
+          )}
+        </div>
+      ) : (
+        <div>
+          {status === 'loading' && (
+            <p role="status" className="status">
+              Carregando…
+            </p>
+          )}
+          {status === 'error' && (
+            <p role="alert" className="error">
+              Não foi possível carregar as cifras.
+            </p>
+          )}
+          {status === 'ready' && items.length === 0 && <p className="status">{emptyText}</p>}
+          {tab.id === 'musicas' ? (
+            <SongList songs={visibleSongs} />
+          ) : (
+            <ul className="list">
+              {visibleArtists.map((artist) => (
+                <li key={artist.id} className="list-card">
+                  <Link to={`/cantores/${artist.id}`} className="list-main artist-row">
+                    <span className="avatar avatar-lg" aria-hidden="true">
+                      {artist.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="song-title">{artist.name}</span>
+                    <span className="muted">
+                      {artist.songCount === 1 ? '1 música' : `${artist.songCount} músicas`} ›
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {canEdit(role) &&
+        (tab.id === 'repertorios' ? (
+          <button
+            type="button"
+            className="fab"
+            onClick={() => {
+              setCreateError(null);
+              setCreating(true);
+            }}
+          >
+            ＋ Novo repertório
+          </button>
         ) : (
-          <ul className="list">
-            {visibleArtists.map((artist) => (
-              <li key={artist.id} className="list-card">
-                <Link to={`/cantores/${artist.id}`} className="list-main artist-row">
-                  <span className="avatar avatar-lg" aria-hidden="true">
-                    {artist.name.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="song-title">{artist.name}</span>
-                  <span className="muted">
-                    {artist.songCount === 1 ? '1 música' : `${artist.songCount} músicas`} ›
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      {canEdit(role) && (
-        <Link to="/nova" className="fab">
-          ＋ Nova cifra
-        </Link>
+          <Link to="/nova" className="fab">
+            ＋ Nova cifra
+          </Link>
+        ))}
+      {creating && (
+        <SetlistFormDialog
+          mode="create"
+          busy={createBusy}
+          error={createError}
+          onSave={(value) => void createSetlist(value)}
+          onCancel={() => setCreating(false)}
+        />
       )}
     </section>
   );

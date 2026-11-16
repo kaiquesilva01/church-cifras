@@ -367,6 +367,34 @@ body {
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
 }
 
+button.fab {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.next-culto {
+  margin: 12px 0;
+}
+
+.next-culto-title,
+.section-title {
+  margin: 12px 0 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted, inherit);
+}
+
+.setlist-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .back {
   color: var(--color-accent);
   text-decoration: none;
@@ -1009,4 +1037,92 @@ body {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.setlist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.setlist-menu {
+  position: relative;
+}
+
+.setlist-menu-list {
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.setlist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.setlist-item-number {
+  min-width: 1.5em;
+  text-align: right;
+}
+
+.setlist-item-handle {
+  cursor: grab;
+}
+
+.setlist-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.setlist-item-main a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.setlist-item-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.add-song-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-bottom: 0;
+}
+
+.add-song-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.add-song-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

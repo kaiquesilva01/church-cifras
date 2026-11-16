@@ -1,11 +1,14 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import type { SongSummary } from '../catalog/types';
 import { SongsProvider } from '../catalog/SongsProvider';
+import { SetlistsProvider } from '../setlists/SetlistsProvider';
+import type { Setlist } from '../setlists/types';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
+import { fakeSetlistApi, makeSetlist, type FakeSetlistApi } from '../test/fakeSetlistApi';
 import { testUser } from '../test/fakeGateway';
 import { HomePage } from './HomePage';
 
@@ -14,9 +17,27 @@ function StateProbe() {
   return <output data-testid="state">{JSON.stringify(state)}</output>;
 }
 
+function PathProbe() {
+  const { pathname } = useLocation();
+  return <output data-testid="path">{pathname}</output>;
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-16T15:00:00Z') });
+});
+afterEach(() => vi.useRealTimers());
+
 function renderHome(
-  options: { role?: Role; path?: string; songs?: SongSummary[]; state?: unknown } = {},
+  options: {
+    role?: Role;
+    path?: string;
+    songs?: SongSummary[];
+    state?: unknown;
+    setlists?: Setlist[];
+    setlistApi?: FakeSetlistApi;
+  } = {},
 ) {
+  const setlistApi = options.setlistApi ?? fakeSetlistApi(options.setlists);
   const auth: AuthState = {
     status: 'signed-in',
     user: testUser,
@@ -35,8 +56,11 @@ function renderHome(
         ]}
       >
         <SongsProvider api={fakeCatalogApi(options.songs)}>
-          <HomePage />
-          <StateProbe />
+          <SetlistsProvider api={setlistApi}>
+            <HomePage setlistApi={setlistApi} />
+            <StateProbe />
+            <PathProbe />
+          </SetlistsProvider>
         </SongsProvider>
       </MemoryRouter>
     </AuthContext.Provider>,
@@ -148,8 +172,10 @@ describe('HomePage', () => {
       >
         <MemoryRouter>
           <SongsProvider api={api}>
-            <HomePage />
-            <StateProbe />
+            <SetlistsProvider api={fakeSetlistApi()}>
+              <HomePage setlistApi={fakeSetlistApi()} />
+              <StateProbe />
+            </SetlistsProvider>
           </SongsProvider>
         </MemoryRouter>
       </AuthContext.Provider>,
@@ -168,5 +194,97 @@ describe('HomePage', () => {
   it('shows empty catalog message', () => {
     renderHome({ songs: [] });
     expect(screen.getByText('Nenhuma cifra ainda.')).toBeInTheDocument();
+  });
+
+  describe('Repertórios', () => {
+    it('opens the tab from the url without the search box', () => {
+      renderHome({ path: '/?aba=repertorios' });
+      expect(screen.getByRole('link', { name: 'Repertórios' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(screen.getByRole('link', { name: 'Repertórios' })).toHaveAttribute(
+        'href',
+        '/?aba=repertorios',
+      );
+      expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+      expect(screen.getByText('Nenhum repertório ainda.')).toBeInTheDocument();
+    });
+
+    it('keeps the search box on the other tabs', () => {
+      renderHome();
+      expect(screen.getByRole('searchbox')).toBeInTheDocument();
+    });
+
+    it('shows the next-service card on the home tabs', () => {
+      renderHome({ setlists: [makeSetlist({ id: 'a', date: '2026-11-22', label: 'Domingo' })] });
+      expect(screen.getByText('Próximo culto')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Domingo · 22\/11/ })).toHaveAttribute(
+        'href',
+        '/repertorios/a',
+      );
+    });
+
+    it('shows the next-service card on the Repertórios tab only when a future setlist exists', () => {
+      const { unmount } = renderHome({
+        path: '/?aba=repertorios',
+        setlists: [makeSetlist({ id: 'a', date: '2026-11-22', label: 'Domingo' })],
+      });
+      expect(screen.getByText('Próximo culto')).toBeInTheDocument();
+      unmount();
+      renderHome({ path: '/?aba=repertorios' });
+      expect(screen.queryByText('Próximo culto')).not.toBeInTheDocument();
+    });
+
+    it('shows the right FAB per tab and role', () => {
+      const { unmount } = renderHome({ role: 'member', path: '/?aba=repertorios' });
+      expect(screen.getByRole('button', { name: '＋ Novo repertório' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /Nova cifra/ })).not.toBeInTheDocument();
+      unmount();
+      const second = renderHome({ role: 'admin' });
+      expect(screen.getByRole('link', { name: '＋ Nova cifra' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Novo repertório/ })).not.toBeInTheDocument();
+      second.unmount();
+      renderHome({ role: 'viewer', path: '/?aba=repertorios' });
+      expect(screen.queryByRole('button', { name: /Novo repertório/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /Nova cifra/ })).not.toBeInTheDocument();
+    });
+
+    it('creates a setlist and navigates to it', async () => {
+      const setlistApi = fakeSetlistApi();
+      renderHome({ role: 'member', path: '/?aba=repertorios', setlistApi });
+      fireEvent.click(screen.getByRole('button', { name: '＋ Novo repertório' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+      await waitFor(() =>
+        expect(screen.getByTestId('path')).toHaveTextContent('/repertorios/new-1'),
+      );
+      expect(setlistApi.createSetlist).toHaveBeenCalledWith({
+        date: '2026-11-19',
+        label: 'Quinta',
+        items: [],
+      });
+    });
+
+    it('shows an error and keeps the dialog when creating fails', async () => {
+      const setlistApi = fakeSetlistApi([], {
+        createSetlist: vi.fn(() => Promise.reject(new Error('boom'))),
+      });
+      renderHome({ role: 'member', path: '/?aba=repertorios', setlistApi });
+      fireEvent.click(screen.getByRole('button', { name: '＋ Novo repertório' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Não foi possível criar o repertório.',
+      );
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByTestId('path')).toHaveTextContent('/');
+      expect(screen.getByTestId('path')).not.toHaveTextContent('/repertorios');
+    });
+
+    it('closes the dialog on cancel', () => {
+      renderHome({ role: 'member', path: '/?aba=repertorios' });
+      fireEvent.click(screen.getByRole('button', { name: '＋ Novo repertório' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 });
