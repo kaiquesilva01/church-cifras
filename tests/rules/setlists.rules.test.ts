@@ -200,7 +200,9 @@ describe('setlists rules', () => {
       await assertFails(updateDoc(existing(memberDb()), updateData({ updatedBy: 'other' })));
     });
     it('denies client-supplied updatedAt', async () => {
-      await assertFails(updateDoc(existing(memberDb()), updateData({ updatedAt: Timestamp.now() })));
+      await assertFails(
+        updateDoc(existing(memberDb()), updateData({ updatedAt: Timestamp.now() })),
+      );
     });
     it('denies 41 items', async () => {
       await assertFails(updateDoc(existing(memberDb()), updateData({ items: items(41) })));
