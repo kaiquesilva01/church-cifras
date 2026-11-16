@@ -30,23 +30,22 @@ Um acorde com caractere fora desse conjunto (ex.: `♭`, `♯`) não tem glyph n
 
 | Arquivo | Original (bytes) | Reduzida (bytes) | SHA-256 do original | SHA-256 da reduzida |
 | --- | --- | --- | --- | --- |
-| LiberationMono-Bold.ttf | 307996 | 29928 | bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb | 041fc9d2a1e788db1de9c9d89ccd07cb532c2b93167b17ff669b54d3d7983654 |
-| LiberationMono-Regular.ttf | 319508 | 29988 | f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1 | a6d7d9bfa1884253cb51cedd9fd717822921403a97bbd2a7ce157b4ed1faf81d |
-| LiberationSans-Bold.ttf | 414456 | 33608 | 788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173 | 4c397a565c8c512ed8caea140ed6389e5933d39b2b669a1d5ff5698ac6b26c3c |
-| LiberationSans-Regular.ttf | 410712 | 35196 | 76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8 | 03a556667b4be788cbc1a1b79af6b419c965de553a839c600aea1af6731e87e1 |
-| Roboto-Bold.ttf | 351108 | 29408 | 2ca2b3bfc2c2d43fa8f2b7227982d735fd537ecf113a4c56cc2d292bcc3106c8 | c69aa92e405827062be51756071f172122175c24e944df7111bfa637a918a416 |
-| Roboto-Regular.ttf | 349400 | 29520 | f3edb8058e523f5612bfd99d0745e661568ad85e1b6217bc62f786fabae624c6 | 22d83d1f02b3135169c220a78d74bac0064b4eb57c637413260725a944d1accc |
-| RobotoMono-Bold.ttf | 126680 | 35140 | 3ecf35e5e87accc7578b605d1f5f0bc30d88b195d6807bec8a0c57f6aa95c4db | cb3f5d0427e57a7fe37440dd3a39d2fed2f6a78ab02fb6655e0f4589f3805443 |
-| RobotoMono-Regular.ttf | 125748 | 34560 | af0bff7599c3df3831755c16e39b3c496df74b8c8d8a1161b14dc8461be17cb4 | c5dca13194013f26d27790b0b05d6e4aa9fe4017bc31f07d6f4c69c037c36dd1 |
+| LiberationMono-Bold.ttf | 307996 | 31420 | bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb | 91be63525d0c2e2d8af9eb15c6741589e4e53b548305d1c8f735124d161b0507 |
+| LiberationMono-Regular.ttf | 319508 | 31480 | f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1 | 8110bbf5668f08bfdc5f037fb9732c476c9fd4be83d99a7e5b71df90f3c87f7f |
+| LiberationSans-Bold.ttf | 414456 | 35080 | 788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173 | a364c5eab5696dd8e80004e1d831f96ed9fd5b092e49311ab2c13356ed7542e3 |
+| LiberationSans-Regular.ttf | 410712 | 36672 | 76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8 | 81e2f0847af4abd544b70f5727138d9fa9a49a66d71eea412fb9902e2b14cb31 |
+| Roboto-Bold.ttf | 351108 | 29824 | 2ca2b3bfc2c2d43fa8f2b7227982d735fd537ecf113a4c56cc2d292bcc3106c8 | cd6ed28147a88093627a6d0193bace7bc2e9cdf92c5a38386f6d515619df4d8b |
+| Roboto-Regular.ttf | 349400 | 29948 | f3edb8058e523f5612bfd99d0745e661568ad85e1b6217bc62f786fabae624c6 | 5f046ed058871c8018e61ba4d2ec62352b55d15714813d42873d7ddbba619147 |
+| RobotoMono-Bold.ttf | 126680 | 35700 | 3ecf35e5e87accc7578b605d1f5f0bc30d88b195d6807bec8a0c57f6aa95c4db | e60b6f81ad499824c31609ab0883b7e094e9f3bb97a92be3fc4c195370f483d0 |
+| RobotoMono-Regular.ttf | 125748 | 35120 | af0bff7599c3df3831755c16e39b3c496df74b8c8d8a1161b14dc8461be17cb4 | b9376946ecf01b11ea9e401748628ee259b45ca38391a475a4cc4624c670048d |
 
 Os hashes das reduzidas valem para a saída do script com `subset-font` 2.9.0 (determinística).
 
-## Licenças e nomes reservados
+## Licenças, modificações e nomes reservados
 
-- **Liberation (SIL OFL 1.1)**: a licença reserva o nome `Liberation` (e Arimo, Tinos, Cousine). Uma versão reduzida é uma versão modificada e não pode usar esses nomes. O script reescreve a tabela `name` das reduzidas: família `Cifras Mono` / `Cifras Sans`, PostScript `CifrasMono-Bold`, `CifrasSans-Regular` etc.; mantém os avisos de copyright e de licença (name IDs 0, 11–14). Os nomes de arquivo `Liberation*.ttf` foram mantidos apenas por compatibilidade com o código; o conteúdo da fonte não se identifica mais como Liberation. Os originais completos continuam em `source/`, com nome original, e a licença em `LICENSES/`.
-- **Roboto (Apache 2.0)**: sem restrição de nome; reduzida mantém os nomes.
-- **Roboto Mono (SIL OFL 1.1)**: `LICENSES/RobotoMono-OFL-1.1.txt` não declara nome reservado (só o aviso de copyright); reduzida mantém os nomes.
+Todas as `*.ttf` desta pasta (fora de `source/`) são **versões modificadas** dos originais: foram reduzidas (subset) por `scripts/subset-fonts.mjs` ao conjunto de code points acima, mantendo os contornos TrueType, as métricas e os registros de copyright e licença (name IDs 0 e 7–14 copiados do original; IDs 1–6 do subset).
 
-Licenças: `LICENSES/Liberation-OFL-1.1.txt` (+ `Liberation-AUTHORS.txt`), `LICENSES/Roboto-Apache-2.0.txt`, `LICENSES/RobotoMono-OFL-1.1.txt`.
-
-Os repositórios oficiais não publicam checksums; os hashes acima foram calculados no download e cada arquivo foi aberto com fontkit para validar a integridade.
+- **Roboto (Apache 2.0, §4(b))**: `Roboto-Regular.ttf` e `Roboto-Bold.ttf` aqui foram modificados (reduzidos pelo script e conjunto de caracteres acima). O aviso de licença e de copyright está preservado nos name IDs 0, 13 e 14 e em `LICENSES/Roboto-Apache-2.0.txt`. Nomes mantidos.
+- **Roboto Mono (SIL OFL 1.1)**: `RobotoMono-Regular.ttf` e `RobotoMono-Bold.ttf` aqui são versões modificadas (reduzidas pelo mesmo script). `LICENSES/RobotoMono-OFL-1.1.txt` não declara nome reservado, então os nomes foram mantidos; copyright e licença preservados.
+- **Liberation (SIL OFL 1.1)**: a licença reserva o nome `Liberation` (e Arimo, Tinos, Cousine). As quatro `Liberation*.ttf` aqui são versões modificadas (reduzidas) e por isso foram **renomeadas**: família `Cifras Mono` / `Cifras Sans`, PostScript `CifrasMono-Bold`, `CifrasSans-Regular` etc. Copyright e licença permanecem nos name IDs 0, 13 e 14. Os nomes de arquivo `Liberation*.ttf` foram mantidos só por compatibilidade com o código. Os originais completos, com nome original, continuam em `source/`.
+- `package.json` exporta apenas as 8 `*.ttf` reduzidas; `source/` e `LICENSES/` não fazem parte da superfície pública do pacote.

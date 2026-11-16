@@ -76,4 +76,40 @@ describe('subset substitute fonts', () => {
       }
     }
   });
+
+  it.each(ids)('keeps copyright and license name records from the source (%s)', (id) => {
+    const subset = nameRecords(readFileSync(resolve(fontsDir, FONT_FILES[id])));
+    const source = nameRecords(readFileSync(resolve(fontsDir, 'source', FONT_FILES[id])));
+    const present = [0, 13, 14].filter((n) => source.has(n));
+    expect(present).toContain(0);
+    expect(present).toContain(13);
+    for (const n of present) expect(subset.get(n), `name ID ${n}`).toBe(source.get(n));
+  });
 });
+
+// Windows-platform name records by ID, decoded from UTF-16BE.
+function nameRecords(font: Buffer): Map<number, string> {
+  const tables = font.readUInt16BE(4);
+  for (let i = 0; i < tables; i++) {
+    const at = 12 + i * 16;
+    if (font.toString('latin1', at, at + 4) !== 'name') continue;
+    const table = font.subarray(font.readUInt32BE(at + 8));
+    const count = table.readUInt16BE(2);
+    const strings = table.readUInt16BE(4);
+    const out = new Map<number, string>();
+    for (let r = 0; r < count; r++) {
+      const rec = 6 + r * 12;
+      if (table.readUInt16BE(rec) !== 3) continue;
+      const length = table.readUInt16BE(rec + 8);
+      const offset = strings + table.readUInt16BE(rec + 10);
+      out.set(
+        table.readUInt16BE(rec + 6),
+        Buffer.from(table.subarray(offset, offset + length))
+          .swap16()
+          .toString('utf16le'),
+      );
+    }
+    return out;
+  }
+  throw new Error('no name table');
+}
