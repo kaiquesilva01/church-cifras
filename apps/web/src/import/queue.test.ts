@@ -124,3 +124,17 @@ describe('describeError', () => {
     expect(describeError('boom')).toBe('erro inesperado');
   });
 });
+
+describe('runImport logging', () => {
+  it('logs the underlying error of a failed row', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const boom = new Error('boom');
+    const results = await runImport([group('g1', 'a')], () => Promise.reject(boom), {
+      concurrency: 1,
+      onProgress: () => undefined,
+    });
+    expect(results.get('a')).toEqual({ status: 'error', message: 'erro inesperado' });
+    expect(error).toHaveBeenCalledWith(expect.any(String), boom);
+    error.mockRestore();
+  });
+});

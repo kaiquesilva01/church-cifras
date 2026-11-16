@@ -3,6 +3,27 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rolldownOptions: {
+      output: {
+        // Stable chunk names: the heavy libraries get long-lived cache entries and show up by name.
+        codeSplitting: {
+          groups: [
+            { name: 'pdfjs', test: /node_modules\/pdfjs-dist\// },
+            {
+              name: 'overlay',
+              test: /node_modules\/(pdf-lib|@pdf-lib)\/|packages\/overlay\/src\/(measure|fontkit|overlayWriter|rewriteWriter)\./,
+            },
+            {
+              // Auth + Firestore (the app shell); Storage and Functions stay lazy.
+              name: 'firebase-core',
+              test: /node_modules\/(firebase\/(app|auth|firestore)|@firebase\/(app|auth|firestore|util|component|logger|webchannel-wrapper))\//,
+            },
+          ],
+        },
+      },
+    },
+  },
   server: {
     host: true,
     port: 5173,

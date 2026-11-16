@@ -6,9 +6,18 @@ import type { PdfDocument } from './PdfPages';
 import { ViewerPage } from './ViewerPage';
 
 // fontExtraProperties: real font names are needed to read chords with readTextLinesFromDocument.
+// A single PDFWorker serves every document: one worker thread (and one copy of pdf.js in memory)
+// instead of one per opened key.
+let sharedWorker: InstanceType<ReturnType<typeof getPdfjs>['PDFWorker']> | undefined;
+const pdfWorker = () => (sharedWorker ??= new (getPdfjs().PDFWorker)());
+
 const openPdf = (bytes: Uint8Array): Promise<PdfDocument> =>
-  getPdfjs().getDocument({ data: bytes, verbosity: 0, fontExtraProperties: true })
-    .promise as unknown as Promise<PdfDocument>;
+  getPdfjs().getDocument({
+    data: bytes,
+    verbosity: 0,
+    fontExtraProperties: true,
+    worker: pdfWorker(),
+  }).promise as unknown as Promise<PdfDocument>;
 
 const readLines = (doc: PdfDocument) =>
   readTextLinesFromDocument(doc as unknown as Parameters<typeof readTextLinesFromDocument>[0]);

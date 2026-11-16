@@ -1,5 +1,5 @@
 import type { OverlayOp } from '@cifras/overlay/ops';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { PreviewLayer, type ViewportLike } from './PreviewLayer';
 
 interface RenderTaskLike {
@@ -68,6 +68,18 @@ export function PdfPages({
     return () => {
       clearTimeout(timer);
       observer.disconnect();
+    };
+  }, []);
+
+  // Free the canvases' backing stores right away: mobile browsers keep detached canvases alive for a while.
+  // Layout cleanup runs before React detaches the canvas refs on unmount.
+  useLayoutEffect(() => {
+    const map = canvases.current;
+    return () => {
+      for (const canvas of map.values()) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
     };
   }, []);
 

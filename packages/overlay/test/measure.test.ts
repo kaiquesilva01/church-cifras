@@ -29,4 +29,15 @@ describe('createMeasure', () => {
       );
     }
   });
+
+  it('measure falls back for unloaded fonts', () => {
+    const warnings: string[] = [];
+    const measure = createMeasure(new Map(), (message) => warnings.push(message));
+    // 0.6 em per char: 3 chars at 10pt
+    expect(measure('Gm7', 'Arial-BoldMT', 10)).toBeCloseTo(18, 6);
+    expect(measure('Gm7', 'Arial-BoldMT', 10)).toBeCloseTo(18, 6);
+    // one warning per missing font, not per call
+    expect(warnings).toEqual(['Fonte não carregada: sans-bold; largura estimada.']);
+    expect(() => createMeasure(new Map())('A', 'Courier', 10)).not.toThrow();
+  });
 });

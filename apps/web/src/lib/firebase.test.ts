@@ -45,27 +45,46 @@ describe('createFirebase', () => {
     vi.clearAllMocks();
   });
 
-  it('connects to emulators only when flag is true', () => {
+  it('connects to emulators only when flag is true', async () => {
     const s = createFirebase(baseEnv);
     expect(connectAuthEmulator).toHaveBeenCalledWith(s.auth, 'http://localhost:9099');
     expect(connectFirestoreEmulator).toHaveBeenCalledWith(s.db, 'localhost', 8080);
-    expect(connectStorageEmulator).toHaveBeenCalledWith(s.storage, 'localhost', 9199);
-    expect(connectFunctionsEmulator).toHaveBeenCalledWith(s.functions, 'localhost', 5001);
+    const storage = await s.loadStorage();
+    const functions = await s.loadFunctions();
+    expect(connectStorageEmulator).toHaveBeenCalledWith(storage, 'localhost', 9199);
+    expect(connectFunctionsEmulator).toHaveBeenCalledWith(functions, 'localhost', 5001);
 
     vi.clearAllMocks();
-    createFirebase({ ...baseEnv, VITE_USE_EMULATORS: 'false' });
+    const off = createFirebase({ ...baseEnv, VITE_USE_EMULATORS: 'false' });
+    await off.loadStorage();
+    await off.loadFunctions();
     expect(connectAuthEmulator).not.toHaveBeenCalled();
     expect(connectFirestoreEmulator).not.toHaveBeenCalled();
     expect(connectStorageEmulator).not.toHaveBeenCalled();
     expect(connectFunctionsEmulator).not.toHaveBeenCalled();
   });
 
-  it('uses southamerica-east1 for functions', () => {
+  it('loads storage and functions lazily', async () => {
     const s = createFirebase(baseEnv);
+    expect(getStorage).not.toHaveBeenCalled();
+    expect(getFunctions).not.toHaveBeenCalled();
+
+    const [a, b] = await Promise.all([s.loadStorage(), s.loadStorage()]);
+    expect(a).toBe(b);
+    expect(getStorage).toHaveBeenCalledTimes(1);
+    expect(connectStorageEmulator).toHaveBeenCalledTimes(1);
+    expect(getFunctions).not.toHaveBeenCalled();
+
+    await s.loadFunctions();
+    await s.loadFunctions();
+    expect(getFunctions).toHaveBeenCalledTimes(1);
     expect(getFunctions).toHaveBeenCalledWith(s.app, 'southamerica-east1');
+  });
+
+  it('creates auth and firestore eagerly', () => {
+    createFirebase(baseEnv);
     expect(getAuth).toHaveBeenCalled();
     expect(initializeFirestore).toHaveBeenCalled();
-    expect(getStorage).toHaveBeenCalled();
   });
 
   it('uses memory cache without IndexedDB and persistent cache with it', () => {

@@ -96,6 +96,7 @@ interface Options {
   /** Use `window.matchMedia` instead of the injected prop. */
   windowMedia?: boolean;
   readLines?: () => Promise<ReturnType<typeof sheetInG>>;
+  loadFont?: ViewerPageProps['loadFont'];
 }
 
 function renderViewer(options: Options = {}) {
@@ -114,7 +115,7 @@ function renderViewer(options: Options = {}) {
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),
   };
-  const { container } = render(
+  const { container, unmount } = render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[options.path ?? '/musicas/s1?tom=G']}>
         <Probe />
@@ -127,7 +128,7 @@ function renderViewer(options: Options = {}) {
                   api={api}
                   openPdf={openPdf as never}
                   readLines={readLines as never}
-                  loadFont={loadFontFromDisk}
+                  loadFont={options.loadFont ?? loadFontFromDisk}
                   writer={writer}
                   writerMode={options.writerMode ?? 'overlay'}
                   matchMedia={options.windowMedia ? undefined : media(options.wide ?? false)}
@@ -139,7 +140,7 @@ function renderViewer(options: Options = {}) {
       </MemoryRouter>
     </AuthContext.Provider>,
   );
-  return { api, writer, readLines, openPdf, container };
+  return { api, writer, readLines, openPdf, container, unmount };
 }
 
 const openPanel = async () => {
@@ -333,9 +334,10 @@ describe('ViewerPage change key', () => {
     fireEvent.click(screen.getByRole('button', { name: 'D' }));
     expect(await screen.findByTestId('layer')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    await waitFor(() => expect(api.getPdfBytes).toHaveBeenLastCalledWith('songs/s1/A-abc.pdf'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' })).toBeEnabled());
     expect(screen.queryByTestId('layer')).not.toBeInTheDocument();
+    // Tom A's document came back from the cache: no second download.
+    expect(api.getPdfBytes).toHaveBeenCalledTimes(2);
   });
 
   it('cancel closes the panel and removes the preview', async () => {
@@ -401,7 +403,7 @@ describe('ViewerPage change key', () => {
     expect(viewer.style.getPropertyValue('--sheet-height')).toBe('');
   });
 
-  it('does not show a destroyed document when the panel is cancelled before the source loads', async () => {
+  it('keeps showing the cached document when the panel is cancelled before the source loads', async () => {
     let release: (bytes: Uint8Array) => void = () => undefined;
     const api = fakeCatalogApi([songG], {
       getPdfBytes: vi.fn((path: string) =>
@@ -410,15 +412,59 @@ describe('ViewerPage change key', () => {
           : Promise.resolve(new Uint8Array([1])),
       ),
     });
-    const { container } = renderViewer({ api, path: '/musicas/s1?tom=A' });
+    const { container, openPdf } = renderViewer({ api, path: '/musicas/s1?tom=A' });
     await waitFor(() => expect(container.querySelector('.pdf-pages')).not.toBeNull());
     fireEvent.click(screen.getByRole('button', { name: 'Mudar tom' }));
     await screen.findByRole('dialog');
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    // Tom A's first document was destroyed when the panel opened: it must not be on screen.
-    expect(container.querySelector('.pdf-pages')).toBeNull();
+    // Tom A's document stayed in the cache (alive), so it is back on screen right away.
+    expect(container.querySelector('.pdf-pages')).not.toBeNull();
+    const docA = (await openPdf.mock.results[0]!.value) as { destroy: ReturnType<typeof vi.fn> };
+    expect(docA.destroy).not.toHaveBeenCalled();
     release(new Uint8Array([2]));
-    await waitFor(() => expect(container.querySelector('.pdf-pages')).not.toBeNull());
+    await waitFor(() => expect(openPdf).toHaveBeenCalledTimes(2));
+  });
+
+  it('reuses cached pdf documents across key switches', async () => {
+    const { api, openPdf, unmount } = renderViewer({ path: '/musicas/s1?tom=G' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom A' }));
+    await waitFor(() => expect(where()).toBe('/musicas/s1?tom=A'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom G' }));
+    await waitFor(() => expect(where()).toBe('/musicas/s1?tom=G'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' })).toBeEnabled());
+    expect(openPdf).toHaveBeenCalledTimes(2);
+    expect(api.getPdfBytes).toHaveBeenCalledTimes(2);
+    const docs = await Promise.all(
+      openPdf.mock.results.map((r) => r.value as Promise<{ destroy: ReturnType<typeof vi.fn> }>),
+    );
+    for (const doc of docs) expect(doc.destroy).not.toHaveBeenCalled();
+    unmount();
+    for (const doc of docs) expect(doc.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries preparation after closing the panel', async () => {
+    const lines = sheetInG();
+    const readLines = vi
+      .fn<() => Promise<ReturnType<typeof sheetInG>>>()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValue(lines);
+    renderViewer({ readLines });
+    fireEvent.click(await screen.findByRole('button', { name: 'Mudar tom' }));
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.map((a) => a.textContent)).toContain('Não foi possível preparar a troca de tom.');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    await openPanel();
+    expect(readLines).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('Não foi possível preparar a troca de tom.')).not.toBeInTheDocument();
+  });
+
+  it('loads only the bold-run and key-indicator fonts', async () => {
+    const loadFont = vi.fn(loadFontFromDisk);
+    renderViewer({ loadFont });
+    await openPanel();
+    expect(loadFont.mock.calls.map(([id]) => id)).toEqual(['mono-bold']);
   });
 
   it('subscribes to the media query once, not on every render', async () => {

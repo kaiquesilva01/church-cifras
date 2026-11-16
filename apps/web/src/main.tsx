@@ -1,27 +1,19 @@
-import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from './App';
-import { createCatalogApi } from './catalog/catalogApi';
-import { createAuthGateway } from './auth/gateway';
-import { readWebEnv } from './lib/env';
-import { createFirebase } from './lib/firebase';
-import { createPeopleApi } from './people/peopleApi';
+import { installPreloadErrorReload } from './lib/preloadError';
 import './ui/styles.css';
 
-const root = createRoot(document.getElementById('root')!);
+installPreloadErrorReload(window, sessionStorage);
 
-try {
-  const env = readWebEnv(import.meta.env as Record<string, string | undefined>);
-  const services = createFirebase(env);
-  const gateway = createAuthGateway(services);
-  const peopleApi = createPeopleApi(services);
-  const catalogApi = createCatalogApi(services);
-  root.render(
-    <StrictMode>
-      <App gateway={gateway} peopleApi={peopleApi} catalogApi={catalogApi} />
-    </StrictMode>,
-  );
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  root.render(<p role="alert">{message}</p>);
-}
+const root = createRoot(document.getElementById('root')!);
+root.render(
+  <p role="status" className="status">
+    Carregando…
+  </p>,
+);
+
+import('./bootstrap')
+  .then(({ renderApp }) => renderApp(root))
+  .catch((error: unknown) => {
+    console.error('Falha ao iniciar o app', error);
+    root.render(<p role="alert">Não foi possível carregar o app. Recarregue a página.</p>);
+  });

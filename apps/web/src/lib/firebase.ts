@@ -7,8 +7,8 @@ import {
   persistentMultipleTabManager,
   type Firestore,
 } from 'firebase/firestore';
-import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
-import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
+import type { Functions } from 'firebase/functions';
+import type { FirebaseStorage } from 'firebase/storage';
 
 export interface WebEnv {
   VITE_FIREBASE_API_KEY: string;
@@ -24,8 +24,9 @@ export interface FirebaseServices {
   app: FirebaseApp;
   auth: Auth;
   db: Firestore;
-  storage: FirebaseStorage;
-  functions: Functions;
+  /** Storage e Functions só são baixados (import dinâmico) no primeiro uso. */
+  loadStorage(): Promise<FirebaseStorage>;
+  loadFunctions(): Promise<Functions>;
 }
 
 export const FUNCTIONS_REGION = 'southamerica-east1';
@@ -46,16 +47,33 @@ export function createFirebase(env: WebEnv): FirebaseServices {
       ? {}
       : { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) },
   );
-  const storage = getStorage(app);
-  const functions = getFunctions(app, FUNCTIONS_REGION);
+  const useEmulators = env.VITE_USE_EMULATORS === 'true';
+  const host = env.VITE_EMULATOR_HOST;
 
-  if (env.VITE_USE_EMULATORS === 'true') {
-    const host = env.VITE_EMULATOR_HOST;
+  if (useEmulators) {
     connectAuthEmulator(auth, `http://${host}:9099`);
     connectFirestoreEmulator(db, host, 8080);
-    connectStorageEmulator(storage, host, 9199);
-    connectFunctionsEmulator(functions, host, 5001);
   }
 
-  return { app, auth, db, storage, functions };
+  let storagePromise: Promise<FirebaseStorage> | undefined;
+  let functionsPromise: Promise<Functions> | undefined;
+
+  const loadStorage = (): Promise<FirebaseStorage> =>
+    (storagePromise ??= import('firebase/storage').then(
+      ({ getStorage, connectStorageEmulator }) => {
+        const storage = getStorage(app);
+        if (useEmulators) connectStorageEmulator(storage, host, 9199);
+        return storage;
+      },
+    ));
+  const loadFunctions = (): Promise<Functions> =>
+    (functionsPromise ??= import('firebase/functions').then(
+      ({ getFunctions, connectFunctionsEmulator }) => {
+        const functions = getFunctions(app, FUNCTIONS_REGION);
+        if (useEmulators) connectFunctionsEmulator(functions, host, 5001);
+        return functions;
+      },
+    ));
+
+  return { app, auth, db, loadStorage, loadFunctions };
 }

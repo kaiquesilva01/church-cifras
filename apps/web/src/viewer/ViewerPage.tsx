@@ -1,15 +1,17 @@
 import { chooseFont, type FontBytesLoader, type FontId } from '@cifras/overlay/ops';
 import type { ChordWriter } from '@cifras/overlay';
 import {
+  findKeyIndicator,
   keyFromSlug,
   keySlug,
   parseKey,
   type KeyName,
   type Measure,
   type TextLine,
+  type TextRun,
 } from '@cifras/chords';
 import type { CSSProperties } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { canEdit, isAdmin } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
@@ -18,6 +20,7 @@ import { deriveArtists } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { KeyChips } from '../search/KeyChips';
 import { pdfFileName } from './fileName';
+import { createDocCache } from './docCache';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EditSongDialog } from './EditSongDialog';
 import { KeyPanel } from './KeyPanel';
@@ -30,6 +33,8 @@ import { useSongArrangements } from './useSongArrangements';
 import { useTranspose } from './useTranspose';
 
 type Loaded = { status: 'ready'; doc: PdfDocument; bytes: Uint8Array } | { status: 'error' };
+
+const CACHED_DOCS = 3;
 
 interface MediaQueryLike {
   matches: boolean;
@@ -95,15 +100,21 @@ function useWide(matchMedia?: ViewerPageProps['matchMedia']): boolean {
   return wide;
 }
 
-// Only the substitute fonts this pdf's text will be measured and drawn with.
+// Only the substitute fonts the transposition draws with: the bold runs (chords) and the key
+// indicator's run. Everything else is measured with the tolerant fallback in `createMeasure`.
 function neededFonts(lines: TextLine[]): FontId[] {
   const ids = new Set<FontId>();
+  const add = (run: TextRun): void => {
+    ids.add(chooseFont(run.fontName, BOLD_FONT.test(run.fontName)));
+    ids.add(chooseFont(run.fontName, run.bold));
+  };
   for (const line of lines) {
     for (const run of line.runs) {
-      ids.add(chooseFont(run.fontName, BOLD_FONT.test(run.fontName)));
-      ids.add(chooseFont(run.fontName, run.bold));
+      if (run.bold || BOLD_FONT.test(run.fontName)) add(run);
     }
   }
+  const indicator = findKeyIndicator(lines);
+  if (indicator) add(indicator.token.run);
   return [...ids];
 }
 
@@ -150,34 +161,51 @@ export function ViewerPage({
 
   const path = displayed?.storagePath ?? null;
   const [previewFailed, setPreviewFailed] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState<{ path: string; result: Loaded } | null>(null);
+  // Open documents by path (LRU of 3): going back to a key already seen is instant.
+  const [docCache] = useState(() => createDocCache(CACHED_DOCS));
+  const alive = useRef(false);
+  const [, refresh] = useReducer((n: number) => n + 1, 0);
+  const [failedPath, setFailedPath] = useState<string | null>(null);
+  // The failure belongs to one path: moving to another one forgets it (a retry starts clean).
+  if (failedPath !== null && failedPath !== path) setFailedPath(null);
   const onPreviewError = useCallback(() => setPreviewFailed(path), [path]);
 
   useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      docCache.clear();
+    };
+  }, [docCache]);
+
+  useEffect(() => {
     if (!path) return;
+    if (docCache.get(path)) return;
     let cancelled = false;
-    let opened: PdfDocument | null = null;
     api
       .getPdfBytes(path)
       // pdf.js transfers the buffer to its worker: keep the original for the download.
       .then(async (bytes) => ({ bytes, doc: await openPdf(bytes.slice()) }))
       .then(({ bytes, doc }) => {
-        if (cancelled) return void doc.destroy?.();
-        opened = doc;
-        setLoaded({ path, result: { status: 'ready', doc, bytes } });
+        // Even when this path is no longer open the document is worth keeping (unless we unmounted).
+        if (!alive.current) return void doc.destroy?.();
+        docCache.set(path, { doc, bytes });
+        refresh();
       })
       .catch(() => {
-        if (!cancelled) setLoaded({ path, result: { status: 'error' } });
+        if (!cancelled) setFailedPath(path);
       });
     return () => {
       cancelled = true;
-      void opened?.destroy?.();
-      // The document is destroyed: coming back to this path must reload, not show it.
-      setLoaded((prev) => (prev?.path === path ? null : prev));
     };
-  }, [api, openPdf, path]);
+  }, [api, openPdf, path, docCache]);
 
-  const current = loaded && loaded.path === path ? loaded.result : null;
+  const cached = path ? docCache.peek(path) : undefined;
+  const current: Loaded | null = cached
+    ? { status: 'ready', doc: cached.doc, bytes: cached.bytes }
+    : path && failedPath === path
+      ? { status: 'error' }
+      : null;
   const readyDoc = current?.status === 'ready' ? current.doc : null;
 
   // Panel open: read the source's chords and load the fonts they need (once per document).
@@ -189,7 +217,7 @@ export function ViewerPage({
       .then(async (lines) => {
         const { createMeasure, loadFonts } = await loadOverlay();
         const fonts = await loadFonts(loadFont, neededFonts(lines));
-        return { lines, measure: createMeasure(fonts) };
+        return { lines, measure: createMeasure(fonts, (message) => console.warn(message)) };
       })
       .then(({ lines, measure }) => {
         if (!cancelled) setPrepared({ doc: readyDoc, status: 'ready', lines, measure });
@@ -241,6 +269,8 @@ export function ViewerPage({
     setPanelOpen(false);
     setTarget(null);
     setGenerateError(null);
+    // A failed preparation must not stick: opening the panel again tries again.
+    setPrepared((prev) => (prev?.status === 'error' ? null : prev));
   };
   const open = (key: string): void => {
     navigate(`/musicas/${songId}?tom=${keySlug(key)}`, { replace: true });

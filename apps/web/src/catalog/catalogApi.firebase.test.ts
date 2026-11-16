@@ -39,11 +39,13 @@ import { getBlob, uploadBytes } from 'firebase/storage';
 import type { FirebaseServices } from '../lib/firebase';
 import { createCatalogApi } from './catalogApi';
 
+const fakeStorage = { name: 'storage' };
+const fakeFunctions = { name: 'functions' };
 const services = {
   auth: { currentUser: { uid: 'u1' } },
   db: {},
-  storage: {},
-  functions: {},
+  loadStorage: () => Promise.resolve(fakeStorage),
+  loadFunctions: () => Promise.resolve(fakeFunctions),
 } as unknown as FirebaseServices;
 
 describe('createCatalogApi payloads', () => {
@@ -138,7 +140,7 @@ describe('createCatalogApi payloads', () => {
 
   it('deleteFile calls the discardUpload callable', async () => {
     await createCatalogApi(services).deleteFile('songs/s1/G-abc.pdf');
-    expect(httpsCallable).toHaveBeenCalledWith(services.functions, 'discardUpload');
+    expect(httpsCallable).toHaveBeenCalledWith(fakeFunctions, 'discardUpload');
     expect(callable).toHaveBeenCalledWith({ storagePath: 'songs/s1/G-abc.pdf' });
   });
 
@@ -252,7 +254,7 @@ describe('createCatalogApi payloads', () => {
 
   it('replaceArrangement calls the callable with the payload', async () => {
     await createCatalogApi(services).replaceArrangement('s1', 'G', 'songs/s1/G-abc.pdf', 9);
-    expect(httpsCallable).toHaveBeenCalledWith(services.functions, 'replaceArrangement');
+    expect(httpsCallable).toHaveBeenCalledWith(fakeFunctions, 'replaceArrangement');
     expect(callable).toHaveBeenCalledWith({
       songId: 's1',
       key: 'G',
@@ -266,7 +268,7 @@ describe('createCatalogApi payloads', () => {
       title: 'Nova',
       artistName: 'Outra Pessoa',
     });
-    expect(httpsCallable).toHaveBeenCalledWith(services.functions, 'updateSongMeta');
+    expect(httpsCallable).toHaveBeenCalledWith(fakeFunctions, 'updateSongMeta');
     expect(callable).toHaveBeenCalledWith({
       songId: 's1',
       title: 'Nova',
@@ -276,13 +278,13 @@ describe('createCatalogApi payloads', () => {
 
   it('deleteArrangement calls the callable with song and key', async () => {
     await createCatalogApi(services).deleteArrangement('s1', 'F#m');
-    expect(httpsCallable).toHaveBeenCalledWith(services.functions, 'deleteArrangement');
+    expect(httpsCallable).toHaveBeenCalledWith(fakeFunctions, 'deleteArrangement');
     expect(callable).toHaveBeenCalledWith({ songId: 's1', key: 'F#m' });
   });
 
   it('deleteSong calls the callable with the song id', async () => {
     await createCatalogApi(services).deleteSong('s1');
-    expect(httpsCallable).toHaveBeenCalledWith(services.functions, 'deleteSong');
+    expect(httpsCallable).toHaveBeenCalledWith(fakeFunctions, 'deleteSong');
     expect(callable).toHaveBeenCalledWith({ songId: 's1' });
   });
 
