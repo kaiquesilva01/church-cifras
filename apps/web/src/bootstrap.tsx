@@ -6,6 +6,7 @@ import { createCatalogApi } from './catalog/catalogApi';
 import { readWebEnv } from './lib/env';
 import { createFirebase } from './lib/firebase';
 import { createPeopleApi } from './people/peopleApi';
+import { createSetlistApi } from './setlists/setlistApi';
 import { UpdatePrompt } from './pwa/UpdatePrompt';
 
 // Everything that needs Firebase lives behind this module, so the first script only carries React
@@ -17,9 +18,15 @@ export function renderApp(root: Root): void {
     const gateway = createAuthGateway(services);
     const peopleApi = createPeopleApi(services);
     const catalogApi = createCatalogApi(services);
+    const setlistApi = createSetlistApi(services);
     root.render(
       <StrictMode>
-        <App gateway={gateway} peopleApi={peopleApi} catalogApi={catalogApi} />
+        <App
+          gateway={gateway}
+          peopleApi={peopleApi}
+          catalogApi={catalogApi}
+          setlistApi={setlistApi}
+        />
         <UpdatePrompt />
       </StrictMode>,
     );
