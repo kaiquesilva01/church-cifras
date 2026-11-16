@@ -52,6 +52,7 @@ export interface ImportRowProps {
   /** A read or import is running: inputs are inert. */
   busy: boolean;
   onEdit: (id: string, patch: Partial<BatchRow>) => void;
+  onRemove: (id: string) => void;
 }
 
 export const ImportRow = memo(function ImportRow({
@@ -60,6 +61,7 @@ export const ImportRow = memo(function ImportRow({
   result,
   busy,
   onEdit,
+  onRemove,
 }: ImportRowProps) {
   const imported = result?.status === 'imported' || result?.status === 'existing';
   const locked = busy || imported;
@@ -129,6 +131,17 @@ export const ImportRow = memo(function ImportRow({
         ) : (
           <span className="muted">Verificando…</span>
         )}
+      </td>
+      <td>
+        <button
+          type="button"
+          className="btn btn-icon"
+          aria-label={`Remover ${row.fileName}`}
+          disabled={busy}
+          onClick={() => onRemove(row.id)}
+        >
+          ✕
+        </button>
       </td>
     </tr>
   );

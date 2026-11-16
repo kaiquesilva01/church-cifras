@@ -155,7 +155,8 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     if (pdfs.length === 0) return;
     busyRef.current = true;
     setCancelled(false);
-    const slots: Array<BatchRow | undefined> = Array.from({ length: pdfs.length });
+    // Rows land as each read finishes; `placed` keeps them in selection order.
+    const placed: boolean[] = Array.from({ length: pdfs.length }, () => false);
     const known = new Set([
       ...artistsRef.current,
       ...rowsRef.current.map((r) => r.artist).filter(Boolean),
@@ -206,12 +207,18 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           };
         }
       }
-      slots[i] = row;
+      // Rows of this batch are the tail of the list and removal is blocked while reading,
+      // so the slot is the end minus the already placed rows that come later in the selection.
+      const later = placed.filter((done, j) => done && j > i).length;
+      placed[i] = true;
+      setRows((prev) => [
+        ...prev.slice(0, prev.length - later),
+        row,
+        ...prev.slice(prev.length - later),
+      ]);
       finished += 1;
       setReading({ done: finished, total: pdfs.length });
     }).then(() => {
-      const added = slots.filter((r): r is BatchRow => r !== undefined);
-      setRows((prev) => [...prev, ...added]);
       setReading(null);
     });
   };
@@ -221,6 +228,25 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
       setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row))),
     [],
   );
+
+  const remove = useCallback((id: string) => {
+    setRows((prev) => prev.filter((row) => row.id !== id));
+    setResults((prev) => {
+      if (!prev?.has(id)) return prev;
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const clearList = () => {
+    if (busyRef.current) return;
+    setRows([]);
+    setResults(undefined);
+    setQueued(new Set());
+    setCancelled(false);
+    setNonPdf(0);
+  };
 
   const startImport = async () => {
     if (abort.current || busyRef.current) return;
@@ -357,6 +383,9 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
                   <th scope="col">Tom</th>
                   <th scope="col">Acordes</th>
                   <th scope="col">Status</th>
+                  <th scope="col">
+                    <span className="sr-only">Remover</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -370,6 +399,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
                       result={results?.get(row.id)}
                       busy={busy}
                       onEdit={edit}
+                      onRemove={remove}
                     />
                   );
                 })}
@@ -394,6 +424,9 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
           )}
 
           <div className="import-actions">
+            <button type="button" className="btn" disabled={busy} onClick={clearList}>
+              Limpar lista
+            </button>
             {importing ? (
               <>
                 <button
