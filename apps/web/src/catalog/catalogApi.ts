@@ -54,6 +54,12 @@ export interface CatalogApi {
     storagePath: string,
     chordCount: number,
   ): Promise<void>;
+  /** Admin: corrige título/cantor (callable `updateSongMeta`); não altera PDFs. */
+  updateSongMeta(songId: string, input: { title: string; artistName: string }): Promise<void>;
+  /** Admin: apaga um tom e o PDF (callable `deleteArrangement`). */
+  deleteArrangement(songId: string, key: KeyName): Promise<void>;
+  /** Admin: apaga a música com todos os tons (callable `deleteSong`). */
+  deleteSong(songId: string): Promise<void>;
   /** Cria um tom gerado (writer overlay); as regras exigem o tom de origem feito à mão. */
   createGeneratedArrangement(songId: string, input: NewGeneratedArrangementInput): Promise<void>;
   getPdfUrl(storagePath: string): Promise<string>;
@@ -111,6 +117,16 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
   >(functions, 'replaceArrangement');
 
   const callDiscard = httpsCallable<{ storagePath: string }, unknown>(functions, 'discardUpload');
+
+  const callUpdateMeta = httpsCallable<
+    { songId: string; title: string; artistName: string },
+    unknown
+  >(functions, 'updateSongMeta');
+  const callDeleteArrangement = httpsCallable<{ songId: string; key: KeyName }, unknown>(
+    functions,
+    'deleteArrangement',
+  );
+  const callDeleteSong = httpsCallable<{ songId: string }, unknown>(functions, 'deleteSong');
 
   const uid = (): string => {
     const id = auth.currentUser?.uid;
@@ -214,6 +230,15 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
     },
     replaceArrangement: async (songId, key, storagePath, chordCount) => {
       await callReplace({ songId, key, storagePath, chordCount });
+    },
+    updateSongMeta: async (songId, { title, artistName }) => {
+      await callUpdateMeta({ songId, title, artistName });
+    },
+    deleteArrangement: async (songId, key) => {
+      await callDeleteArrangement({ songId, key });
+    },
+    deleteSong: async (songId) => {
+      await callDeleteSong({ songId });
     },
     createGeneratedArrangement: async (songId, input) => {
       const batch = writeBatch(db);

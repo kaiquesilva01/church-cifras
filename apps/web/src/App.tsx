@@ -14,6 +14,7 @@ import { HomePage } from './search/HomePage';
 import { AppShell } from './ui/AppShell';
 
 const UploadRoute = lazy(() => import('./upload/UploadRoute'));
+const ImportRoute = lazy(() => import('./import/ImportRoute'));
 const ViewerRoute = lazy(() => import('./viewer/ViewerRoute'));
 
 export interface AppProps {
@@ -83,6 +84,22 @@ function AppRoutes({
           </Route>
           <Route element={<RequireRole roles={['admin']} />}>
             <Route path="/pessoas" element={<PeoplePage api={peopleApi} />} />
+            <Route
+              path="/importar"
+              element={
+                <ErrorBoundary onReload={onReload}>
+                  <Suspense
+                    fallback={
+                      <p role="status" className="status">
+                        Carregando…
+                      </p>
+                    }
+                  >
+                    <ImportRoute api={catalogApi} />
+                  </Suspense>
+                </ErrorBoundary>
+              }
+            />
           </Route>
         </Route>
       </Route>

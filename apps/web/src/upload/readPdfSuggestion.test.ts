@@ -60,4 +60,14 @@ describe('readPdfSuggestion', () => {
     const result = await readPdfSuggestion(pdfFile('x.pdf'), []);
     expect(result.suspects.flat().length).toBeGreaterThan(0);
   });
+
+  it('counts chord lines ignored because of a non chord word', async () => {
+    readTextLines.mockResolvedValue([
+      line([run('G D (repete', 40, 700, true)], 700),
+      line([run('G D', 40, 650, true)], 650),
+    ]);
+    const result = await readPdfSuggestion(pdfFile('x.pdf'), []);
+    expect(result.ignoredChordLines).toBe(1);
+    expect(result.suspects).toEqual([]);
+  });
 });

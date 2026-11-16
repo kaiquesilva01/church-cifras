@@ -155,11 +155,11 @@ async function getDoc(token, path) {
 
 const arrayOf = (field) => (field?.arrayValue?.values ?? []).map((v) => v.stringValue).sort();
 
-async function waitForSong(token, expected, label) {
+async function waitForSong(token, expected, label, id = songId) {
   const deadline = Date.now() + 30_000;
   let last;
   while (Date.now() < deadline) {
-    const fields = await getDoc(token, `songs/${songId}`);
+    const fields = await getDoc(token, `songs/${id}`);
     last = { keys: arrayOf(fields.keys), handmadeKeys: arrayOf(fields.handmadeKeys) };
     if (
       JSON.stringify(last.keys) === JSON.stringify(expected.keys) &&
@@ -315,7 +315,8 @@ async function main() {
   log('discardUpload on referenced file -> FAILED_PRECONDITION');
 
   await generatedKeysScenario(admin, adminSdk, adminUid);
-  await foreignFileScenario(admin, adminSdk, adminUid);
+  const member = await foreignFileScenario(admin, adminSdk, adminUid);
+  await adminCallablesScenario(admin, adminSdk, adminUid, member);
 }
 
 // Tom gerado pelo cliente (viewer de transposição): derivedFromKey precisa ser um
@@ -392,6 +393,187 @@ async function foreignFileScenario(admin, adminSdk, adminUid) {
     fail(`G changed after denied replace: ${JSON.stringify(g)}`);
   }
   log('replaceArrangement with another user file -> PERMISSION_DENIED');
+  return member;
+}
+
+async function docStatus(token, path) {
+  const response = await fetch(`${DOCS}/${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return response.status;
+}
+
+function expectStatus(result, expected, label) {
+  if (result.body?.error?.status !== expected) {
+    fail(`${label}: expected ${expected}, got ${result.status} ${JSON.stringify(result.body)}`);
+  }
+}
+
+function expectOk(result, label) {
+  if (result.status !== 200 || !result.body.result) {
+    fail(`${label}: ${result.status} ${JSON.stringify(result.body)}`);
+  }
+}
+
+async function expectGone(admin, docPath, filePath, label) {
+  const doc = await docStatus(admin, docPath);
+  if (doc !== 404) fail(`${label}: doc ${docPath} expected 404, got ${doc}`);
+  const file = await fileStatus(admin, filePath);
+  if (file !== 404) fail(`${label}: file ${filePath} expected 404, got ${file}`);
+}
+
+// Cria uma música com arranjos [key, source, derivedFromKey]; devolve key -> storagePath.
+async function seedSong(admin, adminSdk, adminUid, id, arrangements) {
+  const paths = {};
+  const handmade = [songWrite(adminUid, id)];
+  const generated = [];
+  for (const [key, source, derivedFrom] of arrangements) {
+    const path = `songs/${id}/${key}-file${runId}.pdf`;
+    const uploaded = await uploadFile(adminSdk, path, adminUid);
+    if (!uploaded.ok) {
+      fail(`seed upload ${id}/${key}: ${uploaded.status} ${uploaded.error?.message}`);
+    }
+    paths[key] = path;
+    const write = arrangementWrite(adminUid, key, key, path, source, derivedFrom, id);
+    (source === 'handmade' ? handmade : generated).push(write);
+  }
+  // As regras exigem que o handmade de origem já exista: gerados vão num commit à parte.
+  for (const writes of [handmade, generated]) {
+    const response = await commit(admin, writes);
+    if (!response.ok) fail(`seed commit ${id}: ${response.status} ${await response.text()}`);
+  }
+  return paths;
+}
+
+// Callables de admin: edição de metadados, remoção de arranjos e de músicas.
+async function adminCallablesScenario(admin, adminSdk, adminUid, member) {
+  step = 'seed songs for admin callables';
+  const songA = `${songId}a`;
+  const songB = `${songId}b`;
+  const a = await seedSong(admin, adminSdk, adminUid, songA, [
+    ['C', 'handmade', null],
+    ['D', 'generated', 'C'],
+    ['E', 'generated', 'C'],
+  ]);
+  const b = await seedSong(admin, adminSdk, adminUid, songB, [
+    ['C', 'handmade', null],
+    ['D', 'generated', 'C'],
+  ]);
+  await waitForSong(admin, { keys: ['C', 'D', 'E'], handmadeKeys: ['C'] }, 'seed A', songA);
+  await waitForSong(admin, { keys: ['C', 'D'], handmadeKeys: ['C'] }, 'seed B', songB);
+
+  step = 'member calling admin callables is PERMISSION_DENIED';
+  expectStatus(
+    await callFunction('updateSongMeta', member, {
+      songId: songA,
+      title: 'Hack',
+      artistName: 'Hack',
+    }),
+    'PERMISSION_DENIED',
+    'member updateSongMeta',
+  );
+  expectStatus(
+    await callFunction('deleteArrangement', member, { songId: songA, key: 'D' }),
+    'PERMISSION_DENIED',
+    'member deleteArrangement',
+  );
+  expectStatus(
+    await callFunction('deleteSong', member, { songId: songA }),
+    'PERMISSION_DENIED',
+    'member deleteSong',
+  );
+  const untouched = await getDoc(admin, `songs/${songA}`);
+  if (untouched.title.stringValue !== `Smoke ${songA}`) fail('song A changed after denied calls');
+  if ((await fileStatus(admin, a.D)) !== 200) fail('file D removed by a denied call');
+  log('member updateSongMeta/deleteArrangement/deleteSong -> PERMISSION_DENIED');
+
+  step = 'updateSongMeta renames a song';
+  let result = await callFunction('updateSongMeta', admin, {
+    songId: songA,
+    title: `Renomeada ${runId}`,
+    artistName: 'Outro Cantor',
+  });
+  expectOk(result, 'updateSongMeta');
+  const renamed = await getDoc(admin, `songs/${songA}`);
+  if (
+    renamed.title.stringValue !== `Renomeada ${runId}` ||
+    renamed.titleNormalized.stringValue !== `renomeada ${runId}` ||
+    renamed.artistName.stringValue !== 'Outro Cantor' ||
+    renamed.artistId.stringValue !== 'outro-cantor'
+  ) {
+    fail(`song A after rename: ${JSON.stringify(renamed)}`);
+  }
+  log('updateSongMeta: title/artist/titleNormalized/artistId updated');
+
+  step = 'updateSongMeta to another song identity is ALREADY_EXISTS';
+  result = await callFunction('updateSongMeta', admin, {
+    songId: songA,
+    title: `Smoke ${songB}`,
+    artistName: 'Smoke Artist',
+  });
+  expectStatus(result, 'ALREADY_EXISTS', 'updateSongMeta duplicate');
+  const afterDup = await getDoc(admin, `songs/${songA}`);
+  if (afterDup.titleNormalized.stringValue !== `renomeada ${runId}`) {
+    fail(`song A changed after ALREADY_EXISTS: ${JSON.stringify(afterDup)}`);
+  }
+  log('updateSongMeta duplicate identity -> ALREADY_EXISTS');
+
+  step = 'deleteArrangement removes a generated key';
+  result = await callFunction('deleteArrangement', admin, { songId: songA, key: 'D' });
+  expectOk(result, 'deleteArrangement D');
+  await expectGone(admin, `songs/${songA}/arrangements/D`, a.D, 'delete generated D');
+  await waitForSong(admin, { keys: ['C', 'E'], handmadeKeys: ['C'] }, 'after delete D', songA);
+  log('deleteArrangement generated D: doc and file gone, song.keys updated');
+
+  step = 'deleteArrangement of the last handmade with a generated left is FAILED_PRECONDITION';
+  result = await callFunction('deleteArrangement', admin, { songId: songA, key: 'C' });
+  expectStatus(result, 'FAILED_PRECONDITION', 'deleteArrangement last handmade');
+  if ((await docStatus(admin, `songs/${songA}/arrangements/C`)) !== 200) fail('C doc vanished');
+  if ((await fileStatus(admin, a.C)) !== 200) fail('C file vanished');
+  log('deleteArrangement last handmade with generated -> FAILED_PRECONDITION');
+
+  step = 'deleteArrangement of the last handmade works once no generated is left';
+  result = await callFunction('deleteArrangement', admin, { songId: songA, key: 'E' });
+  expectOk(result, 'deleteArrangement E');
+  result = await callFunction('deleteArrangement', admin, { songId: songA, key: 'C' });
+  expectOk(result, 'deleteArrangement C');
+  await expectGone(admin, `songs/${songA}/arrangements/C`, a.C, 'delete last handmade C');
+  await expectGone(admin, `songs/${songA}/arrangements/E`, a.E, 'delete generated E');
+  await waitForSong(admin, { keys: [], handmadeKeys: [] }, 'after delete all', songA);
+  log('deleteArrangement last handmade without generated -> ok');
+
+  step = 'deleteSong removes the song, its arrangements and files';
+  result = await callFunction('deleteSong', admin, { songId: songB });
+  expectOk(result, 'deleteSong');
+  if ((await docStatus(admin, `songs/${songB}`)) !== 404) fail('song B doc still exists');
+  await expectGone(admin, `songs/${songB}/arrangements/C`, b.C, 'deleteSong C');
+  await expectGone(admin, `songs/${songB}/arrangements/D`, b.D, 'deleteSong D');
+  log('deleteSong: song doc, arrangement docs and files gone');
+
+  step = 'deleting a handmade source while another handmade remains';
+  const songC = `${songId}c`;
+  const c = await seedSong(admin, adminSdk, adminUid, songC, [
+    ['C', 'handmade', null],
+    ['G', 'handmade', null],
+    ['D', 'generated', 'C'],
+  ]);
+  await waitForSong(admin, { keys: ['C', 'D', 'G'], handmadeKeys: ['C', 'G'] }, 'seed C', songC);
+  result = await callFunction('deleteArrangement', admin, { songId: songC, key: 'C' });
+  expectOk(result, 'deleteArrangement handmade C with G left');
+  await expectGone(admin, `songs/${songC}/arrangements/C`, c.C, 'delete handmade C');
+  await waitForSong(admin, { keys: ['D', 'G'], handmadeKeys: ['G'] }, 'after delete C', songC);
+  log('deleteArrangement handmade C while G remains -> ok, keys [D,G], handmadeKeys [G]');
+
+  step = 'generated E derived from the remaining handmade G';
+  const ePath = `songs/${songC}/E-file${runId}.pdf`;
+  let response = await uploadFile(adminSdk, ePath, adminUid);
+  if (!response.ok) fail(`upload E: ${response.status} ${response.error?.message}`);
+  response = await commit(admin, [
+    arrangementWrite(adminUid, 'E', 'E', ePath, 'generated', 'G', songC),
+  ]);
+  if (!response.ok) fail(`commit E from G: ${response.status} ${await response.text()}`);
+  await waitForSong(admin, { keys: ['D', 'E', 'G'], handmadeKeys: ['G'] }, 'generated E', songC);
+  log('generated E from handmade G after deleting C -> OK');
 }
 
 try {

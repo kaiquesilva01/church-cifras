@@ -8,6 +8,12 @@ import { onCall } from 'firebase-functions/v2/https';
 import { requireRole } from './auth/requireRole';
 import { buildHealth } from './health';
 import { parseAdminEmails, ROLES } from './roles';
+import {
+  deleteArrangement as deleteArrangementLogic,
+  deleteSong as deleteSongLogic,
+  updateSongMeta as updateSongMetaLogic,
+  type AdminDeps,
+} from './songs/adminSongs';
 import { discardUpload as discardUploadLogic, type DiscardDeps } from './songs/discardUpload';
 import {
   replaceArrangement as replaceArrangementLogic,
@@ -116,6 +122,82 @@ export const discardUpload = onCall({ region: REGION }, async (request) => {
   await requireRole(deps, uid, ['member', 'admin']);
   const data = (request.data ?? {}) as Record<string, unknown>;
   return discardUploadLogic(discardDeps, { uid: uid as string, storagePath: data.storagePath });
+});
+
+const adminDeps: AdminDeps = {
+  getSong: async (id) => {
+    const data = (await getFirestore().doc(`songs/${id}`).get()).data();
+    return data
+      ? { title: String(data.title ?? ''), artistName: String(data.artistName ?? '') }
+      : null;
+  },
+  listArrangements: async (songId) =>
+    (await getFirestore().collection(`songs/${songId}/arrangements`).get()).docs.map((d) => ({
+      slug: d.id,
+      key: String(d.data().key ?? ''),
+      source: String(d.data().source ?? ''),
+      storagePath: String(d.data().storagePath ?? ''),
+    })),
+  deleteArrangementDoc: async (songId, slug) => {
+    await getFirestore().doc(`songs/${songId}/arrangements/${slug}`).delete();
+  },
+  deleteArrangementGuarded: (songId, decide) => {
+    const db = getFirestore();
+    return db.runTransaction(async (tx) => {
+      const snap = await tx.get(db.collection(`songs/${songId}/arrangements`));
+      const target = decide(
+        snap.docs.map((d) => ({
+          slug: d.id,
+          key: String(d.data().key ?? ''),
+          source: String(d.data().source ?? ''),
+          storagePath: String(d.data().storagePath ?? ''),
+        })),
+      );
+      tx.delete(db.doc(`songs/${songId}/arrangements/${target.slug}`));
+      return target;
+    });
+  },
+  deleteSongDoc: async (songId) => {
+    await getFirestore().doc(`songs/${songId}`).delete();
+  },
+  deleteFile: async (path) => {
+    await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
+  },
+  findSongsByIdentity: async (titleNormalized, artistId) => {
+    const snap = await getFirestore()
+      .collection('songs')
+      .where('titleNormalized', '==', titleNormalized)
+      .where('artistId', '==', artistId)
+      .limit(2)
+      .get();
+    return snap.docs.map((d) => d.id);
+  },
+  updateSong: async (songId, data) => {
+    await getFirestore().doc(`songs/${songId}`).update(data);
+  },
+  now: () => new Date(),
+};
+
+export const updateSongMeta = onCall({ region: REGION }, async (request) => {
+  await requireRole(deps, request.auth?.uid, ['admin']);
+  const data = (request.data ?? {}) as Record<string, unknown>;
+  return updateSongMetaLogic(adminDeps, {
+    songId: data.songId,
+    title: data.title,
+    artistName: data.artistName,
+  });
+});
+
+export const deleteArrangement = onCall({ region: REGION }, async (request) => {
+  await requireRole(deps, request.auth?.uid, ['admin']);
+  const data = (request.data ?? {}) as Record<string, unknown>;
+  return deleteArrangementLogic(adminDeps, { songId: data.songId, key: data.key });
+});
+
+export const deleteSong = onCall({ region: REGION }, async (request) => {
+  await requireRole(deps, request.auth?.uid, ['admin']);
+  const data = (request.data ?? {}) as Record<string, unknown>;
+  return deleteSongLogic(adminDeps, { songId: data.songId });
 });
 
 export const setUserRole = onCall({ region: REGION }, async (request) => {

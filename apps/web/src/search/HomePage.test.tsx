@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
@@ -9,7 +9,14 @@ import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { testUser } from '../test/fakeGateway';
 import { HomePage } from './HomePage';
 
-function renderHome(options: { role?: Role; path?: string; songs?: SongSummary[] } = {}) {
+function StateProbe() {
+  const { state } = useLocation();
+  return <output data-testid="state">{JSON.stringify(state)}</output>;
+}
+
+function renderHome(
+  options: { role?: Role; path?: string; songs?: SongSummary[]; state?: unknown } = {},
+) {
   const auth: AuthState = {
     status: 'signed-in',
     user: testUser,
@@ -19,9 +26,16 @@ function renderHome(options: { role?: Role; path?: string; songs?: SongSummary[]
   };
   return render(
     <AuthContext.Provider value={auth}>
-      <MemoryRouter initialEntries={[options.path ?? '/']}>
+      <MemoryRouter
+        initialEntries={[
+          options.state === undefined
+            ? (options.path ?? '/')
+            : { pathname: options.path ?? '/', state: options.state },
+        ]}
+      >
         <SongsProvider api={fakeCatalogApi(options.songs)}>
           <HomePage />
+          <StateProbe />
         </SongsProvider>
       </MemoryRouter>
     </AuthContext.Provider>,
@@ -29,6 +43,22 @@ function renderHome(options: { role?: Role; path?: string; songs?: SongSummary[]
 }
 
 describe('HomePage', () => {
+  it('shows the notice passed by navigation state once', async () => {
+    renderHome({ state: { notice: 'Música apagada.' } });
+    expect(screen.getByText('Música apagada.').closest('[role="status"]')).not.toBeNull();
+  });
+
+  it('clears the navigation state after showing the notice', async () => {
+    renderHome({ state: { notice: 'Música apagada.' } });
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
+    expect(screen.getByText('Música apagada.')).toBeInTheDocument();
+  });
+
+  it('shows no notice without navigation state', () => {
+    renderHome();
+    expect(screen.queryByText('Música apagada.')).not.toBeInTheDocument();
+  });
+
   it('lists songs with key chips linking to the key', () => {
     renderHome();
     const row = screen.getByText('Sonda-me').closest('a')!;
@@ -117,6 +147,7 @@ describe('HomePage', () => {
         <MemoryRouter>
           <SongsProvider api={api}>
             <HomePage />
+            <StateProbe />
           </SongsProvider>
         </MemoryRouter>
       </AuthContext.Provider>,

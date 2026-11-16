@@ -12,6 +12,7 @@ import '../lib/pdfWorker';
 export interface PdfSuggestion {
   chordCount: number;
   suspects: string[][];
+  ignoredChordLines: number;
   suggestion: MetadataSuggestion;
 }
 
@@ -40,6 +41,7 @@ export async function readPdfSuggestion(
   return {
     chordCount: chords.length,
     suspects: plan.suspectSegments.map((segment) => segment.unknown),
+    ignoredChordLines: plan.ignoredChordLines,
     suggestion,
   };
 }

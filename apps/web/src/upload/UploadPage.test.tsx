@@ -9,6 +9,7 @@ import { UploadPage, type ReadPdf } from './UploadPage';
 const baseResult = {
   chordCount: 12,
   suspects: [] as string[][],
+  ignoredChordLines: 0,
   suggestion: {
     title: 'Sonda-me',
     artist: 'Aline Barros',

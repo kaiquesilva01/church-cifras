@@ -40,6 +40,8 @@ export interface TransposePlan {
   chordCount: number;
   collisions: number;
   suspectSegments: SuspectSegment[];
+  // Bold segments with chords that were not classified as chord lines nor reported as suspects.
+  ignoredChordLines: number;
 }
 
 // A bold segment with chords plus 1-2 unparseable tokens: probably a chord we could not read.
@@ -51,10 +53,16 @@ export interface SuspectSegment {
 }
 
 const MAX_SUSPECT_UNKNOWN = 2;
+// Segments with this many non-chord words or more are titles/lyrics in bold, not ignored chords.
+const MIN_TITLE_WORDS = 3;
 // An unknown token only counts if it looks like a mistyped chord: a chord letter (optionally
 // with an accidental) not followed by two more letters, or followed by a quality word.
 // All-caps words (DE, DO, EM, ADORAÇÃO) are title text, never a chord attempt.
 const ALL_CAPS_WORD = /^[A-G][A-ZÀ-Ý]+$/;
+// An all-caps word beside a chord-like letter (`MEU PRAZER E`) marks a bold title.
+// An opening bracket marks an annotation (`(repete`, `(BIS)`) beside chords, never a title.
+const ANNOTATION = /^[([]/;
+const ALL_CAPS_TITLE_WORD = /^[A-ZÀ-Ý]{2,}$/;
 const CHORD_ATTEMPT = /^[[(]?[A-G](?:[#b]?(?![a-z]{2}|[A-Z]{2})|[#b]?(?:maj|min|dim|aug|sus|add))/;
 
 function collisionLimit(input: {
@@ -87,6 +95,7 @@ export function buildTransposePlan(input: {
   const chords: Replacement[] = [];
   const suspectSegments: SuspectSegment[] = [];
   let chordCount = 0;
+  let ignoredChordLines = 0;
 
   for (const segment of scanSegments(lines, indicator, measure)) {
     const attempts = segment.unknown.filter((t) => CHORD_ATTEMPT.test(t) && !ALL_CAPS_WORD.test(t));
@@ -101,6 +110,14 @@ export function buildTransposePlan(input: {
         unknown: attempts,
         chords: segment.chords.length,
       });
+    } else if (
+      segment.chords.length > 0 &&
+      !segment.isChordLine &&
+      (segment.unknown.some((t) => ANNOTATION.test(t)) ||
+        (segment.unknown.length < MIN_TITLE_WORDS &&
+          !segment.unknown.some((t) => ALL_CAPS_TITLE_WORD.test(t))))
+    ) {
+      ignoredChordLines++;
     }
   }
 
@@ -183,5 +200,6 @@ export function buildTransposePlan(input: {
     chordCount,
     collisions: chords.filter((c) => c.collides).length,
     suspectSegments,
+    ignoredChordLines,
   };
 }

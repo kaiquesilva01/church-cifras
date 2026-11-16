@@ -1,17 +1,28 @@
 import { chooseFont, type FontBytesLoader, type FontId } from '@cifras/overlay/ops';
 import type { ChordWriter } from '@cifras/overlay';
-import { keyFromSlug, keySlug, parseKey, type Measure, type TextLine } from '@cifras/chords';
+import {
+  keyFromSlug,
+  keySlug,
+  parseKey,
+  type KeyName,
+  type Measure,
+  type TextLine,
+} from '@cifras/chords';
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { canEdit } from '../auth/roles';
+import { canEdit, isAdmin } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import type { CatalogApi } from '../catalog/catalogApi';
+import { deriveArtists } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { KeyChips } from '../search/KeyChips';
 import { pdfFileName } from './fileName';
+import { ConfirmDialog } from './ConfirmDialog';
+import { EditSongDialog } from './EditSongDialog';
 import { KeyPanel } from './KeyPanel';
 import { loadFontBytes } from './loadFonts';
+import { ManageMenu, type ManageAction } from './ManageMenu';
 import { PdfPages, type PdfDocument } from './PdfPages';
 import { saveGenerated } from './saveGenerated';
 import { pickTransposeSource } from './transposeSource';
@@ -45,6 +56,17 @@ export interface ViewerPageProps {
 const NO_OVERLAYS: never[] = [];
 const WIDE_QUERY = '(min-width: 900px)';
 const BOLD_FONT = /bold|black|heavy/i;
+
+interface ManageState {
+  action: ManageAction;
+  /** Key captured when the delete-key dialog opened; it does not follow the URL. */
+  key: KeyName | null;
+  busy: boolean;
+  error: string | null;
+}
+
+const errorCode = (error: unknown): string =>
+  String((error as { code?: unknown } | null)?.code ?? '').replace(/^functions\//, '');
 
 const defaultMode = (): 'overlay' | 'rewrite' =>
   import.meta.env.VITE_CHORD_WRITER === 'rewrite' ? 'rewrite' : 'overlay';
@@ -104,6 +126,7 @@ export function ViewerPage({
   const { role, user } = useAuth();
   const navigate = useNavigate();
   const song = songs.find((s) => s.id === songId);
+  const artistNames = useMemo(() => deriveArtists(songs).map((a) => a.name), [songs]);
   const { status: arrStatus, arrangements } = useSongArrangements(api, song ? song.id : null);
   const wide = useWide(matchMedia);
 
@@ -191,6 +214,14 @@ export function ViewerPage({
   const [busy, setBusy] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ key: string } | null>(null);
+  const [manage, setManage] = useState<ManageState | null>(null);
+  const [metaSaved, setMetaSaved] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  // The key being deleted vanished (removed elsewhere): nothing left to confirm.
+  const targetKey = manage?.action === 'delete-key' && !manage.busy ? manage.key : null;
+  if (targetKey && arrStatus === 'ready' && !arrangements.some((a) => a.key === targetKey)) {
+    setManage(null);
+  }
   const chordWriter = useMemo<ChordWriter>(
     () =>
       writer ?? {
@@ -279,6 +310,82 @@ export function ViewerPage({
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
 
+  const admin = isAdmin(role);
+  // The Mudar tom panel and the manage menu/dialogs are never open together.
+  const managing = menuOpen || manage !== null;
+  const closeManage = (): void => setManage(null);
+  const startManage = (action: ManageAction): void => {
+    setMetaSaved(false);
+    setManage({
+      action,
+      key: action === 'delete-key' ? (selected?.key ?? null) : null,
+      busy: false,
+      error: null,
+    });
+  };
+  const fail = (action: ManageAction, error: unknown, fallback: string): void =>
+    setManage((prev) => ({
+      action,
+      key: prev?.key ?? null,
+      busy: false,
+      error:
+        errorCode(error) === 'failed-precondition' && error instanceof Error
+          ? error.message
+          : fallback,
+    }));
+
+  const saveMeta = async (value: { title: string; artistName: string }): Promise<void> => {
+    if (value.title === song.title && value.artistName === song.artistName) {
+      setManage(null);
+      return;
+    }
+    setManage({ action: 'edit', key: null, busy: true, error: null });
+    try {
+      await api.updateSongMeta(songId, value);
+      setManage(null);
+      setMetaSaved(true);
+    } catch (error) {
+      setManage({
+        action: 'edit',
+        key: null,
+        busy: false,
+        error:
+          errorCode(error) === 'already-exists'
+            ? 'Já existe uma música com esse nome e cantor.'
+            : 'Não foi possível salvar. Tente de novo.',
+      });
+    }
+  };
+
+  const deleteKey = async (): Promise<void> => {
+    const removed = manage?.key;
+    if (manage?.action !== 'delete-key' || !removed) return;
+    setManage({ action: 'delete-key', key: removed, busy: true, error: null });
+    const leave = (): void => {
+      const next = arrangements.find((a) => a.key !== removed);
+      setManage(null);
+      navigate(next ? `/musicas/${songId}?tom=${keySlug(next.key)}` : '/', { replace: true });
+    };
+    try {
+      await api.deleteArrangement(songId, removed);
+      leave();
+    } catch (error) {
+      // Already gone (another admin got there first): same outcome as success.
+      if (errorCode(error) === 'not-found') leave();
+      else fail('delete-key', error, 'Não foi possível apagar o tom. Tente de novo.');
+    }
+  };
+
+  const deleteWholeSong = async (): Promise<void> => {
+    setManage({ action: 'delete-song', key: null, busy: true, error: null });
+    try {
+      await api.deleteSong(songId);
+      navigate('/', { state: { notice: 'Música apagada.' } });
+    } catch (error) {
+      fail('delete-song', error, 'Não foi possível apagar a música. Tente de novo.');
+    }
+  };
+
   const canChange = canEdit(role);
   const prepareFailed =
     current?.status === 'error' || (prepared?.doc === readyDoc && prepared?.status === 'error');
@@ -302,6 +409,15 @@ export function ViewerPage({
             {song.title}
           </Link>
           <p className="muted">{song.artistName}</p>
+          {admin && (
+            <ManageMenu
+              keyName={selected?.key ?? null}
+              open={menuOpen}
+              onOpenChange={setMenuOpen}
+              disabled={panelOpen}
+              onSelect={startManage}
+            />
+          )}
           <KeyChips
             songId={song.id}
             title={song.title}
@@ -310,6 +426,11 @@ export function ViewerPage({
             replace
           />
         </header>
+        {metaSaved && (
+          <p role="status" className="notice">
+            Dados atualizados.
+          </p>
+        )}
         {notice && notice.key === keyFromSlug(tomSlug ?? '') && (
           <p role="status" className="notice">
             Esse tom já tinha sido salvo. Abrimos o existente.
@@ -352,9 +473,10 @@ export function ViewerPage({
             <button
               type="button"
               className="btn btn-primary"
-              disabled={!source}
+              disabled={!source || managing}
               aria-describedby={!source ? 'no-source' : undefined}
               onClick={() => {
+                if (managing) return;
                 setNotice(null);
                 setPanelOpen(true);
               }}
@@ -369,6 +491,42 @@ export function ViewerPage({
           )}
         </div>
       </div>
+      {manage?.action === 'edit' && (
+        <EditSongDialog
+          title={song.title}
+          artistName={song.artistName}
+          busy={manage.busy}
+          error={manage.error}
+          artists={artistNames}
+          onSave={(value) => void saveMeta(value)}
+          onCancel={closeManage}
+        />
+      )}
+      {manage?.action === 'delete-key' && manage.key && (
+        <ConfirmDialog
+          title={`Apagar tom ${manage.key}`}
+          confirmLabel="Apagar tom"
+          busy={manage.busy}
+          error={manage.error}
+          onConfirm={() => void deleteKey()}
+          onCancel={closeManage}
+        >
+          {`Apagar o tom ${manage.key} de “${song.title}”? O PDF será removido.`}
+        </ConfirmDialog>
+      )}
+      {manage?.action === 'delete-song' && (
+        <ConfirmDialog
+          title="Apagar música"
+          confirmLabel="Apagar música"
+          requireText={song.title}
+          busy={manage.busy}
+          error={manage.error}
+          onConfirm={() => void deleteWholeSong()}
+          onCancel={closeManage}
+        >
+          {`Isto apaga “${song.title}” e todos os tons, com os PDFs. Não dá para desfazer.`}
+        </ConfirmDialog>
+      )}
       {panelOpen && source && (
         <KeyPanel
           sourceKey={source.key}
