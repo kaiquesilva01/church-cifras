@@ -48,7 +48,7 @@ Todo acesso exige login com conta Google; não há link público [decidido].
 - Modo offline completo (internet da igreja é estável [decidido]); apenas cache de app/arquivos.
 - OCR/PDF escaneado, PDFs fora do padrão, upload de DOCX.
 - Comentários, playback de áudio.
-- ~~Setlists/repertório de culto~~ — **entregue na Fase 8**; ver [Repertórios](2026-11-16-repertorios-design.md).
+- ~~Setlists/repertório de culto~~ — **reaberto na Fase 8**; ver [Repertórios](2026-11-16-repertorios-design.md).
 
 **Anti-objetivos (falha mesmo que "funcione")**
 - Alterar qualquer coisa além dos acordes e do tom no título (layout, letra, espaçamento).
@@ -282,6 +282,8 @@ Ao final, relatório baixável (CSV) dos que não entraram. Upload em fila com c
 - **Nova cifra:** seleção do PDF, campos pré-preenchidos (com selo "lido do PDF"), sugestão de cantores existentes,
   miniatura, aviso de música/tom já existente, "Salvar cifra".
 - **Pessoas** (admin). **Importar em lote** (admin, computador).
+- **Repertórios (Fase 8):** aba na tela inicial, cartão "Próximo culto", tela do repertório e barra Anterior/Próxima no
+  visualizador — ver [2026-11-16-repertorios-design.md](2026-11-16-repertorios-design.md) §6.6 e §6.7.
 - Mockups da conversa salvos em `.superpowers/brainstorm/` (fora do Git).
 - Visual: cor de destaque neutra (roxo) até o ministério enviar logo/cores [proposta].
 

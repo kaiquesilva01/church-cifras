@@ -1,7 +1,7 @@
 # Repertórios (setlists) — Documento de Design
 
 - **Data:** 2026-11-16
-- **Status:** rascunho para aprovação
+- **Status:** aprovado pelo dono do produto em 2026-11-16
 - **Fase:** 8 (acrescenta-se à §11 do [design principal](2026-11-13-church-cifras-design.md))
 - **Autor da ideia:** responsável pelo ministério de louvor (dono do produto)
 
@@ -130,11 +130,16 @@ setlists/{setlistId}                 // id aleatório do Firestore
 - Política TTL do Firestore sobre `setlists.expiresAt`, declarada em `firestore.indexes.json` (`fieldOverrides` com `ttl: true`)
   e publicada pelo deploy de índices que já existe (§9 do design principal). Quem constrói confirma que o CLI instalado
   aceita essa chave; se não aceitar, configura via `gcloud` e documenta no `AGENTS.md`.
+- **Cuidado com o índice:** a consulta da lista (`expiresAt > agora`) precisa do índice de campo único em `expiresAt`.
+  O override de TTL deve **manter** esse índice ascendente (não declarar `indexes: []`, que o desliga). O emulador não
+  exige índices, então esse erro só apareceria em produção; o plano inclui conferir isso no deploy.
 - A exclusão do TTL pode atrasar um dia ou mais, e o emulador não a executa. Por isso **o cliente também esconde**
   repertórios com `expiresAt` no passado: o que o usuário vê não depende do TTL ter rodado [decisão nossa].
 - Data nova não pode ser anterior a 29 dias atrás (a UI barra: "já expiraria") [decisão nossa].
 
 ### 6.3 Security Rules
+
+Esboço; as condições exatas ficam para o plano.
 
 ```
 match /setlists/{setlistId} {
@@ -152,8 +157,14 @@ match /setlists/{setlistId} {
 - **Limite conhecido:** as rules não iteram sobre `items`, então não validam o formato de cada item nem se `songId`
   existe. Como só membro/admin escreve, o risco é aceito [decidido, §5.4]. O cliente valida e tolera itens inválidos
   (renderiza "Música removida" e ignora tom inválido).
+- O padrão de `date` aceita datas impossíveis (`2026-13-45`); o cliente valida a data real.
+- `expiresAt`: as rules **podem** conferir o cálculo a partir de `date` (UTC−3 fixo, sem horário de verão desde 2019),
+  protegendo o anti-objetivo "sumir antes do fim do dia" contra erro do cliente. O plano decide; se não for adotado,
+  fica como risco aceito (hoje as rules só exigem que seja um timestamp).
 - Testes com `@firebase/rules-unit-testing` (`npm run test:rules`): matriz visitante/membro/admin/anônimo em
-  leitura, criação, atualização e exclusão; rejeição de `items` com mais de 40; de `label` vazio; de `date` malformada.
+  leitura, criação, atualização e exclusão; rejeição de `items` com mais de 40; de `label` vazio; de `date` malformada;
+  de chaves extras ou ausentes; de `createdBy`/`createdAt` alterados no update; de `updatedBy` de outro uid; de
+  `expiresAt` que não é timestamp; aceitação de lista vazia (repertório recém-criado).
 
 ### 6.4 Edição e concorrência
 
@@ -180,6 +191,10 @@ match /setlists/{setlistId} {
   "Atualizar" faz `shown := latest` **na própria tela**, sem recarregar o app, sem perder o lugar nem a cifra aberta.
   Se o conteúdo voltar a ser igual (alguém desfez a mudança), o banner some sozinho.
 - Sem aceitar, a tela permanece como está, inclusive depois de novas mudanças; o banner continua até aceitar.
+- **Cache persistente:** o app usa `persistentLocalCache`, então o primeiro snapshot pode vir do cache, até 30 dias
+  defasado. `shown` acompanha `latest` **até o primeiro snapshot com `metadata.fromCache === false`**; só a partir daí
+  mudanças geram banner. Assim o músico não abre o repertório já com um aviso falso. Coberto nos testes (§6.9)
+  [decisão nossa].
 - Repertório apagado/expirado enquanto aberto: a tela mantém `shown` e o banner diz que foi removido, com link para a
   lista [decisão nossa].
 - O estado `latest`/`shown` vive **acima** da lista e do visualizador (mesma assinatura), para que o músico que pula de
@@ -202,11 +217,12 @@ Próximo culto
 ┌─────────────────────────────────────┐
 │ Domingo · 22/11        5 louvores  ›│
 └─────────────────────────────────────┘
- Músicas | Cantores | Repertórios   [＋ Novo]
+ Músicas | Cantores | Repertórios
 ```
 
-**Aba Repertórios.** "Próximos" (data crescente) e "Recentes" (data decrescente, só não expirados). Sem busca [decisão nossa].
-"＋ Novo repertório" só para membro/admin, como o "＋ Nova cifra".
+**Aba Repertórios.** "Próximos" (data crescente) e "Recentes" (data decrescente, só não expirados). Nessa aba o campo
+de busca da tela inicial **não aparece** [decisão nossa]. "＋ Novo repertório" só para membro/admin, como botão flutuante,
+igual ao "＋ Nova cifra" (que continua nas outras abas).
 
 **Criar/editar repertório** (diálogo): data (padrão: o próximo dia que seja quinta ou domingo, hoje incluído) e rótulo
 (padrão: nome do dia da semana, editável) [proposta]. **Duplicar** (no menu do repertório) abre o mesmo diálogo com os
@@ -228,9 +244,9 @@ itens copiados (ids novos) e data/rótulo para o novo culto.
   escolha entre os tons salvos da música; tocar no **título** abre a cifra (§6.7).
 - Visitante vê só título e tom, sem controles.
 - **＋ Adicionar** abre uma folha de busca (mesma busca em memória de `filterSongs`); tocar numa música a acrescenta **ao
-  fim** no seu **tom feito à mão** (o primeiro, em ordem de tons) e a folha continua aberta para acrescentar mais.
+  fim** no seu **tom feito à mão** (o primeiro, em ordem de tons; se não houver, o primeiro tom salvo, como o visualizador já faz) e a folha continua aberta para acrescentar mais.
   Músicas sem PDF aparecem desabilitadas; músicas já no repertório ganham o selo "já está" [decisão nossa].
-- Item cuja música foi apagada aparece como "Música removida" com `✕`, e é pulado na navegação [decisão nossa].
+- Item cuja música foi apagada aparece como "Música removida" com `✕`, e é pulado na navegação. O contador "2 de 5" considera só os itens que abrem uma cifra [decisão nossa].
 - Se o tom do item deixou de existir (admin apagou o tom), o item mostra o tom riscado e a cifra abre no padrão da
   música com um aviso, nunca em silêncio (anti-objetivo).
 
@@ -254,6 +270,10 @@ itens copiados (ids novos) e data/rótulo para o novo culto.
   item acima.
 - A fonte de verdade do tom exibido é o `?tom=` da URL (como hoje); o repertório define o `?tom=` inicial ao abrir e ao
   navegar Anterior/Próxima, e quando "Atualizar" muda o tom do item aberto.
+- **Pontos do `ViewerPage` que hoje descartam parâmetros** e precisam preservar `repertorio`/`item`: o `open()` que
+  navega para `?tom=` (troca de tom), o `leave()` de apagar tom, e os links do `KeyChips`. Além disso, o "‹" do cabeçalho
+  hoje leva sempre a `/`; em contexto de repertório ele leva ao repertório (o botão voltar do aparelho já cai lá, por
+  causa do `replace`).
 - O pré-carregamento do PDF da próxima cifra (para a troca ser rápida) é desejável, desde que não pese na abertura da atual
   (anti-objetivo de desempenho); fica a cargo de quem constrói medir.
 - "Mudar tom" no visualizador continua independente do repertório: gerar um tom novo não altera o tom do item
@@ -271,7 +291,7 @@ itens copiados (ids novos) e data/rótulo para o novo culto.
   escolha de "Próximo culto"; padrão de data/rótulo; filtro de expirados.
 - **Componentes:** lista com e sem permissão, banner (aparece, atualizar, sumir ao ficar igual), item com música removida,
   tom inexistente, barra anterior/próxima (extremos, item fora do repertório, troca de tom pelo músico mantém a barra),
-  "Atualizar" que muda o tom do item aberto, diálogos.
+  "Atualizar" que muda o tom do item aberto, primeiro snapshot vindo do cache (sem banner), diálogos.
 - **Rules:** §6.3.
 - **E2E (Playwright, contra emuladores):** dois contextos de navegador; o líder reordena e o outro vê o banner, ignora,
   e depois aceita; fluxo montar → abrir → próxima → anterior.
@@ -282,7 +302,9 @@ itens copiados (ids novos) e data/rótulo para o novo culto.
 - Versão e integração do `@dnd-kit` (sensores de toque/teclado, anúncios de acessibilidade).
 - Visual fino das telas, tokens e estados, em conjunto com o agente `designer`.
 - Textos exatos, ordem dos itens do menu, comportamento do teclado nos diálogos.
-- Como compartilhar `latest`/`shown` acima das telas (contexto, hook), respeitada a restrição da §6.5.
+- Como compartilhar `latest`/`shown` acima das telas (contexto, hook), respeitada a restrição da §6.5. `/repertorios/:id`
+  e `/musicas/:songId` são rotas irmãs sob o `AppShell`, então o estado precisa de um provider no nível do layout
+  (junto do `SongsProvider`), chaveado pelo repertório ativo; por isso o `App.tsx` também muda.
 - Estratégia de pré-carregamento da cifra seguinte e como medi-la.
 - Cálculo do fuso (America/Sao_Paulo) sem dependência pesada.
 - Detalhes de otimização na UI durante a transação.
@@ -298,7 +320,8 @@ Um plano (Fase 8), em PRs pequenos para `develop`; ordem sugerida, ajustável pe
 
 ## 9. Edições no design principal (ao aprovar)
 
-- §3 Não-objetivos: remover "Setlists/repertório de culto".
+- §3 Não-objetivos: marcar "Setlists/repertório de culto" como reaberto na Fase 8 (riscado, com link).
+- §6.10 Telas: acrescentar nota apontando para a §6.6 deste documento.
 - §6.5 Modelo de dados: apontar para este documento (coleção `setlists`).
 - §6.8 Security Rules: apontar para o §6.3 deste documento.
 - §11 Ordem de entrega: acrescentar "8. Repertórios (setlists)".
