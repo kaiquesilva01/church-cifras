@@ -43,7 +43,7 @@ export function syncReducer(state: SyncState, event: SyncEvent): SyncState {
       }
       const synced = state.synced || !fromCache;
       // `shown` acompanha `latest` até o primeiro snapshot do servidor (inclusive ele).
-      const follow = !state.synced;
+      const follow = !state.synced || state.shown === null;
       return {
         phase: 'ready',
         latest: setlist,

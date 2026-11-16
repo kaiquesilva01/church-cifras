@@ -117,7 +117,7 @@ export function createSetlistApi({ auth, db }: FirebaseServices): SetlistApi {
         updatedAt: serverTimestamp(),
       });
     },
-    applyOp: (id, op) => {
+    applyOp: async (id, op) => {
       const by = uid();
       const ref = doc(db, 'setlists', id);
       return runTransaction(db, async (tx) => {

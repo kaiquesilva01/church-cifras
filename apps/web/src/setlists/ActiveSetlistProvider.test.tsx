@@ -1,5 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
-import { useEffect } from 'react';
+import { StrictMode, useEffect } from 'react';
 import { MemoryRouter, Link } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
@@ -104,6 +104,59 @@ describe('ActiveSetlistProvider', () => {
     mount(api, '/repertorios/r1');
     act(() => screen.getByText('other').click());
     expect(text()).toBe('r2|ready|B|false|false');
+  });
+
+  describe('invalid ids', () => {
+    it.each([
+      ['/musicas/s1?repertorio=a%2Fb', 'a/b'],
+      ['/repertorios/..', '..'],
+      [`/repertorios/${'x'.repeat(101)}`, 'x'.repeat(101)],
+    ])('%s never subscribes and is not-found', (path, id) => {
+      const api = fakeSetlistApi();
+      const spy = vi.spyOn(api, 'subscribeSetlist');
+      mount(api, path);
+      expect(spy).not.toHaveBeenCalled();
+      expect(text()).toBe(`${id}|not-found|-|false|false`);
+    });
+
+    it('a throwing subscribeSetlist yields error instead of crashing', () => {
+      const api = fakeSetlistApi([], {
+        subscribeSetlist: () => {
+          throw new Error('invalid document path');
+        },
+      });
+      mount(api, '/repertorios/r1');
+      expect(text()).toBe('r1|error|-|false|false');
+    });
+  });
+
+  describe('StrictMode', () => {
+    it('keeps balanced subscriptions and no false banner', () => {
+      let subs = 0;
+      let emit: (s: Setlist | null, fromCache: boolean) => void = () => {};
+      const api = fakeSetlistApi([], {
+        subscribeSetlist: (_id, cb) => {
+          subs++;
+          cb({ setlist: makeSetlist({ id: 'r1', label: 'Old' }), fromCache: true });
+          emit = (setlist, fromCache) => cb({ setlist, fromCache });
+          return () => {
+            subs--;
+          };
+        },
+      });
+      render(
+        <StrictMode>
+          <MemoryRouter initialEntries={['/repertorios/r1']}>
+            <ActiveSetlistProvider api={api}>
+              <Probe />
+            </ActiveSetlistProvider>
+          </MemoryRouter>
+        </StrictMode>,
+      );
+      expect(subs).toBe(1);
+      act(() => emit(makeSetlist({ id: 'r1', label: 'Server' }), false));
+      expect(text()).toBe('r1|ready|Server|false|false');
+    });
   });
 
   describe('sync', () => {
@@ -227,6 +280,42 @@ describe('ActiveSetlistProvider', () => {
       });
       expect(r).toBe('gone');
       expect(current?.shown?.items.map((i) => i.id)).toEqual(['a']);
+    });
+
+    it('a late result of an old id does not touch the new id state', async () => {
+      type Res = { setlist: Setlist; changed: boolean };
+      const r1 = makeSetlist({ id: 'r1', label: 'A', items: [item('a')] });
+      const r2 = makeSetlist({ id: 'r2', label: 'B', items: [item('z')] });
+      const calls: Record<string, { resolve: (v: Res) => void; reject: (e: unknown) => void }> = {};
+      const api = fakeSetlistApi([r1, r2], {
+        applyOp: vi.fn(
+          (id: string) =>
+            new Promise<Res>((resolve, reject) => {
+              calls[id] = { resolve, reject };
+            }),
+        ),
+      });
+      mount(api, '/repertorios/r1');
+      let p1: Promise<string> = Promise.resolve('');
+      act(() => {
+        p1 = current!.edit({ type: 'add', item: item('b') });
+      });
+      act(() => screen.getByText('other').click());
+      let p2: Promise<string> = Promise.resolve('');
+      act(() => {
+        p2 = current!.edit({ type: 'add', item: item('y') });
+      });
+      expect(current?.shown?.items.map((i) => i.id)).toEqual(['z', 'y']);
+      await act(async () => {
+        calls['r1']!.resolve({ setlist: { ...r1, items: [item('a'), item('b')] }, changed: true });
+        await p1;
+      });
+      expect(current?.shown?.items.map((i) => i.id)).toEqual(['z', 'y']);
+      await act(async () => {
+        calls['r2']!.reject(new Error('net'));
+        await p2;
+      });
+      expect(current?.shown?.items.map((i) => i.id)).toEqual(['z']);
     });
 
     describe('overlapping edits', () => {

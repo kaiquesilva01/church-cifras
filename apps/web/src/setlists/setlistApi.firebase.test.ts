@@ -210,6 +210,15 @@ describe('createSetlistApi', () => {
     });
   });
 
+  it('applyOp rejects (does not throw) when unauthenticated', async () => {
+    const anon = createSetlistApi({ auth: { currentUser: null }, db: {} } as never);
+    let promise: Promise<unknown> | undefined;
+    expect(() => {
+      promise = anon.applyOp('l1', { type: 'remove', itemId: 'a' });
+    }).not.toThrow();
+    await expect(promise).rejects.toThrow();
+  });
+
   it('applyOp throws SetlistGoneError when the doc is missing', async () => {
     txGet.mockResolvedValueOnce({ exists: () => false });
     await expect(api().applyOp('l1', { type: 'remove', itemId: 'a' })).rejects.toBeInstanceOf(

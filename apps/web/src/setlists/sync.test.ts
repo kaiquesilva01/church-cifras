@@ -31,6 +31,13 @@ describe('syncReducer', () => {
     expect(s.synced).toBe(false);
   });
 
+  it('a snapshot after not-found shows it without a false banner', () => {
+    const nf = syncReducer(initialSync, server(null));
+    const s = syncReducer(nf, server(sl('Novo')));
+    expect(s.shown?.label).toBe('Novo');
+    expect(hasChanges(s)).toBe(false);
+  });
+
   it('server null with no shown is not-found', () => {
     const s = syncReducer(initialSync, server(null));
     expect(s.phase).toBe('not-found');

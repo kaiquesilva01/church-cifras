@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
 import { useMatch, useSearchParams } from 'react-router';
 import { applySetlistOp, SetlistFullError } from './ops';
 import { SetlistGoneError, type SetlistApi } from './setlistApi';
@@ -14,21 +6,32 @@ import { hasChanges, initialSync, isRemoved, syncReducer, type SyncEvent } from 
 import type { Setlist, SetlistOp } from './types';
 import { ActiveSetlistContext, type ActiveSetlist } from './useActiveSetlist';
 
+/** Mesmo padrão de `validId` nas Security Rules. */
+const VALID_ID = /^[A-Za-z0-9_-]{1,100}$/;
+
 type EditResult = Awaited<ReturnType<ActiveSetlist['edit']>>;
 
 interface Store {
   id: string | null;
   sync: typeof initialSync;
+  failed: boolean;
 }
 
 type StoreEvent =
-  { type: 'reset'; id: string | null } | { type: 'event'; id: string; event: SyncEvent };
+  | { type: 'fail'; id: string }
+  | { type: 'reset'; id: string | null }
+  | { type: 'event'; id: string; event: SyncEvent };
 
 /** Eventos de um repertório antigo (assinatura ou edição tardia) são ignorados. */
 function storeReducer(store: Store, action: StoreEvent): Store {
-  if (action.type === 'reset') return { id: action.id, sync: initialSync };
+  if (action.type === 'reset') return { id: action.id, sync: initialSync, failed: false };
   if (action.id !== store.id) return store;
-  return { ...store, sync: syncReducer(store.sync, action.event) };
+  if (action.type === 'fail') return { ...store, failed: true };
+  return {
+    ...store,
+    failed: action.event.type === 'snapshot' ? false : store.failed,
+    sync: syncReducer(store.sync, action.event),
+  };
 }
 
 /**
@@ -41,8 +44,7 @@ export function ActiveSetlistProvider({ api, children }: { api: SetlistApi; chil
   const [params] = useSearchParams();
   const id = match?.params.id ?? params.get('repertorio');
 
-  const [store, dispatchStore] = useReducer(storeReducer, { id, sync: initialSync });
-  const [failed, setFailed] = useState<string | null>(null);
+  const [store, dispatchStore] = useReducer(storeReducer, { id, sync: initialSync, failed: false });
   if (store.id !== id) dispatchStore({ type: 'reset', id });
   const state = store.id === id ? store.sync : initialSync;
   const stateRef = useRef(state);
@@ -50,17 +52,23 @@ export function ActiveSetlistProvider({ api, children }: { api: SetlistApi; chil
     stateRef.current = state;
   });
 
+  const validId = id !== null && VALID_ID.test(id);
+
   useEffect(() => {
-    if (!id) return;
-    return api.subscribeSetlist(
-      id,
-      (snap) => {
-        setFailed(null);
-        dispatchStore({ type: 'event', id, event: { type: 'snapshot', snap } });
-      },
-      () => setFailed(id),
-    );
-  }, [api, id]);
+    if (!id || !validId) return;
+    try {
+      return api.subscribeSetlist(
+        id,
+        (snap) => {
+          dispatchStore({ type: 'event', id, event: { type: 'snapshot', snap } });
+        },
+        () => dispatchStore({ type: 'fail', id }),
+      );
+    } catch {
+      // A API pode lançar de forma síncrona (caminho de documento inválido).
+      dispatchStore({ type: 'fail', id });
+    }
+  }, [api, id, validId]);
 
   const accept = useCallback(() => {
     if (id) dispatchStore({ type: 'event', id, event: { type: 'accept' } });
@@ -69,7 +77,9 @@ export function ActiveSetlistProvider({ api, children }: { api: SetlistApi; chil
   // Edições em voo: `shown` = base (sem as pendentes) + operações pendentes, na ordem.
   const baseRef = useRef<Setlist | null>(null);
   const pendingRef = useRef<SetlistOp[]>([]);
+  const activeIdRef = useRef(id);
   useEffect(() => {
+    activeIdRef.current = id;
     pendingRef.current = [];
     baseRef.current = null;
   }, [id]);
@@ -109,6 +119,7 @@ export function ActiveSetlistProvider({ api, children }: { api: SetlistApi; chil
       };
       try {
         const result = await api.applyOp(id, op);
+        if (activeIdRef.current !== id) return result.changed ? 'ok' : 'noop';
         settle();
         baseRef.current = result.setlist;
         send({ type: 'adopt', setlist: result.setlist });
@@ -116,6 +127,10 @@ export function ActiveSetlistProvider({ api, children }: { api: SetlistApi; chil
         if (rest) send({ type: 'optimistic', setlist: rest });
         return result.changed ? 'ok' : 'noop';
       } catch (error) {
+        if (activeIdRef.current !== id) {
+          if (error instanceof SetlistGoneError) return 'gone';
+          return error instanceof SetlistFullError ? 'full' : 'error';
+        }
         settle();
         const restored = rebuild();
         if (restored) send({ type: 'optimistic', setlist: restored });
@@ -126,8 +141,11 @@ export function ActiveSetlistProvider({ api, children }: { api: SetlistApi; chil
     [api, id],
   );
 
-  const status: ActiveSetlist['status'] =
-    state.phase === 'loading' && failed === id ? 'error' : state.phase;
+  const status: ActiveSetlist['status'] = !validId
+    ? 'not-found'
+    : state.phase === 'loading' && store.id === id && store.failed
+      ? 'error'
+      : state.phase;
 
   const value = useMemo<ActiveSetlist | null>(
     () =>
