@@ -1,6 +1,13 @@
 import { chooseFont, type FontBytesLoader, type FontId } from '@cifras/overlay/ops';
 import type { ChordWriter } from '@cifras/overlay';
-import { keyFromSlug, keySlug, parseKey, type Measure, type TextLine } from '@cifras/chords';
+import {
+  keyFromSlug,
+  keySlug,
+  parseKey,
+  type KeyName,
+  type Measure,
+  type TextLine,
+} from '@cifras/chords';
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -51,6 +58,8 @@ const BOLD_FONT = /bold|black|heavy/i;
 
 interface ManageState {
   action: ManageAction;
+  /** Key captured when the delete-key dialog opened; it does not follow the URL. */
+  key: KeyName | null;
   busy: boolean;
   error: string | null;
 }
@@ -206,6 +215,13 @@ export function ViewerPage({
   const [manage, setManage] = useState<ManageState | null>(null);
   const [metaSaved, setMetaSaved] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The key being deleted vanished (removed elsewhere): nothing left to confirm.
+  const targetKey = manage?.action === 'delete-key' && !manage.busy ? manage.key : null;
+  useEffect(() => {
+    if (targetKey && arrStatus === 'ready' && !arrangements.some((a) => a.key === targetKey)) {
+      setManage(null);
+    }
+  }, [targetKey, arrStatus, arrangements]);
   const chordWriter = useMemo<ChordWriter>(
     () =>
       writer ?? {
@@ -300,24 +316,30 @@ export function ViewerPage({
   const closeManage = (): void => setManage(null);
   const startManage = (action: ManageAction): void => {
     setMetaSaved(false);
-    setManage({ action, busy: false, error: null });
-  };
-  const fail = (action: ManageAction, error: unknown, fallback: string): void =>
     setManage({
       action,
+      key: action === 'delete-key' ? (selected?.key ?? null) : null,
+      busy: false,
+      error: null,
+    });
+  };
+  const fail = (action: ManageAction, error: unknown, fallback: string): void =>
+    setManage((prev) => ({
+      action,
+      key: prev?.key ?? null,
       busy: false,
       error:
         errorCode(error) === 'failed-precondition' && error instanceof Error
           ? error.message
           : fallback,
-    });
+    }));
 
   const saveMeta = async (value: { title: string; artistName: string }): Promise<void> => {
     if (value.title === song.title && value.artistName === song.artistName) {
       setManage(null);
       return;
     }
-    setManage({ action: 'edit', busy: true, error: null });
+    setManage({ action: 'edit', key: null, busy: true, error: null });
     try {
       await api.updateSongMeta(songId, value);
       setManage(null);
@@ -325,6 +347,7 @@ export function ViewerPage({
     } catch (error) {
       setManage({
         action: 'edit',
+        key: null,
         busy: false,
         error:
           errorCode(error) === 'already-exists'
@@ -335,21 +358,26 @@ export function ViewerPage({
   };
 
   const deleteKey = async (): Promise<void> => {
-    if (!selected) return;
-    const removed = selected.key;
-    setManage({ action: 'delete-key', busy: true, error: null });
-    try {
-      await api.deleteArrangement(songId, removed);
+    const removed = manage?.key;
+    if (manage?.action !== 'delete-key' || !removed) return;
+    setManage({ action: 'delete-key', key: removed, busy: true, error: null });
+    const leave = (): void => {
       const next = arrangements.find((a) => a.key !== removed);
       setManage(null);
       navigate(next ? `/musicas/${songId}?tom=${keySlug(next.key)}` : '/', { replace: true });
+    };
+    try {
+      await api.deleteArrangement(songId, removed);
+      leave();
     } catch (error) {
-      fail('delete-key', error, 'Não foi possível apagar o tom. Tente de novo.');
+      // Already gone (another admin got there first): same outcome as success.
+      if (errorCode(error) === 'not-found') leave();
+      else fail('delete-key', error, 'Não foi possível apagar o tom. Tente de novo.');
     }
   };
 
   const deleteWholeSong = async (): Promise<void> => {
-    setManage({ action: 'delete-song', busy: true, error: null });
+    setManage({ action: 'delete-song', key: null, busy: true, error: null });
     try {
       await api.deleteSong(songId);
       navigate('/', { state: { notice: 'Música apagada.' } });
@@ -473,16 +501,16 @@ export function ViewerPage({
           onCancel={closeManage}
         />
       )}
-      {manage?.action === 'delete-key' && selected && (
+      {manage?.action === 'delete-key' && manage.key && (
         <ConfirmDialog
-          title={`Apagar tom ${selected.key}`}
+          title={`Apagar tom ${manage.key}`}
           confirmLabel="Apagar tom"
           busy={manage.busy}
           error={manage.error}
           onConfirm={() => void deleteKey()}
           onCancel={closeManage}
         >
-          {`Apagar o tom ${selected.key} de “${song.title}”? O PDF será removido.`}
+          {`Apagar o tom ${manage.key} de “${song.title}”? O PDF será removido.`}
         </ConfirmDialog>
       )}
       {manage?.action === 'delete-song' && (

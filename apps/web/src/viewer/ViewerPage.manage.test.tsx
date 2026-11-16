@@ -1,9 +1,18 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
+import type { ArrangementSummary } from '../catalog/types';
 import { fakeCatalogApi, makeSong } from '../test/fakeCatalogApi';
 import { testUser } from '../test/fakeGateway';
 import { ViewerPage } from './ViewerPage';
@@ -28,12 +37,18 @@ afterEach(() => {
 
 function Probe() {
   const where = useLocation();
+  const navigate = useNavigate();
   const state = where.state as { notice?: string } | null;
   return (
-    <output
-      data-testid="location"
-      data-notice={state?.notice ?? ''}
-    >{`${where.pathname}${where.search}`}</output>
+    <>
+      <output
+        data-testid="location"
+        data-notice={state?.notice ?? ''}
+      >{`${where.pathname}${where.search}`}</output>
+      <button type="button" onClick={() => navigate('/musicas/s1?tom=A')}>
+        ir para A
+      </button>
+    </>
   );
 }
 
@@ -207,6 +222,47 @@ describe('ViewerPage manage', () => {
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Apagar tom' }),
     );
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/));
+  });
+
+  it('keeps the delete-key target frozen when the selected key changes', async () => {
+    const api = setup();
+    const dialog = await openMenu('Apagar tom G');
+    fireEvent.click(screen.getByRole('button', { name: 'ir para A' }));
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('?tom=A'));
+    expect(dialog).toHaveTextContent('Apagar o tom G de “Sonda-me”?');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Apagar tom' }));
+    await waitFor(() => expect(api.deleteArrangement).toHaveBeenCalledWith('s1', 'G'));
+  });
+
+  it('closes the delete-key dialog when that key disappears', async () => {
+    let emit: (list: ArrangementSummary[]) => void = () => undefined;
+    const arr = (key: 'G' | 'A', source: 'handmade' | 'generated'): ArrangementSummary => ({
+      key,
+      source,
+      storagePath: `p/${key}`,
+      derivedFromKey: null,
+      collisions: 0,
+    });
+    const api = setup('admin', {
+      subscribeArrangements: (_id, cb) => {
+        emit = cb;
+        cb([arr('G', 'handmade'), arr('A', 'handmade')]);
+        return () => undefined;
+      },
+    });
+    await openMenu('Apagar tom G');
+    await act(async () => emit([arr('A', 'handmade')]));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(api.deleteArrangement).not.toHaveBeenCalled();
+  });
+
+  it('treats not-found on delete-key as success', async () => {
+    setup('admin', {
+      deleteArrangement: vi.fn(() => Promise.reject(codeError('functions/not-found', 'sumiu'))),
+    });
+    const dialog = await openMenu('Apagar tom G');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Apagar tom' }));
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('?tom=A'));
   });
 
   it('shows last handmade error', async () => {
