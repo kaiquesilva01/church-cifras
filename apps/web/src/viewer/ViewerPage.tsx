@@ -217,11 +217,9 @@ export function ViewerPage({
   const [menuOpen, setMenuOpen] = useState(false);
   // The key being deleted vanished (removed elsewhere): nothing left to confirm.
   const targetKey = manage?.action === 'delete-key' && !manage.busy ? manage.key : null;
-  useEffect(() => {
-    if (targetKey && arrStatus === 'ready' && !arrangements.some((a) => a.key === targetKey)) {
-      setManage(null);
-    }
-  }, [targetKey, arrStatus, arrangements]);
+  if (targetKey && arrStatus === 'ready' && !arrangements.some((a) => a.key === targetKey)) {
+    setManage(null);
+  }
   const chordWriter = useMemo<ChordWriter>(
     () =>
       writer ?? {
