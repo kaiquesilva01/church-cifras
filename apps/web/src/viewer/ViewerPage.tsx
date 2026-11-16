@@ -299,6 +299,18 @@ export function ViewerPage({
     // A failed preparation must not stick: opening the panel again tries again.
     setPrepared((prev) => (prev?.status === 'error' ? null : prev));
   };
+  // Next/previous in a setlist keeps this component mounted (its doc cache feeds the preload), so
+  // the per-song UI state is dropped here when the song changes.
+  const [stateSongId, setStateSongId] = useState(songId);
+  if (stateSongId !== songId) {
+    setStateSongId(songId);
+    closePanel();
+    setPreviewFailed(null);
+    setNotice(null);
+    setManage(null);
+    setMetaSaved(false);
+    setMenuOpen(false);
+  }
   const open = (key: string): void => {
     navigate(viewerUrl(songId, key, setlist.extraQuery), { replace: true });
   };
@@ -454,7 +466,7 @@ export function ViewerPage({
 
   return (
     <section
-      className={`viewer${panelOpen && wide ? ' has-side' : ''}${sheetHeight !== null ? ' has-sheet' : ''}`}
+      className={`viewer${panelOpen && wide ? ' has-side' : ''}${sheetHeight !== null ? ' has-sheet' : ''}${setlist.nav ? ' has-setlist' : ''}`}
       style={
         sheetHeight !== null
           ? ({ '--sheet-height': `${sheetHeight}px` } as CSSProperties)

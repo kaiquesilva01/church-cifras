@@ -690,6 +690,11 @@ button.fab {
   border-left: 1px solid var(--color-border);
 }
 
+/* The setlist bar adds a row to the fixed bottom bar: clear both rows. Before .has-sheet, which wins. */
+.viewer.has-setlist {
+  padding-bottom: 136px;
+}
+
 .viewer.has-sheet {
   padding-bottom: calc(var(--sheet-height) + 16px);
 }

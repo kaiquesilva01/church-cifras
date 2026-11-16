@@ -1,5 +1,22 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router';
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigationType,
+  useParams,
+  useSearchParams,
+} from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
@@ -9,7 +26,16 @@ import { testUser } from '../test/fakeGateway';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import { ActiveSetlistProvider } from '../setlists/ActiveSetlistProvider';
 import type { SetlistItem } from '../setlists/types';
+import { loadFontFromDisk, sheetInG } from './transposeFixtures';
 import { ViewerPage } from './ViewerPage';
+
+configure({ asyncUtilTimeout: 8000 });
+
+const media = (matches: boolean) => () => ({
+  matches,
+  addEventListener: () => undefined,
+  removeEventListener: () => undefined,
+});
 
 vi.mock('./PdfPages', () => ({
   PdfPages: () => <div data-testid="pdf-pages" />,
@@ -36,7 +62,10 @@ const ic: SetlistItem = { id: 'c', songId: 's3', key: 'D' };
 
 function Probe() {
   const where = useLocation();
-  return <output data-testid="location">{`${where.pathname}${where.search}`}</output>;
+  const type = useNavigationType();
+  return (
+    <output data-testid="location" data-nav={type}>{`${where.pathname}${where.search}`}</output>
+  );
 }
 
 function Page({ api }: { api: ReturnType<typeof fakeCatalogApi> }) {
@@ -50,7 +79,9 @@ function Page({ api }: { api: ReturnType<typeof fakeCatalogApi> }) {
       setlistId={params.get('repertorio')}
       itemId={params.get('item')}
       openPdf={vi.fn(() => Promise.resolve({ numPages: 1, destroy: vi.fn() })) as never}
-      readLines={() => Promise.resolve([])}
+      readLines={() => Promise.resolve(sheetInG())}
+      loadFont={loadFontFromDisk}
+      matchMedia={media(true)}
     />
   );
 }
@@ -78,7 +109,7 @@ function setup(
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),
   };
-  render(
+  const { container } = render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[path]}>
         <Probe />
@@ -99,10 +130,16 @@ function setup(
       </MemoryRouter>
     </AuthContext.Provider>,
   );
-  return { api, setlistApi };
+  return { api, setlistApi, container };
 }
 
 const where = () => screen.getByTestId('location').textContent;
+const navType = () => screen.getByTestId('location').getAttribute('data-nav');
+const openPanel = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Mudar tom' }));
+  await screen.findByText('Mudar tom · original', { exact: false });
+  await waitFor(() => expect(screen.queryByText('Preparando…')).not.toBeInTheDocument());
+};
 const setlistOf = (items: SetlistItem[]) => makeSetlist({ id: 'r1', items });
 
 describe('ViewerPage in a setlist', () => {
@@ -124,8 +161,10 @@ describe('ViewerPage in a setlist', () => {
     setup('/musicas/s1?tom=G&repertorio=r1&item=a');
     await screen.findByTestId('pdf-pages');
     expect(screen.getByRole('button', { name: /Anterior/ })).toBeDisabled();
+    expect(navType()).toBe('POP');
     fireEvent.click(screen.getByRole('button', { name: /Próxima/ }));
     expect(where()).toBe('/musicas/s2?tom=Fsm&repertorio=r1&item=b');
+    expect(navType()).toBe('REPLACE');
     await screen.findByText('2 de 3');
     fireEvent.click(screen.getByRole('button', { name: /Próxima/ }));
     expect(where()).toBe('/musicas/s3?tom=D&repertorio=r1&item=c');
@@ -188,6 +227,7 @@ describe('ViewerPage in a setlist', () => {
       expect(vi.mocked(api.getPdfBytes).mock.calls.length).toBe(calls);
       fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }));
       expect(where()).toBe('/musicas/s1?tom=A&repertorio=r1&item=a');
+      expect(navType()).toBe('REPLACE');
       expect(screen.queryByRole('button', { name: 'Atualizar' })).toBeNull();
     });
 
@@ -227,6 +267,66 @@ describe('ViewerPage in a setlist', () => {
       );
       expect(screen.getByTestId('pdf-pages')).toBeInTheDocument();
       expect(screen.getByText('1 de 2')).toBeInTheDocument();
+    });
+  });
+
+  it('marks the layout only in a setlist, so the taller bar clears the cifra', async () => {
+    const inList = setup('/musicas/s1?tom=G&repertorio=r1&item=a');
+    await screen.findByTestId('pdf-pages');
+    expect(inList.container.querySelector('.viewer')).toHaveClass('has-setlist');
+    cleanup();
+    const plain = setup('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    expect(plain.container.querySelector('.viewer')).not.toHaveClass('has-setlist');
+  });
+
+  describe('Mudar tom', () => {
+    it('opening a saved tom keeps repertorio and item', async () => {
+      setup('/musicas/s1?tom=G&repertorio=r1&item=a');
+      await openPanel();
+      fireEvent.click(screen.getByRole('button', { name: 'A, salvo' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Abrir A' }));
+      expect(where()).toBe('/musicas/s1?tom=A&repertorio=r1&item=a');
+      expect(navType()).toBe('REPLACE');
+      expect(screen.getByText(/Tom do repertório: G/)).toBeInTheDocument();
+    });
+
+    it('moving to another song closes the panel', async () => {
+      setup('/musicas/s1?tom=G&repertorio=r1&item=a');
+      await openPanel();
+      fireEvent.click(screen.getByRole('button', { name: /Próxima/ }));
+      await screen.findByText('2 de 3');
+      expect(screen.queryByText('Mudar tom · original', { exact: false })).toBeNull();
+    });
+  });
+
+  describe('per-song UI state', () => {
+    const saveMeta = async () => {
+      fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Editar nome e cantor' }));
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.change(within(dialog).getByLabelText('Cantor'), { target: { value: 'Outra' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+      await screen.findByText('Dados atualizados.');
+    };
+
+    it('the saved-data notice survives a tom switch but not another song', async () => {
+      setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, { role: 'admin' });
+      await saveMeta();
+      fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom A' }));
+      expect(screen.getByText('Dados atualizados.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Próxima/ }));
+      await screen.findByText('2 de 3');
+      expect(screen.queryByText('Dados atualizados.')).toBeNull();
+    });
+
+    it('an open manage menu does not follow to the next song', async () => {
+      setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, { role: 'admin' });
+      fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar' }));
+      expect(screen.getByRole('group', { name: 'Gerenciar música' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Próxima/ }));
+      await screen.findByText('2 de 3');
+      expect(screen.queryByRole('group', { name: 'Gerenciar música' })).toBeNull();
     });
   });
 
