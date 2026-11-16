@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Role } from './roles';
 import { AuthContext, type AuthState } from './useAuth';
 
@@ -14,6 +14,7 @@ export interface AuthGateway {
   getClaimRole(): Promise<Role | undefined>;
   onUserDoc(uid: string, cb: (role: Role | undefined) => void): () => void;
   refreshToken(): Promise<void>;
+  prepareSignIn(): Promise<void>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
 }
@@ -58,6 +59,9 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     };
   }, [gateway, uid]);
 
+  // Stable across session changes so the sign-in screen warms the popup once, not per update.
+  const prepareSignIn = useCallback(() => gateway.prepareSignIn(), [gateway]);
+
   const value = useMemo<AuthState>(() => {
     const user = session.resolved ? session.user : null;
     return {
@@ -65,10 +69,11 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
         !session.resolved || (user && !doc.loaded) ? 'loading' : user ? 'signed-in' : 'signed-out',
       user,
       role: doc.role ?? 'viewer',
+      prepareSignIn,
       signIn: () => gateway.signIn(),
       signOut: () => gateway.signOut(),
     };
-  }, [session, doc, gateway]);
+  }, [session, doc, gateway, prepareSignIn]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -38,6 +38,7 @@ export function createFakeGateway(): FakeGateway {
       gateway.claimRole = currentRole;
       return Promise.resolve();
     }),
+    prepareSignIn: vi.fn(() => Promise.resolve()),
     signIn: vi.fn(() => Promise.resolve()),
     signOut: vi.fn(() => Promise.resolve()),
     emitUser: (u) => userCb?.(u),

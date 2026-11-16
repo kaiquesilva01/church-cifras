@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FirebaseServices } from '../lib/firebase';
-import { browserPopupRedirectResolver, signInWithPopup, signOut } from 'firebase/auth';
+import {
+  browserPopupRedirectResolver,
+  getRedirectResult,
+  signInWithPopup,
+  signOut,
+} from 'firebase/auth';
 import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
 import { createAuthGateway } from './gateway';
 
@@ -13,6 +18,7 @@ vi.mock('firebase/auth', () => ({
   browserPopupRedirectResolver: { resolver: true },
   getIdToken: vi.fn(),
   getIdTokenResult: vi.fn(),
+  getRedirectResult: vi.fn(),
   onAuthStateChanged: vi.fn(),
   signInWithPopup: vi.fn(),
   signOut: vi.fn(),
@@ -39,6 +45,17 @@ describe('createAuthGateway', () => {
       expect.anything(),
       browserPopupRedirectResolver,
     );
+  });
+
+  it('prepareSignIn warms the popup resolver via getRedirectResult', async () => {
+    vi.mocked(getRedirectResult).mockResolvedValueOnce(null);
+    await createAuthGateway(services).prepareSignIn();
+    expect(getRedirectResult).toHaveBeenCalledWith(services.auth, browserPopupRedirectResolver);
+  });
+
+  it('prepareSignIn swallows failures (offline, blocked iframe)', async () => {
+    vi.mocked(getRedirectResult).mockRejectedValueOnce(new Error('network'));
+    await expect(createAuthGateway(services).prepareSignIn()).resolves.toBeUndefined();
   });
 
   it('clears pdf cache on sign out', async () => {

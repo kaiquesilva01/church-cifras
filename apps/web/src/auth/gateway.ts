@@ -3,6 +3,7 @@ import {
   browserPopupRedirectResolver,
   getIdToken,
   getIdTokenResult,
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
   signOut,
@@ -47,6 +48,16 @@ export function createAuthGateway(
     },
     refreshToken: async () => {
       if (auth.currentUser) await getIdToken(auth.currentUser, true);
+    },
+    // Auth starts without a popup resolver (keeps the Google iframe out of startup), but
+    // signInWithPopup waits for that iframe before window.open and mobile browsers block the popup
+    // once the user gesture is lost. With no pending redirect this only pre-loads the iframe.
+    prepareSignIn: async () => {
+      try {
+        await getRedirectResult(auth, browserPopupRedirectResolver);
+      } catch {
+        // Best effort: signIn still works, it just may open the popup later.
+      }
     },
     signIn: async () => {
       await signInWithPopup(auth, new GoogleAuthProvider(), browserPopupRedirectResolver);

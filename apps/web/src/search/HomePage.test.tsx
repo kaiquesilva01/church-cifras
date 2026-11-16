@@ -21,6 +21,7 @@ function renderHome(
     status: 'signed-in',
     user: testUser,
     role: options.role ?? 'viewer',
+    prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),
   };
@@ -140,6 +141,7 @@ describe('HomePage', () => {
           status: 'signed-in',
           user: testUser,
           role: 'viewer',
+          prepareSignIn: () => Promise.resolve(),
           signIn: () => Promise.resolve(),
           signOut: () => Promise.resolve(),
         }}

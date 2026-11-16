@@ -87,6 +87,7 @@ function setup(role: Role = 'admin', overrides: Parameters<typeof fakeCatalogApi
     status: 'signed-in',
     user: testUser,
     role,
+    prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),
   };
@@ -206,6 +207,7 @@ describe('ViewerPage manage', () => {
       status: 'signed-in',
       user: testUser,
       role: 'admin',
+      prepareSignIn: () => Promise.resolve(),
       signIn: () => Promise.resolve(),
       signOut: () => Promise.resolve(),
     };
