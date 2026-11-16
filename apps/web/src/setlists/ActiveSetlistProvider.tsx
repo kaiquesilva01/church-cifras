@@ -11,7 +11,7 @@ import { useMatch, useSearchParams } from 'react-router';
 import { applySetlistOp, SetlistFullError } from './ops';
 import { SetlistGoneError, type SetlistApi } from './setlistApi';
 import { hasChanges, initialSync, isRemoved, syncReducer, type SyncEvent } from './sync';
-import type { SetlistOp } from './types';
+import type { Setlist, SetlistOp } from './types';
 import { ActiveSetlistContext, type ActiveSetlist } from './useActiveSetlist';
 
 type EditResult = Awaited<ReturnType<ActiveSetlist['edit']>>;
@@ -66,30 +66,60 @@ export function ActiveSetlistProvider({ api, children }: { api: SetlistApi; chil
     if (id) dispatchStore({ type: 'event', id, event: { type: 'accept' } });
   }, [id]);
 
+  // Edições em voo: `shown` = base (sem as pendentes) + operações pendentes, na ordem.
+  const baseRef = useRef<Setlist | null>(null);
+  const pendingRef = useRef<SetlistOp[]>([]);
+  useEffect(() => {
+    pendingRef.current = [];
+    baseRef.current = null;
+  }, [id]);
+
   const edit = useCallback(
     async (op: SetlistOp): Promise<EditResult> => {
       if (!id) return 'error';
       const send = (event: SyncEvent) => dispatchStore({ type: 'event', id, event });
-      const previous = stateRef.current.shown;
-      let optimistic = false;
-      if (previous) {
-        try {
-          const { items, changed } = applySetlistOp(previous.items, op);
-          if (changed) {
-            optimistic = true;
-            send({ type: 'optimistic', setlist: { ...previous, items } });
+      const pending = pendingRef.current;
+      if (pending.length === 0) baseRef.current = stateRef.current.shown;
+      const rebuild = (): Setlist | null => {
+        const base = baseRef.current;
+        if (!base) return null;
+        let items = base.items;
+        for (const p of pendingRef.current) {
+          try {
+            items = applySetlistOp(items, p).items;
+          } catch {
+            // operação pendente que deixou de caber: ignora
           }
+        }
+        return { ...base, items };
+      };
+      if (baseRef.current) {
+        try {
+          applySetlistOp(rebuild()!.items, op);
         } catch (error) {
           return error instanceof SetlistFullError ? 'full' : 'error';
         }
       }
+      pending.push(op);
+      const view = rebuild();
+      if (view) send({ type: 'optimistic', setlist: view });
+      const settle = () => {
+        const i = pendingRef.current.indexOf(op);
+        if (i >= 0) pendingRef.current.splice(i, 1);
+      };
       try {
         const result = await api.applyOp(id, op);
+        settle();
+        baseRef.current = result.setlist;
         send({ type: 'adopt', setlist: result.setlist });
+        const rest = pendingRef.current.length > 0 ? rebuild() : null;
+        if (rest) send({ type: 'optimistic', setlist: rest });
         return result.changed ? 'ok' : 'noop';
       } catch (error) {
+        settle();
+        const restored = rebuild();
+        if (restored) send({ type: 'optimistic', setlist: restored });
         if (error instanceof SetlistGoneError) return 'gone';
-        if (optimistic && previous) send({ type: 'optimistic', setlist: previous });
         return error instanceof SetlistFullError ? 'full' : 'error';
       }
     },

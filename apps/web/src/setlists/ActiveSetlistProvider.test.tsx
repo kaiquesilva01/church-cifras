@@ -226,6 +226,86 @@ describe('ActiveSetlistProvider', () => {
         r = await current!.edit({ type: 'add', item: item('b') });
       });
       expect(r).toBe('gone');
+      expect(current?.shown?.items.map((i) => i.id)).toEqual(['a']);
+    });
+
+    describe('overlapping edits', () => {
+      type Res = { setlist: Setlist; changed: boolean };
+      const setup = () => {
+        const base = makeSetlist({ id: 'r1', items: [item('a')] });
+        const calls: { resolve: (v: Res) => void; reject: (e: unknown) => void }[] = [];
+        const api = fakeSetlistApi([base], {
+          applyOp: vi.fn(
+            () =>
+              new Promise<Res>((resolve, reject) => {
+                calls.push({ resolve, reject });
+              }),
+          ),
+        });
+        mount(api, '/repertorios/r1');
+        const ids = () => current?.shown?.items.map((i) => i.id);
+        return { base, calls, ids };
+      };
+
+      it('both fail: shown returns to the server content, no phantom state', async () => {
+        const { calls, ids } = setup();
+        let p1: Promise<string> = Promise.resolve('');
+        let p2: Promise<string> = Promise.resolve('');
+        act(() => {
+          p1 = current!.edit({ type: 'add', item: item('b') });
+          p2 = current!.edit({ type: 'add', item: item('c') });
+        });
+        expect(ids()).toEqual(['a', 'b', 'c']);
+        await act(async () => {
+          calls[0]!.reject(new Error('net'));
+          await p1;
+        });
+        expect(ids()).toEqual(['a', 'c']);
+        await act(async () => {
+          calls[1]!.reject(new Error('net'));
+          await p2;
+        });
+        expect(await p1).toBe('error');
+        expect(await p2).toBe('error');
+        expect(ids()).toEqual(['a']);
+        expect(current?.hasChanges).toBe(false);
+      });
+
+      it('first succeeds while second is pending: second change is kept', async () => {
+        const { base, calls, ids } = setup();
+        let p1: Promise<string> = Promise.resolve('');
+        act(() => {
+          p1 = current!.edit({ type: 'add', item: item('b') });
+          void current!.edit({ type: 'add', item: item('c') });
+        });
+        await act(async () => {
+          calls[0]!.resolve({ setlist: { ...base, items: [item('a'), item('b')] }, changed: true });
+          await p1;
+        });
+        expect(await p1).toBe('ok');
+        expect(ids()).toEqual(['a', 'b', 'c']);
+      });
+
+      it('first fails, second succeeds: shown is the server result of the second', async () => {
+        const { base, calls, ids } = setup();
+        let p1: Promise<string> = Promise.resolve('');
+        let p2: Promise<string> = Promise.resolve('');
+        act(() => {
+          p1 = current!.edit({ type: 'add', item: item('b') });
+          p2 = current!.edit({ type: 'add', item: item('c') });
+        });
+        await act(async () => {
+          calls[0]!.reject(new Error('net'));
+          await p1;
+        });
+        await act(async () => {
+          calls[1]!.resolve({ setlist: { ...base, items: [item('a'), item('c')] }, changed: true });
+          await p2;
+        });
+        expect(await p2).toBe('ok');
+        expect(ids()).toEqual(['a', 'c']);
+        expect(current?.hasChanges).toBe(false);
+      });
     });
   });
 });
