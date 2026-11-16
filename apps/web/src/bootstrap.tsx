@@ -6,6 +6,7 @@ import { createCatalogApi } from './catalog/catalogApi';
 import { readWebEnv } from './lib/env';
 import { createFirebase } from './lib/firebase';
 import { createPeopleApi } from './people/peopleApi';
+import { UpdatePrompt } from './pwa/UpdatePrompt';
 
 // Everything that needs Firebase lives behind this module, so the first script only carries React
 // and the loading screen; the Firebase chunk downloads in parallel right after it.
@@ -19,6 +20,7 @@ export function renderApp(root: Root): void {
     root.render(
       <StrictMode>
         <App gateway={gateway} peopleApi={peopleApi} catalogApi={catalogApi} />
+        <UpdatePrompt />
       </StrictMode>,
     );
   } catch (error) {

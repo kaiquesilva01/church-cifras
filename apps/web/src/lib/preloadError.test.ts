@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { clearReloadMarker, installPreloadErrorReload, RELOAD_MARKER } from './preloadError';
+import {
+  clearReloadMarker,
+  installPreloadErrorReload,
+  RELOAD_MARKER,
+  scheduleClearReloadMarker,
+} from './preloadError';
 
 function setup(now: { value: number }, broken = false) {
   const store = new Map<string, string>();
@@ -54,6 +59,22 @@ describe('installPreloadErrorReload', () => {
     fire();
     clearReloadMarker(storage);
     expect(store.has(RELOAD_MARKER)).toBe(false);
+  });
+
+  it('keeps the marker for 10 s after boot, then clears it', () => {
+    vi.useFakeTimers();
+    try {
+      const now = { value: 5 };
+      const { fire, store, storage } = setup(now);
+      fire();
+      scheduleClearReloadMarker(storage);
+      vi.advanceTimersByTime(9_999);
+      expect(store.has(RELOAD_MARKER)).toBe(true);
+      vi.advanceTimersByTime(1);
+      expect(store.has(RELOAD_MARKER)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('survives an unavailable sessionStorage', () => {

@@ -59,6 +59,12 @@ export function createAuthGateway(
       } catch (error) {
         console.warn('Falha ao limpar o cache local', error);
       }
+      // Aparelho compartilhado: os PDFs em cache do service worker são da pessoa anterior.
+      try {
+        await globalThis.caches?.delete('cifras-pdfs');
+      } catch (error) {
+        console.warn('Falha ao limpar o cache de PDFs', error);
+      }
       reload();
     },
   };

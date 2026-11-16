@@ -1,9 +1,11 @@
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 import { preloadHints } from './build/preloadHints';
+import { pwaOptions } from './build/pwaConfig';
 
 export default defineConfig({
-  plugins: [react(), preloadHints(['bootstrap', 'firebase-core'])],
+  plugins: [react(), preloadHints(['bootstrap', 'firebase-core']), VitePWA(pwaOptions)],
   build: {
     rolldownOptions: {
       output: {

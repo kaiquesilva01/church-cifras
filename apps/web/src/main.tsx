@@ -1,8 +1,8 @@
 import { createRoot } from 'react-dom/client';
 import {
-  clearReloadMarker,
   getSessionStorage,
   installPreloadErrorReload,
+  scheduleClearReloadMarker,
 } from './lib/preloadError';
 import './ui/styles.css';
 
@@ -15,7 +15,7 @@ const root = createRoot(document.getElementById('root')!);
 import('./bootstrap')
   .then(({ renderApp }) => {
     renderApp(root);
-    clearReloadMarker(storage);
+    scheduleClearReloadMarker(storage);
   })
   .catch((error: unknown) => {
     console.error('Falha ao iniciar o app', error);

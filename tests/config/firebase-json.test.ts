@@ -38,6 +38,29 @@ describe('firebase.json', () => {
     expect(config.hosting.rewrites).toContainEqual({ source: '**', destination: '/index.html' });
   });
 
+  it('firebase.json serves sw and index without cache', () => {
+    const headers: Array<{ source: string; headers: Array<{ key: string; value: string }> }> =
+      config.hosting.headers;
+    // Firebase applies every matching header; the last Cache-Control wins.
+    const cacheControl = (path: string) =>
+      headers
+        .filter(
+          (h) =>
+            h.source === '**' ||
+            h.source === path ||
+            (h.source === '/assets/**' && path.startsWith('/assets/')),
+        )
+        .flatMap((h) => h.headers)
+        .filter((h) => h.key === 'Cache-Control')
+        .at(-1)?.value;
+    for (const path of ['/sw.js', '/index.html', '/manifest.webmanifest']) {
+      expect(cacheControl(path), path).toBe('no-cache');
+    }
+    expect(cacheControl('/assets/index-abc.js')).toBe('public, max-age=31536000, immutable');
+    expect(headers.some((h) => h.source === '/sw.js')).toBe(true);
+    expect(headers.some((h) => h.source === '/index.html')).toBe(true);
+  });
+
   it('serves index with no-cache and assets immutable', () => {
     // Firebase applies every matching header; later entries override earlier ones.
     const headers = config.hosting.headers;

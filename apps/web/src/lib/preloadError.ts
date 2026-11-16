@@ -43,6 +43,14 @@ export function clearReloadMarker(storage: StorageLike): void {
   attempt(() => storage.removeItem(RELOAD_MARKER));
 }
 
+/** Keeps the marker for a while after boot: a chunk that fails right after a reload is no new deploy. */
+export function scheduleClearReloadMarker(
+  storage: StorageLike,
+  delayMs: number = RELOAD_COOLDOWN_MS,
+): void {
+  setTimeout(() => clearReloadMarker(storage), delayMs);
+}
+
 const NO_STORAGE: StorageLike = {
   getItem: () => null,
   setItem: () => undefined,
