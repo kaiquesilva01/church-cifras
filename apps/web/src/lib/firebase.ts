@@ -55,25 +55,30 @@ export function createFirebase(env: WebEnv): FirebaseServices {
     connectFirestoreEmulator(db, host, 8080);
   }
 
-  let storagePromise: Promise<FirebaseStorage> | undefined;
-  let functionsPromise: Promise<Functions> | undefined;
+  // A failed import (offline, chunk gone after a deploy) must not stick: the next call tries again.
+  const lazy = <T>(load: () => Promise<T>): (() => Promise<T>) => {
+    let promise: Promise<T> | undefined;
+    return () => {
+      const current = (promise ??= load().catch((error: unknown) => {
+        promise = undefined;
+        throw error;
+      }));
+      return current;
+    };
+  };
 
-  const loadStorage = (): Promise<FirebaseStorage> =>
-    (storagePromise ??= import('firebase/storage').then(
-      ({ getStorage, connectStorageEmulator }) => {
-        const storage = getStorage(app);
-        if (useEmulators) connectStorageEmulator(storage, host, 9199);
-        return storage;
-      },
-    ));
-  const loadFunctions = (): Promise<Functions> =>
-    (functionsPromise ??= import('firebase/functions').then(
-      ({ getFunctions, connectFunctionsEmulator }) => {
-        const functions = getFunctions(app, FUNCTIONS_REGION);
-        if (useEmulators) connectFunctionsEmulator(functions, host, 5001);
-        return functions;
-      },
-    ));
+  const loadStorage = lazy(async (): Promise<FirebaseStorage> => {
+    const { getStorage, connectStorageEmulator } = await import('firebase/storage');
+    const storage = getStorage(app);
+    if (useEmulators) connectStorageEmulator(storage, host, 9199);
+    return storage;
+  });
+  const loadFunctions = lazy(async (): Promise<Functions> => {
+    const { getFunctions, connectFunctionsEmulator } = await import('firebase/functions');
+    const functions = getFunctions(app, FUNCTIONS_REGION);
+    if (useEmulators) connectFunctionsEmulator(functions, host, 5001);
+    return functions;
+  });
 
   return { app, auth, db, loadStorage, loadFunctions };
 }

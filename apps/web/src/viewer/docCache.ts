@@ -28,13 +28,15 @@ export function createDocCache(limit = 3) {
       }
       return entry;
     },
-    set(path: string, entry: CachedDoc): void {
+    /** `keep` is the path on screen: it is never evicted, whatever its recency. */
+    set(path: string, entry: CachedDoc, keep?: string): void {
       if (entries.has(path)) return destroy(entry);
       entries.set(path, entry);
       while (entries.size > limit) {
-        const [oldest, evicted] = entries.entries().next().value as [string, CachedDoc];
-        entries.delete(oldest);
-        destroy(evicted);
+        const victim = [...entries.keys()].find((key) => key !== keep && key !== path);
+        if (victim === undefined) break;
+        destroy(entries.get(victim)!);
+        entries.delete(victim);
       }
     },
     clear(): void {

@@ -3,13 +3,13 @@ import { useParams, useSearchParams } from 'react-router';
 import type { CatalogApi } from '../catalog/catalogApi';
 import '../lib/pdfWorker';
 import type { PdfDocument } from './PdfPages';
+import { createSharedWorker } from './sharedWorker';
 import { ViewerPage } from './ViewerPage';
 
 // fontExtraProperties: real font names are needed to read chords with readTextLinesFromDocument.
 // A single PDFWorker serves every document: one worker thread (and one copy of pdf.js in memory)
 // instead of one per opened key.
-let sharedWorker: InstanceType<ReturnType<typeof getPdfjs>['PDFWorker']> | undefined;
-const pdfWorker = () => (sharedWorker ??= new (getPdfjs().PDFWorker)());
+const pdfWorker = createSharedWorker(() => new (getPdfjs().PDFWorker)());
 
 const openPdf = (bytes: Uint8Array): Promise<PdfDocument> =>
   getPdfjs().getDocument({

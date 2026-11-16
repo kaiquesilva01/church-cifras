@@ -164,6 +164,8 @@ export function ViewerPage({
   // Open documents by path (LRU of 3): going back to a key already seen is instant.
   const [docCache] = useState(() => createDocCache(CACHED_DOCS));
   const alive = useRef(false);
+  const shownPath = useRef<string | null>(null);
+  const inflight = useRef(new Set<string>());
   const [, refresh] = useReducer((n: number) => n + 1, 0);
   const [failedPath, setFailedPath] = useState<string | null>(null);
   // The failure belongs to one path: moving to another one forgets it (a retry starts clean).
@@ -179,9 +181,10 @@ export function ViewerPage({
   }, [docCache]);
 
   useEffect(() => {
+    shownPath.current = path;
     if (!path) return;
-    if (docCache.get(path)) return;
-    let cancelled = false;
+    if (docCache.get(path) || inflight.current.has(path)) return;
+    inflight.current.add(path);
     api
       .getPdfBytes(path)
       // pdf.js transfers the buffer to its worker: keep the original for the download.
@@ -189,15 +192,11 @@ export function ViewerPage({
       .then(({ bytes, doc }) => {
         // Even when this path is no longer open the document is worth keeping (unless we unmounted).
         if (!alive.current) return void doc.destroy?.();
-        docCache.set(path, { doc, bytes });
+        docCache.set(path, { doc, bytes }, shownPath.current ?? undefined);
         refresh();
       })
-      .catch(() => {
-        if (!cancelled) setFailedPath(path);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => setFailedPath(path))
+      .finally(() => inflight.current.delete(path));
   }, [api, openPdf, path, docCache]);
 
   const cached = path ? docCache.peek(path) : undefined;
