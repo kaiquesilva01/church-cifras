@@ -6,7 +6,7 @@ const HEADER = ['arquivo', 'música', 'cantor', 'tom', 'status', 'detalhe'];
 
 // Spreadsheets run cells starting with these characters as formulas.
 const cell = (raw: string): string => {
-  const value = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+  const value = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
   return /[;"\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 };
 

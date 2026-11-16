@@ -27,7 +27,7 @@ export function AppShell() {
                 <Link to="/pessoas" className="nav-link">
                   Pessoas
                 </Link>
-                <Link to="/importar" className="nav-link">
+                <Link to="/importar" className="nav-link nav-link-wide">
                   Importar
                 </Link>
               </>

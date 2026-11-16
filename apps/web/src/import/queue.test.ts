@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { KeyName } from '@cifras/chords';
 import type { ClassifiedRow } from './batch';
-import { runImport } from './queue';
+import { describeError, runImport } from './queue';
 
 const mk = (id: string): ClassifiedRow =>
   ({
@@ -68,7 +68,7 @@ describe('runImport', () => {
       concurrency: 2,
       onProgress: () => {},
     });
-    expect(results.get('a1')).toEqual({ status: 'error', message: 'falhou' });
+    expect(results.get('a1')).toEqual({ status: 'error', message: 'erro inesperado' });
     expect(results.get('a2')).toEqual({ status: 'imported' });
     expect(results.get('b1')).toEqual({ status: 'imported' });
   });
@@ -105,5 +105,22 @@ describe('runImport', () => {
       ['a1', 'imported'],
       ['a2', 'existing'],
     ]);
+  });
+});
+
+describe('describeError', () => {
+  const coded = (code: string) => Object.assign(new Error('x'), { code });
+  it('translates common codes to pt-BR', () => {
+    expect(describeError(coded('permission-denied'))).toBe('sem permissão');
+    expect(describeError(coded('functions/permission-denied'))).toBe('sem permissão');
+    expect(describeError(coded('unavailable'))).toBe('sem conexão');
+    expect(describeError(coded('auth/network-request-failed'))).toBe('sem conexão');
+    expect(describeError(new TypeError('Failed to fetch'))).toBe('sem conexão');
+    expect(describeError(coded('storage/unauthorized'))).toBe('falha ao enviar o arquivo');
+    expect(describeError(coded('storage/retry-limit-exceeded'))).toBe('falha ao enviar o arquivo');
+  });
+  it('falls back to a generic message', () => {
+    expect(describeError(new Error('boom'))).toBe('erro inesperado');
+    expect(describeError('boom')).toBe('erro inesperado');
   });
 });

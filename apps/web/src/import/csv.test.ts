@@ -45,6 +45,12 @@ describe('toCsv', () => {
     expect(csv).toContain('e.pdf;Música;Cantor;G;erro;boom');
   });
 
+  it('neutralizes formulas that start with a tab or a carriage return too', () => {
+    const csv = toCsv([mk({ title: '\tcmd' }), mk({ id: 'x', title: '\rcmd', fileName: 'x.pdf' })]);
+    expect(csv).toContain("a.pdf;'\tcmd;");
+    expect(csv).toContain('x.pdf;"\'\rcmd";');
+  });
+
   it('marks rows never run after a cancel as cancelado', () => {
     const csv = toCsv(
       [

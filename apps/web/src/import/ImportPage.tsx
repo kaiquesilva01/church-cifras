@@ -23,6 +23,8 @@ import { runImport, type RowResult } from './queue';
 
 const DEBOUNCE_MS = 300;
 const READ_CONCURRENCY = 2;
+const READ_TIMEOUT_MS = 30_000;
+const CSV_URL_TTL_MS = 10_000;
 
 type Classified = {
   /** The row objects that were classified: an edited row is a new object. */
@@ -33,6 +35,16 @@ type Classified = {
 };
 type Progress = { done: number; total: number };
 
+class ReadTimeoutError extends Error {}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ReadTimeoutError()), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 function downloadCsv(text: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
@@ -41,7 +53,8 @@ function downloadCsv(text: string): void {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  // Not revoked right away: some browsers start the download asynchronously.
+  setTimeout(() => URL.revokeObjectURL(url), CSV_URL_TTL_MS);
 }
 
 export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf }) {
@@ -111,6 +124,16 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   useEffect(() => {
     busyRef.current = busy;
   }, [busy]);
+  // Leaving mid-import would drop the queue: ask the browser to confirm.
+  useEffect(() => {
+    if (!importingNow) return;
+    const warn = (event: BeforeUnloadEvent): void => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [importingNow]);
   // Counts and the previous classification stay on screen while a debounce is pending;
   // actions that act on the classification wait until it is current.
   const upToDate =
@@ -141,38 +164,47 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     setReading({ done: 0, total: pdfs.length });
     void runPool(pdfs, READ_CONCURRENCY, async (file, i) => {
       const label = file.webkitRelativePath || file.name;
+      const sizeOk = file.size <= MAX_BYTES;
+      const base = {
+        id: `row-${++nextId.current}`,
+        fileName: label,
+        file,
+        suspects: [],
+        ignoredChordLines: 0,
+        sizeOk,
+      };
       let row: BatchRow;
-      try {
-        const read = await readPdf(file, [...known]);
-        const { suggestion } = read;
-        if (suggestion.artist) known.add(suggestion.artist);
-        row = {
-          id: `row-${++nextId.current}`,
-          fileName: label,
-          file,
-          title: suggestion.title.slice(0, MAX_TEXT),
-          artist: suggestion.artist.slice(0, MAX_TEXT),
-          key: (suggestion.key ? parseKey(suggestion.key)?.name : null) ?? null,
-          chordCount: read.chordCount,
-          suspects: [...new Set(read.suspects.flat())],
-          ignoredChordLines: read.ignoredChordLines,
-          sizeOk: file.size <= MAX_BYTES,
-        };
-      } catch {
-        // Unreadable PDF: shows up as "fora do padrão" so it lands in the report.
-        row = {
-          id: `row-${++nextId.current}`,
-          fileName: label,
-          file,
-          title: '',
-          artist: '',
-          key: null,
-          chordCount: 0,
-          suspects: [],
-          ignoredChordLines: 0,
-          sizeOk: file.size <= MAX_BYTES,
-          readError: 'não foi possível ler o PDF',
-        };
+      if (!sizeOk) {
+        // Too big to be accepted anyway: do not spend time or memory reading it.
+        row = { ...base, title: '', artist: '', key: null, chordCount: 0 };
+      } else {
+        try {
+          const read = await withTimeout(readPdf(file, [...known]), READ_TIMEOUT_MS);
+          const { suggestion } = read;
+          if (suggestion.artist) known.add(suggestion.artist);
+          row = {
+            ...base,
+            title: suggestion.title.slice(0, MAX_TEXT),
+            artist: suggestion.artist.slice(0, MAX_TEXT),
+            key: (suggestion.key ? parseKey(suggestion.key)?.name : null) ?? null,
+            chordCount: read.chordCount,
+            suspects: [...new Set(read.suspects.flat())],
+            ignoredChordLines: read.ignoredChordLines,
+          };
+        } catch (error) {
+          // Unreadable PDF: shows up as "fora do padrão" so it lands in the report.
+          row = {
+            ...base,
+            title: '',
+            artist: '',
+            key: null,
+            chordCount: 0,
+            readError:
+              error instanceof ReadTimeoutError
+                ? 'tempo esgotado ao ler o PDF'
+                : 'não foi possível ler o PDF',
+          };
+        }
       }
       slots[i] = row;
       finished += 1;
@@ -278,7 +310,6 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
 
       <div
         className={`dropzone${dragging && !busy ? ' dropzone-active' : ''}${busy ? ' dropzone-disabled' : ''}`}
-        aria-disabled={busy}
         onDragOver={(e) => {
           e.preventDefault();
           if (!busy) setDragging(true);

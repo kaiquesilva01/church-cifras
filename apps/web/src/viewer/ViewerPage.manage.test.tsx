@@ -150,6 +150,17 @@ describe('ViewerPage manage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('suggests existing artists in the edit dialog', async () => {
+    setup();
+    const dialog = await openMenu('Editar nome e cantor');
+    const input = within(dialog).getByLabelText('Cantor');
+    const list = document.getElementById(input.getAttribute('list') ?? 'none');
+    expect(list?.tagName).toBe('DATALIST');
+    expect([...list!.querySelectorAll('option')].map((o) => o.getAttribute('value'))).toContain(
+      'Aline Barros',
+    );
+  });
+
   it('validates the edited names like the upload', async () => {
     const api = setup();
     const dialog = await openMenu('Editar nome e cantor');

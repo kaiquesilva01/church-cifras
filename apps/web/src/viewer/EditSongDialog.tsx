@@ -7,6 +7,8 @@ export interface EditSongDialogProps {
   artistName: string;
   busy: boolean;
   error: string | null;
+  /** Existing artist names, offered as suggestions for the artist field. */
+  artists?: string[];
   onSave: (value: { title: string; artistName: string }) => void;
   onCancel: () => void;
 }
@@ -16,6 +18,7 @@ export function EditSongDialog({
   artistName: initialArtist,
   busy,
   error,
+  artists = [],
   onSave,
   onCancel,
 }: EditSongDialogProps) {
@@ -66,6 +69,7 @@ export function EditSongDialog({
           <input
             id="edit-song-artist"
             className="input"
+            list="edit-song-artists"
             maxLength={MAX_TEXT}
             value={artist}
             disabled={busy}
@@ -73,6 +77,11 @@ export function EditSongDialog({
             aria-describedby={attempted && artistError ? 'edit-song-artist-err' : undefined}
             onChange={(e) => setArtist(e.target.value)}
           />
+          <datalist id="edit-song-artists">
+            {artists.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
           {attempted && artistError && (
             <p id="edit-song-artist-err" className="field-error">
               {artistError}

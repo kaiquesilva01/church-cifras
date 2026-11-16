@@ -11,6 +11,18 @@ export interface RunOptions {
   signal?: AbortSignal;
 }
 
+/** Short pt-BR reason for a failed row (raw error messages are not for the report). */
+export function describeError(error: unknown): string {
+  const code = String((error as { code?: unknown } | null)?.code ?? '').replace(/^functions\//, '');
+  const message = error instanceof Error ? error.message : '';
+  if (code === 'permission-denied') return 'sem permissão';
+  if (code === 'unavailable' || /network/i.test(code) || /failed to fetch|network/i.test(message)) {
+    return 'sem conexão';
+  }
+  if (code.startsWith('storage/')) return 'falha ao enviar o arquivo';
+  return 'erro inesperado';
+}
+
 /**
  * Rows of one song run in sequence (the first creates it, the rest add keys);
  * different songs run in parallel up to `concurrency`. A failing row does not
@@ -35,8 +47,7 @@ export async function runImport(
         try {
           result = { status: await worker(row) };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          result = { status: 'error', message };
+          result = { status: 'error', message: describeError(error) };
         }
         results.set(row.id, result);
         opts.onResult?.(row.id, result);

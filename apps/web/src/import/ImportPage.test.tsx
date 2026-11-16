@@ -49,7 +49,10 @@ function addFiles(files: File[]) {
 
 const rowOf = (fileName: string) => screen.getByRole('row', { name: new RegExp(fileName) });
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe('ImportPage', () => {
   it('lists files with suggestions and statuses', async () => {
@@ -162,7 +165,7 @@ describe('ImportPage', () => {
       expect.objectContaining({ key: 'A' }),
     );
     expect(within(rowOf('a.pdf')).getByText('importado')).toBeVisible();
-    expect(within(rowOf('c.pdf')).getByText('erro: falhou')).toBeVisible();
+    expect(within(rowOf('c.pdf')).getByText('erro: erro inesperado')).toBeVisible();
   });
 
   it('downloads csv with skipped rows', async () => {
@@ -335,5 +338,91 @@ describe('ImportPage', () => {
         screen.queryByText('Aguarde terminar antes de adicionar arquivos.'),
       ).not.toBeInTheDocument(),
     );
+  });
+
+  it('locks the inputs of rows already imported', async () => {
+    setup({ reads: { 'a.pdf': result({ title: 'A' }), 'b.pdf': result({ title: 'B' }) } });
+    addFiles([pdf('a.pdf'), pdf('b.pdf')]);
+    const button = await screen.findByRole('button', { name: 'Importar 2 prontos' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(await screen.findByText('2 importados · 0 já existiam · 0 com erro')).toBeVisible();
+    expect(screen.getByLabelText('Música de a.pdf')).toBeDisabled();
+    expect(screen.getByLabelText('Cantor de a.pdf')).toBeDisabled();
+    expect(screen.getByLabelText('Tom de a.pdf')).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Inverter música e cantor de a.pdf' }),
+    ).toBeDisabled();
+  });
+
+  it('revokes the csv object url after 10 s', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:x');
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    setup({ reads: { 'a.pdf': result({}, 0) } });
+    addFiles([pdf('a.pdf')]);
+    await waitFor(() => expect(within(rowOf('a.pdf')).getByText('fora do padrão')).toBeVisible());
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    fireEvent.click(screen.getByRole('button', { name: '⬇ Relatório CSV' }));
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(10_000);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:x');
+  });
+
+  it('does not read files over 10 MB', async () => {
+    const { readPdf } = setup();
+    addFiles([pdf('big.pdf', 10 * 1024 * 1024 + 1), pdf('ok.pdf')]);
+    await waitFor(() => expect(within(rowOf('big.pdf')).getByText('grande demais')).toBeVisible());
+    expect(readPdf).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(readPdf).mock.calls[0]![0].name).toBe('ok.pdf');
+  });
+
+  it('gives up on a PDF that takes more than 30 s to read', async () => {
+    const { readPdf } = setup();
+    vi.mocked(readPdf).mockImplementation(() => new Promise(() => {}));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    addFiles([pdf('slow.pdf')]);
+    await act(async () => {
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400); // classification debounce
+    });
+    expect(within(rowOf('slow.pdf')).getByText('fora do padrão')).toBeVisible();
+    expect(within(rowOf('slow.pdf')).getByText('tempo esgotado ao ler o PDF')).toBeVisible();
+  });
+
+  it('warns before leaving only while importing', async () => {
+    let finish!: () => void;
+    setup({
+      reads: { 'a.pdf': result({ title: 'A' }) },
+      api: {
+        createSongWithArrangement: vi.fn(
+          () => new Promise<string>((resolve) => (finish = () => resolve('id'))),
+        ),
+      },
+    });
+    const leave = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(leave()).toBe(false);
+    addFiles([pdf('a.pdf')]);
+    const button = await screen.findByRole('button', { name: 'Importar 1 prontos' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await screen.findByText('Importando 0 de 1…');
+    expect(leave()).toBe(true);
+    await act(async () => finish());
+    await screen.findByText('1 importados · 0 já existiam · 0 com erro');
+    expect(leave()).toBe(false);
+  });
+
+  it('does not mark the dropzone aria-disabled', async () => {
+    setup();
+    const zone = screen.getByText('Arraste PDFs ou uma pasta aqui').parentElement!;
+    expect(zone).not.toHaveAttribute('aria-disabled');
   });
 });

@@ -14,6 +14,7 @@ import { Link, useNavigate } from 'react-router';
 import { canEdit, isAdmin } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import type { CatalogApi } from '../catalog/catalogApi';
+import { deriveArtists } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { KeyChips } from '../search/KeyChips';
 import { pdfFileName } from './fileName';
@@ -125,6 +126,7 @@ export function ViewerPage({
   const { role, user } = useAuth();
   const navigate = useNavigate();
   const song = songs.find((s) => s.id === songId);
+  const artistNames = useMemo(() => deriveArtists(songs).map((a) => a.name), [songs]);
   const { status: arrStatus, arrangements } = useSongArrangements(api, song ? song.id : null);
   const wide = useWide(matchMedia);
 
@@ -495,6 +497,7 @@ export function ViewerPage({
           artistName={song.artistName}
           busy={manage.busy}
           error={manage.error}
+          artists={artistNames}
           onSave={(value) => void saveMeta(value)}
           onCancel={closeManage}
         />
