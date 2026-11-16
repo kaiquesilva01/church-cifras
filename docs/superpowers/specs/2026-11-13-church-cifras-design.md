@@ -47,7 +47,8 @@ Todo acesso exige login com conta Google; não há link público [decidido].
 - Editor de cifras no sistema (o PDF continua sendo feito no Google Docs).
 - Modo offline completo (internet da igreja é estável [decidido]); apenas cache de app/arquivos.
 - OCR/PDF escaneado, PDFs fora do padrão, upload de DOCX.
-- Setlists/repertório de culto, comentários, playback de áudio.
+- Comentários, playback de áudio.
+- ~~Setlists/repertório de culto~~ — **entregue na Fase 8**; ver [Repertórios](2026-11-16-repertorios-design.md).
 
 **Anti-objetivos (falha mesmo que "funcione")**
 - Alterar qualquer coisa além dos acordes e do tom no título (layout, letra, espaçamento).
@@ -194,6 +195,9 @@ songs/{songId}/arrangements/{key}  // id do doc = tom normalizado ('D', 'Bb', 'A
 - **Normalização** de nomes (busca e cantor): minúsculas, sem acentos, sem pontuação, espaços colapsados.
   "Aline Barros" e "aline barros " → mesmo `artistId`. Campo cantor no upload sugere nomes existentes.
 
+> **Repertórios (Fase 8):** a coleção `setlists/{setlistId}` (data, rótulo, itens, `expiresAt` com TTL de 30 dias) está
+> descrita em [2026-11-16-repertorios-design.md](2026-11-16-repertorios-design.md) §6.1.
+
 ### 6.6 Busca
 - Acervo esperado: centenas de músicas. A lista leve de `songs` (metadados) é carregada uma vez e filtrada **em memória**
   (instantâneo, insensível a acento/maiúsculas), com cache persistente do Firestore [proposta].
@@ -226,6 +230,9 @@ chama `getIdToken(true)`.
 - Storage `songs/**`: leitura autenticado; escrita `member|admin`, `contentType == application/pdf`, tamanho ≤ 10 MB,
   sem sobrescrever arquivo existente.
 - Regras cobertas por testes com `@firebase/rules-unit-testing` no emulador.
+
+> **Repertórios (Fase 8):** as regras de `setlists` (leitura autenticada; escrita `member|admin`) estão em
+> [2026-11-16-repertorios-design.md](2026-11-16-repertorios-design.md) §6.3.
 
 **Riscos aceitos** (conhecidos e tolerados nesta versão):
 - Corridas de identidade: renomear (`updateSongMeta`) ou criar músicas ao mesmo tempo pode gerar duas músicas com a mesma
@@ -326,6 +333,7 @@ docker-compose.yml, .github/workflows/, .claude/ (harness), docs/
 5. Visualizador + Mudar tom (prévia, OverlayWriter, salvar/abrir); esqueleto do RewriteWriter.
 6. Administração (apagar tom/música, editar metadados) + importação em lote.
 7. PWA, cache, polimento de performance, E2E completos.
+8. Repertórios (setlists): ver [2026-11-16-repertorios-design.md](2026-11-16-repertorios-design.md).
 
 ## 12. Harness (antes de qualquer implementação) [decidido]
 - **`AGENTS.md`** [decidido] com as regras do projeto: fluxo Git (fonte única da regra "só `develop` → `main`"), TDD,
