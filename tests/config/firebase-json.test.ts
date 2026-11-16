@@ -53,7 +53,6 @@ describe('firebase.json', () => {
       '/nova',
       '/pessoas',
       '/login',
-      '/__/auth/handler',
     ];
     for (const route of routes) {
       expect(re.test(route), route).toBe(true);

@@ -1,11 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FirebaseServices } from '../lib/firebase';
-import {
-  browserPopupRedirectResolver,
-  getRedirectResult,
-  signInWithPopup,
-  signOut,
-} from 'firebase/auth';
+import { browserPopupRedirectResolver, signInWithPopup, signOut } from 'firebase/auth';
+import { _getInstance } from '@firebase/auth/internal';
 import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
 import { createAuthGateway } from './gateway';
 
@@ -18,10 +14,13 @@ vi.mock('firebase/auth', () => ({
   browserPopupRedirectResolver: { resolver: true },
   getIdToken: vi.fn(),
   getIdTokenResult: vi.fn(),
-  getRedirectResult: vi.fn(),
   onAuthStateChanged: vi.fn(),
   signInWithPopup: vi.fn(),
   signOut: vi.fn(),
+}));
+const initialize = vi.fn();
+vi.mock('@firebase/auth/internal', () => ({
+  _getInstance: vi.fn(() => ({ _initialize: initialize })),
 }));
 vi.mock('firebase/firestore', () => ({
   terminate: vi.fn(() => Promise.resolve()),
@@ -47,14 +46,15 @@ describe('createAuthGateway', () => {
     );
   });
 
-  it('prepareSignIn warms the popup resolver via getRedirectResult', async () => {
-    vi.mocked(getRedirectResult).mockResolvedValueOnce(null);
+  it('prepareSignIn initializes the shared popup resolver instance (opens the auth iframe)', async () => {
+    initialize.mockResolvedValueOnce(undefined);
     await createAuthGateway(services).prepareSignIn();
-    expect(getRedirectResult).toHaveBeenCalledWith(services.auth, browserPopupRedirectResolver);
+    expect(_getInstance).toHaveBeenCalledWith(browserPopupRedirectResolver);
+    expect(initialize).toHaveBeenCalledWith(services.auth);
   });
 
   it('prepareSignIn swallows failures (offline, blocked iframe)', async () => {
-    vi.mocked(getRedirectResult).mockRejectedValueOnce(new Error('network'));
+    initialize.mockRejectedValueOnce(new Error('network'));
     await expect(createAuthGateway(services).prepareSignIn()).resolves.toBeUndefined();
   });
 

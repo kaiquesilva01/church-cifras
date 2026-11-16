@@ -122,7 +122,7 @@ test('an already-visited cifra paints in under 1 s on Fast 4G', async ({
       if (!data) return false;
       for (let i = 0; i < data.length; i += 4) {
         if (data[i + 3]! > 0 && (data[i]! < 200 || data[i + 1]! < 200 || data[i + 2]! < 200)) {
-          return performance.now();
+          return { at: performance.now(), controlled: navigator.serviceWorker.controller !== null };
         }
       }
       return false;
@@ -130,7 +130,9 @@ test('an already-visited cifra paints in under 1 s on Fast 4G', async ({
     null,
     { polling: 'raf', timeout: 15_000 },
   );
-  const elapsed = Math.round((await handle.jsonValue()) as number);
+  const result = (await handle.jsonValue()) as { at: number; controlled: boolean };
+  const elapsed = Math.round(result.at);
+  expect(result.controlled, 'the revisit must be served under the service worker').toBe(true);
 
   console.log([`revisit paint: ${elapsed} ms`, ...requests].join(String.fromCharCode(10)));
   testInfo.annotations.push({ type: 'revisit-paint-ms', description: String(elapsed) });
