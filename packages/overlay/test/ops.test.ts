@@ -173,6 +173,19 @@ describe('overlayOps', () => {
       expect(ops[1]!.rect.width).toBeCloseTo(30.8, 10);
     });
 
+    it('treats baselines up to 1 pt apart as one line, like the pdf reader', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, y: 700, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({ x: 118, y: 700.6, runKey: 'b', newWidth: 12, limitX: 130 }),
+          replacement({ x: 130, y: 700, runKey: 'c', newWidth: 12, limitX: 300 }),
+        ]),
+      );
+      // Bm is the true next chord of the first: pushed to 136; it then collides and pushes G
+      expect(ops.map((o) => o.text.x)).toEqual([100, 136, 160]);
+      expect(ops.map((o) => o.collides)).toEqual([false, false, false]);
+    });
+
     it('only chords of the same page and baseline interact', () => {
       const collider = { x: 100, newWidth: 24, collides: true, limitX: 118 };
       const otherLine = overlayOps(

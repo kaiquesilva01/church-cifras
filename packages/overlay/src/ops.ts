@@ -11,7 +11,9 @@ export interface OverlayOp {
 }
 
 const PAD_EM = 0.04;
-const SAME_LINE_TOLERANCE = 0.5;
+// Same tolerance as SAME_LINE_TOLERANCE in packages/pdf/src/readTextLines.ts (not exported there):
+// the reader keeps runs up to 1 pt apart in one TextLine, so chords must group the same way.
+const SAME_LINE_TOLERANCE = 1;
 const SPREAD_GAP_SPACES = 2;
 
 function toOp(r: Replacement, kind: OverlayOp['kind'], x = r.x, collides = r.collides): OverlayOp {
@@ -51,7 +53,7 @@ export function spreadChords(chords: Replacement[]): Spread[] {
   const lines: Replacement[][] = [];
   for (const chord of chords) {
     const line = lines.find(
-      (l) => l[0]!.page === chord.page && Math.abs(l[0]!.y - chord.y) < SAME_LINE_TOLERANCE,
+      (l) => l[0]!.page === chord.page && Math.abs(l[0]!.y - chord.y) <= SAME_LINE_TOLERANCE,
     );
     if (line) line.push(chord);
     else lines.push([chord]);
