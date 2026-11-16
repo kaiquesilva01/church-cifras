@@ -23,6 +23,7 @@ function replacement(overrides: Partial<Replacement> = {}): Replacement {
     runKey: '1:700:100',
     spaceWidth: 6,
     limitX: 580.5,
+    nextIsChord: true,
     ...overrides,
   };
 }

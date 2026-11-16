@@ -36,6 +36,37 @@ describe('buildTransposePlan', () => {
     expect(plan.collisions).toBe(1);
   });
 
+  it('flags whether the next token is another chord', () => {
+    const plan = buildTransposePlan({
+      lines: [line([run('C7  F', 10)])],
+      from: key('C'),
+      to: key('D'),
+      measure,
+    });
+    expect(plan.chords.map((c) => c.nextIsChord)).toEqual([true, false]);
+  });
+
+  it('does not flag a chord followed by an annotation', () => {
+    const plan = buildTransposePlan({
+      lines: [line([run('C7 (2x) F', 10)])],
+      from: key('C'),
+      to: key('D'),
+      measure,
+    });
+    expect(plan.chords.map((c) => c.nextIsChord)).toEqual([false, false]);
+  });
+
+  it('never flags the key indicator', () => {
+    const plan = buildTransposePlan({
+      lines: [line([run('Tom: C', 10)]), line([run('C F', 10)], 1, 600)],
+      from: key('C'),
+      to: key('D'),
+      measure,
+    });
+    expect(plan.keyIndicator).not.toBeNull();
+    expect(plan.keyIndicator!.nextIsChord).toBe(false);
+  });
+
   it('does not collide when an equal-length chord fits a one-space gap', () => {
     const noisy = (text: string) => text.length * 6.0000001;
     const plan = buildTransposePlan({
