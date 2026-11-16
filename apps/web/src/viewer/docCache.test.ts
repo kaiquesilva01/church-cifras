@@ -40,4 +40,17 @@ describe('createDocCache', () => {
     expect(b.doc.destroy).toHaveBeenCalled();
     expect(cache.peek('a')).toBeUndefined();
   });
+
+  it('never evicts the protected (displayed) path', () => {
+    const cache = createDocCache(3);
+    const [a, b, c, d] = [entry(), entry(), entry(), entry()];
+    cache.set('a', a);
+    cache.set('b', b);
+    cache.set('c', c);
+    // 'a' is the oldest but on screen: 'b' goes instead
+    cache.set('d', d, 'a');
+    expect(a.doc.destroy).not.toHaveBeenCalled();
+    expect(b.doc.destroy).toHaveBeenCalledTimes(1);
+    expect(cache.peek('a')).toBe(a);
+  });
 });

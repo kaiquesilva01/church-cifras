@@ -81,6 +81,20 @@ describe('createFirebase', () => {
     expect(getFunctions).toHaveBeenCalledWith(s.app, 'southamerica-east1');
   });
 
+  it('retries loading storage and functions after an import failure', async () => {
+    const s = createFirebase(baseEnv);
+    vi.mocked(getStorage).mockImplementationOnce(() => {
+      throw new Error('chunk gone');
+    });
+    await expect(s.loadStorage()).rejects.toThrow('chunk gone');
+    await expect(s.loadStorage()).resolves.toEqual({ name: 'storage' });
+    vi.mocked(getFunctions).mockImplementationOnce(() => {
+      throw new Error('chunk gone');
+    });
+    await expect(s.loadFunctions()).rejects.toThrow('chunk gone');
+    await expect(s.loadFunctions()).resolves.toEqual({ name: 'functions' });
+  });
+
   it('creates auth and firestore eagerly', () => {
     createFirebase(baseEnv);
     expect(getAuth).toHaveBeenCalled();
