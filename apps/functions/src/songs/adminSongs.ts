@@ -7,6 +7,14 @@ export type AdminDeps = {
   getSong(id: string): Promise<{ title: string; artistName: string } | null>;
   listArrangements(songId: string): Promise<ArrangementInfo[]>;
   deleteArrangementDoc(songId: string, slug: string): Promise<void>;
+  /**
+   * Em uma transação: lê os arranjos da música, chama `decide` (que escolhe o alvo ou lança)
+   * e apaga o doc do alvo. Duas exclusões concorrentes não deixam só tons gerados.
+   */
+  deleteArrangementGuarded(
+    songId: string,
+    decide: (all: ArrangementInfo[]) => ArrangementInfo,
+  ): Promise<ArrangementInfo>;
   deleteSongDoc(songId: string): Promise<void>;
   deleteFile(path: string): Promise<void>;
   /** Ids (até 2) das músicas com essa identidade (título normalizado + cantor). */
@@ -75,24 +83,24 @@ export async function deleteArrangement(
     throw new HttpsError('invalid-argument', 'Invalid key.');
   const slug = keySlug(parsed.name);
 
-  const all = await deps.listArrangements(songId);
-  const target = all.find((a) => a.slug === slug);
-  if (!target) throw new HttpsError('not-found', 'Arrangement not found.');
-
-  if (target.source === 'handmade') {
-    const others = all.filter((a) => a.slug !== slug);
-    const otherHandmade = others.some((a) => a.source === 'handmade');
-    const anyGenerated = others.some((a) => a.source === 'generated');
-    if (!otherHandmade && anyGenerated) {
-      throw new HttpsError(
-        'failed-precondition',
-        'Não é possível apagar o último PDF feito à mão enquanto houver tons gerados.',
-      );
+  const target = await deps.deleteArrangementGuarded(songId, (all) => {
+    const found = all.find((a) => a.slug === slug);
+    if (!found) throw new HttpsError('not-found', 'Arrangement not found.');
+    if (found.source === 'handmade') {
+      const others = all.filter((a) => a.slug !== slug);
+      const otherHandmade = others.some((a) => a.source === 'handmade');
+      const anyGenerated = others.some((a) => a.source === 'generated');
+      if (!otherHandmade && anyGenerated) {
+        throw new HttpsError(
+          'failed-precondition',
+          'Não é possível apagar o último PDF feito à mão enquanto houver tons gerados.',
+        );
+      }
     }
-  }
+    return found;
+  });
 
-  // Doc primeiro: o gatilho recalcula keys/handmadeKeys; arquivo órfão é só lixo.
-  await deps.deleteArrangementDoc(songId, slug);
+  // Doc apagado na transação (o gatilho recalcula keys/handmadeKeys); arquivo órfão é só lixo.
   await removeFile(deps, target.storagePath);
   return { songId, key: parsed.name };
 }

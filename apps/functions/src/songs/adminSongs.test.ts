@@ -24,12 +24,19 @@ function setup(
   } = {},
 ) {
   const log: string[] = [];
+  let guardCalls = 0;
   const updates: Array<[string, Record<string, unknown>]> = [];
   const deps: AdminDeps = {
     getSong: async () => (opts.song === false ? null : { title: 'Old', artistName: 'Old' }),
     listArrangements: async () => opts.arrangements ?? [],
     deleteArrangementDoc: async (songId, slug) => {
       log.push(`doc:${songId}/${slug}`);
+    },
+    deleteArrangementGuarded: async (songId, decide) => {
+      guardCalls += 1;
+      const target = decide(opts.arrangements ?? []);
+      log.push(`doc:${songId}/${target.slug}`);
+      return target;
     },
     deleteSongDoc: async (songId) => {
       log.push(`song:${songId}`);
@@ -44,7 +51,7 @@ function setup(
     },
     now: () => NOW,
   };
-  return { deps, log, updates };
+  return { deps, log, updates, guardCalls: () => guardCalls };
 }
 
 describe('updateSongMeta', () => {
@@ -169,6 +176,20 @@ describe('deleteArrangement', () => {
     await expect(deleteArrangement(deps, { songId: 's1', key: 'A' })).rejects.toMatchObject({
       code: 'not-found',
     });
+  });
+});
+
+describe('deleteArrangement transactional guard', () => {
+  it('decides inside the guarded delete, not from a separate listing', async () => {
+    const { deps, log, guardCalls } = setup({
+      arrangements: [arr('G', 'handmade'), arr('A', 'generated')],
+    });
+    deps.listArrangements = async () => {
+      throw new Error('must not list outside the transaction');
+    };
+    await deleteArrangement(deps, { songId: 's1', key: 'A' });
+    expect(guardCalls()).toBe(1);
+    expect(log).toEqual(['doc:s1/A', 'file:songs/s1/A-x.pdf']);
   });
 });
 

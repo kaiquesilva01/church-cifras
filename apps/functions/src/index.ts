@@ -141,6 +141,22 @@ const adminDeps: AdminDeps = {
   deleteArrangementDoc: async (songId, slug) => {
     await getFirestore().doc(`songs/${songId}/arrangements/${slug}`).delete();
   },
+  deleteArrangementGuarded: (songId, decide) => {
+    const db = getFirestore();
+    return db.runTransaction(async (tx) => {
+      const snap = await tx.get(db.collection(`songs/${songId}/arrangements`));
+      const target = decide(
+        snap.docs.map((d) => ({
+          slug: d.id,
+          key: String(d.data().key ?? ''),
+          source: String(d.data().source ?? ''),
+          storagePath: String(d.data().storagePath ?? ''),
+        })),
+      );
+      tx.delete(db.doc(`songs/${songId}/arrangements/${target.slug}`));
+      return target;
+    });
+  },
   deleteSongDoc: async (songId) => {
     await getFirestore().doc(`songs/${songId}`).delete();
   },
