@@ -1,5 +1,5 @@
 import { chip, expect, expectPdfRendered, shot, signInAs, ADMIN, test } from './fixtures/app';
-import { CROWDED_LINES } from './fixtures/pdf';
+import { COLLIDING_LINES } from './fixtures/pdf';
 import { seedSong } from './fixtures/emulator';
 import { lettersTag } from './fixtures/names';
 
@@ -62,12 +62,15 @@ test('Mudar tom opens a key that is already saved instead of generating it', asy
   await expect(chip(page, song.title, 'D')).toHaveAttribute('aria-current', 'true');
 });
 
-test('Mudar tom warns about chords that would touch their neighbours', async ({
-  page,
-}, testInfo) => {
+const CHORD_WARNING = '⚠ 1 acorde pode encostar no vizinho (em vermelho)';
+const KEY_WARNING = '⚠ O tom no título pode encostar no texto ao lado (em vermelho)';
+
+test('Mudar tom warns about a chord that would touch its neighbour', async ({ page }, testInfo) => {
   const tag = lettersTag();
+  // The PDF heading is short and fixed, so the key indicator "(C#)" never reaches the margin; the
+  // song title in the app stays unique.
   const song = await seedSong(`Canto Apertado ${tag}`, `Cantor Teste ${tag}`, [
-    { key: 'C', chordLines: CROWDED_LINES },
+    { key: 'C', chordLines: COLLIDING_LINES, heading: 'Canto Apertado - Cantor (C)' },
   ]);
   await signInAs(page, ADMIN, 'Admin');
   await page.goto(`/musicas/${song.id}`);
@@ -75,11 +78,43 @@ test('Mudar tom warns about chords that would touch their neighbours', async ({
 
   await openPanel(page, 'C');
   await keyButton(page, 'C#').click();
-  await expect(page.getByRole('status').filter({ hasText: /encostar no vizinho/ })).toBeVisible();
+  await expect(page.getByText(CHORD_WARNING, { exact: true })).toBeVisible();
+  await expect(page.getByText(KEY_WARNING)).toHaveCount(0);
+
+  // With the side panel open (desktop) the page is refitted and not covered by it.
+  if (testInfo.project.name === 'desktop') {
+    const canvas = page.locator('.pdf-page canvas').first();
+    const panel = page.locator('.key-panel');
+    await expect
+      .poll(async () => {
+        const c = await canvas.boundingBox();
+        const p = await panel.boundingBox();
+        return c && p ? p.x - (c.x + c.width) : -1;
+      })
+      .toBeGreaterThanOrEqual(0);
+  }
   await shot(page, testInfo, 'transpose-4-collision-warning');
 
   // Cancelling leaves the song untouched.
   await page.getByRole('button', { name: 'Cancelar' }).click();
   await expect(page.getByRole('heading', { name: /Mudar tom/ })).toHaveCount(0);
   await expect(chip(page, song.title, 'C#')).toHaveCount(0);
+});
+
+test('Mudar tom warns when the key in the title would reach the margin', async ({
+  page,
+}, testInfo) => {
+  const tag = lettersTag();
+  const song = await seedSong(`Titulo Largo ${tag}`, `Cantor Teste ${tag}`, [
+    { key: 'C', heading: 'Titulo Largo - Cantor (C)', headingEndX: 571 },
+  ]);
+  await signInAs(page, ADMIN, 'Admin');
+  await page.goto(`/musicas/${song.id}`);
+  await expectPdfRendered(page);
+
+  await openPanel(page, 'C');
+  await keyButton(page, 'C#').click();
+  await expect(page.getByText(KEY_WARNING, { exact: true })).toBeVisible();
+  await expect(page.getByText(/encostar no vizinho/)).toHaveCount(0);
+  await shot(page, testInfo, 'transpose-5-key-collision-warning');
 });

@@ -44,6 +44,8 @@ export interface SeedKey {
   source?: 'handmade' | 'generated';
   derivedFromKey?: string;
   chordLines?: Array<Array<[number, string]>>;
+  heading?: string;
+  headingEndX?: number;
 }
 
 export interface SeededSong {
@@ -91,6 +93,8 @@ export async function seedSong(
       artist,
       key: entry.key,
       chordLines: entry.chordLines,
+      heading: entry.heading,
+      headingEndX: entry.headingEndX,
     });
     await ok(
       await fetch(

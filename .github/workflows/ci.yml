@@ -99,4 +99,5 @@ jobs:
           path: |
             e2e/playwright-report
             e2e/test-results
+            e2e/artifacts
           retention-days: 7

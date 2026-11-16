@@ -6,6 +6,13 @@ export interface SyntheticSong {
   key: string;
   /** Chord lines as [x, chord] pairs; each one gets a made-up lyric line below it. */
   chordLines?: Array<Array<[x: number, chord: string]>>;
+  /**
+   * Right-aligns the heading so it ends at this x (points). Page width is 595 and the app's right
+   * margin limit is about 575, so ending at 571 lets "(C)" fit but "(C#)" overflow.
+   */
+  headingEndX?: number;
+  /** Heading text; defaults to "title - artist (key)". Keeps the title short while the song title stays unique. */
+  heading?: string;
 }
 
 const LYRICS = [
@@ -42,20 +49,17 @@ const DEFAULT_LINES: Array<Array<[number, string]>> = [
 ];
 
 /**
- * Chords close enough that a longer transposed name (C -> Db, F -> Gb) runs into its neighbour,
- * so the "Mudar tom" panel warns about collisions.
+ * Deterministic collision that survives the reflow: C7 (ends at 52) and F (at 62) are more than 1.5
+ * spaces apart, so they are not a packed run, and C# 7 (18 wide) runs into F. Nothing else collides.
  */
-export const CROWDED_LINES: Array<Array<[number, string]>> = [
+export const COLLIDING_LINES: Array<Array<[number, string]>> = [
   [
-    [40, 'C'],
-    [49, 'F'],
-    [58, 'G'],
-    [67, 'C'],
+    [40, 'C7'],
+    [62, 'F'],
   ],
   [
-    [40, 'F'],
-    [49, 'C'],
-    [58, 'G'],
+    [40, 'G'],
+    [140, 'Am'],
   ],
 ];
 
@@ -68,8 +72,13 @@ export async function syntheticPdf(song: SyntheticSong): Promise<Buffer> {
   const lyricFont = await doc.embedFont(StandardFonts.Courier);
 
   const top = 842 - 50;
-  page.drawText(`${song.title} - ${song.artist} (${song.key})`, {
-    x: 40,
+  const headingText = song.heading ?? `${song.title} - ${song.artist} (${song.key})`;
+  const headingX =
+    song.headingEndX === undefined
+      ? 40
+      : song.headingEndX - heading.widthOfTextAtSize(headingText, 16);
+  page.drawText(headingText, {
+    x: headingX,
     y: top,
     size: 16,
     font: heading,
