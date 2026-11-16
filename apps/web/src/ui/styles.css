@@ -1038,3 +1038,87 @@ button.fab {
   font-weight: 600;
   cursor: pointer;
 }
+
+.setlist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.setlist-menu {
+  position: relative;
+}
+
+.setlist-menu-list {
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.setlist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.setlist-item-number {
+  min-width: 1.5em;
+  text-align: right;
+}
+
+.setlist-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.setlist-item-main a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.setlist-item-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.add-song-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-bottom: 0;
+}
+
+.add-song-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.add-song-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
