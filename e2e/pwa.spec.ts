@@ -76,11 +76,6 @@ test('an already-visited cifra paints in under 1 s on Fast 4G with a 4x slower C
   context,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'the budget is a phone metric');
-  // Measured 1110-1220 ms (budget 1000 ms): the route chunk waits for Firebase Auth, which loads the
-  // gapi iframe first (+530 ms on Fast 4G), then the PDF chain follows. Expected failure until the
-  // product gets under budget; the threshold stays at 1000 ms. When this starts passing, remove the line.
-  test.fail(true, 'revisit budget not met yet (about 1.1 s); see the comment above');
-
   const tag = lettersTag();
   const song = await seedSong(`Revisita Rapida ${tag}`, `Cantor Teste ${tag}`, [{ key: 'C' }]);
 
