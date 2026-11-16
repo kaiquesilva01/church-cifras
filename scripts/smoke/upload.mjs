@@ -549,6 +549,31 @@ async function adminCallablesScenario(admin, adminSdk, adminUid, member) {
   await expectGone(admin, `songs/${songB}/arrangements/C`, b.C, 'deleteSong C');
   await expectGone(admin, `songs/${songB}/arrangements/D`, b.D, 'deleteSong D');
   log('deleteSong: song doc, arrangement docs and files gone');
+
+  step = 'deleting a handmade source while another handmade remains';
+  const songC = `${songId}c`;
+  const c = await seedSong(admin, adminSdk, adminUid, songC, [
+    ['C', 'handmade', null],
+    ['G', 'handmade', null],
+    ['D', 'generated', 'C'],
+  ]);
+  await waitForSong(admin, { keys: ['C', 'D', 'G'], handmadeKeys: ['C', 'G'] }, 'seed C', songC);
+  result = await callFunction('deleteArrangement', admin, { songId: songC, key: 'C' });
+  expectOk(result, 'deleteArrangement handmade C with G left');
+  await expectGone(admin, `songs/${songC}/arrangements/C`, c.C, 'delete handmade C');
+  await waitForSong(admin, { keys: ['D', 'G'], handmadeKeys: ['G'] }, 'after delete C', songC);
+  log('deleteArrangement handmade C while G remains -> ok, keys [D,G], handmadeKeys [G]');
+
+  step = 'generated E derived from the remaining handmade G';
+  const ePath = `songs/${songC}/E-file${runId}.pdf`;
+  let response = await uploadFile(adminSdk, ePath, adminUid);
+  if (!response.ok) fail(`upload E: ${response.status} ${response.error?.message}`);
+  response = await commit(admin, [
+    arrangementWrite(adminUid, 'E', 'E', ePath, 'generated', 'G', songC),
+  ]);
+  if (!response.ok) fail(`commit E from G: ${response.status} ${await response.text()}`);
+  await waitForSong(admin, { keys: ['D', 'E', 'G'], handmadeKeys: ['G'] }, 'generated E', songC);
+  log('generated E from handmade G after deleting C -> OK');
 }
 
 try {
