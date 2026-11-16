@@ -100,7 +100,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
           onChange={(e) => setQuery(e.target.value)}
         />
       )}
-      {tab.id !== 'repertorios' && <NextCultoCard setlists={setlists} today={today} now={now} />}
+      <NextCultoCard setlists={setlists} today={today} now={now} />
       <nav aria-label="Seções" className="tabs">
         {TABS.map((t) => (
           <Link

@@ -225,6 +225,17 @@ describe('HomePage', () => {
       );
     });
 
+    it('shows the next-service card on the Repertórios tab only when a future setlist exists', () => {
+      const { unmount } = renderHome({
+        path: '/?aba=repertorios',
+        setlists: [makeSetlist({ id: 'a', date: '2026-11-22', label: 'Domingo' })],
+      });
+      expect(screen.getByText('Próximo culto')).toBeInTheDocument();
+      unmount();
+      renderHome({ path: '/?aba=repertorios' });
+      expect(screen.queryByText('Próximo culto')).not.toBeInTheDocument();
+    });
+
     it('shows the right FAB per tab and role', () => {
       const { unmount } = renderHome({ role: 'member', path: '/?aba=repertorios' });
       expect(screen.getByRole('button', { name: '＋ Novo repertório' })).toBeInTheDocument();
