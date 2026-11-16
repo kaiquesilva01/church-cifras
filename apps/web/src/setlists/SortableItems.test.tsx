@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
-import { handleDragEnd, SortableItems } from './SortableItems';
+import { handleDragEnd, ptBrAccessibility, SortableItems } from './SortableItems';
 import type { SetlistItem } from './types';
 
 const items: SetlistItem[] = [
@@ -34,6 +34,7 @@ describe('SortableItems', () => {
     const handle = screen.getByRole('button', { name: 'Arrastar Música 0' });
     expect(handle).toHaveTextContent('≡');
     expect(handle.style.touchAction).toBe('none');
+    expect(handle).toHaveAttribute('aria-roledescription', 'item reordenável');
     expect(screen.getAllByRole('button')).toHaveLength(3);
     expect(screen.getByRole('list').style.touchAction).toBe('');
   });
@@ -62,5 +63,38 @@ describe('handleDragEnd', () => {
     handleDragEnd(items, { active: { id: 'a' }, over: { id: 'a' } }, onMove);
     expect(onMove).not.toHaveBeenCalled();
     fireEvent.click(document.body);
+  });
+});
+
+describe('ptBrAccessibility', () => {
+  const titles = new Map([
+    ['a', 'Sonda-me'],
+    ['b', 'Ressuscita-me'],
+    ['c', 'Grande é o Senhor'],
+  ]);
+  const { announcements, screenReaderInstructions } = ptBrAccessibility(items, titles);
+  const a = { id: 'a' };
+  const b = { id: 'b' };
+
+  it('gives instructions in pt-BR', () => {
+    expect(screenReaderInstructions.draggable).toMatch(/espaço/);
+    expect(screenReaderInstructions.draggable).toMatch(/Esc/);
+  });
+  it('announces with titles and positions', () => {
+    expect(announcements.onDragStart!({ active: a } as never)).toBe(
+      'Pegou Sonda-me. Posição 1 de 3.',
+    );
+    expect(announcements.onDragOver!({ active: a, over: b } as never)).toBe(
+      'Sonda-me movido para a posição 2 de 3.',
+    );
+    expect(announcements.onDragEnd!({ active: a, over: b } as never)).toBe(
+      'Sonda-me solto na posição 2 de 3.',
+    );
+    expect(announcements.onDragEnd!({ active: a, over: null } as never)).toBe(
+      'Sonda-me solto na posição original.',
+    );
+    expect(announcements.onDragCancel!({ active: a, over: null } as never)).toBe(
+      'Movimento cancelado.',
+    );
   });
 });

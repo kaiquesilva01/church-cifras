@@ -31,7 +31,12 @@ function Probe() {
 
 function mount(
   api: ReturnType<typeof fakeSetlistApi>,
-  { role = 'member', path = '/repertorios/r1', songs = sampleSongs }: Record<string, unknown> = {},
+  {
+    role = 'member',
+    path = '/repertorios/r1',
+    songs = sampleSongs,
+    catalog,
+  }: Record<string, unknown> = {},
 ) {
   const auth: AuthState = {
     status: 'signed-in',
@@ -44,7 +49,12 @@ function mount(
   return render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[path as string]}>
-        <SongsProvider api={fakeCatalogApi(songs as typeof sampleSongs)}>
+        <SongsProvider
+          api={
+            (catalog as ReturnType<typeof fakeCatalogApi>) ??
+            fakeCatalogApi(songs as typeof sampleSongs)
+          }
+        >
           <ActiveSetlistProvider api={api}>
             <Probe />
             <Routes>
@@ -133,6 +143,24 @@ describe('SetlistPage read', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }));
     expect(order()[0]).toContain('Ressuscita-me');
     expect(screen.queryByText('O repertório foi alterado.')).not.toBeInTheDocument();
+  });
+});
+
+describe('SetlistPage catalog error', () => {
+  it('shows an alert instead of claiming songs were removed', async () => {
+    const catalog = fakeCatalogApi(sampleSongs, {
+      subscribeSongs: (_cb, onError) => {
+        onError(new Error('boom'));
+        return () => undefined;
+      },
+    });
+    mount(withItems([a, b]), { catalog });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível carregar as músicas.',
+    );
+    expect(screen.queryByText('Música removida')).not.toBeInTheDocument();
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Adicionar/)).not.toBeInTheDocument();
   });
 });
 

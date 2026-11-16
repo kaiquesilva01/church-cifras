@@ -64,6 +64,20 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
       </section>
     );
   }
+  if (songsStatus === 'error') {
+    // Sem o catálogo não dá para saber quais músicas existem: não mostramos a lista
+    // (senão tudo apareceria como "Música removida") nem controles que dependem dela.
+    return (
+      <section>
+        <p role="alert" className="error">
+          Não foi possível carregar as músicas.
+        </p>
+        <Link to={BACK} className="back">
+          Voltar aos repertórios
+        </Link>
+      </section>
+    );
+  }
   const { shown } = active;
   if (active.status === 'loading' || !shown || songsStatus === 'loading') {
     return (
@@ -195,6 +209,9 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
         <SortableItems
           items={items}
           editable={editable}
+          titles={
+            new Map(items.map((i) => [i.id, songsById.get(i.songId)?.title ?? 'Música removida']))
+          }
           onMove={(itemId, afterItemId) => void run({ type: 'move', itemId, afterItemId })}
           renderRow={(item, index, drag) => (
             <SetlistItemRow

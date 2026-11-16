@@ -1,5 +1,6 @@
 import {
   closestCenter,
+  type Announcements,
   DndContext,
   KeyboardSensor,
   PointerSensor,
@@ -13,7 +14,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { CSSProperties, ReactNode } from 'react';
+import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { afterIdForDrop } from './dnd';
 import type { SetlistItem } from './types';
 
@@ -27,6 +28,8 @@ export interface RowDrag {
 export interface SortableItemsProps {
   items: SetlistItem[];
   editable: boolean;
+  /** id do item → título, para os anúncios de leitor de tela. */
+  titles?: ReadonlyMap<string, string>;
   onMove: (itemId: string, afterItemId: string | null) => void;
   renderRow: (item: SetlistItem, index: number, drag: RowDrag | undefined) => ReactNode;
 }
@@ -46,6 +49,34 @@ export function handleDragEnd(
   const activeId = String(event.active.id);
   const after = afterIdForDrop(items, activeId, String(event.over.id));
   if (after !== undefined) onMove(activeId, after);
+}
+
+const ROLE_DESCRIPTION = 'item reordenável';
+
+/** Instruções e anúncios para leitores de tela em pt-BR (o padrão do dnd-kit é inglês). */
+export function ptBrAccessibility(items: SetlistItem[], titles: ReadonlyMap<string, string>) {
+  const name = (id: string | number): string => titles.get(String(id)) ?? 'Música removida';
+  const where = (id: string | number): string => {
+    const index = items.findIndex((i) => i.id === String(id));
+    return `${index + 1} de ${items.length}`;
+  };
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Pegou ${name(active.id)}. Posição ${where(active.id)}.`,
+    onDragOver: ({ active, over }) =>
+      over ? `${name(active.id)} movido para a posição ${where(over.id)}.` : undefined,
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `${name(active.id)} solto na posição ${where(over.id)}.`
+        : `${name(active.id)} solto na posição original.`,
+    onDragCancel: () => 'Movimento cancelado.',
+  };
+  return {
+    announcements,
+    screenReaderInstructions: {
+      draggable:
+        'Para pegar um item, pressione espaço. Use as setas para mover e espaço para soltar; Esc cancela.',
+    },
+  };
 }
 
 function SortableRow({
@@ -69,6 +100,7 @@ function SortableRow({
       style={{ touchAction: 'none' }}
       {...attributes}
       {...listeners}
+      aria-roledescription={ROLE_DESCRIPTION}
     >
       ≡
     </button>
@@ -76,10 +108,15 @@ function SortableRow({
   return <>{renderRow(item, index, { setNodeRef, style, handle })}</>;
 }
 
-export function SortableItems({ items, editable, onMove, renderRow }: SortableItemsProps) {
+export function SortableItems({ items, editable, titles, onMove, renderRow }: SortableItemsProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const accessibility = useMemo(
+    () => ptBrAccessibility(items, titles ?? new Map()),
+    [items, titles],
   );
 
   if (!editable) {
@@ -88,6 +125,7 @@ export function SortableItems({ items, editable, onMove, renderRow }: SortableIt
   return (
     <DndContext
       sensors={sensors}
+      accessibility={accessibility}
       collisionDetection={closestCenter}
       onDragEnd={(event) => handleDragEnd(items, event, onMove)}
     >
