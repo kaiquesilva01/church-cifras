@@ -7,7 +7,8 @@
   "types": "src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "fonts:subset": "node scripts/subset-fonts.mjs"
   },
   "dependencies": {
     "@cifras/chords": "0.0.0",
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@cifras/pdf": "0.0.0",
+    "subset-font": "2.9.0",
     "typescript": "6.0.3",
     "vitest": "5.1.0"
   },
@@ -28,6 +30,13 @@
       "types": "./src/light.ts",
       "default": "./src/light.ts"
     },
-    "./fonts/*": "./fonts/*"
+    "./fonts/LiberationMono-Bold.ttf": "./fonts/LiberationMono-Bold.ttf",
+    "./fonts/LiberationMono-Regular.ttf": "./fonts/LiberationMono-Regular.ttf",
+    "./fonts/LiberationSans-Bold.ttf": "./fonts/LiberationSans-Bold.ttf",
+    "./fonts/LiberationSans-Regular.ttf": "./fonts/LiberationSans-Regular.ttf",
+    "./fonts/Roboto-Bold.ttf": "./fonts/Roboto-Bold.ttf",
+    "./fonts/Roboto-Regular.ttf": "./fonts/Roboto-Regular.ttf",
+    "./fonts/RobotoMono-Bold.ttf": "./fonts/RobotoMono-Bold.ttf",
+    "./fonts/RobotoMono-Regular.ttf": "./fonts/RobotoMono-Regular.ttf"
   }
 }

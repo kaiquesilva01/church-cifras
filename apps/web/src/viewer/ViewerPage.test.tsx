@@ -41,6 +41,7 @@ function renderViewer(path: string, api = fakeCatalogApi()) {
     status: 'signed-in',
     user: testUser,
     role: 'member',
+    prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),
   };
@@ -70,7 +71,8 @@ describe('ViewerPage', () => {
     const { api } = renderViewer('/musicas/s1?tom=A');
     expect(screen.getByRole('status')).toHaveTextContent('Carregando cifra…');
     expect(screen.getByText('Aline Barros')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Sonda-me' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sonda-me' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Voltar' })).toHaveAttribute('href', '/');
     expect(screen.getByRole('link', { name: 'Sonda-me, tom A' })).toHaveAttribute(
       'aria-current',
       'true',
@@ -137,5 +139,23 @@ describe('ViewerPage', () => {
     await screen.findByTestId('pdf-pages');
     fireEvent.click(screen.getByRole('button', { name: 'fail-preview' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível mostrar a prévia.');
+  });
+
+  it('fetches a path once when switching A to B and back to A while A is loading', async () => {
+    let resolveA: (bytes: Uint8Array) => void = () => undefined;
+    const getPdfBytes = vi.fn((path: string) =>
+      path.endsWith('A-abc.pdf')
+        ? new Promise<Uint8Array>((resolve) => (resolveA = resolve))
+        : Promise.resolve(new Uint8Array([37, 80, 68, 70])),
+    );
+    const api = fakeCatalogApi(undefined, { getPdfBytes });
+    renderViewer('/musicas/s1?tom=A', api);
+    fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom G' }));
+    await screen.findByTestId('pdf-pages');
+    fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom A' }));
+    resolveA(new Uint8Array([37, 80, 68, 70]));
+    await screen.findByTestId('pdf-pages');
+    const fetchesOfA = getPdfBytes.mock.calls.filter(([path]) => path.endsWith('A-abc.pdf'));
+    expect(fetchesOfA).toHaveLength(1);
   });
 });

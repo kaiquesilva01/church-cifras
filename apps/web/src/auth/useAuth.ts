@@ -6,6 +6,7 @@ export interface AuthState {
   status: 'loading' | 'signed-out' | 'signed-in';
   user: SessionUser | null;
   role: Role;
+  prepareSignIn(): Promise<void>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
 }

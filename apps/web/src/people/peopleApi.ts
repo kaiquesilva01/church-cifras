@@ -1,5 +1,4 @@
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
 import { isRole, type Role } from '../auth/roles';
 import type { FirebaseServices } from '../lib/firebase';
 
@@ -25,18 +24,24 @@ export function toPersonRow(uid: string, data: Record<string, unknown>): PersonR
   };
 }
 
-export function createPeopleApi({ db, functions }: FirebaseServices): PeopleApi {
-  const callSetUserRole = httpsCallable<{ uid: string; role: Role }, unknown>(
-    functions,
-    'setUserRole',
-  );
+export function createPeopleApi({ db, loadFunctions }: FirebaseServices): PeopleApi {
   return {
     listUsers: async () => {
       const snap = await getDocs(query(collection(db, 'users'), orderBy('displayName')));
       return snap.docs.map((d) => toPersonRow(d.id, d.data()));
     },
     setRole: async (uid, role) => {
-      await callSetUserRole({ uid, role });
+      const [{ httpsCallable }, functions] = await Promise.all([
+        import('firebase/functions'),
+        loadFunctions(),
+      ]);
+      await httpsCallable<{ uid: string; role: Role }, unknown>(
+        functions,
+        'setUserRole',
+      )({
+        uid,
+        role,
+      });
     },
   };
 }

@@ -134,6 +134,24 @@ describe('KeyPanel', () => {
     ).toBeInTheDocument();
   });
 
+  it('warns about the key indicator separately from chords', () => {
+    setup({ keyCollision: true });
+    expect(
+      screen.getByText('⚠ O tom no título pode encostar no texto ao lado (em vermelho)'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/acorde/)).not.toBeInTheDocument();
+  });
+
+  it('shows both warnings when chords and the key indicator collide', () => {
+    setup({ collisions: 2, keyCollision: true });
+    expect(
+      screen.getByText('⚠ 2 acordes podem encostar no vizinho (em vermelho)'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('⚠ O tom no título pode encostar no texto ao lado (em vermelho)'),
+    ).toBeInTheDocument();
+  });
+
   it('shows preparing, errors and the unavailable message', () => {
     setup({ preparing: true, error: 'Falhou', unavailable: true, target: 'D' });
     expect(screen.getByRole('status')).toHaveTextContent('Preparando…');

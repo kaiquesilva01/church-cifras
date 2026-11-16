@@ -23,6 +23,7 @@ function renderPage(api: PeopleApi) {
     status: 'signed-in',
     user: testUser,
     role: 'admin',
+    prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),
   };

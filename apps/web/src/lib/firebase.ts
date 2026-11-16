@@ -1,5 +1,11 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  connectAuthEmulator,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  type Auth,
+} from 'firebase/auth';
 import {
   connectFirestoreEmulator,
   initializeFirestore,
@@ -7,8 +13,8 @@ import {
   persistentMultipleTabManager,
   type Firestore,
 } from 'firebase/firestore';
-import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
-import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
+import type { Functions } from 'firebase/functions';
+import type { FirebaseStorage } from 'firebase/storage';
 
 export interface WebEnv {
   VITE_FIREBASE_API_KEY: string;
@@ -24,8 +30,9 @@ export interface FirebaseServices {
   app: FirebaseApp;
   auth: Auth;
   db: Firestore;
-  storage: FirebaseStorage;
-  functions: Functions;
+  /** Storage e Functions só são baixados (import dinâmico) no primeiro uso. */
+  loadStorage(): Promise<FirebaseStorage>;
+  loadFunctions(): Promise<Functions>;
 }
 
 export const FUNCTIONS_REGION = 'southamerica-east1';
@@ -38,7 +45,11 @@ export function createFirebase(env: WebEnv): FirebaseServices {
     storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
     appId: env.VITE_FIREBASE_APP_ID,
   });
-  const auth = getAuth(app);
+  // No popupRedirectResolver here: getAuth wires it in and loads the Google API iframe (apis.google.com)
+  // at startup, which delays the first auth state. signInWithPopup receives the resolver explicitly.
+  const auth = initializeAuth(app, {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+  });
   // Cache persistente só onde há IndexedDB (navegador); jsdom/SSR usam o cache em memória.
   const db = initializeFirestore(
     app,
@@ -46,16 +57,38 @@ export function createFirebase(env: WebEnv): FirebaseServices {
       ? {}
       : { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) },
   );
-  const storage = getStorage(app);
-  const functions = getFunctions(app, FUNCTIONS_REGION);
+  const useEmulators = env.VITE_USE_EMULATORS === 'true';
+  const host = env.VITE_EMULATOR_HOST;
 
-  if (env.VITE_USE_EMULATORS === 'true') {
-    const host = env.VITE_EMULATOR_HOST;
+  if (useEmulators) {
     connectAuthEmulator(auth, `http://${host}:9099`);
     connectFirestoreEmulator(db, host, 8080);
-    connectStorageEmulator(storage, host, 9199);
-    connectFunctionsEmulator(functions, host, 5001);
   }
 
-  return { app, auth, db, storage, functions };
+  // A failed import (offline, chunk gone after a deploy) must not stick: the next call tries again.
+  const lazy = <T>(load: () => Promise<T>): (() => Promise<T>) => {
+    let promise: Promise<T> | undefined;
+    return () => {
+      const current = (promise ??= load().catch((error: unknown) => {
+        promise = undefined;
+        throw error;
+      }));
+      return current;
+    };
+  };
+
+  const loadStorage = lazy(async (): Promise<FirebaseStorage> => {
+    const { getStorage, connectStorageEmulator } = await import('firebase/storage');
+    const storage = getStorage(app);
+    if (useEmulators) connectStorageEmulator(storage, host, 9199);
+    return storage;
+  });
+  const loadFunctions = lazy(async (): Promise<Functions> => {
+    const { getFunctions, connectFunctionsEmulator } = await import('firebase/functions');
+    const functions = getFunctions(app, FUNCTIONS_REGION);
+    if (useEmulators) connectFunctionsEmulator(functions, host, 5001);
+    return functions;
+  });
+
+  return { app, auth, db, loadStorage, loadFunctions };
 }

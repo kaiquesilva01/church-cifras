@@ -54,6 +54,12 @@ body {
   text-decoration: none;
 }
 
+.header-inner nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .nav-link {
   color: var(--color-accent);
   text-decoration: none;
@@ -427,6 +433,11 @@ body {
   margin-bottom: 14px;
 }
 
+.field > label {
+  display: block;
+  margin-bottom: 8px;
+}
+
 .field-head {
   display: flex;
   align-items: baseline;
@@ -513,6 +524,9 @@ body {
 
 .viewer {
   display: grid;
+  /* minmax(0, ...): the track must be able to shrink below the pdf canvas width, or the side
+     panel's padding never narrows the page and the canvas is not refit. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   padding-bottom: 72px;
 }
@@ -521,14 +535,39 @@ body {
   display: contents;
 }
 
-.viewer-head .back {
+.viewer-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.viewer-title h1 {
+  margin: 0;
+  /* Centers the first line on the chevron (44px box) even when the title wraps. */
+  padding-top: 10px;
   font-size: 1.125rem;
   font-weight: 600;
-  color: var(--color-text);
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.back-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  /* The glyph is centred in the 44 px target: pull the box left so the chevron meets the content edge. */
+  margin-left: -12px;
+  color: var(--color-accent);
+  font-size: 1.75rem;
+  line-height: 1;
   text-decoration: none;
 }
 
 .pdf-pages {
+  min-width: 0;
   display: grid;
   gap: 12px;
   justify-items: center;
@@ -770,14 +809,15 @@ body {
 }
 
 /* Importar em lote (desktop) */
-.page:has(.import-page) {
-  max-width: 1240px;
-}
-
 .import-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+}
+
+.import-head .chip {
+  white-space: nowrap;
 }
 
 .chip {
@@ -877,6 +917,10 @@ body {
   padding: 6px 8px;
 }
 
+.pill:not(.pill-red) {
+  white-space: nowrap;
+}
+
 .pill {
   display: inline-block;
   padding: 2px 10px;
@@ -934,4 +978,35 @@ body {
 
 .cancel-btn {
   margin-right: auto;
+}
+
+.update-prompt {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--color-text);
+  color: var(--color-on-accent);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+}
+
+.update-prompt button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }

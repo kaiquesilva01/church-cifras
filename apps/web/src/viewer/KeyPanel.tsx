@@ -11,6 +11,8 @@ export interface KeyPanelProps {
   /** Confirms the target: generates it, or opens it when it is already saved. */
   onConfirm: () => void;
   collisions: number;
+  /** The key indicator in the title may touch the text beside it. */
+  keyCollision?: boolean;
   suspects: string[];
   busy: boolean;
   layout: 'sheet' | 'side';
@@ -30,6 +32,7 @@ export function KeyPanel({
   onCancel,
   onConfirm,
   collisions,
+  keyCollision = false,
   suspects,
   busy,
   layout,
@@ -128,6 +131,11 @@ export function KeyPanel({
       {collisions > 0 && (
         <p role="status" className="key-warning">
           {`⚠ ${collisions} ${collisions === 1 ? 'acorde pode' : 'acordes podem'} encostar no vizinho (em vermelho)`}
+        </p>
+      )}
+      {keyCollision && (
+        <p role="status" className="key-warning">
+          ⚠ O tom no título pode encostar no texto ao lado (em vermelho)
         </p>
       )}
       {suspects.length > 0 && (

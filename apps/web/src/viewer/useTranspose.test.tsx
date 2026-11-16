@@ -38,8 +38,13 @@ describe('useTranspose', () => {
       ]),
     );
     act(() => result.current.setTarget('Ab'));
-    expect(result.current.collisions).toBe(result.current.ops.filter((o) => o.collides).length);
+    const { ops } = result.current;
+    // The key indicator in the title is not a chord: it is reported on its own.
+    expect(result.current.collisions).toBe(
+      ops.filter((o) => o.kind === 'chord' && o.collides).length,
+    );
     expect(result.current.collisions).toBeGreaterThan(0);
+    expect(result.current.keyCollision).toBe(ops.some((o) => o.kind === 'key' && o.collides));
   });
 
   it('memoizes per target and stays under 100 ms', () => {

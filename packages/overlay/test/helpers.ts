@@ -22,15 +22,15 @@ export async function loadAllFonts(): Promise<LoadedFonts> {
 }
 
 // pdf-lib names the embedded font `<Family>-<Weight>-<random digits>`; originals have no digits.
-const SUBSTITUTE = /(Liberation|Roboto).*-\d+$/;
+const SUBSTITUTE = /(Cifras|Roboto).*-\d+$/;
 const MERGE_SLACK_EM = 0.6;
 
 // pdf.js merges neighbouring chunks of the same font into one item ("A/C#G9"), so the op's text is
 // searched inside each substitute-font run and its x is rebuilt from the measured prefix width.
 const originalFamily = (fontName: string): string => {
-  const family = /LiberationMono/.test(fontName)
+  const family = /CifrasMono/.test(fontName)
     ? 'Courier'
-    : /LiberationSans/.test(fontName)
+    : /CifrasSans/.test(fontName)
       ? 'Arial'
       : /RobotoMono/.test(fontName)
         ? 'RobotoMono'

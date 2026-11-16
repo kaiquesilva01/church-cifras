@@ -47,6 +47,7 @@ export async function runImport(
         try {
           result = { status: await worker(row) };
         } catch (error) {
+          console.error(`Falha ao importar ${row.fileName}`, error);
           result = { status: 'error', message: describeError(error) };
         }
         results.set(row.id, result);

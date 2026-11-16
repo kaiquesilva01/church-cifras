@@ -30,3 +30,4 @@ apps/functions/lib/
 *.local
 .vite/
 firebase-export-*/
+e2e/artifacts/

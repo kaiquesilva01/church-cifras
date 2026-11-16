@@ -420,6 +420,137 @@ describe('ImportPage', () => {
     expect(leave()).toBe(false);
   });
 
+  it('shows each row as soon as its file is read, in selection order', async () => {
+    const gates = new Map<string, () => void>();
+    const { readPdf } = setup();
+    vi.mocked(readPdf).mockImplementation(
+      (f: File) =>
+        new Promise((resolve) => {
+          gates.set(f.name, () => resolve(result({ title: f.name })));
+        }),
+    );
+    addFiles([pdf('a.pdf'), pdf('b.pdf')]);
+    await waitFor(() => expect(gates.size).toBe(2));
+    await act(async () => gates.get('b.pdf')!());
+    expect(screen.getByLabelText('Música de b.pdf')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Música de a.pdf')).not.toBeInTheDocument();
+    expect(screen.getByText('Lendo 1 de 2…')).toBeInTheDocument();
+    await act(async () => gates.get('a.pdf')!());
+    const names = screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((r) => r.getAttribute('aria-label'));
+    expect(names).toEqual(['a.pdf', 'b.pdf']);
+    await waitFor(() => expect(within(rowOf('a.pdf')).getByText('pronto')).toBeVisible());
+  });
+
+  it('keeps the import button disabled until every read finishes', async () => {
+    const gates = new Map<string, () => void>();
+    const { readPdf } = setup();
+    vi.mocked(readPdf).mockImplementation(
+      (f: File) =>
+        new Promise((resolve) => {
+          gates.set(f.name, () => resolve(result({ title: f.name })));
+        }),
+    );
+    addFiles([pdf('a.pdf'), pdf('b.pdf')]);
+    await waitFor(() => expect(gates.size).toBe(2));
+    await act(async () => gates.get('a.pdf')!());
+    await new Promise((r) => setTimeout(r, 400));
+    expect(screen.getByRole('button', { name: /^Importar \d+ prontos$/ })).toBeDisabled();
+    await act(async () => gates.get('b.pdf')!());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Importar 2 prontos' })).toBeEnabled(),
+    );
+  });
+
+  it('removes a single row and its result', async () => {
+    setup({ reads: { 'a.pdf': result({ title: 'A' }), 'b.pdf': result({ title: 'B' }) } });
+    addFiles([pdf('a.pdf'), pdf('b.pdf')]);
+    await waitFor(() => expect(within(rowOf('b.pdf')).getByText('pronto')).toBeVisible());
+    fireEvent.click(screen.getByRole('button', { name: 'Remover a.pdf' }));
+    expect(screen.queryByLabelText('Música de a.pdf')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Música de b.pdf')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Importar 1 prontos' })).toBeEnabled(),
+    );
+    expect(screen.getByText('1 arquivos · 1 prontos')).toBeInTheDocument();
+  });
+
+  it('disables Remover and Limpar lista while importing, and enables them after', async () => {
+    let finish!: () => void;
+    setup({
+      reads: { 'a.pdf': result({ title: 'A' }) },
+      api: {
+        createSongWithArrangement: vi.fn(
+          () => new Promise<string>((resolve) => (finish = () => resolve('id'))),
+        ),
+      },
+    });
+    addFiles([pdf('a.pdf')]);
+    const button = await screen.findByRole('button', { name: 'Importar 1 prontos' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await screen.findByText('Importando 0 de 1…');
+    expect(screen.getByRole('button', { name: 'Remover a.pdf' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Limpar lista' })).toBeDisabled();
+    await act(async () => finish());
+    await screen.findByText('1 importados · 0 já existiam · 0 com erro');
+    expect(screen.getByRole('button', { name: 'Remover a.pdf' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Limpar lista' })).toBeEnabled();
+  });
+
+  it('disables list controls while reading', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const { readPdf } = setup();
+    vi.mocked(readPdf).mockImplementation(async (f: File) => {
+      if (f.name === 'b.pdf') await gate;
+      return result({ title: f.name });
+    });
+    addFiles([pdf('a.pdf'), pdf('b.pdf')]);
+    expect(await screen.findByLabelText('Música de a.pdf')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remover a.pdf' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Limpar lista' })).toBeDisabled();
+    await act(async () => release());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Limpar lista' })).toBeEnabled());
+  });
+
+  it('Limpar lista empties rows, results and notices', async () => {
+    setup({ reads: { 'a.pdf': result({ title: 'A' }) } });
+    addFiles([pdf('a.pdf'), new File(['x'], 'n.txt', { type: 'text/plain' })]);
+    const button = await screen.findByRole('button', { name: 'Importar 1 prontos' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await screen.findByText('1 importados · 0 já existiam · 0 com erro');
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar lista' }));
+    expect(screen.queryByLabelText('Música de a.pdf')).not.toBeInTheDocument();
+    expect(screen.queryByText(/importados/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ignoramos/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Limpar lista' })).not.toBeInTheDocument();
+  });
+
+  it('removing the last row resets the batch state like Limpar lista', async () => {
+    setup({
+      reads: { 'a.pdf': result({ title: 'A' }), 'b.pdf': result({ title: 'B' }) },
+    });
+    addFiles([pdf('a.pdf'), new File(['x'], 'n.txt', { type: 'text/plain' })]);
+    const button = await screen.findByRole('button', { name: 'Importar 1 prontos' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await screen.findByText('1 importados · 0 já existiam · 0 com erro');
+    fireEvent.click(screen.getByRole('button', { name: 'Remover a.pdf' }));
+    expect(screen.queryByText(/importados/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ignoramos/)).not.toBeInTheDocument();
+    addFiles([pdf('b.pdf')]);
+    await screen.findByLabelText('Música de b.pdf');
+    expect(screen.queryByText(/importados/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ignoramos/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Importação cancelada/)).not.toBeInTheDocument();
+  });
+
   it('does not mark the dropzone aria-disabled', async () => {
     setup();
     const zone = screen.getByText('Arraste PDFs ou uma pasta aqui').parentElement!;

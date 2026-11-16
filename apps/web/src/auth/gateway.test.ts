@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FirebaseServices } from '../lib/firebase';
-import { signOut } from 'firebase/auth';
+import { browserPopupRedirectResolver, signInWithPopup, signOut } from 'firebase/auth';
+import { _getInstance } from '@firebase/auth/internal';
 import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
 import { createAuthGateway } from './gateway';
 
@@ -10,11 +11,16 @@ let handlers: { next: Next; fail: Fail };
 
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {},
+  browserPopupRedirectResolver: { resolver: true },
   getIdToken: vi.fn(),
   getIdTokenResult: vi.fn(),
   onAuthStateChanged: vi.fn(),
   signInWithPopup: vi.fn(),
   signOut: vi.fn(),
+}));
+const initialize = vi.fn();
+vi.mock('@firebase/auth/internal', () => ({
+  _getInstance: vi.fn(() => ({ _initialize: initialize })),
 }));
 vi.mock('firebase/firestore', () => ({
   terminate: vi.fn(() => Promise.resolve()),
@@ -28,7 +34,55 @@ vi.mock('firebase/firestore', () => ({
 
 const services = { auth: {}, db: {} } as unknown as FirebaseServices;
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe('createAuthGateway', () => {
+  it('signs in with the popup resolver passed explicitly (auth is created without one)', async () => {
+    await createAuthGateway(services).signIn();
+    expect(signInWithPopup).toHaveBeenCalledWith(
+      services.auth,
+      expect.anything(),
+      browserPopupRedirectResolver,
+    );
+  });
+
+  it('prepareSignIn initializes the shared popup resolver instance (opens the auth iframe)', async () => {
+    initialize.mockResolvedValueOnce(undefined);
+    await createAuthGateway(services).prepareSignIn();
+    expect(_getInstance).toHaveBeenCalledWith(browserPopupRedirectResolver);
+    expect(initialize).toHaveBeenCalledWith(services.auth);
+  });
+
+  it('prepareSignIn swallows failures (offline, blocked iframe)', async () => {
+    initialize.mockRejectedValueOnce(new Error('network'));
+    await expect(createAuthGateway(services).prepareSignIn()).resolves.toBeUndefined();
+  });
+
+  it('clears pdf cache on sign out', async () => {
+    const calls: string[] = [];
+    const deleteCache = vi.fn((name: string) => {
+      calls.push(`delete:${name}`);
+      return Promise.resolve(true);
+    });
+    vi.stubGlobal('caches', { delete: deleteCache });
+    const reload = vi.fn(() => calls.push('reload'));
+    await createAuthGateway(services, { reload }).signOut();
+    expect(deleteCache).toHaveBeenCalledWith('cifras-pdfs');
+    expect(calls).toEqual(['delete:cifras-pdfs', 'reload']);
+  });
+
+  it('still reloads when the cache storage is unavailable or fails', async () => {
+    vi.stubGlobal('caches', undefined);
+    const reload = vi.fn();
+    await createAuthGateway(services, { reload }).signOut();
+    expect(reload).toHaveBeenCalledTimes(1);
+    vi.stubGlobal('caches', { delete: () => Promise.reject(new Error('denied')) });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await createAuthGateway(services, { reload }).signOut();
+    expect(reload).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+
   it('falls back to viewer when users doc fails to load', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const cb = vi.fn();

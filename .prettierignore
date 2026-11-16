@@ -9,3 +9,6 @@ fixtures/private
 .claude
 docs
 *.md
+e2e/artifacts
+playwright-report
+test-results

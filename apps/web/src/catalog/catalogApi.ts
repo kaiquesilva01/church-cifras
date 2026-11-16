@@ -17,8 +17,6 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { getBlob, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import type { FirebaseServices } from '../lib/firebase';
 import type {
   ArrangementSummary,
@@ -110,23 +108,23 @@ export class ArrangementExistsError extends Error {
 const errorCode = (error: unknown): unknown =>
   typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
 
-export function createCatalogApi({ auth, db, storage, functions }: FirebaseServices): CatalogApi {
-  const callReplace = httpsCallable<
-    { songId: string; key: KeyName; storagePath: string; chordCount: number },
-    unknown
-  >(functions, 'replaceArrangement');
-
-  const callDiscard = httpsCallable<{ storagePath: string }, unknown>(functions, 'discardUpload');
-
-  const callUpdateMeta = httpsCallable<
-    { songId: string; title: string; artistName: string },
-    unknown
-  >(functions, 'updateSongMeta');
-  const callDeleteArrangement = httpsCallable<{ songId: string; key: KeyName }, unknown>(
-    functions,
-    'deleteArrangement',
-  );
-  const callDeleteSong = httpsCallable<{ songId: string }, unknown>(functions, 'deleteSong');
+export function createCatalogApi({
+  auth,
+  db,
+  loadStorage,
+  loadFunctions,
+}: FirebaseServices): CatalogApi {
+  const call = async <Req, Res = unknown>(name: string, data: Req): Promise<Res> => {
+    const [{ httpsCallable }, functions] = await Promise.all([
+      import('firebase/functions'),
+      loadFunctions(),
+    ]);
+    return (await httpsCallable<Req, Res>(functions, name)(data)).data;
+  };
+  const storageRef = async (path: string) => {
+    const [{ ref }, storage] = await Promise.all([import('firebase/storage'), loadStorage()]);
+    return ref(storage, path);
+  };
 
   const uid = (): string => {
     const id = auth.currentUser?.uid;
@@ -188,7 +186,8 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
     newSongId: () => doc(collection(db, 'songs')).id,
     uploadPdf: async (songId, key, file) => {
       const path = `songs/${songId}/${keySlug(key)}-${newFileId()}.pdf`;
-      await uploadBytes(ref(storage, path), file, {
+      const { uploadBytes } = await import('firebase/storage');
+      await uploadBytes(await storageRef(path), file, {
         contentType: 'application/pdf',
         cacheControl: 'public, max-age=31536000, immutable',
         customMetadata: { uploadedBy: uid() },
@@ -196,7 +195,7 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
       return path;
     },
     deleteFile: async (path) => {
-      await callDiscard({ storagePath: path });
+      await call('discardUpload', { storagePath: path });
     },
     createSongWithArrangement: async (input) => {
       const createdBy = uid();
@@ -229,16 +228,16 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
       await batch.commit();
     },
     replaceArrangement: async (songId, key, storagePath, chordCount) => {
-      await callReplace({ songId, key, storagePath, chordCount });
+      await call('replaceArrangement', { songId, key, storagePath, chordCount });
     },
     updateSongMeta: async (songId, { title, artistName }) => {
-      await callUpdateMeta({ songId, title, artistName });
+      await call('updateSongMeta', { songId, title, artistName });
     },
     deleteArrangement: async (songId, key) => {
-      await callDeleteArrangement({ songId, key });
+      await call('deleteArrangement', { songId, key });
     },
     deleteSong: async (songId) => {
-      await callDeleteSong({ songId });
+      await call('deleteSong', { songId });
     },
     createGeneratedArrangement: async (songId, input) => {
       const batch = writeBatch(db);
@@ -255,9 +254,14 @@ export function createCatalogApi({ auth, db, storage, functions }: FirebaseServi
       });
       await batch.commit();
     },
-    getPdfUrl: (storagePath) => getDownloadURL(ref(storage, storagePath)),
-    getPdfBytes: async (storagePath) =>
-      new Uint8Array(await (await getBlob(ref(storage, storagePath))).arrayBuffer()),
+    getPdfUrl: async (storagePath) => {
+      const { getDownloadURL } = await import('firebase/storage');
+      return getDownloadURL(await storageRef(storagePath));
+    },
+    getPdfBytes: async (storagePath) => {
+      const { getBlob } = await import('firebase/storage');
+      return new Uint8Array(await (await getBlob(await storageRef(storagePath))).arrayBuffer());
+    },
   };
 }
 

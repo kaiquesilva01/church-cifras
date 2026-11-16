@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "icons": "node scripts/generate-icons.mjs",
     "test": "vitest run"
   },
   "devDependencies": {
@@ -17,14 +18,19 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
     "jsdom": "31.0.1",
+    "sharp": "0.35.5",
     "typescript": "6.0.3",
     "vite": "8.3.8",
-    "vitest": "5.1.0"
+    "vite-plugin-pwa": "2.0.0",
+    "vitest": "5.1.0",
+    "workbox-build": "7.4.1",
+    "workbox-window": "7.4.1"
   },
   "dependencies": {
     "@cifras/chords": "0.0.0",
     "@cifras/overlay": "0.0.0",
     "@cifras/pdf": "0.0.0",
+    "@firebase/auth": "1.13.10",
     "firebase": "13.3.0",
     "pdfjs-dist": "6.5.438",
     "react": "19.3.1",

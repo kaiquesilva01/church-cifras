@@ -32,6 +32,11 @@ describe('routes', () => {
     expect(screen.getByText('Entrar com Google')).toBeInTheDocument();
   });
 
+  it('login screen warms the sign-in popup on mount', () => {
+    const gateway = setup('/login');
+    expect(gateway.prepareSignIn).toHaveBeenCalledTimes(1);
+  });
+
   it('login button calls signIn', () => {
     const gateway = setup('/login');
     fireEvent.click(screen.getByText('Entrar com Google'));

@@ -126,4 +126,17 @@ describe('PdfPages', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(error).not.toHaveBeenCalled();
   });
+
+  it('releases canvas memory on unmount', async () => {
+    const { doc, render: renderPage } = fakeDoc(2);
+    const { container, unmount } = render(<PdfPages doc={doc} overlays={[]} />);
+    await waitFor(() => expect(renderPage).toHaveBeenCalledTimes(2));
+    const canvases = [...container.querySelectorAll<HTMLCanvasElement>('canvas[data-page]')];
+    expect(canvases[0]!.width).toBeGreaterThan(0);
+    unmount();
+    for (const canvas of canvases) {
+      expect(canvas.width).toBe(0);
+      expect(canvas.height).toBe(0);
+    }
+  });
 });

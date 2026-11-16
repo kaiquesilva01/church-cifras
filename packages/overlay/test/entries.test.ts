@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { FONT_FILES } from '../src/fonts';
 
 const pkgDir = resolve(import.meta.dirname, '..');
 const pkg = JSON.parse(readFileSync(resolve(pkgDir, 'package.json'), 'utf8'));
@@ -26,7 +27,11 @@ function graph(entry: string) {
 describe('package entries', () => {
   it('exposes a light ./ops entry and the font files', () => {
     expect(pkg.exports['./ops']).toBeDefined();
-    expect(pkg.exports['./fonts/*']).toBeDefined();
+    // explicit entries: a `*` pattern would also expose fonts/source/* and fonts/LICENSES/*
+    for (const file of Object.values(FONT_FILES)) {
+      expect(pkg.exports[`./fonts/${file}`]).toBe(`./fonts/${file}`);
+    }
+    expect(Object.keys(pkg.exports).filter((k) => k.includes('*'))).toEqual([]);
     expect(pkg.exports['.']).toBeDefined();
   });
 

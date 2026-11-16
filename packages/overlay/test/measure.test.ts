@@ -29,4 +29,34 @@ describe('createMeasure', () => {
       );
     }
   });
+
+  it('measure falls back for unloaded fonts', () => {
+    const warnings: string[] = [];
+    const measure = createMeasure(new Map(), (message) => warnings.push(message));
+    // 0.6 em per char: 3 chars at 10pt
+    expect(measure('Gm7', 'Arial-BoldMT', 10)).toBeCloseTo(18, 6);
+    expect(measure('Gm7', 'Arial-BoldMT', 10)).toBeCloseTo(18, 6);
+    // one warning per missing font, not per call
+    expect(warnings).toEqual(['Fonte não carregada: sans-bold; largura estimada.']);
+    expect(() => createMeasure(new Map())('A', 'Courier', 10)).not.toThrow();
+  });
+
+  it('warns once per font when a character has no glyph (notdef)', async () => {
+    const warnings: string[] = [];
+    const measure = createMeasure(await loadAllFonts(), (message) => warnings.push(message));
+    measure('A中B', 'Arial-BoldMT', 10);
+    measure('中', 'Arial-BoldMT', 10);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('sans-bold');
+    expect(warnings[0]).toContain('U+4E2D');
+    measure('Gm7', 'Courier', 10);
+    expect(warnings).toHaveLength(1);
+  });
+
+  it('does not warn for characters covered by the font', async () => {
+    const warnings: string[] = [];
+    const measure = createMeasure(await loadAllFonts(), (message) => warnings.push(message));
+    measure('F#m7(b5)/C° Tom: E', 'Arial-BoldMT', 10);
+    expect(warnings).toEqual([]);
+  });
 });

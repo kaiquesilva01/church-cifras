@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router';
 import { useAuth } from '../auth/useAuth';
 
 export function LoginPage() {
-  const { status, signIn } = useAuth();
+  const { status, signIn, prepareSignIn } = useAuth();
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // Warm the popup resolver before the tap so signInWithPopup can window.open inside the gesture.
+  useEffect(() => {
+    void prepareSignIn();
+  }, [prepareSignIn]);
 
   if (status === 'loading')
     return (
