@@ -127,7 +127,8 @@ describe('SetlistPage read', () => {
     act(() =>
       api.push('r1', { setlist: makeSetlist({ id: 'r1', items: [b, a] }), fromCache: false }),
     );
-    expect(screen.getByRole('status')).toHaveTextContent('O repertório foi alterado.');
+    // dnd-kit adds its own role=status live region, so look the banner up by text.
+    expect(screen.getByText('O repertório foi alterado.')).toBeInTheDocument();
     expect(order()[0]).toContain('Sonda-me');
     fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }));
     expect(order()[0]).toContain('Ressuscita-me');
@@ -146,6 +147,13 @@ describe('SetlistPage visitor', () => {
 });
 
 describe('SetlistPage editing', () => {
+  it('shows a drag handle per item for editors', async () => {
+    mount(withItems([a, b]));
+    const handle = await screen.findByRole('button', { name: 'Arrastar Sonda-me' });
+    expect(handle).toHaveTextContent('≡');
+    expect(screen.getAllByRole('button', { name: /^Arrastar / })).toHaveLength(2);
+  });
+
   it('moves with the neighbour semantics and disables the edges', async () => {
     const api = withItems([a, b, c]);
     mount(api);

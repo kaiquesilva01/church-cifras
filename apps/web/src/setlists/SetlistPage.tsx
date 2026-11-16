@@ -10,6 +10,7 @@ import { copyItems, defaultKeyFor, newItemId } from './items';
 import { KeyPicker } from './KeyPicker';
 import { SetlistFormDialog } from './SetlistFormDialog';
 import { SetlistItemRow } from './SetlistItemRow';
+import { SortableItems } from './SortableItems';
 import type { SetlistApi } from './setlistApi';
 import type { SetlistOp } from './types';
 import { UpdateBanner } from './UpdateBanner';
@@ -191,8 +192,11 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
       {items.length === 0 ? (
         <p className="status">Nenhum louvor neste repertório ainda.</p>
       ) : (
-        <ul className="list">
-          {items.map((item, index) => (
+        <SortableItems
+          items={items}
+          editable={editable}
+          onMove={(itemId, afterItemId) => void run({ type: 'move', itemId, afterItemId })}
+          renderRow={(item, index, drag) => (
             <SetlistItemRow
               key={item.id}
               setlistId={active.id}
@@ -218,9 +222,10 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
               }
               onRemove={() => void run({ type: 'remove', itemId: item.id })}
               onPickKey={() => setPickingKeyOf(item.id)}
+              drag={drag}
             />
-          ))}
-        </ul>
+          )}
+        />
       )}
       {editable && (
         <button type="button" className="fab" onClick={() => setDialog('add')}>

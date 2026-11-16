@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import type { SongSummary } from '../catalog/types';
 import { itemHref } from './navigation';
+import type { RowDrag } from './SortableItems';
 import type { SetlistItem } from './types';
 
 export interface SetlistItemRowProps {
@@ -16,6 +17,8 @@ export interface SetlistItemRowProps {
   onMoveDown: () => void;
   onRemove: () => void;
   onPickKey: () => void;
+  /** Presente só para quem edita: ref/estilo do `li` e a alça `≡`. */
+  drag?: RowDrag;
 }
 
 export function SetlistItemRow({
@@ -30,6 +33,7 @@ export function SetlistItemRow({
   onMoveDown,
   onRemove,
   onPickKey,
+  drag,
 }: SetlistItemRowProps) {
   const title = song?.title ?? 'Música removida';
   // O tom salvo deixou de existir entre os tons da música: aparece riscado.
@@ -37,8 +41,8 @@ export function SetlistItemRow({
   const keyLabel = keyGone ? <s>{item.key}</s> : item.key;
 
   return (
-    <li className="list-card setlist-item">
-      {/* Task 8: alça de arrastar (≡) entra aqui, antes do número. */}
+    <li className="list-card setlist-item" ref={drag?.setNodeRef} style={drag?.style}>
+      {drag?.handle(title)}
       <span className="setlist-item-number muted">{position}</span>
       <span className="setlist-item-main">
         {song ? (

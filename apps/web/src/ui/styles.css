@@ -1081,6 +1081,10 @@ button.fab {
   text-align: right;
 }
 
+.setlist-item-handle {
+  cursor: grab;
+}
+
 .setlist-item-main {
   flex: 1;
   min-width: 0;
