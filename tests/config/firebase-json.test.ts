@@ -57,29 +57,37 @@ describe('firebase.json', () => {
   });
 
   describe('legacy site', () => {
-    const redirects = (legacy.redirects ?? []) as Array<{
-      regex: string;
-      destination: string;
-      type: number;
-    }>;
+    type Redirect = { source?: string; regex?: string; destination: string; type: number };
+    const redirects = (legacy.redirects ?? []) as Redirect[];
+    // The root has its own rule: a regex capture that matches the empty string makes the destination
+    // (`/:path`) fail to compile in Firebase/superstatic and the request falls through to a 404.
+    const rootRule = redirects.find((r) => r.source === '/')!;
+    const pathRule = redirects.find((r) => r.regex !== undefined)!;
     // Firebase regex redirects use RE2 with (?P<name>...); JS spells named groups (?<name>...).
-    const redirect = redirects[0]!;
-    const re = new RegExp(redirect.regex.replace('(?P<', '(?<'));
+    const re = new RegExp(pathRule.regex!.replace('(?P<', '(?<'));
     const target = (path: string) => {
+      if (path === '/') return rootRule.destination;
       const m = re.exec(path);
-      return m ? redirect.destination.replace(':path', m.groups!.path!) : null;
+      return m ? pathRule.destination.replace(':path', m.groups!.path!) : null;
     };
 
-    it('has a single permanent redirect and never rewrites', () => {
+    it('has permanent redirects only and never rewrites', () => {
       expect(legacy.rewrites).toBeUndefined();
-      expect(redirects).toHaveLength(1);
-      expect(redirect.type).toBe(301);
+      expect(redirects).toHaveLength(2);
+      expect(redirects.every((r) => r.type === 301)).toBe(true);
       // RE2 has no lookahead.
-      expect(redirect.regex).not.toContain('(?=');
-      expect(redirect.regex).not.toContain('(?!');
+      expect(pathRule.regex).not.toContain('(?=');
+      expect(pathRule.regex).not.toContain('(?!');
     });
 
-    it('redirects every path to the friendly site keeping the path', () => {
+    it('redirects the root with its own rule, before the path rule', () => {
+      expect(redirects[0]).toBe(rootRule);
+      expect(rootRule.destination).toBe(`https://${APP_SITE}.web.app/`);
+      // The path capture can never be empty, so the root must not depend on it.
+      expect(re.test('/')).toBe(false);
+    });
+
+    it('redirects every other path to the friendly site keeping the path', () => {
       const base = `https://${APP_SITE}.web.app`;
       expect(target('/')).toBe(`${base}/`);
       expect(target('/musicas/s1')).toBe(`${base}/musicas/s1`);
@@ -89,6 +97,7 @@ describe('firebase.json', () => {
 
     it('never redirects /sw.js, so old clients can fetch the self-unregistering worker', () => {
       expect(re.test('/sw.js')).toBe(false);
+      expect(rootRule.source).toBe('/');
       // Prefixes and look-alikes still redirect.
       for (const path of [
         '/s',
