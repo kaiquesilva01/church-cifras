@@ -641,7 +641,6 @@ section:last-child > .section-title + .list {
 }
 
 .viewer-bar {
-  flex-wrap: wrap;
   position: fixed;
   right: 0;
   bottom: 0;
@@ -651,6 +650,10 @@ section:last-child > .section-title + .list {
   padding: 8px 16px;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
+}
+
+.viewer.has-setlist .viewer-bar {
+  flex-wrap: wrap;
 }
 
 .setlist-bar {
@@ -1271,6 +1274,10 @@ span.setlist-item-key {
 
 .add-song-option:hover:not(:disabled) {
   background: var(--color-bg);
+}
+
+.add-song-option:focus-visible {
+  outline-offset: -2px;
 }
 
 .add-song-option:disabled {

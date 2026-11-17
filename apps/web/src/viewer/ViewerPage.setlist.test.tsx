@@ -27,6 +27,7 @@ import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import { ActiveSetlistProvider } from '../setlists/ActiveSetlistProvider';
 import type { SetlistItem } from '../setlists/types';
 import { loadFontFromDisk, sheetInG } from './transposeFixtures';
+import type { ChordWriter } from '@cifras/overlay';
 import { ViewerPage } from './ViewerPage';
 
 configure({ asyncUtilTimeout: 8000 });
@@ -68,7 +69,7 @@ function Probe() {
   );
 }
 
-function Page({ api }: { api: ReturnType<typeof fakeCatalogApi> }) {
+function Page({ api, writer }: { api: ReturnType<typeof fakeCatalogApi>; writer?: ChordWriter }) {
   const { songId = '' } = useParams();
   const [params] = useSearchParams();
   return (
@@ -82,6 +83,7 @@ function Page({ api }: { api: ReturnType<typeof fakeCatalogApi> }) {
       readLines={() => Promise.resolve(sheetInG())}
       loadFont={loadFontFromDisk}
       matchMedia={media(true)}
+      writer={writer}
     />
   );
 }
@@ -89,7 +91,7 @@ function Page({ api }: { api: ReturnType<typeof fakeCatalogApi> }) {
 function setup(
   path: string,
   items: SetlistItem[] = [ia, ix, ib, ic],
-  { role = 'member' }: { role?: Role } = {},
+  { role = 'member', writer }: { role?: Role; writer?: ChordWriter } = {},
 ) {
   const api = fakeCatalogApi(sampleSongs, {
     deleteArrangement: vi.fn(() => Promise.resolve()),
@@ -109,7 +111,7 @@ function setup(
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),
   };
-  const { container } = render(
+  const { container, unmount } = render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[path]}>
         <Probe />
@@ -119,7 +121,7 @@ function setup(
               path="/musicas/:songId"
               element={
                 <SongsProvider api={api}>
-                  <Page api={api} />
+                  <Page api={api} writer={writer} />
                 </SongsProvider>
               }
             />
@@ -130,7 +132,7 @@ function setup(
       </MemoryRouter>
     </AuthContext.Provider>,
   );
-  return { api, setlistApi, container };
+  return { api, setlistApi, container, unmount };
 }
 
 const where = () => screen.getByTestId('location').textContent;
@@ -297,6 +299,46 @@ describe('ViewerPage in a setlist', () => {
       fireEvent.click(screen.getByRole('button', { name: /Próxima/ }));
       await screen.findByText('2 de 3');
       expect(screen.queryByText('Mudar tom · original', { exact: false })).toBeNull();
+    });
+  });
+
+  describe('tom generation in flight', () => {
+    const startGeneration = async () => {
+      let finish: (bytes: Uint8Array) => void = () => undefined;
+      const writer: ChordWriter = {
+        write: vi.fn(() => new Promise<Uint8Array>((resolve) => (finish = resolve))),
+      };
+      const view = setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, { writer });
+      await openPanel();
+      fireEvent.click(screen.getByRole('button', { name: 'D' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Confirmar D' }));
+      await screen.findByRole('button', { name: 'Gerando PDF…' });
+      return { ...view, finish: (bytes = new Uint8Array([9, 9, 9])) => finish(bytes) };
+    };
+
+    it('does not send the member back to the previous song', async () => {
+      const { finish, api } = await startGeneration();
+      fireEvent.click(screen.getByRole('button', { name: /Próxima/ }));
+      await screen.findByText('2 de 3');
+      const next = where();
+      await act(async () => {
+        finish();
+        await waitFor(() => expect(api.createGeneratedArrangement).toHaveBeenCalled());
+      });
+      expect(where()).toBe(next);
+      expect(next).toContain('/musicas/s2');
+      expect(screen.queryByRole('button', { name: 'Gerando PDF…' })).toBeNull();
+    });
+
+    it('does nothing when the viewer unmounts during generation', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { finish, unmount } = await startGeneration();
+      unmount();
+      await act(async () => {
+        finish();
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(error).not.toHaveBeenCalled();
     });
   });
 

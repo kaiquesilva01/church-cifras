@@ -215,6 +215,48 @@ describe('ActiveSetlistProvider', () => {
       expect(current?.shown?.items.map((i) => i.id)).toEqual(['a', 'b', 'c']);
     });
 
+    it('own in-flight edits never raise hasChanges; another person change after settling does', async () => {
+      type Res = { setlist: Setlist; changed: boolean };
+      const base = makeSetlist({ id: 'r1', label: 'A', items: [item('a')] });
+      const calls: { resolve: (v: Res) => void; reject: (e: unknown) => void }[] = [];
+      const api = fakeSetlistApi([base], {
+        applyOp: vi.fn(
+          () =>
+            new Promise<Res>((resolve, reject) => {
+              calls.push({ resolve, reject });
+            }),
+        ),
+      });
+      mount(api, '/repertorios/r1');
+      let p1: Promise<string> = Promise.resolve('');
+      let p2: Promise<string> = Promise.resolve('');
+      act(() => {
+        p1 = current!.edit({ type: 'add', item: item('b') });
+      });
+      expect(current?.hasChanges).toBe(false);
+      act(() => {
+        p2 = current!.edit({ type: 'add', item: item('c') });
+      });
+      expect(current?.hasChanges).toBe(false);
+      act(() => current?.accept());
+      expect(current?.shown?.items.map((i) => i.id)).toEqual(['a', 'b', 'c']);
+      const first = { ...base, items: [item('a'), item('b')] };
+      await act(async () => {
+        calls[0]!.resolve({ setlist: first, changed: true });
+        await p1;
+      });
+      expect(current?.hasChanges).toBe(false);
+      await act(async () => {
+        calls[1]!.reject(new Error('net'));
+        await p2;
+      });
+      expect(current?.hasChanges).toBe(false);
+      expect(current?.shown?.items.map((i) => i.id)).toEqual(['a', 'b']);
+      act(() => api.push('r1', { setlist: { ...first, label: 'Other' }, fromCache: false }));
+      expect(current?.hasChanges).toBe(true);
+      expect(current?.shown?.label).toBe('A');
+    });
+
     it('restores shown and returns error on failure', async () => {
       const base = makeSetlist({ id: 'r1', items: [item('a')] });
       const api = fakeSetlistApi([base], {

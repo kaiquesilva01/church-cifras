@@ -43,6 +43,11 @@ describe('SetlistFormDialog', () => {
     expect(labelInput()).toHaveValue('Santa ceia');
   });
 
+  it('limits the label input length', () => {
+    setup();
+    expect(screen.getByLabelText('Rótulo')).toHaveAttribute('maxlength', '60');
+  });
+
   it('uses initial values for edit and duplicate', () => {
     setup({ mode: 'edit', initial: { date: '2026-11-25', label: 'Especial' } });
     expect(dateInput()).toHaveValue('2026-11-25');

@@ -61,13 +61,16 @@ export function SetlistItemRow({
         <button
           type="button"
           className="btn setlist-item-key"
-          aria-label={`Tom ${item.key}, alterar`}
+          aria-label={`Tom ${item.key}${keyGone ? ' (indisponível)' : ''}, alterar`}
           onClick={onPickKey}
         >
           {keyLabel}
         </button>
       ) : (
-        <span className="setlist-item-key">{keyLabel}</span>
+        <span className="setlist-item-key">
+          {keyLabel}
+          {keyGone && <span className="sr-only"> (tom indisponível)</span>}
+        </span>
       )}
       {editable && (
         <span className="setlist-item-actions">

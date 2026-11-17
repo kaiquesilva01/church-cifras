@@ -87,6 +87,7 @@ export function SetlistFormDialog({
             id="setlist-label"
             className="input"
             value={label}
+            maxLength={LABEL_MAX}
             disabled={busy}
             onChange={(e) => {
               setLabel(e.target.value);
