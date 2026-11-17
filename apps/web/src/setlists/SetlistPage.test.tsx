@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import type { Role } from '../auth/roles';
@@ -292,6 +292,8 @@ describe('SetlistPage menu', () => {
       }),
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Novo nome · 20/11');
+    expect(screen.queryByText('O repertório foi alterado.')).not.toBeInTheDocument();
   });
 
   it('shows API errors inside the dialog', async () => {
@@ -305,6 +307,27 @@ describe('SetlistPage menu', () => {
     expect(await within(screen.getByRole('dialog')).findByRole('alert')).toBeInTheDocument();
   });
 
+  it('announces an unavailable key to screen readers', () => {
+    // s1 only has G and A: D is gone.
+    mount(withItems([{ id: 'a', songId: 's1', key: 'D' }]));
+    expect(
+      screen.getByRole('button', { name: 'Tom D (indisponível), alterar' }),
+    ).toBeInTheDocument();
+    cleanup();
+    mount(withItems([{ id: 'a', songId: 's1', key: 'D' }]), { role: 'viewer' });
+    expect(screen.getByText('(tom indisponível)')).toBeInTheDocument();
+  });
+
+  it('does not show the update banner for the own edit still in flight', () => {
+    const api = fakeSetlistApi([makeSetlist({ id: 'r1', items: [a, b, c] })], {
+      applyOp: vi.fn(() => new Promise<never>(() => {})),
+    });
+    mount(api);
+    fireEvent.click(screen.getByRole('button', { name: 'Mover Grande é o Senhor para cima' }));
+    expect(order()[1]).toContain('Grande é o Senhor');
+    expect(screen.queryByText('O repertório foi alterado.')).not.toBeInTheDocument();
+  });
+
   it('duplicates with new item ids and navigates', async () => {
     const api = withItems([a, b]);
     mount(api);
@@ -314,9 +337,14 @@ describe('SetlistPage menu', () => {
     await waitFor(() => expect(api.createSetlist).toHaveBeenCalled());
     const input = (api.createSetlist as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
       items: SetlistItem[];
+      date: string;
+      label: string;
     };
     expect(input.items.map((i) => i.songId)).toEqual(['s1', 's2']);
     expect(input.items[0]!.id).not.toBe('a');
+    // The copy is for a new service: it must not inherit the old date/label.
+    expect(input.label).not.toBe('Culto de domingo');
+    expect(input.date).not.toBe('2026-11-20');
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/repertorios/new-1'));
   });
 

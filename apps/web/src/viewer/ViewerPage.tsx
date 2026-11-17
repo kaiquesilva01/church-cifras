@@ -182,6 +182,10 @@ export function ViewerPage({
   // Open documents by path (LRU of 3): going back to a key already seen is instant.
   const [docCache] = useState(() => createDocCache(CACHED_DOCS));
   const alive = useRef(false);
+  const songIdRef = useRef(songId);
+  useEffect(() => {
+    songIdRef.current = songId;
+  }, [songId]);
   const shownPath = useRef<string | null>(null);
   const inflight = useRef(new Set<string>());
   const [, refresh] = useReducer((n: number) => n + 1, 0);
@@ -336,10 +340,13 @@ export function ViewerPage({
         collisions,
         uid: user.uid,
       });
+      // O membro pode ter trocado de cifra (ou saído) durante a geração: não o leve de volta.
+      if (!alive.current || songIdRef.current !== songId) return;
       setNotice(saved.status === 'existing' ? { key: saved.key } : null);
       open(saved.key);
       closePanel();
     } catch {
+      if (!alive.current || songIdRef.current !== songId) return;
       setGenerateError('Não foi possível gerar o PDF. Tente de novo.');
     } finally {
       setBusy(false);

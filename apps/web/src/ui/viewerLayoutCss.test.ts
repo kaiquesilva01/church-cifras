@@ -24,4 +24,13 @@ describe('viewer layout css', () => {
     expect(px('.viewer.has-setlist')).toBeGreaterThan(px('.viewer'));
     expect(css.indexOf('.viewer.has-setlist {')).toBeLessThan(css.indexOf('.viewer.has-sheet {'));
   });
+
+  it('wraps the bottom bar only when a setlist adds its extra row', () => {
+    expect(rule('.viewer-bar')).not.toMatch(/flex-wrap/);
+    expect(rule('.viewer.has-setlist .viewer-bar')).toMatch(/flex-wrap:\s*wrap/);
+  });
+
+  it('keeps the add-song focus ring inside the scrolling list', () => {
+    expect(rule('.add-song-option:focus-visible')).toMatch(/outline-offset:\s*-2px/);
+  });
 });

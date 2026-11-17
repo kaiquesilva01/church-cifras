@@ -15,18 +15,27 @@ interface Store {
   id: string | null;
   sync: typeof initialSync;
   failed: boolean;
+  /** Edições próprias em voo: não contam como mudança de outra pessoa. */
+  pending: number;
 }
 
 type StoreEvent =
   | { type: 'fail'; id: string }
+  | { type: 'pending'; id: string; delta: 1 | -1 }
   | { type: 'reset'; id: string | null }
   | { type: 'event'; id: string; event: SyncEvent };
 
 /** Eventos de um repertório antigo (assinatura ou edição tardia) são ignorados. */
 function storeReducer(store: Store, action: StoreEvent): Store {
-  if (action.type === 'reset') return { id: action.id, sync: initialSync, failed: false };
+  if (action.type === 'reset')
+    return { id: action.id, sync: initialSync, failed: false, pending: 0 };
   if (action.id !== store.id) return store;
   if (action.type === 'fail') return { ...store, failed: true };
+  if (action.type === 'pending') {
+    return { ...store, pending: Math.max(0, store.pending + action.delta) };
+  }
+  // `accept` com edição em voo sobrescreveria a própria edição.
+  if (action.event.type === 'accept' && store.pending > 0) return store;
   return {
     ...store,
     failed: action.event.type === 'snapshot' ? false : store.failed,
@@ -44,9 +53,15 @@ export function ActiveSetlistProvider({ api, children }: { api: SetlistApi; chil
   const [params] = useSearchParams();
   const id = match?.params.id ?? params.get('repertorio');
 
-  const [store, dispatchStore] = useReducer(storeReducer, { id, sync: initialSync, failed: false });
+  const [store, dispatchStore] = useReducer(storeReducer, {
+    id,
+    sync: initialSync,
+    failed: false,
+    pending: 0,
+  });
   if (store.id !== id) dispatchStore({ type: 'reset', id });
   const state = store.id === id ? store.sync : initialSync;
+  const pending = store.id === id ? store.pending : 0;
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
@@ -111,11 +126,13 @@ export function ActiveSetlistProvider({ api, children }: { api: SetlistApi; chil
         }
       }
       pending.push(op);
+      dispatchStore({ type: 'pending', id, delta: 1 });
       const view = rebuild();
       if (view) send({ type: 'optimistic', setlist: view });
       const settle = () => {
         const i = pendingRef.current.indexOf(op);
         if (i >= 0) pendingRef.current.splice(i, 1);
+        dispatchStore({ type: 'pending', id, delta: -1 });
       };
       try {
         const result = await api.applyOp(id, op);
@@ -155,13 +172,13 @@ export function ActiveSetlistProvider({ api, children }: { api: SetlistApi; chil
             status,
             shown: state.shown,
             latest: state.latest,
-            hasChanges: hasChanges(state),
+            hasChanges: pending === 0 && hasChanges(state),
             removed: isRemoved(state),
             accept,
             edit,
           }
         : null,
-    [id, status, state, accept, edit],
+    [id, status, state, pending, accept, edit],
   );
 
   return <ActiveSetlistContext.Provider value={value}>{children}</ActiveSetlistContext.Provider>;

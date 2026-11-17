@@ -116,6 +116,8 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
         navigate(`/repertorios/${id}`);
       } else {
         await api.updateSetlistMeta(active.id, value);
+        // Edição própria mostra o estado confirmado (§6.4), não um aviso de mudança alheia.
+        active.accept();
       }
       closeDialog();
     } catch {
@@ -260,7 +262,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
       {(dialog === 'edit' || dialog === 'duplicate') && (
         <SetlistFormDialog
           mode={dialog}
-          initial={{ date: shown.date, label: shown.label }}
+          initial={dialog === 'edit' ? { date: shown.date, label: shown.label } : undefined}
           busy={busy}
           error={dialogError}
           onSave={(value) => void saveMeta(value)}
