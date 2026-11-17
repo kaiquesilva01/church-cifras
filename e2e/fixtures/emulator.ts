@@ -244,18 +244,26 @@ export async function seedSetlist(
 
 /** Deletes every setlist, so the "next culto" card and the tab only hold what the test seeds. */
 export async function clearSetlists(): Promise<void> {
-  const response = await ok(
-    await fetch(`${DOCS}/setlists?pageSize=300`, { headers: OWNER }),
-    'list setlists',
-  );
-  const { documents = [] } = (await response.json()) as { documents?: Array<{ name: string }> };
-  for (const document of documents) {
-    await ok(
-      await fetch(`http://localhost:8080/v1/${document.name}`, {
-        method: 'DELETE',
-        headers: OWNER,
-      }),
-      `delete ${document.name}`,
+  let pageToken: string | undefined;
+  do {
+    const query = `pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    const response = await ok(
+      await fetch(`${DOCS}/setlists?${query}`, { headers: OWNER }),
+      'list setlists',
     );
-  }
+    const body = (await response.json()) as {
+      documents?: Array<{ name: string }>;
+      nextPageToken?: string;
+    };
+    for (const document of body.documents ?? []) {
+      await ok(
+        await fetch(`http://localhost:8080/v1/${document.name}`, {
+          method: 'DELETE',
+          headers: OWNER,
+        }),
+        `delete ${document.name}`,
+      );
+    }
+    pageToken = body.nextPageToken;
+  } while (pageToken);
 }
