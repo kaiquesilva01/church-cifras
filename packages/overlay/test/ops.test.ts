@@ -122,11 +122,44 @@ describe('overlayOps', () => {
       expect(ops.map((o) => o.collides)).toEqual([false, false, false]);
     });
 
-    it('does not move a chord whose predecessor does not collide', () => {
+    it('does not move a chord that keeps at least one space from its predecessor', () => {
       const ops = overlayOps(
-        plan([replacement({ x: 100, newWidth: 6 }), replacement({ x: 118, runKey: 'b' })]),
+        plan([replacement({ x: 100, newWidth: 6 }), replacement({ x: 112, runKey: 'b' })]),
       );
+      // gap 112 - 106 = 6 = one space
+      expect(ops[1]!.text.x).toBe(112);
+      expect(ops[0]!.collides).toBe(false);
+    });
+
+    it('does not push when the plan flags a collision but the gap is one space (proportional font)', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 12, spaceWidth: 3, collides: true, limitX: 110 }),
+          replacement({ x: 115, runKey: 'b', newWidth: 12, spaceWidth: 3 }),
+        ]),
+      );
+      expect(ops.map((o) => o.text.x)).toEqual([100, 115]);
+      expect(ops.map((o) => o.collides)).toEqual([false, false]);
+    });
+
+    it('pushes to exactly two spaces when the gap is smaller than one space', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 12, spaceWidth: 3, collides: true, limitX: 108 }),
+          replacement({ x: 113, runKey: 'b', newWidth: 12, spaceWidth: 3 }),
+        ]),
+      );
+      // gap 1 < 3: successor goes to 112 + 6 = 118
       expect(ops[1]!.text.x).toBe(118);
+      expect(ops[0]!.collides).toBe(false);
+    });
+
+    it('keeps output order for unsorted input while spreading by x', () => {
+      const first = replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 });
+      const second = replacement({ x: 118, runKey: 'b', replacement: 'Bm', limitX: 300 });
+      const ops = overlayOps(plan([second, first]));
+      expect(ops.map((o) => o.text.value)).toEqual(['Bm', 'D']);
+      expect(ops.map((o) => o.text.x)).toEqual([136, 100]);
     });
 
     it('never moves left', () => {
@@ -150,15 +183,39 @@ describe('overlayOps', () => {
       expect(ops[0]!.collides).toBe(true);
     });
 
-    it('stays colliding when the push would pass the margin', () => {
+    it('caps the push of a chord without a chord after it at its margin', () => {
       const ops = overlayOps(
         plan([
           replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
-          replacement({ x: 118, runKey: 'b', newWidth: 12, limitX: 140 }),
+          replacement({ x: 118, runKey: 'b', newWidth: 12, limitX: 140, nextIsChord: false }),
+        ]),
+      );
+      // wanted 136, capped to 140 - 12 = 128; gap 4 < one space, so the first stays red
+      expect(ops[1]!.text.x).toBe(128);
+      expect(ops[1]!.collides).toBe(false);
+      expect(ops[0]!.collides).toBe(true);
+    });
+
+    it('accepts the capped push when two spaces still fit', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({ x: 118, runKey: 'b', newWidth: 12, limitX: 148, nextIsChord: false }),
         ]),
       );
       expect(ops[1]!.text.x).toBe(136);
-      expect(ops[1]!.collides).toBe(true);
+      expect(ops.map((o) => o.collides)).toEqual([false, false]);
+    });
+
+    it('never pushes a chord without a chord after it past its margin', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({ x: 118, runKey: 'b', newWidth: 12, limitX: 125, nextIsChord: false }),
+        ]),
+      );
+      expect(ops[1]!.text.x).toBe(118);
+      expect(ops[0]!.collides).toBe(true);
     });
 
     it('rect covers the original and the new position of a pushed chord', () => {

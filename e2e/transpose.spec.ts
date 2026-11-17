@@ -76,6 +76,7 @@ test('Mudar tom spreads colliding chords instead of warning', async ({ page }) =
 
   await openPanel(page, 'C');
   await keyButton(page, 'C#').click();
+  await expect(page.getByRole('button', { name: 'Confirmar C#' })).toBeEnabled();
   await expect(page.getByText(/encostar no vizinho/)).toHaveCount(0);
   await expect(page.getByText(KEY_WARNING)).toHaveCount(0);
 });

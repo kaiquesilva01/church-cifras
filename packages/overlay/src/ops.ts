@@ -46,8 +46,10 @@ interface Spread {
   collides: boolean;
 }
 
-// A chord that collides with the next chord pushes it to exactly two spaces after its own new end
-// (never left), cascading along the line. Only chords of one page and baseline interact.
+// When a chord is followed by another chord closer than one space (by its real new end), the next
+// chord moves to exactly two spaces after it (never left), cascading along the line. A chord with
+// no chord after it is never pushed past its own limit. Only chords of one page and baseline
+// interact.
 export function spreadChords(chords: Replacement[]): Spread[] {
   const result = new Map<Replacement, Spread>();
   const lines: Replacement[][] = [];
@@ -63,9 +65,13 @@ export function spreadChords(chords: Replacement[]): Spread[] {
     let prev: Spread | null = null;
     for (const r of sorted) {
       let x = r.x;
-      if (prev && prev.collides && prev.r.nextIsChord) {
-        x = Math.max(r.x, prev.x + prev.r.newWidth + SPREAD_GAP_SPACES * prev.r.spaceWidth);
-        prev.collides = false; // the neighbour moved away
+      if (prev && prev.r.nextIsChord) {
+        const prevEnd = prev.x + prev.r.newWidth;
+        if (r.x - prevEnd < prev.r.spaceWidth) {
+          x = Math.max(r.x, prevEnd + SPREAD_GAP_SPACES * prev.r.spaceWidth);
+          if (!r.nextIsChord) x = Math.max(r.x, Math.min(x, r.limitX - r.newWidth));
+        }
+        prev.collides = x - prevEnd < prev.r.spaceWidth;
       }
       const collides = x !== r.x ? x + r.newWidth > r.limitX : r.collides;
       prev = { r, x, collides };

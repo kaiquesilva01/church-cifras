@@ -44,10 +44,14 @@ O `reflowPackedRuns` atual (junta acordes colados num mesmo trecho com um espaç
 - `packages/chords/src/plan.ts`: `Replacement` ganha `nextIsChord: boolean` — `true` quando o token seguinte
   (`occurrence.next`) é outro acorde encontrado por `findChords`. O indicador de tom recebe `false`.
 - `packages/overlay/src/ops.ts`: `overlayOps` percorre os acordes por linha (mesma página e mesma linha de base,
-  da esquerda para a direita). Mantém um `x` efetivo por acorde: se o anterior colide (`x efetivo + newWidth > limitX`)
-  e `nextIsChord`, o seguinte passa a `max(x original, fim do anterior + 2 × spaceWidth)`. Depois recalcula `collides` do
-  seguinte com o `x` novo; se ainda colide e `nextIsChord`, o deslocamento continua. `OverlayOp.text.x` usa o `x`
-  efetivo; o retângulo branco cobre a **união** da área original e da nova.
+  da esquerda para a direita). Mantém um `x` efetivo por acorde: se o anterior tem `nextIsChord` e a distância real até
+  o seguinte (`x` do seguinte − (`x` efetivo do anterior + `newWidth`)) é **menor que um espaço** (`spaceWidth`), o
+  seguinte passa a `max(x original, fim do anterior + 2 × spaceWidth)`; o deslocamento continua em cascata. A decisão
+  usa a geometria real, não o `collides` do plano (em fontes proporcionais ele marca acordes separados por um espaço).
+  Um acorde sem acorde depois (`!nextIsChord`, inclusive o último da linha) nunca passa de
+  `limitX − newWidth` (nem vai para a esquerda do `x` original); se mesmo assim o espaço real até o anterior fica
+  menor que um espaço, o anterior permanece `collides: true`. `collides` do deslocado é recalculado com o `x` novo.
+  `OverlayOp.text.x` usa o `x` efetivo; o retângulo branco cobre a **união** da área original e da nova.
 - Ordem de desenho: todos os retângulos brancos primeiro, depois todos os textos (em `overlayWriter.ts` e em
   `PreviewLayer.tsx`). Sem isso, o retângulo do acorde seguinte apagaria a ponta do acorde anterior.
 - `README.md` §Prévia e §6.2 do spec são atualizados: colisões resolvidas por deslocamento; vermelho só para o que sobra.
