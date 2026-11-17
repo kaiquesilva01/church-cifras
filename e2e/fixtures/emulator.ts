@@ -46,6 +46,8 @@ export interface SeedKey {
   chordLines?: Array<Array<[number, string]>>;
   heading?: string;
   headingEndX?: number;
+  /** Number of PDF pages (default 1). */
+  pages?: number;
 }
 
 export interface SeededSong {
@@ -95,6 +97,7 @@ export async function seedSong(
       chordLines: entry.chordLines,
       heading: entry.heading,
       headingEndX: entry.headingEndX,
+      pages: entry.pages,
     });
     await ok(
       await fetch(
@@ -170,4 +173,97 @@ export async function waitForUserDoc(uid: string): Promise<void> {
     if (Date.now() > deadline) throw new Error(`users/${uid} never appeared (onUserCreated)`);
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
+}
+
+const DAY_MS = 86_400_000;
+const saoPaulo = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Sao_Paulo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** Today (YYYY-MM-DD) in America/Sao_Paulo, the way the app computes it. */
+export const todayInSaoPaulo = (): string => saoPaulo.format(new Date());
+
+/** `date` (YYYY-MM-DD) shifted by `days`. */
+export function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+const ts = (date: Date) => ({ timestampValue: date.toISOString() });
+
+/**
+ * Creates a setlist (Firestore REST, bypassing the rules) and returns its document id. `expiresAt`
+ * defaults to what the app computes: end of `date` in America/Sao_Paulo + 30 days.
+ */
+export async function seedSetlist(
+  date: string,
+  label: string,
+  items: Array<{ songId: string; key: string }>,
+  opts: { expiresAt?: Date; id?: string } = {},
+): Promise<string> {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const expiresAt = opts.expiresAt ?? new Date(Date.UTC(y, m - 1, d + 1, 3) + 30 * DAY_MS);
+  const now = new Date();
+  const fields = {
+    date: str(date),
+    label: str(label),
+    items: {
+      arrayValue: {
+        values: items.map((item) => ({
+          mapValue: {
+            fields: {
+              id: str(crypto.randomUUID()),
+              songId: str(item.songId),
+              key: str(item.key),
+            },
+          },
+        })),
+      },
+    },
+    expiresAt: ts(expiresAt),
+    createdBy: str('e2e'),
+    createdAt: ts(now),
+    updatedBy: str('e2e'),
+    updatedAt: ts(now),
+  };
+  const query = opts.id ? `?documentId=${encodeURIComponent(opts.id)}` : '';
+  const response = await ok(
+    await fetch(`${DOCS}/setlists${query}`, {
+      method: 'POST',
+      headers: { ...OWNER, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields }),
+    }),
+    `seed setlist ${label}`,
+  );
+  const { name } = (await response.json()) as { name: string };
+  return name.slice(name.lastIndexOf('/') + 1);
+}
+
+/** Deletes every setlist, so the "next culto" card and the tab only hold what the test seeds. */
+export async function clearSetlists(): Promise<void> {
+  let pageToken: string | undefined;
+  do {
+    const query = `pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    const response = await ok(
+      await fetch(`${DOCS}/setlists?${query}`, { headers: OWNER }),
+      'list setlists',
+    );
+    const body = (await response.json()) as {
+      documents?: Array<{ name: string }>;
+      nextPageToken?: string;
+    };
+    for (const document of body.documents ?? []) {
+      await ok(
+        await fetch(`http://localhost:8080/v1/${document.name}`, {
+          method: 'DELETE',
+          headers: OWNER,
+        }),
+        `delete ${document.name}`,
+      );
+    }
+    pageToken = body.nextPageToken;
+  } while (pageToken);
 }

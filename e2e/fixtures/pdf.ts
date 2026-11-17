@@ -13,6 +13,8 @@ export interface SyntheticSong {
   headingEndX?: number;
   /** Heading text; defaults to "title - artist (key)". Keeps the title short while the song title stays unique. */
   heading?: string;
+  /** Number of pages (default 1); extra pages repeat the chord lines under a "Página n" heading. */
+  pages?: number;
 }
 
 const LYRICS = [
@@ -81,7 +83,6 @@ export const UNRESOLVABLE_LINES: Array<Array<[number, string]>> = [
 /** Fully synthetic PDF: invented lyrics, Courier-Bold chords above Courier lines. Never a real score. */
 export async function syntheticPdf(song: SyntheticSong): Promise<Buffer> {
   const doc = await PDFDocument.create();
-  const page = doc.addPage([595, 842]);
   const heading = await doc.embedFont(StandardFonts.HelveticaBold);
   const chordFont = await doc.embedFont(StandardFonts.CourierBold);
   const lyricFont = await doc.embedFont(StandardFonts.Courier);
@@ -92,17 +93,25 @@ export async function syntheticPdf(song: SyntheticSong): Promise<Buffer> {
     song.headingEndX === undefined
       ? 40
       : song.headingEndX - heading.widthOfTextAtSize(headingText, 16);
-  page.drawText(headingText, {
-    x: headingX,
-    y: top,
-    size: 16,
-    font: heading,
-  });
   const lines = song.chordLines ?? DEFAULT_LINES;
-  lines.forEach((chords, index) => {
-    const y = top - 50 - index * 30;
-    for (const [x, chord] of chords) page.drawText(chord, { x, y, size: 10, font: chordFont });
-    page.drawText(LYRICS[index % LYRICS.length]!, { x: 40, y: y - 12, size: 10, font: lyricFont });
-  });
+  for (let number = 1; number <= (song.pages ?? 1); number++) {
+    const page = doc.addPage([595, 842]);
+    page.drawText(number === 1 ? headingText : `Pagina ${number}`, {
+      x: number === 1 ? headingX : 40,
+      y: top,
+      size: 16,
+      font: heading,
+    });
+    lines.forEach((chords, index) => {
+      const y = top - 50 - index * 30;
+      for (const [x, chord] of chords) page.drawText(chord, { x, y, size: 10, font: chordFont });
+      page.drawText(LYRICS[index % LYRICS.length]!, {
+        x: 40,
+        y: y - 12,
+        size: 10,
+        font: lyricFont,
+      });
+    });
+  }
   return Buffer.from(await doc.save());
 }

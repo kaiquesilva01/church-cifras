@@ -1,4 +1,4 @@
-import { expect, test as base, type Page, type TestInfo } from '@playwright/test';
+import { expect, test as base, type Browser, type Page, type TestInfo } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { lettersTag } from './names';
@@ -94,13 +94,37 @@ export const chip = (page: Page, title: string, key: string) =>
 
 // The Firebase SDK pins an "emulator mode" banner to the bottom of the page; it only exists in
 // emulator builds and covers bottom-anchored controls (the FAB, the sheet), so tests hide it.
+const hideEmulatorBanner = (): void => {
+  const style = document.createElement('style');
+  style.textContent = '.firebase-emulator-warning { display: none !important; }';
+  document.addEventListener('DOMContentLoaded', () => document.head.appendChild(style));
+};
+
 export const test = base.extend({
   page: async ({ page }, use) => {
-    await page.addInitScript(() => {
-      const style = document.createElement('style');
-      style.textContent = '.firebase-emulator-warning { display: none !important; }';
-      document.addEventListener('DOMContentLoaded', () => document.head.appendChild(style));
-    });
+    await page.addInitScript(hideEmulatorBanner);
     await use(page);
   },
 });
+
+/**
+ * A second, isolated browser session (own storage, so its own sign-in) with the same device and
+ * locale settings as the running project. The caller closes `context`.
+ */
+export async function openSession(browser: Browser, testInfo: TestInfo) {
+  const { baseURL, viewport, userAgent, deviceScaleFactor, isMobile, hasTouch, locale } =
+    testInfo.project.use;
+  const context = await browser.newContext({
+    baseURL,
+    viewport,
+    userAgent,
+    deviceScaleFactor,
+    isMobile,
+    hasTouch,
+    locale,
+    serviceWorkers: 'block',
+  });
+  const page = await context.newPage();
+  await page.addInitScript(hideEmulatorBanner);
+  return { context, page };
+}
