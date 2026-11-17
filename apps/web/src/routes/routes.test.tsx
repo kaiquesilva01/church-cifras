@@ -4,6 +4,7 @@ import { App } from '../App';
 import type { Role } from '../auth/roles';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { createFakeGateway, testUser } from '../test/fakeGateway';
+import { fakeSetlistApi } from '../test/fakeSetlistApi';
 import type { PeopleApi } from '../people/peopleApi';
 
 const peopleApi: PeopleApi = {
@@ -18,6 +19,7 @@ function setup(path: string, signedIn?: Role) {
       gateway={gateway}
       peopleApi={peopleApi}
       catalogApi={fakeCatalogApi()}
+      setlistApi={fakeSetlistApi()}
       initialPath={path}
     />,
   );
@@ -51,6 +53,7 @@ describe('routes', () => {
         gateway={gateway}
         peopleApi={peopleApi}
         catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
         initialPath="/login"
       />,
     );
@@ -69,6 +72,7 @@ describe('routes', () => {
           gateway={gateway}
           peopleApi={peopleApi}
           catalogApi={fakeCatalogApi()}
+          setlistApi={fakeSetlistApi()}
           initialPath="/login"
         />,
       );
@@ -111,6 +115,7 @@ describe('routes', () => {
         gateway={gateway}
         peopleApi={peopleApi}
         catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
         initialPath="/pessoas"
       />,
     );
@@ -128,6 +133,7 @@ describe('routes', () => {
         gateway={gateway}
         peopleApi={peopleApi}
         catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
         initialPath="/login"
       />,
     );

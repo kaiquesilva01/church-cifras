@@ -25,11 +25,18 @@ export function createOverlayWriter(loadFont: FontBytesLoader): ChordWriter {
         embedded.set(id, await doc.embedFont(await loadFont(id), { subset: false }));
       }
       const pages = doc.getPages();
+      const pageOf = (n: number) => {
+        const page = pages[n - 1];
+        if (!page) throw new Error(`Página ${n} não existe no PDF.`);
+        return page;
+      };
+      // All covers first: a pushed chord's rectangle can reach back over the previous chord's new
+      // text, so painting rect+text per op would erase it.
       for (const op of ops) {
-        const page = pages[op.page - 1];
-        if (!page) throw new Error(`Página ${op.page} não existe no PDF.`);
-        page.drawRectangle({ ...op.rect, color: WHITE, borderWidth: 0 });
-        page.drawText(op.text.value, {
+        pageOf(op.page).drawRectangle({ ...op.rect, color: WHITE, borderWidth: 0 });
+      }
+      for (const op of ops) {
+        pageOf(op.page).drawText(op.text.value, {
           x: op.text.x,
           y: op.text.y,
           size: op.text.fontSize,

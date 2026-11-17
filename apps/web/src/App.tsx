@@ -3,6 +3,9 @@ import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-rout
 import { AuthProvider, type AuthGateway } from './auth/AuthProvider';
 import type { CatalogApi } from './catalog/catalogApi';
 import { SongsProvider } from './catalog/SongsProvider';
+import { ActiveSetlistProvider } from './setlists/ActiveSetlistProvider';
+import type { SetlistApi } from './setlists/setlistApi';
+import { SetlistsProvider } from './setlists/SetlistsProvider';
 import type { PeopleApi } from './people/peopleApi';
 import { PeoplePage } from './people/PeoplePage';
 import { loadViewerRoute } from './lib/prefetch';
@@ -17,11 +20,13 @@ import { AppShell } from './ui/AppShell';
 const UploadRoute = lazy(() => import('./upload/UploadRoute'));
 const ImportRoute = lazy(() => import('./import/ImportRoute'));
 const ViewerRoute = lazy(loadViewerRoute);
+const SetlistRoute = lazy(() => import('./setlists/SetlistRoute'));
 
 export interface AppProps {
   gateway: AuthGateway;
   peopleApi: PeopleApi;
   catalogApi: CatalogApi;
+  setlistApi: SetlistApi;
   initialPath?: string;
   /** Recarrega a página (injetável nos testes). */
   onReload?: () => void;
@@ -30,10 +35,12 @@ export interface AppProps {
 function AppRoutes({
   peopleApi,
   catalogApi,
+  setlistApi,
   onReload,
 }: {
   peopleApi: PeopleApi;
   catalogApi: CatalogApi;
+  setlistApi: SetlistApi;
   onReload: () => void;
 }) {
   return (
@@ -43,11 +50,15 @@ function AppRoutes({
         <Route
           element={
             <SongsProvider api={catalogApi}>
-              <AppShell />
+              <SetlistsProvider api={setlistApi}>
+                <ActiveSetlistProvider api={setlistApi}>
+                  <AppShell />
+                </ActiveSetlistProvider>
+              </SetlistsProvider>
             </SongsProvider>
           }
         >
-          <Route index element={<HomePage />} />
+          <Route index element={<HomePage setlistApi={setlistApi} />} />
           <Route path="/cantores/:artistId" element={<ArtistPage />} />
           <Route
             path="/musicas/:songId"
@@ -61,6 +72,22 @@ function AppRoutes({
                   }
                 >
                   <ViewerRoute api={catalogApi} />
+                </Suspense>
+              </ErrorBoundary>
+            }
+          />
+          <Route
+            path="/repertorios/:id"
+            element={
+              <ErrorBoundary onReload={onReload}>
+                <Suspense
+                  fallback={
+                    <p role="status" className="status">
+                      Carregando…
+                    </p>
+                  }
+                >
+                  <SetlistRoute api={setlistApi} />
                 </Suspense>
               </ErrorBoundary>
             }
@@ -115,6 +142,7 @@ export function App({
   gateway,
   peopleApi,
   catalogApi,
+  setlistApi,
   initialPath,
   onReload = reloadPage,
 }: AppProps) {
@@ -122,14 +150,24 @@ export function App({
     () =>
       initialPath ? (
         <MemoryRouter initialEntries={[initialPath]}>
-          <AppRoutes peopleApi={peopleApi} catalogApi={catalogApi} onReload={onReload} />
+          <AppRoutes
+            peopleApi={peopleApi}
+            catalogApi={catalogApi}
+            setlistApi={setlistApi}
+            onReload={onReload}
+          />
         </MemoryRouter>
       ) : (
         <BrowserRouter>
-          <AppRoutes peopleApi={peopleApi} catalogApi={catalogApi} onReload={onReload} />
+          <AppRoutes
+            peopleApi={peopleApi}
+            catalogApi={catalogApi}
+            setlistApi={setlistApi}
+            onReload={onReload}
+          />
         </BrowserRouter>
       ),
-    [initialPath, peopleApi, catalogApi, onReload],
+    [initialPath, peopleApi, catalogApi, setlistApi, onReload],
   );
   return <AuthProvider gateway={gateway}>{router}</AuthProvider>;
 }

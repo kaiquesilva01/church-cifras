@@ -71,7 +71,7 @@ export function useTranspose({ sourceLines, sourceKey, measure }: UseTransposeIn
       return {
         plan,
         ops,
-        // What the user sees (after reflow), not plan.collisions.
+        // What the user sees (after chord spreading), not plan.collisions.
         collisions: ops.filter((op) => op.kind === 'chord' && op.collides).length,
         keyCollision: ops.some((op) => op.kind === 'key' && op.collides),
         suspects: [...new Set(plan.suspectSegments.flatMap((s) => s.unknown))],

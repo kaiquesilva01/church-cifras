@@ -11,80 +11,88 @@ export interface OverlayOp {
 }
 
 const PAD_EM = 0.04;
+// Same tolerance as SAME_LINE_TOLERANCE in packages/pdf/src/readTextLines.ts (not exported there):
+// the reader keeps runs up to 1 pt apart in one TextLine, so chords must group the same way.
+const SAME_LINE_TOLERANCE = 1;
+const SPREAD_GAP_SPACES = 2;
+// Same value and meaning as TOLERANCE_EM in packages/chords/src/plan.ts: float noise in PDF
+// coordinates must not turn an exact one-space gap into a push.
+const TOLERANCE_EM = 0.05;
 
-function toOp(r: Replacement, kind: OverlayOp['kind']): OverlayOp {
+function toOp(r: Replacement, kind: OverlayOp['kind'], x = r.x, collides = r.collides): OverlayOp {
   const pad = PAD_EM * r.fontSize;
+  const left = Math.min(r.x, x);
+  const right = Math.max(r.x + r.width, x + r.newWidth);
   return {
     page: r.page,
     rect: {
-      x: r.x - pad,
+      x: left - pad,
       y: r.y + r.descent * r.fontSize - pad,
-      width: Math.max(r.width, r.newWidth) + 2 * pad,
+      width: right - left + 2 * pad,
       height: (r.ascent - r.descent) * r.fontSize + 2 * pad,
     },
     text: {
       value: r.replacement,
-      x: r.x,
+      x,
       y: r.y,
       fontId: chooseFont(r.fontName, r.bold),
       fontSize: r.fontSize,
     },
     kind,
-    collides: r.collides,
+    collides,
   };
 }
 
-// Chords of one pdf run whose original tokens sit within this many spaces of each other were typed
-// as running text ("A/C#G9 A F#mBm"), not aligned to lyrics.
-const PACKED_GAP_SPACES = 1.5;
-
-const isPacked = (prev: Replacement, next: Replacement): boolean =>
-  prev.page === next.page &&
-  prev.runKey === next.runKey &&
-  next.x - (prev.x + prev.width) <= PACKED_GAP_SPACES * prev.spaceWidth;
-
-// Consecutive chords of a packed run that include a collision become one replacement: the new
-// chords joined by single spaces from the first token, checked against what follows the group.
-function reflow(group: Replacement[]): Replacement {
-  const first = group[0]!;
-  const last = group[group.length - 1]!;
-  const newWidth =
-    group.reduce((sum, r) => sum + r.newWidth, 0) + first.spaceWidth * (group.length - 1);
-  return {
-    ...first,
-    width: last.x + last.width - first.x,
-    replacement: group.map((r) => r.replacement).join(' '),
-    newWidth,
-    limitX: last.limitX,
-    collides: first.x + newWidth > last.limitX,
-  };
+interface Spread {
+  r: Replacement;
+  x: number;
+  collides: boolean;
 }
 
-function reflowPackedRuns(chords: Replacement[]): Replacement[] {
-  const result: Replacement[] = [];
-  let group: Replacement[] = [];
-  const flush = (): void => {
-    if (group.length > 1 && group.some((r) => r.collides)) result.push(reflow(group));
-    else result.push(...group);
-    group = [];
-  };
+// When a chord is followed by another chord closer than one space (by its real new end), the next
+// chord moves to exactly two spaces after it (never left), cascading along the line. A chord with
+// no chord after it is never pushed past its own limit. Only chords of one page and baseline
+// interact.
+export function spreadChords(chords: Replacement[]): Spread[] {
+  const result = new Map<Replacement, Spread>();
+  const lines: Replacement[][] = [];
   for (const chord of chords) {
-    const prev = group[group.length - 1];
-    if (prev && !isPacked(prev, chord)) flush();
-    group.push(chord);
+    const line = lines.find(
+      (l) => l[0]!.page === chord.page && Math.abs(l[0]!.y - chord.y) <= SAME_LINE_TOLERANCE,
+    );
+    if (line) line.push(chord);
+    else lines.push([chord]);
   }
-  flush();
-  return result;
+  for (const line of lines) {
+    const sorted = [...line].sort((a, b) => a.x - b.x);
+    let prev: Spread | null = null;
+    for (const r of sorted) {
+      let x = r.x;
+      if (prev && prev.r.nextIsChord) {
+        const prevEnd = prev.x + prev.r.newWidth;
+        const minGap = prev.r.spaceWidth - TOLERANCE_EM * prev.r.fontSize;
+        if (r.x - prevEnd < minGap) {
+          x = Math.max(r.x, prevEnd + SPREAD_GAP_SPACES * prev.r.spaceWidth);
+          if (!r.nextIsChord) x = Math.max(r.x, Math.min(x, r.limitX - r.newWidth));
+        }
+        prev.collides = x - prevEnd < minGap;
+      }
+      const collides = x !== r.x ? x + r.newWidth > r.limitX : r.collides;
+      prev = { r, x, collides };
+      result.set(r, prev);
+    }
+  }
+  return chords.map((c) => result.get(c)!);
 }
 
 // Shared by the PDF writer and the browser preview so both draw exactly the same thing.
 export function overlayOps(plan: TransposePlan): OverlayOp[] {
-  const ops = reflowPackedRuns(plan.chords).map((c) => toOp(c, 'chord'));
+  const ops = spreadChords(plan.chords).map((s) => toOp(s.r, 'chord', s.x, s.collides));
   if (plan.keyIndicator) ops.push(toOp(plan.keyIndicator, 'key'));
   return ops;
 }
 
-// Collisions as the user sees them: counted on the final ops (after reflow), not on plan.collisions.
+// Collisions as the user sees them: counted on the final ops (after spacing), not on plan.collisions.
 export function countCollisions(ops: OverlayOp[]): number {
   return ops.filter((op) => op.collides).length;
 }

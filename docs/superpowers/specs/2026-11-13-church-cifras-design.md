@@ -146,6 +146,7 @@ carregadas sob demanda só para a família usada no PDF.
   + substituição do indicador de tom (`(X)` ou `Tom: X`). **O mesmo plano alimenta a prévia (canvas) e o gerador de PDF** → o que se vê é o que se salva.
 - **Colisão:** se a largura do novo acorde invadir o próximo token da mesma linha (com margem de 1 caractere),
   `collides = true` → prévia destaca e o usuário é avisado (pode salvar mesmo assim) [proposta].
+  *Atualização 2026-11-16:* acordes que colidem com o acorde seguinte são afastados para dois espaços; vermelho só para o que não coube (ver `2026-11-16-espacamento-acordes-design.md`).
 - Testes extensos. **O repositório é público** [decidido], então os PDFs reais (letras com direitos autorais) **não são commitados**:
   ficam numa pasta local ignorada pelo Git (`fixtures/private/`) e alimentam testes que só rodam quando a pasta existe.
   Na CI, os testes usam **PDFs sintéticos** gerados no próprio teste, reproduzindo cada variação da tabela da §6.1

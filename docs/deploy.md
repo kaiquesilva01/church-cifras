@@ -100,3 +100,11 @@ Só é preciso repetir se a origem mudar. Os emuladores locais não precisam dis
 ## 9. Publicar
 
 Faça o PR `develop` -> `main` e aprove o merge. O workflow **Deploy** publica hosting, functions, regras do Firestore e regras do Storage.
+
+## 10. Repertórios: TTL e índice (depois do primeiro deploy)
+
+Os repertórios somem sozinhos 30 dias após o culto (campo `expiresAt`). Depois do primeiro deploy com a Fase 8, confira no console do Firebase, em Firestore > TTL e índices:
+
+- a política de TTL da coleção `setlists` no campo `expiresAt` está ativa;
+- o índice ascendente de `setlists.expiresAt` está criado e ativo;
+- a conta de serviço do deploy consegue gerenciar índices (se o deploy falhar ao criar o índice, conceda o papel de administrador do Cloud Datastore/Firestore a ela).

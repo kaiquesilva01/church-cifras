@@ -4,6 +4,7 @@ import { App } from './App';
 import type { PeopleApi } from './people/peopleApi';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway, testUser } from './test/fakeGateway';
+import { fakeSetlistApi } from './test/fakeSetlistApi';
 
 vi.mock('./upload/UploadRoute', () => {
   throw new Error('chunk failed');
@@ -24,6 +25,7 @@ describe('/nova route failure', () => {
         gateway={gateway}
         peopleApi={peopleApi}
         catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
         initialPath="/nova"
         onReload={onReload}
       />,

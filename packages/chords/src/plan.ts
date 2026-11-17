@@ -30,6 +30,8 @@ export interface Replacement {
   spaceWidth: number;
   // Collides when `x + newWidth` exceeds this (next token minus a letter, or the page edge).
   limitX: number;
+  // True when the next token on the line is another chord (the key indicator is always false).
+  nextIsChord: boolean;
 }
 
 export interface TransposePlan {
@@ -121,7 +123,9 @@ export function buildTransposePlan(input: {
     }
   }
 
-  for (const occurrence of findChords(lines, { indicator, measure })) {
+  const occurrences = findChords(lines, { indicator, measure });
+  const chordTokens = new Set(occurrences.map((o) => o.token));
+  for (const occurrence of occurrences) {
     const { token, chord, prefix, suffix, next, page, pageWidth } = occurrence;
     chordCount++;
     if (same) continue;
@@ -147,6 +151,7 @@ export function buildTransposePlan(input: {
       runKey: runKeyOf(page, token.run),
       spaceWidth: measure(' ', fontName, fontSize),
       limitX,
+      nextIsChord: next !== null && chordTokens.has(next),
     });
   }
 
@@ -170,6 +175,7 @@ export function buildTransposePlan(input: {
       runKey: runKeyOf(indicator.page, token.run),
       spaceWidth: measure(' ', token.run.fontName, token.run.fontSize),
       limitX: 0,
+      nextIsChord: false,
     };
     keyIndicator.newWidth = measure(
       keyIndicator.replacement,

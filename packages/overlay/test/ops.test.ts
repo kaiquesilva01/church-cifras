@@ -23,6 +23,7 @@ function replacement(overrides: Partial<Replacement> = {}): Replacement {
     runKey: '1:700:100',
     spaceWidth: 6,
     limitX: 580.5,
+    nextIsChord: true,
     ...overrides,
   };
 }
@@ -66,7 +67,7 @@ describe('overlayOps', () => {
 
   it('keeps the collision flag', () => {
     const ops = overlayOps(
-      plan([replacement({ collides: true }), replacement({ runKey: 'other' })]),
+      plan([replacement({ collides: true }), replacement({ y: 680, runKey: 'other' })]),
     );
     expect(ops.map((o) => o.collides)).toEqual([true, false]);
   });
@@ -94,92 +95,198 @@ describe('overlayOps', () => {
     expect(overlayOps(plan([]))).toEqual([]);
   });
 
-  describe('packed runs', () => {
-    // Three chords in one run, 6 apart (one space): D / A/C# / Bm replace A# / F/A / Gm.
-    const packed = (overrides: Array<Partial<Replacement>> = []): Replacement[] => [
-      replacement({ x: 100, width: 12, replacement: 'D', newWidth: 6, ...overrides[0] }),
-      replacement({
-        x: 118,
-        width: 18,
-        replacement: 'A/C#',
-        newWidth: 24,
-        collides: true,
-        ...overrides[1],
-      }),
-      replacement({ x: 142, width: 12, replacement: 'Bm', newWidth: 12, ...overrides[2] }),
-    ];
-
-    it('reflows a packed group that collides into one op with single spaces', () => {
-      const ops = overlayOps(plan(packed()));
-      expect(ops).toHaveLength(1);
-      const [op] = ops;
-      expect(op!.text.value).toBe('D A/C# Bm');
-      expect(op!.text.x).toBe(100);
-      expect(op!.kind).toBe('chord');
-      // old extent 100..154 (54); new 6 + 6 + 24 + 6 + 12 = 54; pad 0.4
-      expect(op!.rect.x).toBeCloseTo(99.6, 10);
-      expect(op!.rect.width).toBeCloseTo(54.8, 10);
-      expect(op!.collides).toBe(false);
-    });
-
-    it('rect covers the old run when it is wider than the reflowed text', () => {
-      const [op] = overlayOps(plan(packed([{ width: 30 }, {}, { width: 30 }])));
-      // old: 100 .. 142 + 30 = 172; new 54
-      expect(op!.rect.width).toBeCloseTo(72.8, 10);
-    });
-
-    it('recomputes the collision of the reflowed text against what follows the group', () => {
-      const [op] = overlayOps(plan(packed([{}, {}, { limitX: 140 }])));
-      expect(op!.collides).toBe(true);
-    });
-
-    it('leaves a packed group alone when nothing collides', () => {
-      const ops = overlayOps(plan(packed([{}, { collides: false }])));
-      expect(ops.map((o) => o.text.value)).toEqual(['D', 'A/C#', 'Bm']);
-    });
-
-    it('does not reflow chords aligned to lyrics (gaps over 1.5 spaces)', () => {
+  describe('spacing', () => {
+    // spaceWidth 6: two spaces = 12. All chords on page 1, baseline 700.
+    it('pushes the next chord to two spaces after a colliding chord', () => {
       const ops = overlayOps(
         plan([
-          replacement({ x: 100, newWidth: 6 }),
-          replacement({ x: 130, newWidth: 24, collides: true, replacement: 'A/C#' }),
-          replacement({ x: 170, newWidth: 12, replacement: 'Bm' }),
+          replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({ x: 118, runKey: 'b', replacement: 'Bm', newWidth: 12, limitX: 300 }),
         ]),
       );
-      expect(ops.map((o) => o.text.value)).toEqual(['D', 'A/C#', 'Bm']);
-      expect(ops.map((o) => o.collides)).toEqual([false, true, false]);
+      expect(ops[1]!.text.x).toBe(136);
+      expect(ops[0]!.collides).toBe(false);
+      expect(ops[1]!.collides).toBe(false);
     });
 
-    it('only groups chords of the same run', () => {
+    it('chains: a pushed chord that now collides pushes the following one', () => {
       const ops = overlayOps(
         plan([
-          replacement({ x: 100, newWidth: 24, collides: true }),
-          replacement({ x: 118, runKey: '1:700:118', replacement: 'Bm' }),
+          replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({ x: 118, runKey: 'b', newWidth: 12, limitX: 140 }),
+          replacement({ x: 140, runKey: 'c', newWidth: 12, limitX: 300 }),
         ]),
       );
-      expect(ops).toHaveLength(2);
+      // second: 136..148 > limitX 140, so third goes to 148 + 12 = 160
+      expect(ops.map((o) => o.text.x)).toEqual([100, 136, 160]);
+      expect(ops.map((o) => o.collides)).toEqual([false, false, false]);
     });
 
-    it('reflows only the colliding packed segment, keeping others', () => {
+    it('does not move a chord that keeps at least one space from its predecessor', () => {
+      const ops = overlayOps(
+        plan([replacement({ x: 100, newWidth: 6 }), replacement({ x: 112, runKey: 'b' })]),
+      );
+      // gap 112 - 106 = 6 = one space
+      expect(ops[1]!.text.x).toBe(112);
+      expect(ops[0]!.collides).toBe(false);
+    });
+
+    it('tolerates float noise on the one-space gap but pushes clearly smaller gaps', () => {
+      const pair = (nextX: number) =>
+        overlayOps(
+          plan([
+            replacement({ x: 100, newWidth: 6, collides: true, limitX: 110 }),
+            replacement({ x: nextX, runKey: 'b' }),
+          ]),
+        );
+      // prevEnd 106, spaceWidth 6, fontSize 10: threshold = 6 - 0.05 * 10 = 5.5
+      expect(pair(112 - 1e-6)[1]!.text.x).toBe(112 - 1e-6);
+      expect(pair(112)[1]!.text.x).toBe(112);
+      expect(pair(112 - 1e-6)[0]!.collides).toBe(false);
+      // 1 pt below the threshold: gap 4.5
+      expect(pair(110.5)[1]!.text.x).toBe(118);
+    });
+
+    it('does not push when the plan flags a collision but the gap is one space (proportional font)', () => {
       const ops = overlayOps(
         plan([
-          replacement({ x: 100, runKey: 'a', replacement: 'D' }),
-          replacement({ x: 118, runKey: 'a', replacement: 'G', newWidth: 24, collides: true }),
-          replacement({ x: 200, runKey: 'a', replacement: 'Em' }),
+          replacement({ x: 100, newWidth: 12, spaceWidth: 3, collides: true, limitX: 110 }),
+          replacement({ x: 115, runKey: 'b', newWidth: 12, spaceWidth: 3 }),
         ]),
       );
-      // the first two are packed (gap 6) and reflow; the third is aligned and stays
-      expect(ops.map((o) => o.text.value)).toEqual(['D G', 'Em']);
+      expect(ops.map((o) => o.text.x)).toEqual([100, 115]);
+      expect(ops.map((o) => o.collides)).toEqual([false, false]);
+    });
+
+    it('pushes to exactly two spaces when the gap is smaller than one space', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 12, spaceWidth: 3, collides: true, limitX: 108 }),
+          replacement({ x: 113, runKey: 'b', newWidth: 12, spaceWidth: 3 }),
+        ]),
+      );
+      // gap 1 < 3: successor goes to 112 + 6 = 118
+      expect(ops[1]!.text.x).toBe(118);
+      expect(ops[0]!.collides).toBe(false);
+    });
+
+    it('keeps output order for unsorted input while spreading by x', () => {
+      const first = replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 });
+      const second = replacement({ x: 118, runKey: 'b', replacement: 'Bm', limitX: 300 });
+      const ops = overlayOps(plan([second, first]));
+      expect(ops.map((o) => o.text.value)).toEqual(['Bm', 'D']);
+      expect(ops.map((o) => o.text.x)).toEqual([136, 100]);
+    });
+
+    it('never moves left', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({ x: 200, runKey: 'b' }),
+        ]),
+      );
+      expect(ops[1]!.text.x).toBe(200);
+    });
+
+    it('does not move the neighbour when the next token is not a chord', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 24, collides: true, limitX: 118, nextIsChord: false }),
+          replacement({ x: 118, runKey: 'b' }),
+        ]),
+      );
+      expect(ops[1]!.text.x).toBe(118);
+      expect(ops[0]!.collides).toBe(true);
+    });
+
+    it('caps the push of a chord without a chord after it at its margin', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({ x: 118, runKey: 'b', newWidth: 12, limitX: 140, nextIsChord: false }),
+        ]),
+      );
+      // wanted 136, capped to 140 - 12 = 128; gap 4 < one space, so the first stays red
+      expect(ops[1]!.text.x).toBe(128);
+      expect(ops[1]!.collides).toBe(false);
+      expect(ops[0]!.collides).toBe(true);
+    });
+
+    it('accepts the capped push when two spaces still fit', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({ x: 118, runKey: 'b', newWidth: 12, limitX: 148, nextIsChord: false }),
+        ]),
+      );
+      expect(ops[1]!.text.x).toBe(136);
+      expect(ops.map((o) => o.collides)).toEqual([false, false]);
+    });
+
+    it('never pushes a chord without a chord after it past its margin', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({
+            x: 118,
+            runKey: 'b',
+            newWidth: 12,
+            limitX: 125,
+            nextIsChord: false,
+            collides: true,
+          }),
+        ]),
+      );
+      expect(ops[1]!.text.x).toBe(118);
+      expect(ops[0]!.collides).toBe(true);
+      expect(ops[1]!.collides).toBe(true);
+    });
+
+    it('rect covers the original and the new position of a pushed chord', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({ x: 118, runKey: 'b', width: 12, newWidth: 12, limitX: 300 }),
+        ]),
+      );
+      // union of [118, 130] and [136, 148], pad 0.4
+      expect(ops[1]!.rect.x).toBeCloseTo(117.6, 10);
+      expect(ops[1]!.rect.width).toBeCloseTo(30.8, 10);
+    });
+
+    it('treats baselines up to 1 pt apart as one line, like the pdf reader', () => {
+      const ops = overlayOps(
+        plan([
+          replacement({ x: 100, y: 700, newWidth: 24, collides: true, limitX: 118 }),
+          replacement({ x: 118, y: 700.6, runKey: 'b', newWidth: 12, limitX: 130 }),
+          replacement({ x: 130, y: 700, runKey: 'c', newWidth: 12, limitX: 300 }),
+        ]),
+      );
+      // Bm is the true next chord of the first: pushed to 136; it then collides and pushes G
+      expect(ops.map((o) => o.text.x)).toEqual([100, 136, 160]);
+      expect(ops.map((o) => o.collides)).toEqual([false, false, false]);
+    });
+
+    it('only chords of the same page and baseline interact', () => {
+      const collider = { x: 100, newWidth: 24, collides: true, limitX: 118 };
+      const otherLine = overlayOps(
+        plan([replacement(collider), replacement({ x: 118, y: 680, runKey: 'b' })]),
+      );
+      expect(otherLine[1]!.text.x).toBe(118);
+      const otherPage = overlayOps(
+        plan([replacement(collider), replacement({ x: 118, page: 2, runKey: 'b' })]),
+      );
+      expect(otherPage[1]!.text.x).toBe(118);
     });
   });
 });
 
 describe('countCollisions', () => {
-  it('counts ops that collide after reflow, not plan collisions', () => {
+  it('counts ops that collide, not plan collisions', () => {
     const ops = overlayOps(
       plan([
         replacement({ collides: false }),
-        replacement({ x: 200, runKey: '1:700:200', collides: true }),
+        replacement({ x: 200, runKey: '1:700:200', collides: true, nextIsChord: false }),
         replacement({ x: 300, runKey: '1:700:300', collides: true }),
       ]),
     );
@@ -187,13 +294,13 @@ describe('countCollisions', () => {
     expect(countCollisions([])).toBe(0);
   });
 
-  it('does not count a packed run once reflow resolves it', () => {
-    const packed = [
-      replacement({ x: 100, collides: true, limitX: 400 }),
-      replacement({ x: 112, collides: false, limitX: 400 }),
-    ];
-    const ops = overlayOps(plan(packed));
-    expect(countCollisions(ops)).toBe(ops.filter((o) => o.collides).length);
+  it('does not count a collision resolved by spacing', () => {
+    const ops = overlayOps(
+      plan([
+        replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
+        replacement({ x: 118, runKey: 'b', newWidth: 12, limitX: 300 }),
+      ]),
+    );
     expect(countCollisions(ops)).toBe(0);
   });
 });

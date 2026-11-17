@@ -31,6 +31,8 @@ export default function ViewerRoute({ api }: { api: CatalogApi }) {
       api={api}
       songId={songId}
       tomSlug={params.get('tom')}
+      setlistId={params.get('repertorio')}
+      itemId={params.get('item')}
       openPdf={openPdf}
       readLines={readLines}
     />

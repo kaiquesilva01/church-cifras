@@ -5,6 +5,7 @@ import type { Role } from './auth/roles';
 import type { PeopleApi } from './people/peopleApi';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway, testUser } from './test/fakeGateway';
+import { fakeSetlistApi } from './test/fakeSetlistApi';
 
 vi.mock('./upload/UploadRoute', () => ({
   default: () => <p>Nova cifra (marker)</p>,
@@ -22,6 +23,7 @@ function setup(role: Role) {
       gateway={gateway}
       peopleApi={peopleApi}
       catalogApi={fakeCatalogApi()}
+      setlistApi={fakeSetlistApi()}
       initialPath="/nova"
     />,
   );

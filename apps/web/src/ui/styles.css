@@ -367,6 +367,56 @@ body {
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
 }
 
+button.fab {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.next-culto {
+  margin: 0 0 12px;
+}
+
+.next-culto-title,
+.section-title {
+  margin: 12px 0 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted, inherit);
+}
+
+.setlist-row {
+  display: flex;
+  /* .list-main is a column; the card reads as one row: title left, count right. */
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setlist-row .song-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.setlist-row .muted {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* The .list's bottom padding clears the floating button; only the last list of the page needs it. */
+.next-culto .list,
+.section-title + .list {
+  padding-bottom: 0;
+}
+
+section:last-child > .section-title + .list {
+  padding-bottom: 80px;
+}
+
 .back {
   color: var(--color-accent);
   text-decoration: none;
@@ -602,8 +652,32 @@ body {
   border-top: 1px solid var(--color-border);
 }
 
+.viewer.has-setlist .viewer-bar {
+  flex-wrap: wrap;
+}
+
+.setlist-bar {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .viewer-bar .btn-primary {
   margin-left: auto;
+}
+
+.setlist-bar > span {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.setlist-bar a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-accent);
 }
 
 .viewer-bar .muted {
@@ -618,6 +692,22 @@ body {
   border-radius: var(--radius);
   background: var(--color-success-soft);
   color: var(--color-success);
+}
+
+.notice p {
+  margin: 0;
+}
+
+.notice a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.page-title ~ .notice {
+  margin-bottom: 12px;
 }
 
 .key-panel {
@@ -651,6 +741,11 @@ body {
   width: 320px;
   align-content: start;
   border-left: 1px solid var(--color-border);
+}
+
+/* The setlist bar adds a row to the fixed bottom bar: clear both rows. Before .has-sheet, which wins. */
+.viewer.has-setlist {
+  padding-bottom: 136px;
 }
 
 .viewer.has-sheet {
@@ -1009,4 +1104,203 @@ body {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.setlist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.setlist-header + .page-title {
+  margin-bottom: 12px;
+}
+
+.setlist-menu {
+  position: relative;
+}
+
+.setlist-menu-list {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  display: grid;
+  gap: 0;
+  min-width: 200px;
+  margin-top: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+  white-space: nowrap;
+}
+
+.setlist-menu-list .btn {
+  border-color: transparent;
+  background: none;
+  text-align: left;
+}
+
+.setlist-menu-list .btn:hover {
+  background: var(--color-bg);
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+/* Inside the viewer the grid gap already spaces the banner. */
+.viewer .update-banner {
+  margin: 0;
+}
+
+/* Number, handle, title and key share the first row; the three icon buttons drop to a second,
+   right-aligned row when they do not fit (360px), and join the first row on wide screens. */
+.setlist-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.setlist-item .btn-icon,
+.setlist-header .btn-icon {
+  min-width: 44px;
+}
+
+.setlist-item-number {
+  flex: none;
+  min-width: 1.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.setlist-item-handle {
+  flex: none;
+  color: var(--color-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: grab;
+}
+
+.setlist-item-handle:active {
+  cursor: grabbing;
+}
+
+.setlist-item-main {
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.setlist-item-main a,
+.setlist-item-main > .song-title {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* A song that left the catalog: not a link, so it reads as inactive. */
+.setlist-item-main > span.song-title {
+  color: var(--color-muted);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.setlist-item-key {
+  flex: none;
+  min-width: 44px;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Read-only key (visitors): aligned to the card edge, not centred in a button-sized box. */
+span.setlist-item-key {
+  min-width: 1.5em;
+  text-align: right;
+}
+
+/* Decorative ✕ in the key slot of a removed song: it duplicates the remove button. */
+.setlist-item-key[aria-hidden='true'] {
+  display: none;
+}
+
+.setlist-item-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.add-song-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-bottom: 0;
+  gap: 0;
+}
+
+.add-song-list li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.add-song-option {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.add-song-option .song-title {
+  flex-basis: 100%;
+}
+
+.add-song-option:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+
+.add-song-option:focus-visible {
+  outline-offset: -2px;
+}
+
+.add-song-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Key picker (dialog): larger chips, the current key filled like a pressed key button. */
+.dialog .chips {
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.dialog .chip {
+  min-width: 48px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
 }

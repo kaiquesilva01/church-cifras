@@ -257,7 +257,7 @@ describe('ViewerPage change key', () => {
   it('shows collision warning and saves the collision count', async () => {
     const lines = sheetInG([
       ['G', 50],
-      ['C', 65],
+      ['C', 575],
     ]);
     const { api } = renderViewer({ lines });
     await openPanel();

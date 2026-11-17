@@ -36,6 +36,7 @@ function replacementOf(fontName: string, bold: boolean, text: string): Replaceme
     runKey: '1:700:40',
     spaceWidth: 6,
     limitX: 580,
+    nextIsChord: true,
   };
 }
 
