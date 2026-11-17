@@ -34,7 +34,7 @@ describe('useTranspose', () => {
     const { result } = setup(
       sheetInG([
         ['G', 50],
-        ['C', 65],
+        ['C', 575],
       ]),
     );
     act(() => result.current.setTarget('Ab'));

@@ -43,7 +43,7 @@ export function expectOpsWritten(lines: TextLine[], ops: OverlayOp[], measure: M
   for (const op of ops) {
     const words = op.text.value.split(' ');
     if (words.length > 1) {
-      // a reflowed group: pdf.js splits the drawn string at its spaces, so look for every word
+      // a multi-word op: pdf.js splits the drawn string at its spaces, so look for every word
       // inside the span the group should occupy
       const runs = lines.filter((l) => l.page === op.page).flatMap((l) => l.runs);
       const pieces = runs.filter(

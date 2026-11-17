@@ -48,7 +48,7 @@ O script imprime `OK` e sai com 0, ou o passo que falhou e sai com 1.
 Membros e admins veem **Mudar tom** no visualizador. Como funciona:
 
 1. A cifra aberta é sempre transposta a partir de um PDF feito à mão (o tom aberto, ou o `derivedFromKey` dele, ou o primeiro feito à mão). Sem PDF feito à mão, o botão fica desabilitado.
-2. Ao escolher um tom, a prévia é desenhada na hora sobre a página: os acordes novos aparecem sobre um retângulo branco; os alterados em amarelo e os que podem encostar no vizinho em vermelho. A página em si não é renderizada de novo.
+2. Ao escolher um tom, a prévia é desenhada na hora sobre a página: os acordes novos aparecem sobre um retângulo branco; os alterados em amarelo e os que não couberam em vermelho. Um acorde transposto que encostaria no acorde seguinte afasta o seguinte para dois espaços (em cascata, nunca para a esquerda); só fica em vermelho o que não coube (vizinho que não é acorde, como `(2x)`, ou a margem direita). A página em si não é renderizada de novo.
 3. **Confirmar** gera um PDF novo (retângulo branco sobre cada acorde e sobre o indicador de tom, com o texto novo por cima), grava em `songs/{id}/{tom}-{fileId}.pdf` e cria o tom como `generated`. Se alguém salvou o mesmo tom antes, o arquivo é descartado e o existente é aberto.
 4. `pdf-lib` e `fontkit` só carregam quando o painel é aberto (nunca para quem só lê a cifra).
 

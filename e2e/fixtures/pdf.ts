@@ -49,13 +49,28 @@ const DEFAULT_LINES: Array<Array<[number, string]>> = [
 ];
 
 /**
- * Deterministic collision that survives the reflow: C7 (ends at 52) and F (at 62) are more than 1.5
- * spaces apart, so they are not a packed run, and C# 7 (18 wide) runs into F. Nothing else collides.
+ * C7 (ends at 52) and F (at 62): C# 7 (18 wide) runs into F, so the overlay pushes F right to two
+ * spaces and nothing is left in red. Nothing else collides.
  */
 export const COLLIDING_LINES: Array<Array<[number, string]>> = [
   [
     [40, 'C7'],
     [62, 'F'],
+  ],
+  [
+    [40, 'G'],
+    [140, 'Am'],
+  ],
+];
+
+/**
+ * Collision the spreading cannot resolve: C# 7 (18 wide) runs into the non-chord label "(2x)", which
+ * is never moved, so exactly one chord stays red. Nothing else collides.
+ */
+export const UNRESOLVABLE_LINES: Array<Array<[number, string]>> = [
+  [
+    [40, 'C7'],
+    [62, '(2x)'],
   ],
   [
     [40, 'G'],

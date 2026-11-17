@@ -79,7 +79,9 @@ export function PreviewLayer({ page, viewport, ops, highlight = false, onError }
     };
     const draw = (): void => {
       clear();
-      for (const op of toCanvasOps(mine, viewport, highlight)) {
+      const canvasOps = toCanvasOps(mine, viewport, highlight);
+      // Covers first: a pushed chord's rectangle can overlap the previous chord's new text.
+      for (const op of canvasOps) {
         ctx.fillStyle = op.fill;
         ctx.fillRect(op.rect.x, op.rect.y, op.rect.width, op.rect.height);
         if (op.stroke) {
@@ -87,6 +89,8 @@ export function PreviewLayer({ page, viewport, ops, highlight = false, onError }
           ctx.lineWidth = 1;
           ctx.strokeRect(op.rect.x, op.rect.y, op.rect.width, op.rect.height);
         }
+      }
+      for (const op of canvasOps) {
         ctx.fillStyle = '#000000';
         ctx.font = op.text.font;
         ctx.textBaseline = 'alphabetic';
