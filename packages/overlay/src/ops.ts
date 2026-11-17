@@ -15,6 +15,9 @@ const PAD_EM = 0.04;
 // the reader keeps runs up to 1 pt apart in one TextLine, so chords must group the same way.
 const SAME_LINE_TOLERANCE = 1;
 const SPREAD_GAP_SPACES = 2;
+// Same value and meaning as TOLERANCE_EM in packages/chords/src/plan.ts: float noise in PDF
+// coordinates must not turn an exact one-space gap into a push.
+const TOLERANCE_EM = 0.05;
 
 function toOp(r: Replacement, kind: OverlayOp['kind'], x = r.x, collides = r.collides): OverlayOp {
   const pad = PAD_EM * r.fontSize;
@@ -67,11 +70,12 @@ export function spreadChords(chords: Replacement[]): Spread[] {
       let x = r.x;
       if (prev && prev.r.nextIsChord) {
         const prevEnd = prev.x + prev.r.newWidth;
-        if (r.x - prevEnd < prev.r.spaceWidth) {
+        const minGap = prev.r.spaceWidth - TOLERANCE_EM * prev.r.fontSize;
+        if (r.x - prevEnd < minGap) {
           x = Math.max(r.x, prevEnd + SPREAD_GAP_SPACES * prev.r.spaceWidth);
           if (!r.nextIsChord) x = Math.max(r.x, Math.min(x, r.limitX - r.newWidth));
         }
-        prev.collides = x - prevEnd < prev.r.spaceWidth;
+        prev.collides = x - prevEnd < minGap;
       }
       const collides = x !== r.x ? x + r.newWidth > r.limitX : r.collides;
       prev = { r, x, collides };

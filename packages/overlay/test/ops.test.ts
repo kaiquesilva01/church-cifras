@@ -131,6 +131,22 @@ describe('overlayOps', () => {
       expect(ops[0]!.collides).toBe(false);
     });
 
+    it('tolerates float noise on the one-space gap but pushes clearly smaller gaps', () => {
+      const pair = (nextX: number) =>
+        overlayOps(
+          plan([
+            replacement({ x: 100, newWidth: 6, collides: true, limitX: 110 }),
+            replacement({ x: nextX, runKey: 'b' }),
+          ]),
+        );
+      // prevEnd 106, spaceWidth 6, fontSize 10: threshold = 6 - 0.05 * 10 = 5.5
+      expect(pair(112 - 1e-6)[1]!.text.x).toBe(112 - 1e-6);
+      expect(pair(112)[1]!.text.x).toBe(112);
+      expect(pair(112 - 1e-6)[0]!.collides).toBe(false);
+      // 1 pt below the threshold: gap 4.5
+      expect(pair(110.5)[1]!.text.x).toBe(118);
+    });
+
     it('does not push when the plan flags a collision but the gap is one space (proportional font)', () => {
       const ops = overlayOps(
         plan([
@@ -211,11 +227,19 @@ describe('overlayOps', () => {
       const ops = overlayOps(
         plan([
           replacement({ x: 100, newWidth: 24, collides: true, limitX: 118 }),
-          replacement({ x: 118, runKey: 'b', newWidth: 12, limitX: 125, nextIsChord: false }),
+          replacement({
+            x: 118,
+            runKey: 'b',
+            newWidth: 12,
+            limitX: 125,
+            nextIsChord: false,
+            collides: true,
+          }),
         ]),
       );
       expect(ops[1]!.text.x).toBe(118);
       expect(ops[0]!.collides).toBe(true);
+      expect(ops[1]!.collides).toBe(true);
     });
 
     it('rect covers the original and the new position of a pushed chord', () => {
