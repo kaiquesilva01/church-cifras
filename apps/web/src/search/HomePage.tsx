@@ -137,7 +137,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
             </p>
           )}
           {setlistsStatus === 'ready' && (
-            <SetlistsTab setlists={setlists} today={today} now={now} />
+            <SetlistsTab setlists={setlists} today={today} now={now} songs={songs} />
           )}
         </div>
       ) : (
