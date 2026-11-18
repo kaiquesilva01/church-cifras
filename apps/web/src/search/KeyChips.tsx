@@ -27,10 +27,11 @@ export function KeyChips({
         <li key={key}>
           <Link
             to={`/musicas/${songId}?tom=${keySlug(key)}${extraQuery ? `&${extraQuery}` : ''}`}
-            className="chip"
+            className={compact && key === selected ? 'chip is-default' : 'chip'}
             replace={replace}
             aria-label={`${title}, tom ${key}`}
-            aria-current={key === selected ? 'true' : undefined}
+            // In the lists the highlighted pill is only the default key, not the current page.
+            aria-current={!compact && key === selected ? 'true' : undefined}
           >
             {key}
           </Link>

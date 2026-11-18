@@ -369,11 +369,10 @@
 }
 
 /* Song and singer lists */
-.list {
-  gap: 10px;
-}
-
-.list-card {
+.song-card,
+.artist-card {
+  --tile: 44px;
+  --tile-gap: 12px;
   border: 1px solid var(--color-border);
   border-radius: 18px;
   padding: 14px;
@@ -382,7 +381,7 @@
 .song-main {
   flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: var(--tile-gap);
 }
 
 .key-tile {
@@ -391,8 +390,8 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
+  width: var(--tile);
+  height: var(--tile);
   border-radius: 13px;
   background: var(--color-elevated);
   line-height: 1;
@@ -432,16 +431,13 @@
   color: var(--color-muted);
 }
 
-/* The key pills sit under the title, aligned with the text column (tile 44px + gap 12px). */
+/* The key pills sit under the title, aligned with the text column. */
 .song-card .chips-compact {
-  padding-left: 56px;
+  padding-left: calc(var(--tile) + var(--tile-gap));
 }
 
-.chips {
-  gap: 6px;
-}
-
-.chip {
+.song-card .chip,
+.viewer-head .chip {
   min-width: 40px;
   min-height: 32px;
   padding: 0 12px;
@@ -452,21 +448,22 @@
   font-weight: 600;
 }
 
-.chip[aria-current='true'] {
+.viewer-head .chip[aria-current='true'],
+.song-card .chip.is-default {
   background: var(--color-warn-soft);
   box-shadow: inset 0 0 0 1px var(--color-accent);
   color: var(--color-accent-text);
   font-weight: 700;
 }
 
-.chips-compact .chip {
+.song-card .chips-compact .chip {
   min-width: 0;
-  min-height: 24px;
-  padding: 0 9px;
+  min-height: 28px;
+  padding: 0 10px;
   font-size: 0.6875rem;
 }
 
-.avatar-lg {
+.artist-card .avatar-lg {
   width: 44px;
   height: 44px;
   background: var(--color-elevated);
@@ -474,6 +471,10 @@
   color: var(--color-text);
   font-size: 0.875rem;
   font-weight: 800;
+}
+
+.list {
+  gap: 10px;
 }
 
 /* "Próximo culto" card on the Músicas tab */
