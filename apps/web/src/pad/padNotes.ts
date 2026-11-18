@@ -15,7 +15,20 @@ export const BAR_SEC = 240 / 70;
 /** Compassos do trecho em loop. */
 export const LOOP_BARS = 16;
 
-const NOTES_BY_PC: readonly PadNote[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const NOTES_BY_PC: readonly PadNote[] = [
+  'C',
+  'C#',
+  'D',
+  'D#',
+  'E',
+  'F',
+  'F#',
+  'G',
+  'G#',
+  'A',
+  'A#',
+  'B',
+];
 
 function sample(note: PadNote, file: string, introBars: number): PadSample {
   return {
