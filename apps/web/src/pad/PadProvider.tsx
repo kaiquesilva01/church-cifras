@@ -179,7 +179,7 @@ export function PadProvider({
     changeStatus('off');
     changeNote(null);
     setNotice(null);
-  }, [changeNote, changeStatus, clearTeardownTimer, teardown]);
+  }, [armTeardown, changeNote, changeStatus, clearTeardownTimer]);
 
   const crossfade = useCallback(
     async (engine: PadEngine, target: PadNote, token: number) => {
