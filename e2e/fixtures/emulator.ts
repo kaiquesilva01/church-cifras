@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { syntheticPdf } from './pdf';
 
 // Direct access to the Firebase emulators (project demo-church-cifras) to prepare test data.
@@ -266,4 +267,57 @@ export async function clearSetlists(): Promise<void> {
     }
     pageToken = body.nextPageToken;
   } while (pageToken);
+}
+
+/** Mono 16-bit PCM WAV of a quiet sine, generated in code (no audio files in the repo). */
+function syntheticWav(seconds = 2, sampleRate = 8000, frequency = 220): Uint8Array<ArrayBuffer> {
+  const samples = seconds * sampleRate;
+  const buffer = Buffer.alloc(44 + samples * 2);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + samples * 2, 4);
+  buffer.write('WAVEfmt ', 8);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20); // PCM
+  buffer.writeUInt16LE(1, 22); // mono
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(samples * 2, 40);
+  for (let i = 0; i < samples; i++) {
+    buffer.writeInt16LE(
+      Math.round(2000 * Math.sin((2 * Math.PI * frequency * i) / sampleRate)),
+      44 + i * 2,
+    );
+  }
+  const bytes = new Uint8Array(buffer.length);
+  bytes.set(buffer);
+  return bytes;
+}
+
+/**
+ * Uploads the 12 pad loops listed in the app manifest to the Storage emulator. The objects carry a
+ * synthetic WAV under the .m4a names: Chromium in Playwright cannot decode AAC, and
+ * decodeAudioData sniffs the content, not the extension.
+ */
+export async function seedPads(): Promise<void> {
+  const manifest = JSON.parse(
+    readFileSync(new URL('../../apps/web/src/pad/padManifest.json', import.meta.url), 'utf8'),
+  ) as { version: string; files: Record<string, { file: string }> };
+  const wav = syntheticWav();
+  for (const { file } of Object.values(manifest.files)) {
+    const path = `pads/${manifest.version}/${file}.m4a`;
+    await ok(
+      await fetch(
+        `${STORAGE}/upload/storage/v1/b/${BUCKET}/o?uploadType=media&name=${encodeURIComponent(path)}`,
+        {
+          method: 'POST',
+          headers: { ...OWNER, 'Content-Type': 'audio/wav' },
+          body: wav,
+        },
+      ),
+      `upload ${path}`,
+    );
+  }
 }

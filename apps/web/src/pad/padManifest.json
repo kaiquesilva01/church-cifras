@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "files": {
+    "C": { "file": "DS04-C", "introBars": 8 },
+    "C#": { "file": "DS05-Cs", "introBars": 7 },
+    "D": { "file": "DS06-D", "introBars": 6 },
+    "D#": { "file": "DS07-Ds", "introBars": 5 },
+    "E": { "file": "DS08-E", "introBars": 6 },
+    "F": { "file": "DS09-F", "introBars": 7 },
+    "F#": { "file": "DS10-Fs", "introBars": 7 },
+    "G": { "file": "DS11-G", "introBars": 4 },
+    "G#": { "file": "DS12-Gs", "introBars": 5 },
+    "A": { "file": "DS01-A", "introBars": 4 },
+    "A#": { "file": "DS02-As", "introBars": 6 },
+    "B": { "file": "DS03-B", "introBars": 7 }
+  }
+}

@@ -4,6 +4,7 @@ import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import type { SongSummary } from '../catalog/types';
 import { useSongsContext } from '../catalog/SongsProvider';
+import { PadMini } from '../pad/PadMini';
 import { ConfirmDialog } from '../viewer/ConfirmDialog';
 import { AddSongSheet } from './AddSongSheet';
 import { copyItems, defaultKeyFor, newItemId } from './items';
@@ -193,6 +194,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
       <h1 className="page-title">
         {shown.label} · {shortDate(shown.date)}
       </h1>
+      <PadMini setlistId={shown.id} />
       {active.removed && (
         <div role="status" className="notice">
           <p>Este repertório foi removido.</p>

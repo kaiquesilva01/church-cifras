@@ -6,6 +6,7 @@ import {
   createPwaOptions,
   isFontRequest,
   isPdfObjectRequest,
+  isPadObjectRequest,
   rejectHtmlResponse,
   pwaOptions,
   cacheEmulatorStorage,
@@ -150,6 +151,43 @@ describe('emulator host', () => {
       .workbox!.runtimeCaching!.map((r) => String(r.urlPattern))
       .join(' ');
     expect(patterns).toContain('storage\\.local:9199');
+  });
+});
+
+describe('pad runtime caching', () => {
+  const url = (value: string) => new URL(value);
+  const pad = 'https://firebasestorage.googleapis.com/v0/b/b1/o/pads%2Fv1%2FDS04-C.m4a';
+  const song = 'https://firebasestorage.googleapis.com/v0/b/b1/o/songs%2FDS04-C.m4a';
+
+  it('matches only GET media downloads of pad objects from Storage', () => {
+    expect(isPadObjectRequest(url(`${pad}?alt=media&token=t`), 'GET')).toBe(true);
+    expect(isPadObjectRequest(url(`${song}?alt=media&token=t`), 'GET')).toBe(false);
+    expect(isPadObjectRequest(url(pad), 'GET')).toBe(false);
+    expect(isPadObjectRequest(url(`${pad}?alt=media`), 'POST')).toBe(false);
+    expect(
+      isPadObjectRequest(
+        url('https://example.com/v0/b/b1/o/pads%2Fv1%2FDS04-C.m4a?alt=media'),
+        'GET',
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps the PDF and pad matchers disjoint', () => {
+    expect(isPdfObjectRequest(url(`${pad}?alt=media`), 'GET')).toBe(false);
+  });
+
+  it('matches the Storage emulator only when built for emulators', () => {
+    const emulator = url('http://localhost:9199/v0/b/b1/o/pads%2Fv1%2FDS04-C.m4a?alt=media');
+    expect(isPadObjectRequest(emulator, 'GET')).toBe(false);
+    expect(isPadObjectRequest(emulator, 'GET', true)).toBe(true);
+  });
+
+  it('registers a CacheFirst rule for pads', () => {
+    const rule = createPwaOptions(false).workbox!.runtimeCaching!.find(
+      (r) => r.options?.cacheName === 'cifras-pads',
+    )!;
+    expect(rule.handler).toBe('CacheFirst');
+    expect(rule.options!.cacheableResponse!.statuses).toEqual([200]);
   });
 });
 

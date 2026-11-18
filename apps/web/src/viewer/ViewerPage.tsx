@@ -18,7 +18,11 @@ import type { CatalogApi } from '../catalog/catalogApi';
 import { deriveArtists } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { KeyChips } from '../search/KeyChips';
+import { PadControl } from '../pad/PadControl';
+import { padOwnerFor } from '../pad/padRoute';
+import { usePadViewerSync } from '../pad/usePadViewerSync';
 import { SetlistBar } from '../setlists/SetlistBar';
+import { useActiveSetlist } from '../setlists/useActiveSetlist';
 import { pdfFileName } from './fileName';
 import { createDocCache } from './docCache';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -243,6 +247,16 @@ export function ViewerPage({
     onLoaded: refresh,
   });
 
+  // The pad follows the saved key (`selected`), never the preview the panel paints over the source.
+  const activeSetlist = useActiveSetlist();
+  const inSetlist = setlist.extraQuery !== '';
+  const padOwner = padOwnerFor(songId, inSetlist ? setlistId : null);
+  const setlistKeys = useMemo(
+    () => (inSetlist ? (activeSetlist?.shown?.items.map((item) => item.key) ?? []) : []),
+    [inSetlist, activeSetlist?.shown],
+  );
+  usePadViewerSync({ key: selected?.key ?? null, ready: readyDoc !== null, setlistKeys });
+
   // Panel open: read the source's chords and load the fonts they need (once per document).
   const [prepared, setPrepared] = useState<Prepared | null>(null);
   useEffect(() => {
@@ -274,6 +288,19 @@ export function ViewerPage({
   });
 
   const [sheetHeight, setSheetHeight] = useState<number | null>(null);
+  // The fixed bottom bar changes height (wraps) with the pad, the setlist row and the width: the page
+  // keeps room for it. A callback ref also covers the bar appearing after the loading states.
+  const [barHeight, setBarHeight] = useState<number | null>(null);
+  const barObserver = useRef<ResizeObserver | null>(null);
+  const barRef = useCallback((el: HTMLDivElement | null) => {
+    barObserver.current?.disconnect();
+    barObserver.current = null;
+    if (!el) return setBarHeight(null);
+    setBarHeight(el.offsetHeight);
+    if (typeof ResizeObserver === 'undefined') return;
+    barObserver.current = new ResizeObserver(() => setBarHeight(el.offsetHeight));
+    barObserver.current.observe(el);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ key: string } | null>(null);
@@ -497,9 +524,10 @@ export function ViewerPage({
     <section
       className={`viewer${panelOpen && wide ? ' has-side' : ''}${sheetHeight !== null ? ' has-sheet' : ''}${setlist.nav ? ' has-setlist' : ''}`}
       style={
-        sheetHeight !== null
-          ? ({ '--sheet-height': `${sheetHeight}px` } as CSSProperties)
-          : undefined
+        {
+          ...(sheetHeight !== null ? { '--sheet-height': `${sheetHeight}px` } : null),
+          ...(barHeight ? { '--bar-height': `${barHeight}px` } : null),
+        } as CSSProperties
       }
     >
       <div className="viewer-body" inert={panelOpen && !wide}>
@@ -569,7 +597,7 @@ export function ViewerPage({
             Carregando cifra…
           </p>
         )}
-        <div className="viewer-bar">
+        <div className="viewer-bar" ref={barRef}>
           {setlist.nav && (
             <SetlistBar nav={setlist.nav} onGo={setlist.go} backHref={setlist.backHref} />
           )}
@@ -594,6 +622,7 @@ export function ViewerPage({
               <span aria-hidden="true">↗</span>
             </button>
           )}
+          <PadControl keyName={selected?.key ?? null} owner={padOwner} />
           {canChange && (
             <button
               type="button"
