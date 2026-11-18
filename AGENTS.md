@@ -59,6 +59,7 @@ Um plano por fase da §11 do spec.
 - PDFs reais: as letras têm direitos autorais. Usar `fixtures/private/` apenas local e PDFs sintéticos na CI.
 - Credenciais, `.env` e service accounts.
 - `.superpowers/`.
+- Áudio (loops/sources do pad, `*.m4a`, `*.mp3`, `*.wav`): ficam em `fixtures/private/pads/` apenas local, enviados ao Storage por `scripts/pads/upload.mjs`.
 
 ## Convenções
 
@@ -76,3 +77,4 @@ Um plano por fase da §11 do spec.
 - `npm run typecheck` — TypeScript.
 - `npm run test:rules` — testes das Security Rules no emulador.
 - `npm run test:harness` — testes do harness (`node --test ".claude/**/*.test.mjs"`).
+- `npm run test:scripts` — testes dos scripts locais (`node --test "scripts/**/*.test.mjs"`, p.ex. produção dos loops do pad).
