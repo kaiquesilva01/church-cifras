@@ -8,7 +8,8 @@ const redesignCss =
   readFileSync(resolve(import.meta.dirname, 'redesign.css'), 'utf8') +
   readFileSync(resolve(import.meta.dirname, 'redesign-cifra.css'), 'utf8') +
   readFileSync(resolve(import.meta.dirname, 'redesign-setlists.css'), 'utf8') +
-  readFileSync(resolve(import.meta.dirname, 'redesign-forms.css'), 'utf8');
+  readFileSync(resolve(import.meta.dirname, 'redesign-forms.css'), 'utf8') +
+  readFileSync(resolve(import.meta.dirname, 'redesign-states.css'), 'utf8');
 const html = readFileSync(resolve(import.meta.dirname, '../../index.html'), 'utf8');
 
 function tokens(block: string): string[] {
@@ -51,5 +52,12 @@ describe('theme tokens', () => {
     expect(html).toContain(`'${THEME_COLORS.dark}'`);
     expect(html).toContain(`'${THEME_COLORS.light}'`);
     expect(html).toContain(`content="${THEME_COLORS.light}"`);
+  });
+
+  it('keeps the update prompt readable in both themes (no text-on-text colors)', () => {
+    const rule = redesignCss.slice(redesignCss.indexOf('.update-prompt {'));
+    const body = rule.slice(0, rule.indexOf('}'));
+    expect(body).toContain('background: var(--color-elevated)');
+    expect(body).toContain('color: var(--color-text)');
   });
 });
