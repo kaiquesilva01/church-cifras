@@ -13,6 +13,8 @@ type CreateEngine = (fetchBytes: FetchBytes, onGiveUp: () => void) => Promise<Pa
 
 const VOLUME_KEY = 'cifras.pad.volume';
 const DEFAULT_VOLUME = 0.6;
+/** Stop fade-out (3 s, padEngine FADE.outSec) plus a margin; kept here to avoid importing the lazy engine. */
+const TEARDOWN_AFTER_STOP_MS = 3500;
 const CROSSFADE_NOTICE = 'Não foi possível trocar o tom do pad.';
 
 /**
@@ -30,7 +32,7 @@ function closeQuietly(ctx: AudioContext): void {
 
 const defaultCreateEngine: CreateEngine = async (fetchBytes, onGiveUp) => {
   const ctx = new AudioContext();
-  void ctx.resume();
+  ctx.resume().catch(() => {});
   try {
     const { buildPadEngine } = await import('./padBuild');
     const engine = buildPadEngine({ ctx, fetchBytes, onGiveUp });
@@ -99,6 +101,7 @@ export function PadProvider({
   /** Note the engine is heading to (differs from noteRef while a crossfade is in flight). */
   const targetRef = useRef<PadNote | null>(null);
   const crossfadeSeqRef = useRef(0);
+  const teardownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tokenRef = useRef(0);
   const enginePromiseRef = useRef<Promise<PadEngine> | null>(null);
   const engineRef = useRef<PadEngine | null>(null);
@@ -120,20 +123,16 @@ export function PadProvider({
 
   const prefetchNotes = useMemo(() => createPadPrefetcher(fetchBytes), [fetchBytes]);
 
-  /** Cancels any in-flight run and silences the engine. */
-  const halt = useCallback(() => {
-    tokenRef.current += 1;
-    if (engineRef.current) engineRef.current.stop();
-    else enginePromiseRef.current = null; // the pending run disposes the engine once created
-    desiredRef.current = null;
-    targetRef.current = null;
-    changeStatus('off');
-    changeNote(null);
-    setNotice(null);
-  }, [changeNote, changeStatus]);
+  const clearTeardownTimer = useCallback(() => {
+    if (teardownTimerRef.current !== null) {
+      clearTimeout(teardownTimerRef.current);
+      teardownTimerRef.current = null;
+    }
+  }, []);
 
   /** Hard teardown: the next toggle builds a fresh engine (and AudioContext). */
   const teardown = useCallback(() => {
+    clearTeardownTimer();
     tokenRef.current += 1;
     const engine = engineRef.current;
     engineRef.current = null;
@@ -141,7 +140,25 @@ export function PadProvider({
     desiredRef.current = null;
     targetRef.current = null;
     engine?.dispose();
-  }, []);
+  }, [clearTeardownTimer]);
+
+  /** Cancels any in-flight run and fades the engine out; frees it after the fade. */
+  const halt = useCallback(() => {
+    tokenRef.current += 1;
+    clearTeardownTimer();
+    if (engineRef.current) {
+      engineRef.current.stop();
+      teardownTimerRef.current = setTimeout(() => {
+        teardownTimerRef.current = null;
+        teardown();
+      }, TEARDOWN_AFTER_STOP_MS);
+    } else enginePromiseRef.current = null; // the pending run disposes the engine once created
+    desiredRef.current = null;
+    targetRef.current = null;
+    changeStatus('off');
+    changeNote(null);
+    setNotice(null);
+  }, [changeNote, changeStatus, clearTeardownTimer, teardown]);
 
   const crossfade = useCallback(
     async (engine: PadEngine, target: PadNote, token: number) => {
@@ -199,8 +216,12 @@ export function PadProvider({
       engineRef.current = engine;
       engine.setVolume(volumeRef.current);
       if (tokenRef.current !== token) return;
+      // A follow() that arrived while loading: start directly in the final key.
+      const first = desiredRef.current ?? target;
+      desiredRef.current = null;
+      targetRef.current = first;
       try {
-        await engine.start(target);
+        await engine.start(first);
       } catch {
         if (tokenRef.current === token) {
           changeStatus('error');
@@ -209,12 +230,11 @@ export function PadProvider({
         return;
       }
       if (tokenRef.current !== token) return;
-      changeNote(target);
-      targetRef.current = target;
+      changeNote(first);
       changeStatus('playing');
       const desired = desiredRef.current;
       desiredRef.current = null;
-      if (desired && desired !== target) await crossfade(engine, desired, token);
+      if (desired && desired !== first) await crossfade(engine, desired, token);
     },
     [changeNote, changeStatus, crossfade, teardown],
   );
@@ -227,6 +247,7 @@ export function PadProvider({
       }
       const target = padNoteFor(key);
       if (!target) return;
+      clearTeardownTimer();
       tokenRef.current += 1;
       desiredRef.current = null;
       targetRef.current = target;
@@ -236,7 +257,7 @@ export function PadProvider({
       changeStatus('loading');
       void run(target, tokenRef.current);
     },
-    [changeNote, changeStatus, halt, run],
+    [changeNote, changeStatus, clearTeardownTimer, halt, run],
   );
 
   const follow = useCallback(

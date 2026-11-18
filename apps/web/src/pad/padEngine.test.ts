@@ -480,13 +480,14 @@ describe('engine + loader buffer budget', () => {
       )!;
       return new Uint8Array([note.charCodeAt(0)]);
     });
-    let engine!: ReturnType<typeof createPadEngine>;
+    const ref: { engine?: ReturnType<typeof createPadEngine> } = {};
     const loader = createPadLoader({
       fetchBytes,
       decode,
-      keep: (n) => engine.note === n,
+      keep: (n) => ref.engine?.note === n,
     });
-    engine = createPadEngine({ ctx: ctx.asContext(), load: loader.load });
+    const engine = createPadEngine({ ctx: ctx.asContext(), load: loader.load });
+    ref.engine = engine;
     const buf = (tag: string) => ({ tag }) as unknown as AudioBuffer;
     const flushMicro = () => new Promise((r) => setTimeout(r, 0));
 

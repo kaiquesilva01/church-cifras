@@ -321,6 +321,19 @@ describe('PadProvider', () => {
       expect(engine.crossfadeTo).toHaveBeenCalledTimes(2);
     });
 
+    it('starts directly in the desired key when follow happens before the engine exists', async () => {
+      const engine = makeEngine();
+      const created = deferred<PadEngine>();
+      const { result } = setup({ createEngine: () => created.promise });
+      act(() => result.current.toggle('C', song));
+      act(() => result.current.follow('E'));
+      await act(async () => created.resolve(engine));
+      expect(engine.start).toHaveBeenCalledTimes(1);
+      expect(engine.start).toHaveBeenCalledWith('E');
+      expect(engine.crossfadeTo).not.toHaveBeenCalled();
+      expect(result.current.note).toBe('E');
+    });
+
     it('does not crossfade after loading when the desired note is the same', async () => {
       const { result, engine } = setup();
       const d = deferred();
@@ -457,6 +470,113 @@ describe('PadProvider', () => {
     });
   });
 
+  describe('teardown after stop', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('disposes the engine once the fade-out has finished', async () => {
+      vi.useFakeTimers();
+      const { result, engine } = setup();
+      act(() => result.current.toggle('C', song));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      act(() => result.current.toggle('C', song));
+      expect(engine.stop).toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(3400);
+      });
+      expect(engine.dispose).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(engine.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('a toggle inside the window reuses the live engine', async () => {
+      vi.useFakeTimers();
+      const { result, engine, createEngine } = setup();
+      act(() => result.current.toggle('C', song));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      act(() => result.current.toggle('C', song));
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      act(() => result.current.toggle('D', song));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000);
+      });
+      expect(engine.dispose).not.toHaveBeenCalled();
+      expect(createEngine).toHaveBeenCalledTimes(1);
+      expect(result.current.status).toBe('playing');
+    });
+
+    it('a route-driven stop also tears down, and unmount clears the timer', async () => {
+      vi.useFakeTimers();
+      const { result, engine, navigate, unmount } = setup({ path: '/musicas/s1' });
+      act(() => result.current.toggle('C', song));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await navigate('/');
+      act(() => {
+        vi.advanceTimersByTime(3600);
+      });
+      expect(engine.dispose).toHaveBeenCalledTimes(1);
+
+      const second = setup({ path: '/musicas/s1' });
+      act(() => second.result.current.toggle('C', song));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      act(() => second.result.current.toggle('C', song));
+      second.unmount();
+      expect(second.engine.dispose).toHaveBeenCalledTimes(1);
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(second.engine.dispose).toHaveBeenCalledTimes(1);
+      unmount();
+    });
+
+    it('closes the default-factory AudioContext after the fade-out', async () => {
+      vi.useFakeTimers();
+      const close = vi.fn(() => Promise.resolve());
+      class FakeCtx {
+        resume() {
+          return Promise.resolve();
+        }
+        close = close;
+      }
+      vi.stubGlobal('AudioContext', FakeCtx);
+      vi.mocked(buildPadEngine).mockReturnValue(makeEngine());
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <MemoryRouter initialEntries={['/musicas/s1']}>
+          <PadProvider
+            fetchBytes={() => Promise.resolve(new Uint8Array())}
+            storage={memoryStorage()}
+          >
+            {children}
+          </PadProvider>
+        </MemoryRouter>
+      );
+      const { result } = renderHook(() => usePad()!, { wrapper });
+      act(() => result.current.toggle('C', song));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      act(() => result.current.toggle('C', song));
+      expect(close).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(3600);
+      });
+      expect(close).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('default factory AudioContext lifecycle', () => {
     function stubCtx() {
       const close = vi.fn(() => Promise.resolve());
@@ -491,7 +611,7 @@ describe('PadProvider', () => {
       expect(close).toHaveBeenCalledTimes(1);
     });
 
-    it('closes the context on unmount and reuses it across stop/start', async () => {
+    it('closes the context on unmount and keeps it right after a stop', async () => {
       const close = stubCtx();
       vi.mocked(buildPadEngine).mockReturnValue(makeEngine());
       const { result, unmount } = renderHook(() => usePad()!, { wrapper });
