@@ -31,3 +31,6 @@ apps/functions/lib/
 .vite/
 firebase-export-*/
 e2e/artifacts/
+
+# audio (loops/sources do pad ficam fora do git)
+*.m4a
