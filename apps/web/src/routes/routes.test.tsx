@@ -34,6 +34,14 @@ describe('routes', () => {
     expect(screen.getByText('Entrar com Google')).toBeInTheDocument();
   });
 
+  it('login explains that new people start as visitors', () => {
+    setup('/login');
+    expect(
+      screen.getByText('Quem entra pela primeira vez começa como visitante.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Cifras · Louvor' })).toBeInTheDocument();
+  });
+
   it('login screen warms the sign-in popup on mount', () => {
     const gateway = setup('/login');
     expect(gateway.prepareSignIn).toHaveBeenCalledTimes(1);

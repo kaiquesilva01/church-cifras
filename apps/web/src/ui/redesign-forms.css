@@ -1,0 +1,122 @@
+/*
+ * Redesign (phase 10): login, forms, dialogs, banners, people and the batch import. Loaded after
+ * redesign-setlists.css (see main.tsx). Colors come only from the theme tokens.
+ */
+
+/* Buttons: pills, with the amber call to action */
+.btn-primary {
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.dialog-actions .btn,
+.key-actions .btn {
+  border-radius: 999px;
+}
+
+/* Login */
+.login {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  min-height: 100dvh;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 24px 28px 80px;
+  text-align: left;
+}
+
+.login-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--color-accent);
+  border-radius: 20px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+
+.login h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.login p {
+  margin: 0;
+}
+
+.login .btn-primary {
+  min-height: 54px;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.login-note {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+/* Fields */
+.input,
+.role-select {
+  min-height: 46px;
+  border-radius: 12px;
+}
+
+.field > label,
+.field-head {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.banner {
+  border-radius: 14px;
+}
+
+/* Bottom call to action of Nova cifra */
+.sticky-bar {
+  padding: 14px 20px calc(20px + env(safe-area-inset-bottom));
+  background: var(--color-bg);
+}
+
+.sticky-bar .btn-primary {
+  min-height: 52px;
+}
+
+/* Dialogs */
+.dialog {
+  max-width: 440px;
+  padding: 20px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 22px;
+}
+
+.dialog-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+
+/* People: one card per person */
+.people tr {
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Import table status pills share the app's pill look */
+.pill {
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
