@@ -468,6 +468,90 @@ describe('PadProvider', () => {
       act(() => result.current.toggle('C', song));
       expect(calls).toEqual(['new', 'resume']);
     });
+
+    function renderDefault() {
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <MemoryRouter>
+          <PadProvider
+            fetchBytes={() => Promise.resolve(new Uint8Array())}
+            storage={memoryStorage()}
+          >
+            {children}
+          </PadProvider>
+        </MemoryRouter>
+      );
+      return renderHook(() => usePad()!, { wrapper });
+    }
+    const originalAudioSession = Object.getOwnPropertyDescriptor(navigator, 'audioSession');
+    afterEach(() => {
+      if (originalAudioSession)
+        Object.defineProperty(navigator, 'audioSession', originalAudioSession);
+      else delete (navigator as unknown as Record<string, unknown>).audioSession;
+    });
+
+    it('sets audioSession.type to playback before creating the AudioContext, with latencyHint playback', () => {
+      const calls: string[] = [];
+      let options: unknown;
+      class FakeCtx {
+        constructor(opts?: unknown) {
+          options = opts;
+          calls.push('new');
+        }
+        resume() {
+          return Promise.resolve();
+        }
+      }
+      vi.stubGlobal('AudioContext', FakeCtx);
+      const session = {
+        set type(v: string) {
+          calls.push(`type=${v}`);
+        },
+      };
+      Object.defineProperty(navigator, 'audioSession', { value: session, configurable: true });
+      const { result } = renderDefault();
+      act(() => result.current.toggle('C', song));
+      expect(calls).toEqual(['type=playback', 'new']);
+      expect(options).toEqual({ latencyHint: 'playback' });
+    });
+
+    it('does not throw when audioSession is absent', () => {
+      const calls: string[] = [];
+      class FakeCtx {
+        constructor() {
+          calls.push('new');
+        }
+        resume() {
+          return Promise.resolve();
+        }
+      }
+      vi.stubGlobal('AudioContext', FakeCtx);
+      delete (navigator as unknown as Record<string, unknown>).audioSession;
+      const { result } = renderDefault();
+      expect(() => act(() => result.current.toggle('C', song))).not.toThrow();
+      expect(calls).toEqual(['new']);
+    });
+
+    it('still creates the AudioContext when the audioSession setter throws', () => {
+      const calls: string[] = [];
+      class FakeCtx {
+        constructor() {
+          calls.push('new');
+        }
+        resume() {
+          return Promise.resolve();
+        }
+      }
+      vi.stubGlobal('AudioContext', FakeCtx);
+      const session = {
+        set type(_v: string) {
+          throw new Error('not allowed');
+        },
+      };
+      Object.defineProperty(navigator, 'audioSession', { value: session, configurable: true });
+      const { result } = renderDefault();
+      expect(() => act(() => result.current.toggle('C', song))).not.toThrow();
+      expect(calls).toEqual(['new']);
+    });
   });
 
   describe('teardown after stop', () => {

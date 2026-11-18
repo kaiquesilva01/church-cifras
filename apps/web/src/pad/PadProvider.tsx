@@ -30,8 +30,23 @@ function closeQuietly(ctx: AudioContext): void {
   }
 }
 
+/**
+ * iOS plays Web Audio in the "ambient" session category by default, which the Ring/Silent
+ * switch mutes. Phones are often silenced during a service, so ask for "playback" (Audio
+ * Session API, recent Safari). Synchronous, inside the tap; absent or failing is harmless.
+ */
+function requestPlaybackAudioSession(): void {
+  try {
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = 'playback';
+  } catch {
+    // unsupported or refused: the pad just follows the default session
+  }
+}
+
 const defaultCreateEngine: CreateEngine = async (fetchBytes, onGiveUp) => {
-  const ctx = new AudioContext();
+  requestPlaybackAudioSession();
+  const ctx = new AudioContext({ latencyHint: 'playback' });
   ctx.resume().catch(() => {});
   try {
     const { buildPadEngine } = await import('./padBuild');
