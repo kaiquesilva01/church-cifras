@@ -1,6 +1,7 @@
 import type { KeyName } from '@cifras/chords';
 import { padNoteFor } from './padNotes';
 import type { PadOwner } from './padRoute';
+import { PadVolume } from './PadVolume';
 import { usePad } from './usePad';
 
 export function PadControl({ keyName, owner }: { keyName: KeyName | null; owner: PadOwner }) {
@@ -36,17 +37,7 @@ export function PadControl({ keyName, owner }: { keyName: KeyName | null; owner:
           </>
         )}
       </button>
-      {status === 'playing' && (
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          aria-label="Volume do pad"
-          value={Math.round(pad.volume * 100)}
-          onChange={(event) => pad.setVolume(Number(event.currentTarget.value) / 100)}
-        />
-      )}
+      {status === 'playing' && <PadVolume volume={pad.volume} onChange={pad.setVolume} />}
       {pad.notice && (
         <p role="status" className="muted">
           {pad.notice}

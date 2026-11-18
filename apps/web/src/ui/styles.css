@@ -1331,3 +1331,33 @@ span.setlist-item-key {
   border-color: var(--color-accent);
   color: var(--color-on-accent);
 }
+
+.pad-mini {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.pad-mini .btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.pad-mini input[type='range'] {
+  flex: 1 1 120px;
+  min-width: 96px;
+  min-height: 44px;
+  accent-color: var(--color-accent);
+}
+
+.pad-mini .muted {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.pad-mini .muted:empty {
+  display: none;
+}
