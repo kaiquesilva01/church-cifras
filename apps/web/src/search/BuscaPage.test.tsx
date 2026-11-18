@@ -46,6 +46,21 @@ describe('BuscaPage', () => {
     );
   });
 
+  it('keeps the filter in the url, next to the query', () => {
+    renderBusca('/busca?q=aline&tipo=cantores');
+    expect(screen.getByRole('button', { name: 'Cantores' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.queryByRole('heading', { name: 'Músicas' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'sonda' } });
+    // Typing keeps the chosen filter.
+    expect(screen.getByRole('button', { name: 'Cantores' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('types into the url and says when nothing matches', () => {
     renderBusca();
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'zzz' } });

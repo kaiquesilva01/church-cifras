@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { deriveArtists, filterArtists, filterSongs } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
@@ -8,13 +8,27 @@ import { SongList } from './SongList';
 
 const FILTERS = ['Tudo', 'Músicas', 'Cantores'] as const;
 type Filter = (typeof FILTERS)[number];
+/** `?tipo=` in the url, so the filtered view survives back/reload and can be shared. */
+const TIPO: Record<Filter, string | null> = {
+  Tudo: null,
+  Músicas: 'musicas',
+  Cantores: 'cantores',
+};
 
 /** Global search: singers and songs together, with a filter for one of them. */
 export function BuscaPage() {
   const { status, songs } = useSongsContext();
   const [params, setParams] = useSearchParams();
-  const [filter, setFilter] = useState<Filter>('Tudo');
   const query = params.get('q') ?? '';
+  const filter: Filter = FILTERS.find((name) => TIPO[name] === params.get('tipo')) ?? 'Tudo';
+  const update = (next: { q?: string; tipo?: string | null }): void => {
+    const q = next.q ?? query;
+    const tipo = next.tipo === undefined ? params.get('tipo') : next.tipo;
+    const out: Record<string, string> = {};
+    if (q) out.q = q;
+    if (tipo) out.tipo = tipo;
+    setParams(out, { replace: true });
+  };
   const trimmed = query.trim();
 
   const artists = useMemo(() => filterArtists(deriveArtists(songs), query), [songs, query]);
@@ -42,7 +56,7 @@ export function BuscaPage() {
         aria-label="Buscar música ou cantor"
         placeholder="Buscar música ou cantor…"
         value={query}
-        onChange={(e) => setParams(e.target.value ? { q: e.target.value } : {}, { replace: true })}
+        onChange={(e) => update({ q: e.target.value })}
       />
       <div className="filter-row" role="group" aria-label="Filtrar resultados">
         {FILTERS.map((name) => (
@@ -51,7 +65,7 @@ export function BuscaPage() {
             type="button"
             className="filter-chip"
             aria-pressed={filter === name}
-            onClick={() => setFilter(name)}
+            onClick={() => update({ tipo: TIPO[name] })}
           >
             {name}
           </button>

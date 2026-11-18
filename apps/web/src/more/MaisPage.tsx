@@ -89,18 +89,20 @@ export function MaisPage() {
             <span className="soon-pill">Em breve</span>
           </div>
         </li>
-        <li>
-          <div className="menu-row is-soon" aria-disabled="true">
-            <Icon>
-              <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 20h14" />
-            </Icon>
-            <span className="menu-text">
-              <strong>Importar</strong>
-              <span className="muted">Trazer cifras via link Cifra Club ou ChordPro</span>
-            </span>
-            <span className="soon-pill">Em breve</span>
-          </div>
-        </li>
+        {isAdmin(role) && (
+          <li>
+            <div className="menu-row is-soon" aria-disabled="true">
+              <Icon>
+                <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 20h14" />
+              </Icon>
+              <span className="menu-text">
+                <strong>Importar</strong>
+                <span className="muted">Trazer cifras via link Cifra Club ou ChordPro</span>
+              </span>
+              <span className="soon-pill">Em breve</span>
+            </div>
+          </li>
+        )}
         <li>
           <button type="button" className="menu-row menu-row-danger" onClick={() => void signOut()}>
             <span className="menu-icon menu-icon-danger" aria-hidden="true">

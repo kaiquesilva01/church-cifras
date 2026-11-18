@@ -44,6 +44,12 @@ describe('MaisPage', () => {
     expect(screen.queryByRole('link', { name: /Admin/ })).not.toBeInTheDocument();
   });
 
+  it('shows Importar (admin tool) only to admins', () => {
+    renderMais('member');
+    expect(screen.queryByText('Importar')).not.toBeInTheDocument();
+    expect(screen.getByText('Pessoas')).toBeInTheDocument();
+  });
+
   it('keeps Pessoas and Importar disabled with "Em breve"', () => {
     renderMais('admin');
     for (const name of ['Pessoas', 'Importar']) {
