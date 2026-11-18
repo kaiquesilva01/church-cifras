@@ -23,8 +23,8 @@ describe('pwa manifest', () => {
     expect(manifest).toMatchObject({
       name: 'Cifras · Louvor',
       short_name: 'Cifras',
-      theme_color: '#4f46e5',
-      background_color: '#f2f2f4',
+      theme_color: '#f4f5f7',
+      background_color: '#f4f5f7',
       display: 'standalone',
       lang: 'pt-BR',
       start_url: '/',
