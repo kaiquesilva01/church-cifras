@@ -18,7 +18,11 @@ import type { CatalogApi } from '../catalog/catalogApi';
 import { deriveArtists } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { KeyChips } from '../search/KeyChips';
+import { PadControl } from '../pad/PadControl';
+import { padOwnerFor } from '../pad/padRoute';
+import { usePadViewerSync } from '../pad/usePadViewerSync';
 import { SetlistBar } from '../setlists/SetlistBar';
+import { useActiveSetlist } from '../setlists/useActiveSetlist';
 import { pdfFileName } from './fileName';
 import { createDocCache } from './docCache';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -242,6 +246,16 @@ export function ViewerPage({
     next: setlist.next,
     onLoaded: refresh,
   });
+
+  // The pad follows the saved key (`selected`), never the preview the panel paints over the source.
+  const activeSetlist = useActiveSetlist();
+  const inSetlist = setlist.extraQuery !== '';
+  const padOwner = padOwnerFor(songId, inSetlist ? setlistId : null);
+  const setlistKeys = useMemo(
+    () => (inSetlist ? (activeSetlist?.shown?.items.map((item) => item.key) ?? []) : []),
+    [inSetlist, activeSetlist?.shown],
+  );
+  usePadViewerSync({ key: selected?.key ?? null, ready: readyDoc !== null, setlistKeys });
 
   // Panel open: read the source's chords and load the fonts they need (once per document).
   const [prepared, setPrepared] = useState<Prepared | null>(null);
@@ -594,6 +608,7 @@ export function ViewerPage({
               <span aria-hidden="true">↗</span>
             </button>
           )}
+          <PadControl keyName={selected?.key ?? null} owner={padOwner} />
           {canChange && (
             <button
               type="button"

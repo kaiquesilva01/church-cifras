@@ -668,6 +668,23 @@ section:last-child > .section-title + .list {
   margin-left: auto;
 }
 
+.pad-control {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pad-control input[type='range'] {
+  min-width: 96px;
+  min-height: 44px;
+  accent-color: var(--color-accent);
+}
+
+.pad-control .btn[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .viewer-bar .btn-icon {
   min-width: 44px;
   padding: 8px;
