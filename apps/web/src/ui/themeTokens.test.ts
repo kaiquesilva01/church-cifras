@@ -8,7 +8,8 @@ const redesignCss =
   readFileSync(resolve(import.meta.dirname, 'redesign.css'), 'utf8') +
   readFileSync(resolve(import.meta.dirname, 'redesign-cifra.css'), 'utf8') +
   readFileSync(resolve(import.meta.dirname, 'redesign-setlists.css'), 'utf8') +
-  readFileSync(resolve(import.meta.dirname, 'redesign-forms.css'), 'utf8');
+  readFileSync(resolve(import.meta.dirname, 'redesign-forms.css'), 'utf8') +
+  readFileSync(resolve(import.meta.dirname, 'redesign-states.css'), 'utf8');
 const html = readFileSync(resolve(import.meta.dirname, '../../index.html'), 'utf8');
 
 function tokens(block: string): string[] {
@@ -51,5 +52,18 @@ describe('theme tokens', () => {
     expect(html).toContain(`'${THEME_COLORS.dark}'`);
     expect(html).toContain(`'${THEME_COLORS.light}'`);
     expect(html).toContain(`content="${THEME_COLORS.light}"`);
+  });
+
+  it('keeps the update prompt readable in both themes (no text-on-text colors)', () => {
+    // Every .update-prompt rule that sets a background or color, in load order: the last one wins.
+    const bodies = [...redesignCss.matchAll(/\n\.update-prompt \{([^}]*)\}/g)].map((m) => m[1]!);
+    expect(bodies.length).toBeGreaterThan(0);
+    const last = (property: string): string | undefined =>
+      bodies
+        .flatMap((body) => [...body.matchAll(new RegExp(`${property}: ([^;]+);`, 'g'))])
+        .map((m) => m[1])
+        .at(-1);
+    expect(last('background')).toBe('var(--color-elevated)');
+    expect(last('color')).toBe('var(--color-text)');
   });
 });

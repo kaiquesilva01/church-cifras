@@ -10,6 +10,7 @@ import './ui/redesign.css';
 import './ui/redesign-cifra.css';
 import './ui/redesign-setlists.css';
 import './ui/redesign-forms.css';
+import './ui/redesign-states.css';
 
 const storage = getSessionStorage(window);
 installPreloadErrorReload(window, storage);
