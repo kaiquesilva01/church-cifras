@@ -605,8 +605,7 @@ export function ViewerPage({
           <button
             type="button"
             className="btn btn-icon"
-            aria-label="PDF"
-            title="Baixar PDF"
+            aria-label="Baixar PDF"
             onClick={download}
             disabled={current?.status !== 'ready'}
           >

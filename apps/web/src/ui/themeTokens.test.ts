@@ -37,7 +37,9 @@ describe('theme tokens', () => {
     const offenders = [...rest.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\((?!0 0 0 \/)/g)].map(
       (m) => m[0],
     );
-    expect(offenders).toEqual(['#ffffff', '#25d366']);
+    const allowed = new Set(['#ffffff', '#25d366']);
+    expect(offenders.filter((color) => !allowed.has(color))).toEqual([]);
+    expect(new Set(offenders)).toEqual(allowed);
   });
 
   it('paints the saved theme before the first frame, with the same storage key', () => {

@@ -27,6 +27,7 @@
   border: 1px solid var(--color-border-strong);
   border-radius: 28px;
   background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   box-shadow: 0 14px 34px rgb(0 0 0 / 22%);
 }
@@ -58,7 +59,7 @@
 
 .pad-control .btn[aria-pressed='true'] {
   border-color: var(--color-accent);
-  background: var(--color-warn-soft);
+  background: var(--color-accent-soft);
 }
 
 .whatsapp-icon {
