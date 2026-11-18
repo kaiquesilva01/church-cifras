@@ -19,7 +19,7 @@ export function newAccount(label: string): Account {
 
 /**
  * Signs in through the real Google popup of the Auth emulator: "Add new account", fill the form,
- * submit. Waits until the app shows the signed-in header.
+ * submit. Waits until the app shows the signed-in bottom bar.
  */
 export async function signInWithPopup(page: Page, account: Account): Promise<void> {
   await page.goto('/');
@@ -39,15 +39,21 @@ export async function signInWithPopup(page: Page, account: Account): Promise<voi
     await popup.getByLabel(/display name/i).fill(account.name);
     await popup.getByRole('button', { name: /sign in with google/i }).click();
   }
-  await expect(page.getByRole('button', { name: 'Sair' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
 }
 
-/** Waits until the header shows the role label (the claim and users/{uid} are in place). */
+/**
+ * Waits until the Mais tab shows the role label (the claim and users/{uid} are in place), then goes
+ * back to the Músicas tab. Client-side only: no reload.
+ */
 export async function expectRole(
   page: Page,
   label: 'Admin' | 'Membro' | 'Visitante',
 ): Promise<void> {
-  await expect(page.locator('.header .role')).toHaveText(label);
+  const nav = page.getByRole('navigation', { name: 'Principal' });
+  await nav.getByRole('link', { name: 'Mais' }).click();
+  await expect(page.locator('.role-badge')).toHaveText(label);
+  await nav.getByRole('link', { name: 'Músicas' }).click();
 }
 
 /** Saves e2e/artifacts/<project>/<step>.png (git-ignored) for visual inspection. */

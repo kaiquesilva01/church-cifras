@@ -13,13 +13,8 @@ test('admin imports two synthetic PDFs in batch, ignoring a non-PDF, and downloa
     { title: `Lote Segunda ${tag}`, key: 'G' },
   ];
   await signInAs(page, ADMIN, 'Admin');
-  if (testInfo.project.name === 'desktop') {
-    await page.getByRole('link', { name: 'Importar' }).click();
-  } else {
-    // The "Importar" link is hidden in the narrow header (batch import is a desktop task).
-    await expect(page.getByRole('link', { name: 'Importar' })).toBeHidden();
-    await page.goto('/importar');
-  }
+  // Importar in Mais is greyed out ("Em breve") for now: the batch import is reached by its url.
+  await page.goto('/importar');
   await expect(page.getByRole('heading', { name: 'Importar em lote' })).toBeVisible();
   await shot(page, testInfo, 'import-1-empty');
 
@@ -67,7 +62,11 @@ test('admin imports two synthetic PDFs in batch, ignoring a non-PDF, and downloa
   await shot(page, testInfo, 'import-3-done');
 
   // Both songs are in the catalog now.
-  await page.getByRole('link', { name: 'Cifras · Louvor' }).click();
+  await page.getByRole('link', { name: /Voltar/ }).click();
+  await page
+    .getByRole('navigation', { name: 'Principal' })
+    .getByRole('link', { name: 'Músicas' })
+    .click();
   await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(artist);
   for (const { title } of files) {
     await expect(page.locator('a.list-main', { hasText: title })).toBeVisible();

@@ -10,7 +10,11 @@ test('admin promotes a visitor to member, who then gets "Nova cifra"', async ({
   await waitForUserDoc(await createGoogleUser(person.email, person.name));
 
   await signInAs(page, ADMIN, 'Admin');
-  await page.getByRole('link', { name: 'Pessoas' }).click();
+  await page
+    .getByRole('navigation', { name: 'Principal' })
+    .getByRole('link', { name: 'Mais' })
+    .click();
+  await page.getByRole('link', { name: /Admin/ }).click();
   await expect(page.getByRole('heading', { name: 'Pessoas' })).toBeVisible();
   const select = page.getByLabel(`Papel de ${person.name}`);
   await expect(select).toHaveValue('viewer');
@@ -22,12 +26,15 @@ test('admin promotes a visitor to member, who then gets "Nova cifra"', async ({
   await shot(page, testInfo, 'people-2-promoted');
 
   // The person signs in and now sees the member controls.
-  await page.getByRole('button', { name: 'Sair' }).click();
+  await page.getByRole('link', { name: /Voltar/ }).click();
+  await page.getByRole('button', { name: /Sair/ }).click();
   await expect(page.getByRole('button', { name: 'Entrar com Google' })).toBeVisible();
   await signInWithPopup(page, person);
   await expectRole(page, 'Membro');
   await expect(page.getByRole('link', { name: /Nova cifra/ })).toBeVisible();
-  await expect(
-    page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: 'Pessoas' }),
-  ).toHaveCount(0);
+  await page
+    .getByRole('navigation', { name: 'Principal' })
+    .getByRole('link', { name: 'Mais' })
+    .click();
+  await expect(page.getByRole('link', { name: /Admin/ })).toHaveCount(0);
 });

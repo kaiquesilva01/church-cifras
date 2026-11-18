@@ -89,9 +89,12 @@ describe('routes', () => {
     expect(screen.queryByRole('link', { name: 'Pessoas' })).not.toBeInTheDocument();
   });
 
-  it('shows Pessoas link for admin', () => {
-    setup('/', 'admin');
-    expect(screen.getByRole('link', { name: 'Pessoas' })).toBeInTheDocument();
+  it('shows the Admin link (to Pessoas) in Mais for admin only', () => {
+    setup('/mais', 'admin');
+    expect(screen.getByRole('link', { name: /Admin/ })).toHaveAttribute('href', '/pessoas');
+    cleanup();
+    setup('/mais', 'member');
+    expect(screen.queryByRole('link', { name: /Admin/ })).not.toBeInTheDocument();
   });
 
   it('redirects non-admin away from /pessoas', () => {
@@ -142,10 +145,18 @@ describe('routes', () => {
     expect(screen.getByRole('button', { name: 'Entrar com Google' })).toBeDisabled();
   });
 
-  it('header shows role label and Sair', () => {
-    const gateway = setup('/', 'member');
+  it('Mais shows the role label and Sair', () => {
+    const gateway = setup('/mais', 'member');
     expect(screen.getByText('Membro')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    fireEvent.click(screen.getByRole('button', { name: /Sair/ }));
     expect(gateway.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the bottom bar on the root screens and hides it on details', () => {
+    setup('/', 'member');
+    expect(screen.getByRole('navigation', { name: 'Principal' })).toBeInTheDocument();
+    cleanup();
+    setup('/nova', 'member');
+    expect(screen.queryByRole('navigation', { name: 'Principal' })).not.toBeInTheDocument();
   });
 });

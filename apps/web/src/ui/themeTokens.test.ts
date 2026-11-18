@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { THEME_COLORS, THEME_KEY } from '../lib/theme';
 
 const css = readFileSync(resolve(import.meta.dirname, 'styles.css'), 'utf8');
+const redesignCss = readFileSync(resolve(import.meta.dirname, 'redesign.css'), 'utf8');
 const html = readFileSync(resolve(import.meta.dirname, '../../index.html'), 'utf8');
 
 function tokens(block: string): string[] {
@@ -29,7 +30,7 @@ describe('theme tokens', () => {
   });
 
   it('has no hard-coded colors outside the token blocks', () => {
-    const rest = css.slice(css.indexOf('\n* {'));
+    const rest = css.slice(css.indexOf('\n* {')) + redesignCss;
     // Exceptions: the PDF paper (a document is white in both themes) and neutral black shadows.
     const offenders = [...rest.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\((?!0 0 0 \/)/g)].map(
       (m) => m[0],

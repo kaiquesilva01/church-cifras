@@ -199,14 +199,9 @@ describe('HomePage', () => {
   describe('Repertórios', () => {
     it('opens the tab from the url without the search box', () => {
       renderHome({ path: '/?aba=repertorios' });
-      expect(screen.getByRole('link', { name: 'Repertórios' })).toHaveAttribute(
-        'aria-current',
-        'page',
-      );
-      expect(screen.getByRole('link', { name: 'Repertórios' })).toHaveAttribute(
-        'href',
-        '/?aba=repertorios',
-      );
+      expect(screen.getByRole('heading', { level: 1, name: 'Repertório' })).toBeInTheDocument();
+      // The bottom bar owns this tab now: the Músicas/Cantores segment is not shown here.
+      expect(screen.queryByRole('navigation', { name: 'Seções' })).not.toBeInTheDocument();
       expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
       expect(screen.getByText('Nenhum repertório ainda.')).toBeInTheDocument();
     });
@@ -225,14 +220,20 @@ describe('HomePage', () => {
       );
     });
 
-    it('shows the next-service card on the Repertórios tab only when a future setlist exists', () => {
+    it('shows the next-service card on the Músicas tab only when a future setlist exists', () => {
       const { unmount } = renderHome({
-        path: '/?aba=repertorios',
         setlists: [makeSetlist({ id: 'a', date: '2026-11-22', label: 'Domingo' })],
       });
       expect(screen.getByText('Próximo culto')).toBeInTheDocument();
       unmount();
-      renderHome({ path: '/?aba=repertorios' });
+      const second = renderHome();
+      expect(screen.queryByText('Próximo culto')).not.toBeInTheDocument();
+      second.unmount();
+      // The Repertório tab lists the setlists itself, so it has no extra card.
+      renderHome({
+        path: '/?aba=repertorios',
+        setlists: [makeSetlist({ id: 'a', date: '2026-11-22', label: 'Domingo' })],
+      });
       expect(screen.queryByText('Próximo culto')).not.toBeInTheDocument();
     });
 

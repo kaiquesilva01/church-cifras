@@ -5,18 +5,22 @@ import { lettersTag } from './fixtures/names';
 
 const WIDTH = 360;
 
-/** No horizontal scroll, and every header control inside the viewport. */
+/** No horizontal scroll, and the bottom bar (when shown) inside the viewport. */
 async function expectNoOverflow(page: Page): Promise<void> {
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);
-  const header = await page.evaluate(() => {
-    const inner = document.querySelector('.header-inner')!;
-    const rights = [...inner.children].map((el) => el.getBoundingClientRect().right);
-    return { overflow: inner.scrollWidth > inner.clientWidth, maxRight: Math.max(...rights) };
+  const bar = await page.evaluate(() => {
+    const el = document.querySelector('.bottom-nav');
+    if (!el) return null;
+    const { left, right } = el.getBoundingClientRect();
+    return { left, right, overflow: el.scrollWidth > el.clientWidth };
   });
-  expect(header.overflow).toBe(false);
-  expect(header.maxRight).toBeLessThanOrEqual(WIDTH);
+  if (bar) {
+    expect(bar.overflow).toBe(false);
+    expect(bar.left).toBeGreaterThanOrEqual(0);
+    expect(bar.right).toBeLessThanOrEqual(WIDTH);
+  }
 }
 
 test('header and pages do not overflow at 360 px wide', async ({ page }, testInfo) => {

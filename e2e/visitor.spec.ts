@@ -13,9 +13,17 @@ test('visitor can read and download but cannot create, change keys or manage', a
   await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(song.title);
   await expect(page.locator('a.list-main', { hasText: song.title })).toBeVisible();
   await expect(page.getByRole('link', { name: /Nova cifra/ })).toHaveCount(0);
-  const nav = page.getByRole('navigation', { name: 'Principal' });
-  await expect(nav.getByRole('link', { name: 'Pessoas' })).toHaveCount(0);
-  await expect(nav.getByRole('link', { name: 'Importar' })).toHaveCount(0);
+  await page
+    .getByRole('navigation', { name: 'Principal' })
+    .getByRole('link', { name: 'Mais' })
+    .click();
+  await expect(page.getByRole('link', { name: /Admin/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Importar' })).toHaveCount(0);
+  await page
+    .getByRole('navigation', { name: 'Principal' })
+    .getByRole('link', { name: 'Músicas' })
+    .click();
+  await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(song.title);
   await shot(page, testInfo, 'visitor-1-home');
 
   // Viewer: PDF and download only.

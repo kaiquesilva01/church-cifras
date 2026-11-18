@@ -9,6 +9,8 @@ const SETLIST_PATH = /^\/repertorios\/([^/]+)\/?$/;
 
 /** Whether a playing pad keeps playing on the given location (spec §5.2). */
 export function padStaysOn(owner: PadOwner, pathname: string, search: string): boolean {
+  // The Pad tab is the status screen of whatever is playing: it never ends the pad itself.
+  if (pathname === '/pad') return true;
   const setlistParam = new URLSearchParams(search).get('repertorio');
   const songMatch = SONG_PATH.exec(pathname);
 
