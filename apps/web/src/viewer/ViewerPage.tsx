@@ -193,6 +193,9 @@ export function ViewerPage({
   const [failedPath, setFailedPath] = useState<string | null>(null);
   // The failure belongs to one path: moving to another one forgets it (a retry starts clean).
   if (failedPath !== null && failedPath !== path) setFailedPath(null);
+  // Like failedPath: the share failure belongs to one PDF, so another key (or the panel's source) forgets it.
+  const [shareError, setShareError] = useState<string | null>(null);
+  if (shareError !== null && shareError !== path) setShareError(null);
   const onPreviewError = useCallback(() => setPreviewFailed(path), [path]);
 
   useEffect(() => {
@@ -279,8 +282,6 @@ export function ViewerPage({
   const [menuOpen, setMenuOpen] = useState(false);
   const [canShare] = useState(canSharePdf);
   const [sharing, setSharing] = useState(false);
-  // Like previewFailed: the failure belongs to one PDF, so a new key or song forgets it.
-  const [shareError, setShareError] = useState<string | null>(null);
   // The key being deleted vanished (removed elsewhere): nothing left to confirm.
   const targetKey = manage?.action === 'delete-key' && !manage.busy ? manage.key : null;
   if (targetKey && arrStatus === 'ready' && !arrangements.some((a) => a.key === targetKey)) {

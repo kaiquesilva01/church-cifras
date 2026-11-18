@@ -230,6 +230,19 @@ describe('ViewerPage share button', () => {
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   });
 
+  it('does not bring the share error back when returning to the same key', async () => {
+    supported(() => Promise.reject(new Error('boom')));
+    renderViewer('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    fireEvent.click(shareButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent(failure);
+    fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom A' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    fireEvent.click(await screen.findByRole('link', { name: 'Sonda-me, tom G' }));
+    await screen.findByTestId('pdf-pages');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('ignores a second tap while sharing', async () => {
     let finish: () => void = () => undefined;
     const share = supported(() => new Promise<void>((resolve) => (finish = resolve)));
