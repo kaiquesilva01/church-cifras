@@ -288,6 +288,19 @@ export function ViewerPage({
   });
 
   const [sheetHeight, setSheetHeight] = useState<number | null>(null);
+  // The fixed bottom bar changes height (wraps) with the pad, the setlist row and the width: the page
+  // keeps room for it. A callback ref also covers the bar appearing after the loading states.
+  const [barHeight, setBarHeight] = useState<number | null>(null);
+  const barObserver = useRef<ResizeObserver | null>(null);
+  const barRef = useCallback((el: HTMLDivElement | null) => {
+    barObserver.current?.disconnect();
+    barObserver.current = null;
+    if (!el) return setBarHeight(null);
+    setBarHeight(el.offsetHeight);
+    if (typeof ResizeObserver === 'undefined') return;
+    barObserver.current = new ResizeObserver(() => setBarHeight(el.offsetHeight));
+    barObserver.current.observe(el);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ key: string } | null>(null);
@@ -511,9 +524,10 @@ export function ViewerPage({
     <section
       className={`viewer${panelOpen && wide ? ' has-side' : ''}${sheetHeight !== null ? ' has-sheet' : ''}${setlist.nav ? ' has-setlist' : ''}`}
       style={
-        sheetHeight !== null
-          ? ({ '--sheet-height': `${sheetHeight}px` } as CSSProperties)
-          : undefined
+        {
+          ...(sheetHeight !== null ? { '--sheet-height': `${sheetHeight}px` } : null),
+          ...(barHeight ? { '--bar-height': `${barHeight}px` } : null),
+        } as CSSProperties
       }
     >
       <div className="viewer-body" inert={panelOpen && !wide}>
@@ -583,7 +597,7 @@ export function ViewerPage({
             Carregando cifra…
           </p>
         )}
-        <div className="viewer-bar">
+        <div className="viewer-bar" ref={barRef}>
           {setlist.nav && (
             <SetlistBar nav={setlist.nav} onGo={setlist.go} backHref={setlist.backHref} />
           )}

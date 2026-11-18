@@ -18,11 +18,15 @@ describe('viewer layout css', () => {
     expect(rule('.viewer.has-side')).toMatch(/padding-right:\s*336px/);
   });
 
-  it('clears the taller bottom bar of a setlist, without overriding the sheet padding', () => {
-    const px = (selector: string): number =>
-      Number(/padding-bottom:\s*(\d+)px/.exec(rule(selector))?.[1] ?? 0);
-    expect(px('.viewer.has-setlist')).toBeGreaterThan(px('.viewer'));
-    expect(css.indexOf('.viewer.has-setlist {')).toBeLessThan(css.indexOf('.viewer.has-sheet {'));
+  it('derives the bottom padding from the measured bar height, and the sheet still wins', () => {
+    expect(rule('.viewer')).toMatch(
+      /padding-bottom:\s*calc\(var\(--bar-height,\s*72px\)\s*\+\s*16px\)/,
+    );
+    expect(rule('.viewer.has-sheet')).toMatch(/padding-bottom:\s*calc\(var\(--sheet-height\)/);
+    expect(css.indexOf('.viewer {')).toBeLessThan(css.indexOf('.viewer.has-sheet {'));
+    // The measured height already includes the setlist row: no fixed constants are left.
+    expect(css).not.toMatch(/\.viewer\.has-setlist \{/);
+    expect(rule('.viewer')).not.toMatch(/padding-bottom:\s*\d+px/);
   });
 
   it('always wraps the bottom bar, since the pad control can overflow a phone', () => {

@@ -1,4 +1,12 @@
-import { cleanup, configure, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useParams, useSearchParams } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthState } from '../auth/useAuth';
@@ -110,6 +118,38 @@ function setup(path: string, pad: PadContextValue | null) {
     </AuthContext.Provider>,
   );
 }
+
+describe('ViewerPage bar height', () => {
+  it('sets --bar-height from the observed bar and updates it when the observer fires', async () => {
+    let height = 60;
+    const callbacks: (() => void)[] = [];
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: () => void) {
+          callbacks.push(cb);
+        }
+        observe() {}
+        disconnect = disconnect;
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains('viewer-bar') ? height : 0;
+    });
+    setup('/musicas/s1?tom=G', fake());
+    await screen.findByTestId('pdf-pages');
+    const viewer = document.querySelector<HTMLElement>('.viewer')!;
+    expect(viewer.style.getPropertyValue('--bar-height')).toBe('60px');
+    height = 164;
+    act(() => callbacks.forEach((cb) => cb()));
+    expect(viewer.style.getPropertyValue('--bar-height')).toBe('164px');
+    cleanup();
+    expect(disconnect).toHaveBeenCalled();
+  });
+});
 
 describe('ViewerPage pad button', () => {
   it('shows the Pad button in the bar inside a provider', async () => {
