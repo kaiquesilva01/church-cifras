@@ -20,6 +20,7 @@
   flex-direction: column;
   justify-content: center;
   gap: 14px;
+  min-height: 100vh;
   min-height: 100dvh;
   max-width: 420px;
   margin: 0 auto;
@@ -86,7 +87,11 @@
   border-radius: 14px;
 }
 
-/* Bottom call to action of Nova cifra */
+/* Bottom call to action of Nova cifra (the form reserves room for the taller bar) */
+.upload {
+  padding-bottom: calc(120px + env(safe-area-inset-bottom));
+}
+
 .sticky-bar {
   padding: 14px 20px calc(20px + env(safe-area-inset-bottom));
   background: var(--color-bg);
@@ -107,11 +112,6 @@
 .dialog-title {
   font-size: 1.125rem;
   font-weight: 800;
-}
-
-/* People: one card per person */
-.people tr {
-  border-bottom: 1px solid var(--color-border);
 }
 
 /* Import table status pills share the app's pill look */
