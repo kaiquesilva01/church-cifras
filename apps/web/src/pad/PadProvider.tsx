@@ -157,16 +157,22 @@ export function PadProvider({
     engine?.dispose();
   }, [clearTeardownTimer]);
 
+  /** Frees the engine (and its context) after the fade window unless a new toggle cancels it. */
+  const armTeardown = useCallback(() => {
+    clearTeardownTimer();
+    teardownTimerRef.current = setTimeout(() => {
+      teardownTimerRef.current = null;
+      teardown();
+    }, TEARDOWN_AFTER_STOP_MS);
+  }, [clearTeardownTimer, teardown]);
+
   /** Cancels any in-flight run and fades the engine out; frees it after the fade. */
   const halt = useCallback(() => {
     tokenRef.current += 1;
     clearTeardownTimer();
     if (engineRef.current) {
       engineRef.current.stop();
-      teardownTimerRef.current = setTimeout(() => {
-        teardownTimerRef.current = null;
-        teardown();
-      }, TEARDOWN_AFTER_STOP_MS);
+      armTeardown();
     } else enginePromiseRef.current = null; // the pending run disposes the engine once created
     desiredRef.current = null;
     targetRef.current = null;
@@ -241,6 +247,8 @@ export function PadProvider({
         if (tokenRef.current === token) {
           changeStatus('error');
           changeNote(null);
+          // No route change will free the engine inside a setlist: don't leave a silent context running.
+          armTeardown();
         }
         return;
       }
@@ -251,7 +259,7 @@ export function PadProvider({
       desiredRef.current = null;
       if (desired && desired !== first) await crossfade(engine, desired, token);
     },
-    [changeNote, changeStatus, crossfade, teardown],
+    [armTeardown, changeNote, changeStatus, crossfade, teardown],
   );
 
   const toggle = useCallback(

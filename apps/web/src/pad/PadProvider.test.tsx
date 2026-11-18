@@ -721,6 +721,99 @@ describe('PadProvider', () => {
     });
   });
 
+  describe('failed start', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function stubCtxCounting() {
+      const close = vi.fn(() => Promise.resolve());
+      let created = 0;
+      class FakeCtx {
+        constructor() {
+          created += 1;
+        }
+        resume() {
+          return Promise.resolve();
+        }
+        close = close;
+      }
+      vi.stubGlobal('AudioContext', FakeCtx);
+      return { close, created: () => created };
+    }
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={['/musicas/s1']}>
+        <PadProvider fetchBytes={() => Promise.resolve(new Uint8Array())} storage={memoryStorage()}>
+          {children}
+        </PadProvider>
+      </MemoryRouter>
+    );
+    const settle = () =>
+      act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+    it('tears the engine and the context down after the window', async () => {
+      vi.useFakeTimers();
+      const { close } = stubCtxCounting();
+      const engine = makeEngine();
+      engine.start.mockRejectedValue(new Error('network'));
+      vi.mocked(buildPadEngine).mockReturnValue(engine);
+      const { result } = renderHook(() => usePad()!, { wrapper });
+      act(() => result.current.toggle('C', song));
+      await settle();
+      expect(result.current.status).toBe('error');
+      expect(engine.dispose).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(3600);
+      });
+      expect(engine.dispose).toHaveBeenCalledTimes(1);
+      expect(close).toHaveBeenCalledTimes(1);
+    });
+
+    it('a retry inside the window cancels the timer and works', async () => {
+      vi.useFakeTimers();
+      const { close } = stubCtxCounting();
+      const engine = makeEngine();
+      engine.start.mockRejectedValueOnce(new Error('network'));
+      vi.mocked(buildPadEngine).mockReturnValue(engine);
+      const { result } = renderHook(() => usePad()!, { wrapper });
+      act(() => result.current.toggle('C', song));
+      await settle();
+      expect(result.current.status).toBe('error');
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      act(() => result.current.toggle('C', song));
+      await settle();
+      expect(result.current.status).toBe('playing');
+      act(() => {
+        vi.advanceTimersByTime(10000);
+      });
+      expect(engine.dispose).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+    });
+
+    it('a retry after the teardown builds a fresh context synchronously in the tap', async () => {
+      vi.useFakeTimers();
+      const { created } = stubCtxCounting();
+      const first = makeEngine();
+      first.start.mockRejectedValue(new Error('network'));
+      vi.mocked(buildPadEngine).mockReturnValueOnce(first).mockReturnValue(makeEngine());
+      const { result } = renderHook(() => usePad()!, { wrapper });
+      act(() => result.current.toggle('C', song));
+      await settle();
+      act(() => {
+        vi.advanceTimersByTime(3600);
+      });
+      expect(created()).toBe(1);
+      act(() => result.current.toggle('C', song));
+      expect(created()).toBe(2);
+      await settle();
+      expect(result.current.status).toBe('playing');
+    });
+  });
+
   it('usePad returns null outside the provider', () => {
     const { result } = renderHook(() => usePad());
     expect(result.current).toBeNull();
