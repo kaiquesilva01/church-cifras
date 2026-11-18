@@ -1,16 +1,8 @@
 import { Link } from 'react-router';
 import { ROLE_LABELS, isAdmin } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
+import { initialsOf } from '../ui/initials';
 import { ScreenHeader } from '../ui/ScreenHeader';
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('');
-}
 
 const CHEVRON = (
   <svg
@@ -53,7 +45,7 @@ export function MaisPage() {
       <ScreenHeader eyebrow="Conta" title="Mais" />
       <div className="profile-card">
         <span className="profile-avatar" aria-hidden="true">
-          {initials(name)}
+          {initialsOf(name)}
         </span>
         <div className="profile-info">
           {user?.displayName && <p className="profile-name">{user.displayName}</p>}

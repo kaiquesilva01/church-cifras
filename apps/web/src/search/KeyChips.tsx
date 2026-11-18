@@ -8,6 +8,7 @@ export function KeyChips({
   selected,
   replace,
   extraQuery,
+  compact,
 }: {
   songId: string;
   title: string;
@@ -16,18 +17,21 @@ export function KeyChips({
   replace?: boolean;
   /** Extra `a=b&c=d` appended to the `?tom=` link (e.g. the setlist context). */
   extraQuery?: string;
+  /** Small pills for the song lists (the row itself is the main tap target). */
+  compact?: boolean;
 }) {
   if (keys.length === 0) return null;
   return (
-    <ul className="chips">
+    <ul className={compact ? 'chips chips-compact' : 'chips'}>
       {keys.map((key) => (
         <li key={key}>
           <Link
             to={`/musicas/${songId}?tom=${keySlug(key)}${extraQuery ? `&${extraQuery}` : ''}`}
-            className="chip"
+            className={compact && key === selected ? 'chip is-default' : 'chip'}
             replace={replace}
             aria-label={`${title}, tom ${key}`}
-            aria-current={key === selected ? 'true' : undefined}
+            // In the lists the highlighted pill is only the default key, not the current page.
+            aria-current={!compact && key === selected ? 'true' : undefined}
           >
             {key}
           </Link>
