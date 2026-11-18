@@ -45,6 +45,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:harness
+      - run: npm run test:scripts
       - run: npm run test:rules
       - run: npm run build
 

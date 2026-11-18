@@ -7,15 +7,21 @@ const DAY = 24 * 60 * 60;
 // `songs%2F...` objects: listings, metadata calls, uploads and other folders never match. The Storage
 // emulator host is accepted only in builds meant for local development.
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const OBJECT_PATH = String.raw`\/v0\/b\/[^/]+\/o\/songs%2F[^?]*\?(?:[^#]*&)?alt=media(?:&|#|$)`;
+const objectPath = (folder: string): string =>
+  String.raw`\/v0\/b\/[^/]+\/o\/${folder}%2F[^?]*\?(?:[^#]*&)?alt=media(?:&|#|$)`;
 
-export const pdfObjectPattern = (includeEmulator: boolean, emulatorHost = 'localhost'): RegExp =>
+const objectPattern = (folder: string, includeEmulator: boolean, emulatorHost: string): RegExp =>
   new RegExp(
     includeEmulator
       ? String.raw`^https?:\/\/(?:firebasestorage\.googleapis\.com|${escapeRegExp(emulatorHost)}:9199)` +
-          OBJECT_PATH
-      : String.raw`^https:\/\/firebasestorage\.googleapis\.com` + OBJECT_PATH,
+          objectPath(folder)
+      : String.raw`^https:\/\/firebasestorage\.googleapis\.com` + objectPath(folder),
   );
+
+export const pdfObjectPattern = (includeEmulator: boolean, emulatorHost = 'localhost'): RegExp =>
+  objectPattern('songs', includeEmulator, emulatorHost);
+export const padObjectPattern = (includeEmulator: boolean, emulatorHost = 'localhost'): RegExp =>
+  objectPattern('pads', includeEmulator, emulatorHost);
 export const FONT_PATTERN = /\.ttf(?:\?.*)?$/;
 // Lazy chunks, stylesheets and the pdf.js worker (all hashed files under /assets/).
 export const CHUNK_PATTERN = /\/assets\/.+\.(?:m?js|css)(?:\?.*)?$/;
@@ -26,9 +32,16 @@ export const isPdfObjectRequest = (
   includeEmulator = false,
   emulatorHost = 'localhost',
 ): boolean => method === 'GET' && pdfObjectPattern(includeEmulator, emulatorHost).test(url.href);
+export const isPadObjectRequest = (
+  url: URL,
+  method: string,
+  includeEmulator = false,
+  emulatorHost = 'localhost',
+): boolean => method === 'GET' && padObjectPattern(includeEmulator, emulatorHost).test(url.href);
 export const isFontRequest = (url: URL): boolean => FONT_PATTERN.test(url.pathname);
 
 export const PDF_CACHE = 'cifras-pdfs';
+export const PAD_CACHE = 'cifras-pads';
 
 // Firestore, Functions and Auth are deliberately absent: no rule here ever matches them.
 // Serialized into the service worker by Workbox: must not reference anything outside its own body.
@@ -97,6 +110,16 @@ export const createPwaOptions = (
         options: {
           cacheName: PDF_CACHE,
           expiration: { maxEntries: 200, maxAgeSeconds: 60 * DAY },
+          cacheableResponse: { statuses: [200] },
+        },
+      },
+      {
+        urlPattern: padObjectPattern(includeEmulator, emulatorHost),
+        method: 'GET',
+        handler: 'CacheFirst',
+        options: {
+          cacheName: PAD_CACHE,
+          expiration: { maxEntries: 20, maxAgeSeconds: 365 * DAY },
           cacheableResponse: { statuses: [200] },
         },
       },
