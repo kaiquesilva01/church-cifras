@@ -578,7 +578,8 @@ section:last-child > .section-title + .list {
      panel's padding never narrows the page and the canvas is not refit. */
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-  padding-bottom: 72px;
+  /* On a phone the bar wraps to up to three rows (pad control + notice); measured 248px at 360px. */
+  padding-bottom: 256px;
 }
 
 .viewer-body {
@@ -646,14 +647,11 @@ section:last-child > .section-title + .list {
   bottom: 0;
   left: 0;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 8px 16px;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
-}
-
-.viewer.has-setlist .viewer-bar {
-  flex-wrap: wrap;
 }
 
 .setlist-bar {
@@ -670,8 +668,20 @@ section:last-child > .section-title + .list {
 
 .pad-control {
   display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  min-width: 0;
+}
+
+.pad-control .btn {
+  min-height: 44px;
+  min-width: 0;
+}
+
+.pad-control .muted {
+  flex-basis: 100%;
 }
 
 .pad-control input[type='range'] {
@@ -767,7 +777,17 @@ section:last-child > .section-title + .list {
 
 /* The setlist bar adds a row to the fixed bottom bar: clear both rows. Before .has-sheet, which wins. */
 .viewer.has-setlist {
-  padding-bottom: 136px;
+  padding-bottom: 304px;
+}
+
+@media (min-width: 600px) {
+  .viewer {
+    padding-bottom: 96px;
+  }
+
+  .viewer.has-setlist {
+    padding-bottom: 152px;
+  }
 }
 
 .viewer.has-sheet {

@@ -149,8 +149,14 @@ describe('ViewerPage pad button', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Mudar tom' }));
     await screen.findByText('Mudar tom · original', { exact: false });
     await waitFor(() => expect(screen.queryByText('Preparando…')).not.toBeInTheDocument());
+    // Source G differs from the selected A: `displayed` is G while the panel is open.
+    fireEvent.click(screen.getByRole('button', { name: 'D' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Meio tom acima' }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     const calls = vi.mocked(pad.follow).mock.calls.map(([key]) => key);
     expect(calls).not.toContain('G');
+    expect(calls).not.toContain('D');
+    expect(calls).not.toContain('D#');
     expect(calls.at(-1)).toBe('A');
   });
 });

@@ -25,9 +25,9 @@ describe('viewer layout css', () => {
     expect(css.indexOf('.viewer.has-setlist {')).toBeLessThan(css.indexOf('.viewer.has-sheet {'));
   });
 
-  it('wraps the bottom bar only when a setlist adds its extra row', () => {
-    expect(rule('.viewer-bar')).not.toMatch(/flex-wrap/);
-    expect(rule('.viewer.has-setlist .viewer-bar')).toMatch(/flex-wrap:\s*wrap/);
+  it('always wraps the bottom bar, since the pad control can overflow a phone', () => {
+    expect(rule('.viewer-bar')).toMatch(/flex-wrap:\s*wrap/);
+    expect(rule('.pad-control')).toMatch(/min-width:\s*0/);
   });
 
   it('gives the icon-only share button in the bar a 44px touch target', () => {

@@ -45,6 +45,21 @@ describe('PadControl', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('keeps the control while playing even with no key, using the pad note', () => {
+    const value = fake({ status: 'playing', note: 'A#' });
+    render(<PadControl keyName={null} owner={owner} />, { wrapper: wrap(value) });
+    const button = screen.getByRole('button', { name: 'Pad A#' });
+    fireEvent.click(button);
+    expect(value.toggle).toHaveBeenCalledWith('A#', owner);
+  });
+
+  it('renders nothing with no key when the pad is off', () => {
+    const { container } = render(<PadControl keyName={null} owner={owner} />, {
+      wrapper: wrap(fake({ status: 'off', note: 'A#' })),
+    });
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('toggles with the key and owner', () => {
     const value = fake();
     render(<PadControl keyName="Bb" owner={owner} />, { wrapper: wrap(value) });

@@ -5,9 +5,13 @@ import { usePad } from './usePad';
 
 export function PadControl({ keyName, owner }: { keyName: KeyName | null; owner: PadOwner }) {
   const pad = usePad();
-  if (!pad || keyName === null || padNoteFor(keyName) === null) return null;
-
+  if (!pad) return null;
   const { status } = pad;
+  // While a pad is active the control stays (and can stop it) even if the key is momentarily
+  // unknown, e.g. the next cifra of a setlist is still loading its arrangements.
+  const validKey = keyName !== null && padNoteFor(keyName) !== null ? keyName : null;
+  const target = validKey ?? (status !== 'off' ? pad.note : null);
+  if (target === null) return null;
   const label =
     status === 'loading'
       ? 'Carregando pad…'
@@ -24,7 +28,7 @@ export function PadControl({ keyName, owner }: { keyName: KeyName | null; owner:
         className="btn"
         aria-pressed={status === 'playing'}
         aria-busy={status === 'loading' || undefined}
-        onClick={() => pad.toggle(keyName, owner)}
+        onClick={() => pad.toggle(target, owner)}
       >
         {label ?? (
           <>
