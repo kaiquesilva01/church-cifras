@@ -23,6 +23,7 @@ import { AuthContext, type AuthState } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi, sampleSongs } from '../test/fakeCatalogApi';
 import { testUser } from '../test/fakeGateway';
+import { stubShare, unstubShare } from '../test/shareStub';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import { ActiveSetlistProvider } from '../setlists/ActiveSetlistProvider';
 import type { SetlistItem } from '../setlists/types';
@@ -54,6 +55,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  unstubShare();
 });
 
 const ia: SetlistItem = { id: 'a', songId: 's1', key: 'G' };
@@ -370,6 +372,24 @@ describe('ViewerPage in a setlist', () => {
       await screen.findByText('2 de 3');
       expect(screen.queryByRole('group', { name: 'Gerenciar música' })).toBeNull();
     });
+  });
+
+  it('a share that fails after moving to the next cifra shows no error there', async () => {
+    let fail: (error: Error) => void = () => undefined;
+    const share = vi.fn(() => new Promise<void>((_, reject) => (fail = reject)));
+    stubShare({ share, canShare: () => true });
+    setup('/musicas/s1?tom=G&repertorio=r1&item=a');
+    await screen.findByTestId('pdf-pages');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Compartilhar' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Compartilhar' }));
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: /Próxima/ }));
+    await screen.findByText('2 de 3');
+    await act(async () => {
+      fail(new Error('boom'));
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(screen.queryByText('Não foi possível compartilhar. Tente de novo.')).toBeNull();
   });
 
   describe('next cifra preload', () => {

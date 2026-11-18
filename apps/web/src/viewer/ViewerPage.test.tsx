@@ -1,10 +1,11 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useParams, useSearchParams } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi, makeSong } from '../test/fakeCatalogApi';
 import { testUser } from '../test/fakeGateway';
+import { stubShare, unstubShare } from '../test/shareStub';
 import { ViewerPage } from './ViewerPage';
 
 vi.mock('./PdfPages', () => ({
@@ -64,7 +65,10 @@ function renderViewer(path: string, api = fakeCatalogApi()) {
   return { api, openPdf };
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  unstubShare();
+});
 
 describe('ViewerPage', () => {
   it('renders saved key chips and selects the query key', async () => {
@@ -157,5 +161,86 @@ describe('ViewerPage', () => {
     await screen.findByTestId('pdf-pages');
     const fetchesOfA = getPdfBytes.mock.calls.filter(([path]) => path.endsWith('A-abc.pdf'));
     expect(fetchesOfA).toHaveLength(1);
+  });
+});
+
+describe('ViewerPage share button', () => {
+  const supported = (share: (data: ShareData) => Promise<void> = () => Promise.resolve()) => {
+    const fn = vi.fn(share);
+    stubShare({ share: fn, canShare: () => true });
+    return fn;
+  };
+  const shareButton = () => screen.getByRole('button', { name: 'Compartilhar' });
+  const failure = 'Não foi possível compartilhar. Tente de novo.';
+
+  it('hides the share button when the browser cannot share files', async () => {
+    renderViewer('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    expect(screen.queryByRole('button', { name: 'Compartilhar' })).toBeNull();
+  });
+
+  it('disables share until the pdf has loaded', async () => {
+    supported();
+    renderViewer('/musicas/s1?tom=G');
+    expect(shareButton()).toBeDisabled();
+    await screen.findByTestId('pdf-pages');
+    expect(shareButton()).toBeEnabled();
+  });
+
+  it('shares the pdf with a friendly file name', async () => {
+    const share = supported();
+    renderViewer('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    fireEvent.click(shareButton());
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    const [data] = share.mock.calls[0] as [{ files: File[] }];
+    expect(data.files).toHaveLength(1);
+    expect(data.files[0].name).toBe('Sonda-me - Aline Barros (G).pdf');
+    expect(data.files[0].type).toBe('application/pdf');
+  });
+
+  it('stays silent when the user dismisses the share sheet', async () => {
+    const share = supported(() => Promise.reject(new DOMException('x', 'AbortError')));
+    renderViewer('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    fireEvent.click(shareButton());
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    await waitFor(() => expect(shareButton()).toBeEnabled());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows an error when sharing fails, and clears it on the next try', async () => {
+    const share = supported(() => Promise.reject(new Error('boom')));
+    renderViewer('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    fireEvent.click(shareButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent(failure);
+    share.mockImplementation(() => Promise.resolve());
+    fireEvent.click(shareButton());
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+
+  it('clears the share error when the key changes', async () => {
+    supported(() => Promise.reject(new Error('boom')));
+    renderViewer('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    fireEvent.click(shareButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent(failure);
+    fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom A' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+
+  it('ignores a second tap while sharing', async () => {
+    let finish: () => void = () => undefined;
+    const share = supported(() => new Promise<void>((resolve) => (finish = resolve)));
+    renderViewer('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    fireEvent.click(shareButton());
+    await waitFor(() => expect(shareButton()).toBeDisabled());
+    expect(shareButton()).toHaveAttribute('aria-busy', 'true');
+    fireEvent.click(shareButton());
+    expect(share).toHaveBeenCalledTimes(1);
+    finish();
+    await waitFor(() => expect(shareButton()).toBeEnabled());
   });
 });
