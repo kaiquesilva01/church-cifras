@@ -39,6 +39,7 @@ import { useNextPreload } from './useNextPreload';
 import { useSongArrangements } from './useSongArrangements';
 import { useTranspose } from './useTranspose';
 import { useViewerSetlist, viewerUrl } from './useViewerSetlist';
+import { DownloadIcon, WhatsAppIcon } from './barIcons';
 
 type Loaded = { status: 'ready'; doc: PdfDocument; bytes: Uint8Array } | { status: 'error' };
 
@@ -603,11 +604,13 @@ export function ViewerPage({
           )}
           <button
             type="button"
-            className="btn"
+            className="btn btn-icon"
+            aria-label="PDF"
+            title="Baixar PDF"
             onClick={download}
             disabled={current?.status !== 'ready'}
           >
-            <span aria-hidden="true">⬇ </span>PDF
+            <DownloadIcon />
           </button>
           {canShare && (
             <button
@@ -619,7 +622,7 @@ export function ViewerPage({
               onClick={() => void share()}
               disabled={current?.status !== 'ready' || sharing}
             >
-              <span aria-hidden="true">↗</span>
+              <WhatsAppIcon />
             </button>
           )}
           <PadControl keyName={selected?.key ?? null} owner={padOwner} />
@@ -635,7 +638,7 @@ export function ViewerPage({
                 setPanelOpen(true);
               }}
             >
-              <span aria-hidden="true">♪ </span>Mudar tom
+              Mudar tom
             </button>
           )}
           {canChange && arrStatus === 'ready' && !source && (

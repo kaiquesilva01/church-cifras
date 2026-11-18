@@ -7,6 +7,7 @@ import {
 import { prefetchForPath } from './lib/prefetch';
 import './ui/styles.css';
 import './ui/redesign.css';
+import './ui/redesign-cifra.css';
 
 const storage = getSessionStorage(window);
 installPreloadErrorReload(window, storage);

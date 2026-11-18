@@ -179,6 +179,18 @@ describe('ViewerPage share button', () => {
     expect(screen.queryByRole('button', { name: 'Compartilhar' })).toBeNull();
   });
 
+  it('uses icon-only buttons: PDF download and the WhatsApp glyph, both with a name', async () => {
+    supported();
+    renderViewer('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    const download = screen.getByRole('button', { name: 'PDF' });
+    expect(download).toHaveAttribute('title', 'Baixar PDF');
+    expect(download).toHaveTextContent('');
+    expect(download.querySelector('svg')).not.toBeNull();
+    expect(shareButton().querySelector('svg.whatsapp-icon')).not.toBeNull();
+    expect(shareButton()).toHaveTextContent('');
+  });
+
   it('disables share until the pdf has loaded', async () => {
     supported();
     renderViewer('/musicas/s1?tom=G');
