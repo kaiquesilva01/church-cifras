@@ -17,6 +17,7 @@ import { RequireRole } from './routes/RequireRole';
 import { ArtistPage } from './search/ArtistPage';
 import { HomePage } from './search/HomePage';
 import { AppShell } from './ui/AppShell';
+import { ThemeProvider } from './ui/ThemeProvider';
 
 const UploadRoute = lazy(() => import('./upload/UploadRoute'));
 const ImportRoute = lazy(() => import('./import/ImportRoute'));
@@ -172,5 +173,9 @@ export function App({
       ),
     [initialPath, peopleApi, catalogApi, setlistApi, onReload],
   );
-  return <AuthProvider gateway={gateway}>{router}</AuthProvider>;
+  return (
+    <ThemeProvider>
+      <AuthProvider gateway={gateway}>{router}</AuthProvider>
+    </ThemeProvider>
+  );
 }

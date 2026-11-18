@@ -1,6 +1,7 @@
 import { Link, Outlet } from 'react-router';
 import { ROLE_LABELS, isAdmin } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
+import { ThemeToggle } from './ThemeToggle';
 
 function initials(name: string): string {
   return name
@@ -34,6 +35,7 @@ export function AppShell() {
             )}
           </nav>
           <span className="spacer" />
+          <ThemeToggle />
           <span className="avatar" aria-hidden="true">
             {initials(name)}
           </span>

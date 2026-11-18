@@ -72,8 +72,8 @@ export const createPwaOptions = (
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    theme_color: '#4f46e5',
-    background_color: '#f2f2f4',
+    theme_color: '#f4f5f7',
+    background_color: '#f4f5f7',
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
