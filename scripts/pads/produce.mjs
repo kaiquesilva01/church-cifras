@@ -10,6 +10,7 @@ import {
   INTRO_MAX_BARS,
   INTRO_MIN_BARS,
   LOOP_BARS,
+  MAX_GAIN_DB,
   PEAK,
   SR,
   TARGET_DB,
@@ -17,6 +18,8 @@ import {
   buildLoopBuffer,
   rmsDb,
   seamScore,
+  validateSourceAudio,
+  validateSourceNames,
 } from './loop.mjs';
 
 const { values } = parseArgs({ options: { src: { type: 'string' }, out: { type: 'string' } } });
@@ -57,14 +60,29 @@ function encode(pcm, dest) {
   );
 }
 
-const secs = (frames) => +(frames / SR).toFixed(2);
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
 
-mkdirSync(`${outDir}/loops`, { recursive: true });
-mkdirSync(`${outDir}/teste-3x`, { recursive: true });
+const secs = (frames) => +(frames / SR).toFixed(2);
 
 const files = readdirSync(srcDir)
   .filter((n) => /^DS\d\d-.+\.mp3$/.test(n))
   .sort();
+const nameErrors = validateSourceNames(files);
+if (nameErrors.length > 0) fail(`origem inválida em ${srcDir}:\n${nameErrors.join('\n')}`);
+
+// Primeira passada: valida todos os áudios antes de escrever qualquer saída.
+const audioErrors = [];
+for (const name of files) {
+  const pcm = decode(`${srcDir}/${name}`);
+  audioErrors.push(...validateSourceAudio(pcm, name, opts, INTRO_MAX_BARS * BAR));
+}
+if (audioErrors.length > 0) fail(audioErrors.join('\n'));
+
+mkdirSync(`${outDir}/loops`, { recursive: true });
+mkdirSync(`${outDir}/teste-3x`, { recursive: true });
 const report = [];
 
 for (const name of files) {
@@ -86,6 +104,11 @@ for (const name of files) {
   // Só o trecho estável, para o crescendo da intro manter a forma natural.
   const bodyDb = rmsDb(B, M + opts.xfadeFrames, opts.loopFrames - 2 * opts.xfadeFrames);
   const gain = Math.min(10 ** ((TARGET_DB - bodyDb) / 20), PEAK / peak);
+  if (20 * Math.log10(gain) > MAX_GAIN_DB) {
+    fail(
+      `${name}: ganho de nivelamento de ${(20 * Math.log10(gain)).toFixed(1)} dB excede ${MAX_GAIN_DB} dB`,
+    );
+  }
   for (let i = 0; i < B.length; i++) B[i] *= gain;
 
   const id = name.replace(/\.mp3$/, '').replace('#', 's');

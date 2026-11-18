@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BAR, buildLoopBuffer, seamScore, validatePadFiles } from './loop.mjs';
+import {
+  BAR,
+  MAX_GAIN_DB,
+  buildLoopBuffer,
+  seamScore,
+  validatePadFiles,
+  validateSourceAudio,
+  validateSourceNames,
+} from './loop.mjs';
 
 const opts = { loopFrames: 16 * BAR, xfadeFrames: 2 * BAR };
 const intro = 4 * BAR;
@@ -93,4 +101,38 @@ test('validatePadFiles rejects an unexpected name', () => {
 
 test('validatePadFiles rejects duplicates', () => {
   assert.ok(validatePadFiles([...names.slice(0, 11), names[0]]).length > 0);
+});
+
+const mp3s = names.map((n) => n.replace('.m4a', '.mp3'));
+
+test('validateSourceNames accepts 12 DS mp3 files (including #)', () => {
+  assert.deepEqual(validateSourceNames(mp3s), []);
+  assert.deepEqual(validateSourceNames([...mp3s.slice(0, 11), 'DS12-B#.mp3']), []);
+});
+
+test('validateSourceNames rejects an empty set, a short set and strange names', () => {
+  assert.ok(validateSourceNames([]).length > 0);
+  assert.ok(validateSourceNames(mp3s.slice(1)).length > 0);
+  assert.ok(validateSourceNames([...mp3s.slice(0, 11), 'x.mp3']).length > 0);
+});
+
+test('validateSourceAudio accepts a long enough audible source', () => {
+  assert.deepEqual(validateSourceAudio(sine(24 * BAR), 'a.mp3', opts, 8 * BAR), []);
+});
+
+test('validateSourceAudio rejects a short source naming the file', () => {
+  const errors = validateSourceAudio(sine(23 * BAR), 'DS01-C.mp3', opts, 8 * BAR);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /DS01-C\.mp3/);
+});
+
+test('validateSourceAudio rejects empty and silent sources naming the file', () => {
+  const silent = validateSourceAudio(new Float32Array(2 * 24 * BAR), 'DS02-D.mp3', opts, 8 * BAR);
+  assert.equal(silent.length, 1);
+  assert.match(silent[0], /DS02-D\.mp3/);
+  assert.ok(validateSourceAudio(new Float32Array(0), 'e.mp3', opts, 8 * BAR).length > 0);
+});
+
+test('MAX_GAIN_DB is a sane bound', () => {
+  assert.ok(MAX_GAIN_DB > 0 && MAX_GAIN_DB <= 40);
 });

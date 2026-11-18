@@ -70,3 +70,28 @@ export function validatePadFiles(names) {
   }
   return errors;
 }
+
+export const MIN_PEAK = 1e-3; // abaixo disso (-60 dBFS) a fonte é tratada como silenciosa
+export const MAX_GAIN_DB = 40; // ganho de nivelamento acima disso indica fonte quase muda
+
+const padId = (name) => name.replace(/\.mp3$/, '').replace('#', 's');
+
+/** Erros do conjunto de MP3 de origem (vazio = ok): exatamente 12 DS??-<nota>.mp3 únicos. */
+export function validateSourceNames(names) {
+  return validatePadFiles(names.map((n) => `${padId(n)}.m4a`)).map((e) =>
+    e.replace(/\.m4a$/, '.mp3'),
+  );
+}
+
+/** Erros de um áudio decodificado: curto demais (< introMaxFrames + loop) ou silencioso. */
+export function validateSourceAudio(pcm, name, { loopFrames }, introMaxFrames) {
+  const errors = [];
+  const needed = introMaxFrames + loopFrames;
+  if (pcm.length / 2 < needed) {
+    errors.push(`${name}: áudio com ${pcm.length / 2} quadros, mínimo ${needed}`);
+  }
+  let peak = 0;
+  for (let i = 0; i < pcm.length; i++) peak = Math.max(peak, Math.abs(pcm[i]));
+  if (peak < MIN_PEAK) errors.push(`${name}: áudio silencioso ou vazio (pico ${peak})`);
+  return errors;
+}
