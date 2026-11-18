@@ -77,7 +77,8 @@ test('pad button toggles, follows the key chip and does not cross to another vis
   await expect(volume(page)).toBeVisible();
 
   // The key chip of the same cifra moves the pad to the new tonic and keeps it on.
-  // Outside a setlist nothing prefetches D, so a request for it can only come from the follow.
+  // The viewer's prefetch also requests DS06-D once the D cifra is ready, so the request alone
+  // does not prove the follow; the 'Pad D' label and the pressed state below do.
   urls.length = 0;
   await chip(page, song.title, 'D').click();
   await expect.poll(() => requested(urls, 'DS06-D')).toBe(true);
