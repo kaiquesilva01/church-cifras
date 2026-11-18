@@ -1,5 +1,7 @@
 // Produz os loops do pad a partir dos MP3 de origem.
-// Uso: node scripts/pads/produce.mjs --src <dir> --out <dir>   (ffmpeg via $FFMPEG ou PATH)
+// Uso: node scripts/pads/produce.mjs --src <dir> --out fixtures/private/pads   (ffmpeg via $FFMPEG ou PATH)
+// Fontes e saídas nunca são commitadas: use --out fixtures/private/pads (ignorado pelo git).
+// Depois confira o introBars escolhido com apps/web/src/pad/padManifest.json (upload.mjs faz isso).
 // Gera <out>/loops/<arquivo>.m4a, <out>/teste-3x/<arquivo>-3x.m4a e <out>/relatorio.json.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';

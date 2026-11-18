@@ -63,10 +63,16 @@ export function validatePadFiles(names) {
   const errors = [];
   if (names.length !== 12) errors.push(`esperados 12 arquivos, encontrados ${names.length}`);
   const seen = new Set();
+  const notes = new Set();
   for (const name of names) {
     if (!PAD_NAME.test(name)) errors.push(`nome inválido: ${name}`);
     if (seen.has(name)) errors.push(`nome repetido: ${name}`);
     seen.add(name);
+    const note = /-([A-G]s?)\.m4a$/.exec(name)?.[1];
+    if (note !== undefined) {
+      if (notes.has(note)) errors.push(`nota repetida (${note}): ${name}`);
+      notes.add(note);
+    }
   }
   return errors;
 }
@@ -93,5 +99,35 @@ export function validateSourceAudio(pcm, name, { loopFrames }, introMaxFrames) {
   let peak = 0;
   for (let i = 0; i < pcm.length; i++) peak = Math.max(peak, Math.abs(pcm[i]));
   if (peak < MIN_PEAK) errors.push(`${name}: áudio silencioso ou vazio (pico ${peak})`);
+  return errors;
+}
+
+/**
+ * Confere o relatorio.json produzido (entradas { file, introBars }) com padManifest.json:
+ * mesmos 12 arquivos, mesmo introBars por nota e versão no formato vN. Vazio = ok.
+ */
+export function checkAgainstManifest(report, manifest) {
+  const errors = [];
+  if (typeof manifest.version !== 'string' || !/^v\d+$/.test(manifest.version)) {
+    errors.push(`versão inválida no manifesto: ${String(manifest.version)}`);
+  }
+  const produced = new Map();
+  for (const { file, introBars } of report) {
+    if (produced.has(file)) errors.push(`arquivo repetido no relatório: ${file}`);
+    produced.set(file, introBars);
+  }
+  const expected = new Map();
+  for (const { file, introBars } of Object.values(manifest.files)) expected.set(file, introBars);
+  for (const [file, introBars] of expected) {
+    if (!produced.has(file)) errors.push(`arquivo do manifesto ausente no relatório: ${file}`);
+    else if (produced.get(file) !== introBars) {
+      errors.push(
+        `${file}: introBars ${produced.get(file)} no relatório, ${introBars} no manifesto`,
+      );
+    }
+  }
+  for (const file of produced.keys()) {
+    if (!expected.has(file)) errors.push(`arquivo fora do manifesto: ${file}`);
+  }
   return errors;
 }

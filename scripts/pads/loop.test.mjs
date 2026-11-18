@@ -4,6 +4,7 @@ import {
   BAR,
   MAX_GAIN_DB,
   buildLoopBuffer,
+  checkAgainstManifest,
   seamScore,
   validatePadFiles,
   validateSourceAudio,
@@ -135,4 +136,60 @@ test('validateSourceAudio rejects empty and silent sources naming the file', () 
 
 test('MAX_GAIN_DB is a sane bound', () => {
   assert.ok(MAX_GAIN_DB > 0 && MAX_GAIN_DB <= 40);
+});
+
+const manifest = {
+  version: 'v1',
+  files: {
+    C: { file: 'DS04-C', introBars: 8 },
+    'C#': { file: 'DS05-Cs', introBars: 7 },
+    D: { file: 'DS06-D', introBars: 6 },
+    'D#': { file: 'DS07-Ds', introBars: 5 },
+    E: { file: 'DS08-E', introBars: 6 },
+    F: { file: 'DS09-F', introBars: 7 },
+    'F#': { file: 'DS10-Fs', introBars: 7 },
+    G: { file: 'DS11-G', introBars: 4 },
+    'G#': { file: 'DS12-Gs', introBars: 5 },
+    A: { file: 'DS01-A', introBars: 4 },
+    'A#': { file: 'DS02-As', introBars: 6 },
+    B: { file: 'DS03-B', introBars: 7 },
+  },
+};
+const reportFor = () =>
+  Object.values(manifest.files).map(({ file, introBars }) => ({ file, introBars }));
+
+test('checkAgainstManifest accepts a matching report', () => {
+  assert.deepEqual(checkAgainstManifest(reportFor(), manifest), []);
+});
+
+test('checkAgainstManifest rejects a wrong DS-number pairing', () => {
+  const notes = ['C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B'];
+  const wrong = notes.map((n, i) => ({
+    file: `DS${String(i + 1).padStart(2, '0')}-${n}`,
+    introBars: 4,
+  }));
+  assert.ok(checkAgainstManifest(wrong, manifest).length > 0);
+});
+
+test('checkAgainstManifest names the file with a different introBars', () => {
+  const report = reportFor();
+  report[0] = { ...report[0], introBars: 5 };
+  const errors = checkAgainstManifest(report, manifest);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /DS04-C/);
+});
+
+test('checkAgainstManifest rejects a missing file', () => {
+  const errors = checkAgainstManifest(reportFor().slice(1), manifest);
+  assert.ok(errors.some((e) => e.includes('DS04-C')));
+});
+
+test('checkAgainstManifest rejects a bad version', () => {
+  for (const version of ['', 'x1', undefined, 1]) {
+    assert.ok(checkAgainstManifest(reportFor(), { ...manifest, version }).length > 0);
+  }
+});
+
+test('validatePadFiles rejects two files with the same note', () => {
+  assert.ok(validatePadFiles([...names.slice(0, 11), 'DS13-C.m4a']).length > 0);
 });
