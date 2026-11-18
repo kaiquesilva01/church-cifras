@@ -13,7 +13,6 @@
   --color-elevated: #e9ecef;
   --color-text: #111318;
   --color-muted: #52525b;
-  --color-faint: #71717a;
   --color-primary: #111318;
   --color-on-primary: #ffffff;
   --color-success: #15803d;
@@ -46,7 +45,6 @@
   --color-elevated: #1d2026;
   --color-text: #f5f5f6;
   --color-muted: #9a9aa2;
-  --color-faint: #5c5c66;
   --color-primary: #ffffff;
   --color-on-primary: #0a0b0d;
   --color-success: #34d399;
@@ -153,6 +151,11 @@ body {
   cursor: pointer;
 }
 
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -165,11 +168,6 @@ body {
   background: var(--color-elevated);
   color: var(--color-text);
   cursor: pointer;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 :focus-visible {

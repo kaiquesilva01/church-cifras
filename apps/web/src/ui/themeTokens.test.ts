@@ -40,5 +40,9 @@ describe('theme tokens', () => {
   it('paints the saved theme before the first frame, with the same storage key', () => {
     expect(html).toContain(`'${THEME_KEY}'`);
     expect(html).toContain('dataset.theme');
+    // The script repeats the chrome colors by hand: they must match lib/theme.ts.
+    expect(html).toContain(`'${THEME_COLORS.dark}'`);
+    expect(html).toContain(`'${THEME_COLORS.light}'`);
+    expect(html).toContain(`content="${THEME_COLORS.light}"`);
   });
 });

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { THEME_KEY } from '../lib/theme';
 import { ThemeProvider } from './ThemeProvider';
 import { ThemeToggle } from './ThemeToggle';
@@ -41,5 +41,48 @@ describe('ThemeToggle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Mudar para o tema claro' }));
     expect(document.documentElement.dataset.theme).toBe('light');
     expect(storage.getItem(THEME_KEY)).toBe('light');
+  });
+
+  describe('following the system', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    function stubSystem(initialDark: boolean) {
+      let matches = initialDark;
+      const listeners = new Set<() => void>();
+      vi.stubGlobal('matchMedia', () => ({
+        get matches() {
+          return matches;
+        },
+        addEventListener: (_: string, fn: () => void) => listeners.add(fn),
+        removeEventListener: (_: string, fn: () => void) => listeners.delete(fn),
+      }));
+      return (next: boolean) => {
+        matches = next;
+        listeners.forEach((fn) => fn());
+      };
+    }
+
+    it('switches with the OS while the person never picked a theme', () => {
+      const setSystemDark = stubSystem(false);
+      render(
+        <ThemeProvider storage={memoryStorage()}>
+          <ThemeToggle />
+        </ThemeProvider>,
+      );
+      expect(document.documentElement.dataset.theme).toBe('light');
+      act(() => setSystemDark(true));
+      expect(document.documentElement.dataset.theme).toBe('dark');
+    });
+
+    it('ignores the OS once a theme was saved', () => {
+      const setSystemDark = stubSystem(false);
+      render(
+        <ThemeProvider storage={memoryStorage({ [THEME_KEY]: 'light' })}>
+          <ThemeToggle />
+        </ThemeProvider>,
+      );
+      act(() => setSystemDark(true));
+      expect(document.documentElement.dataset.theme).toBe('light');
+    });
   });
 });
