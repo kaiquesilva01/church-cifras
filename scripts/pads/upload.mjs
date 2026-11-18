@@ -13,11 +13,17 @@
 // (c) Fontes e saídas nunca são commitadas; mantenha-as em fixtures/private/pads/.
 // Credenciais: Application Default Credentials do ambiente (nunca guardadas no repo).
 // Com FIREBASE_STORAGE_EMULATOR_HOST definido, envia para o emulador.
+// Nunca sobrescreve: se algum dos 12 destinos já existir, aborta listando-os (suba a version).
 import { readFileSync, readdirSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { initializeApp } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
-import { checkAgainstManifest, validatePadFiles } from './loop.mjs';
+import {
+  checkAgainstManifest,
+  describeUploadTarget,
+  existingObjectsError,
+  validatePadFiles,
+} from './loop.mjs';
 
 const { values } = parseArgs({
   options: { dir: { type: 'string' }, report: { type: 'string' }, bucket: { type: 'string' } },
@@ -50,10 +56,35 @@ if (errors.length > 0) {
 }
 
 const bucket = getStorage(initializeApp({ storageBucket: values.bucket })).bucket();
-for (const name of names) {
-  const destination = `pads/${manifest.version}/${name}`;
+const destinations = names.map((name) => ({
+  name,
+  destination: `pads/${manifest.version}/${name}`,
+}));
+
+// Nunca sobrescreve em silêncio: confere os 12 destinos antes de enviar qualquer arquivo.
+const existing = [];
+for (const { destination } of destinations) {
+  const [exists] = await bucket.file(destination).exists();
+  if (exists) existing.push(destination);
+}
+const existingError = existingObjectsError(existing, manifest.version);
+if (existingError) {
+  console.error(existingError);
+  process.exit(1);
+}
+
+console.log(
+  describeUploadTarget({
+    bucket: values.bucket,
+    emulatorHost: process.env.FIREBASE_STORAGE_EMULATOR_HOST,
+    version: manifest.version,
+    count: destinations.length,
+  }),
+);
+for (const { name, destination } of destinations) {
   await bucket.upload(`${values.dir}/${name}`, {
     destination,
+    preconditionOpts: { ifGenerationMatch: 0 }, // falha se o objeto passou a existir
     metadata: { contentType: 'audio/mp4', cacheControl: 'public, max-age=31536000, immutable' },
   });
   console.log(destination);

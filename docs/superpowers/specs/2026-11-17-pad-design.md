@@ -174,7 +174,9 @@ Script local (Node + ffmpeg, em `scripts/pads/`, sem dependência no app) que, p
 início original + região de loop**: mantém o começo do arquivo **intacto** (com o crescimento, 4 a 8 compassos, tocado
 uma vez) e define a região de loop de **16 compassos** (≈ 54,9 s a 70 BPM) logo depois, com **emenda cruzada de
 potência igual** de 2 compassos embutida no fim, de modo que voltar do fim ao início da região seja contínuo. O motor
-toca o buffer com `loopStart`/`loopEnd` da região. O tamanho do início por tom (o que dá a emenda mais regular), o
+toca o buffer com `loopStart`/`loopEnd` da região. O arquivo codificado leva ainda uma **cauda de guarda de 0,5 s** depois
+de `loopEnd` (a continuação natural do loop, `B[M .. M+0,5 s)`), para que o reamostrador do `decodeAudioData` e qualquer
+corte de fim do decodificador atinjam só a cauda e nunca a emenda; o manifesto não muda (`loopEnd` fica dentro do buffer). O tamanho do início por tom (o que dá a emenda mais regular), o
 `loopStart`/`loopEnd` e o ganho de nivelamento (-18 dB RMS no trecho estável, pico ≤ -1 dBFS) saem num manifesto
 (`relatorio.json`) que o app embute como constantes versionadas [decisão nossa]. Codifica em AAC ~96 kbps
 (≈ 0,85 a 1,0 MB; buffer de 68 a 82 s). Protótipo já gerado e medido (início ≥ 0,99 de correlação com o original).

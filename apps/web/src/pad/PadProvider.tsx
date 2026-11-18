@@ -30,8 +30,23 @@ function closeQuietly(ctx: AudioContext): void {
   }
 }
 
+/**
+ * iOS plays Web Audio in the "ambient" session category by default, which the Ring/Silent
+ * switch mutes. Phones are often silenced during a service, so ask for "playback" (Audio
+ * Session API, recent Safari). Synchronous, inside the tap; absent or failing is harmless.
+ */
+function requestPlaybackAudioSession(): void {
+  try {
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = 'playback';
+  } catch {
+    // unsupported or refused: the pad just follows the default session
+  }
+}
+
 const defaultCreateEngine: CreateEngine = async (fetchBytes, onGiveUp) => {
-  const ctx = new AudioContext();
+  requestPlaybackAudioSession();
+  const ctx = new AudioContext({ latencyHint: 'playback' });
   ctx.resume().catch(() => {});
   try {
     const { buildPadEngine } = await import('./padBuild');
@@ -142,23 +157,29 @@ export function PadProvider({
     engine?.dispose();
   }, [clearTeardownTimer]);
 
+  /** Frees the engine (and its context) after the fade window unless a new toggle cancels it. */
+  const armTeardown = useCallback(() => {
+    clearTeardownTimer();
+    teardownTimerRef.current = setTimeout(() => {
+      teardownTimerRef.current = null;
+      teardown();
+    }, TEARDOWN_AFTER_STOP_MS);
+  }, [clearTeardownTimer, teardown]);
+
   /** Cancels any in-flight run and fades the engine out; frees it after the fade. */
   const halt = useCallback(() => {
     tokenRef.current += 1;
     clearTeardownTimer();
     if (engineRef.current) {
       engineRef.current.stop();
-      teardownTimerRef.current = setTimeout(() => {
-        teardownTimerRef.current = null;
-        teardown();
-      }, TEARDOWN_AFTER_STOP_MS);
+      armTeardown();
     } else enginePromiseRef.current = null; // the pending run disposes the engine once created
     desiredRef.current = null;
     targetRef.current = null;
     changeStatus('off');
     changeNote(null);
     setNotice(null);
-  }, [changeNote, changeStatus, clearTeardownTimer, teardown]);
+  }, [armTeardown, changeNote, changeStatus, clearTeardownTimer]);
 
   const crossfade = useCallback(
     async (engine: PadEngine, target: PadNote, token: number) => {
@@ -226,6 +247,8 @@ export function PadProvider({
         if (tokenRef.current === token) {
           changeStatus('error');
           changeNote(null);
+          // No route change will free the engine inside a setlist: don't leave a silent context running.
+          armTeardown();
         }
         return;
       }
@@ -236,7 +259,7 @@ export function PadProvider({
       desiredRef.current = null;
       if (desired && desired !== first) await crossfade(engine, desired, token);
     },
-    [changeNote, changeStatus, crossfade, teardown],
+    [armTeardown, changeNote, changeStatus, crossfade, teardown],
   );
 
   const toggle = useCallback(

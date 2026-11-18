@@ -468,6 +468,90 @@ describe('PadProvider', () => {
       act(() => result.current.toggle('C', song));
       expect(calls).toEqual(['new', 'resume']);
     });
+
+    function renderDefault() {
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <MemoryRouter>
+          <PadProvider
+            fetchBytes={() => Promise.resolve(new Uint8Array())}
+            storage={memoryStorage()}
+          >
+            {children}
+          </PadProvider>
+        </MemoryRouter>
+      );
+      return renderHook(() => usePad()!, { wrapper });
+    }
+    const originalAudioSession = Object.getOwnPropertyDescriptor(navigator, 'audioSession');
+    afterEach(() => {
+      if (originalAudioSession)
+        Object.defineProperty(navigator, 'audioSession', originalAudioSession);
+      else delete (navigator as unknown as Record<string, unknown>).audioSession;
+    });
+
+    it('sets audioSession.type to playback before creating the AudioContext, with latencyHint playback', () => {
+      const calls: string[] = [];
+      let options: unknown;
+      class FakeCtx {
+        constructor(opts?: unknown) {
+          options = opts;
+          calls.push('new');
+        }
+        resume() {
+          return Promise.resolve();
+        }
+      }
+      vi.stubGlobal('AudioContext', FakeCtx);
+      const session = {
+        set type(v: string) {
+          calls.push(`type=${v}`);
+        },
+      };
+      Object.defineProperty(navigator, 'audioSession', { value: session, configurable: true });
+      const { result } = renderDefault();
+      act(() => result.current.toggle('C', song));
+      expect(calls).toEqual(['type=playback', 'new']);
+      expect(options).toEqual({ latencyHint: 'playback' });
+    });
+
+    it('does not throw when audioSession is absent', () => {
+      const calls: string[] = [];
+      class FakeCtx {
+        constructor() {
+          calls.push('new');
+        }
+        resume() {
+          return Promise.resolve();
+        }
+      }
+      vi.stubGlobal('AudioContext', FakeCtx);
+      delete (navigator as unknown as Record<string, unknown>).audioSession;
+      const { result } = renderDefault();
+      expect(() => act(() => result.current.toggle('C', song))).not.toThrow();
+      expect(calls).toEqual(['new']);
+    });
+
+    it('still creates the AudioContext when the audioSession setter throws', () => {
+      const calls: string[] = [];
+      class FakeCtx {
+        constructor() {
+          calls.push('new');
+        }
+        resume() {
+          return Promise.resolve();
+        }
+      }
+      vi.stubGlobal('AudioContext', FakeCtx);
+      const session = {
+        set type(_v: string) {
+          throw new Error('not allowed');
+        },
+      };
+      Object.defineProperty(navigator, 'audioSession', { value: session, configurable: true });
+      const { result } = renderDefault();
+      expect(() => act(() => result.current.toggle('C', song))).not.toThrow();
+      expect(calls).toEqual(['new']);
+    });
   });
 
   describe('teardown after stop', () => {
@@ -634,6 +718,99 @@ describe('PadProvider', () => {
       await flush();
       expect(result.current.status).toBe('error');
       expect(close).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('failed start', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function stubCtxCounting() {
+      const close = vi.fn(() => Promise.resolve());
+      let created = 0;
+      class FakeCtx {
+        constructor() {
+          created += 1;
+        }
+        resume() {
+          return Promise.resolve();
+        }
+        close = close;
+      }
+      vi.stubGlobal('AudioContext', FakeCtx);
+      return { close, created: () => created };
+    }
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={['/musicas/s1']}>
+        <PadProvider fetchBytes={() => Promise.resolve(new Uint8Array())} storage={memoryStorage()}>
+          {children}
+        </PadProvider>
+      </MemoryRouter>
+    );
+    const settle = () =>
+      act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+    it('tears the engine and the context down after the window', async () => {
+      vi.useFakeTimers();
+      const { close } = stubCtxCounting();
+      const engine = makeEngine();
+      engine.start.mockRejectedValue(new Error('network'));
+      vi.mocked(buildPadEngine).mockReturnValue(engine);
+      const { result } = renderHook(() => usePad()!, { wrapper });
+      act(() => result.current.toggle('C', song));
+      await settle();
+      expect(result.current.status).toBe('error');
+      expect(engine.dispose).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(3600);
+      });
+      expect(engine.dispose).toHaveBeenCalledTimes(1);
+      expect(close).toHaveBeenCalledTimes(1);
+    });
+
+    it('a retry inside the window cancels the timer and works', async () => {
+      vi.useFakeTimers();
+      const { close } = stubCtxCounting();
+      const engine = makeEngine();
+      engine.start.mockRejectedValueOnce(new Error('network'));
+      vi.mocked(buildPadEngine).mockReturnValue(engine);
+      const { result } = renderHook(() => usePad()!, { wrapper });
+      act(() => result.current.toggle('C', song));
+      await settle();
+      expect(result.current.status).toBe('error');
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      act(() => result.current.toggle('C', song));
+      await settle();
+      expect(result.current.status).toBe('playing');
+      act(() => {
+        vi.advanceTimersByTime(10000);
+      });
+      expect(engine.dispose).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+    });
+
+    it('a retry after the teardown builds a fresh context synchronously in the tap', async () => {
+      vi.useFakeTimers();
+      const { created } = stubCtxCounting();
+      const first = makeEngine();
+      first.start.mockRejectedValue(new Error('network'));
+      vi.mocked(buildPadEngine).mockReturnValueOnce(first).mockReturnValue(makeEngine());
+      const { result } = renderHook(() => usePad()!, { wrapper });
+      act(() => result.current.toggle('C', song));
+      await settle();
+      act(() => {
+        vi.advanceTimersByTime(3600);
+      });
+      expect(created()).toBe(1);
+      act(() => result.current.toggle('C', song));
+      expect(created()).toBe(2);
+      await settle();
+      expect(result.current.status).toBe('playing');
     });
   });
 

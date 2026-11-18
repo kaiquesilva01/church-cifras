@@ -38,6 +38,9 @@ function sample(note: PadNote): PadSample {
     storagePath: `pads/${manifest.version}/${file}.m4a`,
     introBars,
     loopStartSec: introBars * BAR_SEC,
+    // The encoded buffer is longer than loopEndSec by a 0.5 s guard tail (the natural loop
+    // continuation, see scripts/pads/loop.mjs): decoder resampling/trimming at the end of the
+    // file then never touches the seam, and loopEnd stays strictly inside the decoded buffer.
     loopEndSec: (introBars + LOOP_BARS) * BAR_SEC,
   };
 }

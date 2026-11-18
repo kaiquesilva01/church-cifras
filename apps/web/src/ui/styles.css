@@ -578,7 +578,8 @@ section:last-child > .section-title + .list {
      panel's padding never narrows the page and the canvas is not refit. */
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-  padding-bottom: 72px;
+  /* --bar-height is the measured fixed bottom bar (it wraps to several rows on a phone). */
+  padding-bottom: calc(var(--bar-height, 72px) + 16px);
 }
 
 .viewer-body {
@@ -646,14 +647,11 @@ section:last-child > .section-title + .list {
   bottom: 0;
   left: 0;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 8px 16px;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
-}
-
-.viewer.has-setlist .viewer-bar {
-  flex-wrap: wrap;
 }
 
 .setlist-bar {
@@ -666,6 +664,45 @@ section:last-child > .section-title + .list {
 
 .viewer-bar .btn-primary {
   margin-left: auto;
+}
+
+.pad-control {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.pad-control .btn {
+  min-height: 44px;
+  min-width: 0;
+}
+
+.pad-control .muted {
+  flex-basis: 100%;
+}
+
+.pad-control .muted:empty {
+  /* Stays in the accessibility tree (a live region) but takes no space or gap. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.pad-control input[type='range'] {
+  min-width: 96px;
+  min-height: 44px;
+  accent-color: var(--color-accent);
+}
+
+.pad-control .btn[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .viewer-bar .btn-icon {
@@ -746,11 +783,6 @@ section:last-child > .section-title + .list {
   width: 320px;
   align-content: start;
   border-left: 1px solid var(--color-border);
-}
-
-/* The setlist bar adds a row to the fixed bottom bar: clear both rows. Before .has-sheet, which wins. */
-.viewer.has-setlist {
-  padding-bottom: 136px;
 }
 
 .viewer.has-sheet {
@@ -1308,4 +1340,34 @@ span.setlist-item-key {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-on-accent);
+}
+
+.pad-mini {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.pad-mini .btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.pad-mini input[type='range'] {
+  flex: 1 1 120px;
+  min-width: 96px;
+  min-height: 44px;
+  accent-color: var(--color-accent);
+}
+
+.pad-mini .muted {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.pad-mini .muted:empty {
+  display: none;
 }

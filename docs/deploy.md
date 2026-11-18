@@ -101,6 +101,32 @@ Só é preciso repetir se a origem mudar. Os emuladores locais não precisam dis
 
 Faça o PR `develop` -> `main` e aprove o merge. O workflow **Deploy** publica hosting, functions, regras do Firestore e regras do Storage.
 
+### Loops do pad
+
+Os 12 loops do pad ambiente (Fase 9) não vão no git nem no Hosting: são enviados uma vez ao Storage, em `pads/<versão>/<arquivo>.m4a`.
+
+1. Produza os loops a partir dos MP3 de origem (fora do repositório, em `fixtures/private/`):
+
+   ```bash
+   node scripts/pads/produce.mjs --src fixtures/private/pads-src --out fixtures/private/pads
+   ```
+
+2. Ouça os arquivos de `fixtures/private/pads/teste-3x/` (intro uma vez e o loop três vezes): a emenda não pode estalar nem engasgar. O aceite é de ouvido, pelo dono.
+3. Envie com credenciais ADC (por exemplo `gcloud auth application-default login`; nunca guarde credenciais no repositório) e o `--bucket` igual ao `VITE_FIREBASE_STORAGE_BUCKET` do deploy:
+
+   ```bash
+   node scripts/pads/upload.mjs --dir fixtures/private/pads/loops \
+     --report fixtures/private/pads/relatorio.json --bucket <bucket>
+   ```
+
+   O script imprime o destino (bucket, produção ou emulador, versão e número de arquivos), confere tudo contra `apps/web/src/pad/padManifest.json` e se recusa a sobrescrever: se algum dos 12 objetos já existir, aborta e lista quais.
+
+**Versão.** Os arquivos são imutáveis e ficam 1 ano em cache nos aparelhos. Para regenerar os loops, suba a `version` em `padManifest.json` (`v1` -> `v2`) e lance o app junto com o novo envio; nunca troque o conteúdo de uma versão publicada.
+
+**Regras.** Os objetos ficam ilegíveis (403) até o deploy das regras do Storage (`pads/` só para autenticados, escrita negada); publique as regras antes de testar no app.
+
+**Se o envio for pulado.** A cifra e o resto do app funcionam normalmente; só o botão do pad mostra "Pad indisponível · tentar de novo".
+
 ## 10. Repertórios: TTL e índice (depois do primeiro deploy)
 
 Os repertórios somem sozinhos 30 dias após o culto (campo `expiresAt`). Depois do primeiro deploy com a Fase 8, confira no console do Firebase, em Firestore > TTL e índices:

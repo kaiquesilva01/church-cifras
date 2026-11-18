@@ -3,12 +3,15 @@
 // Fontes e saídas nunca são commitadas: use --out fixtures/private/pads (ignorado pelo git).
 // Depois confira o introBars escolhido com apps/web/src/pad/padManifest.json (upload.mjs faz isso).
 // Gera <out>/loops/<arquivo>.m4a, <out>/teste-3x/<arquivo>-3x.m4a e <out>/relatorio.json.
+// loops/*.m4a = intro + região do loop + cauda de guarda de 0,5 s (a continuação natural do loop),
+// para que loopEnd fique dentro do buffer decodificado (ver loop.mjs). teste-3x/ não leva a cauda.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
   BAR,
   BPM,
+  GUARD_FRAMES,
   INTRO_MAX_BARS,
   INTRO_MIN_BARS,
   LOOP_BARS,
@@ -22,6 +25,7 @@ import {
   seamScore,
   validateSourceAudio,
   validateSourceNames,
+  withGuardTail,
 } from './loop.mjs';
 
 const { values } = parseArgs({ options: { src: { type: 'string' }, out: { type: 'string' } } });
@@ -114,7 +118,7 @@ for (const name of files) {
   for (let i = 0; i < B.length; i++) B[i] *= gain;
 
   const id = name.replace(/\.mp3$/, '').replace('#', 's');
-  encode(B, `${outDir}/loops/${id}.m4a`);
+  encode(withGuardTail(B, M, GUARD_FRAMES, opts.loopFrames), `${outDir}/loops/${id}.m4a`);
 
   // Arquivo de teste = o que o app toca: intro uma vez, depois a região do loop 3 vezes.
   const loopRegion = B.subarray(2 * M, 2 * len);
@@ -129,7 +133,8 @@ for (const name of files) {
     introBars: bars,
     loopStartSec: secs(M),
     loopEndSec: secs(len),
-    bufferSec: secs(len),
+    bufferSec: secs(len + GUARD_FRAMES),
+    guardSec: secs(GUARD_FRAMES),
     mode: best.mode,
     seamDevDb: +best.score.toFixed(2),
     gainDb: +(20 * Math.log10(gain)).toFixed(1),

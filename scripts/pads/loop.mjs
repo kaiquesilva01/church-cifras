@@ -3,6 +3,11 @@
 // Buffer B = orig[0 .. M+L-X)  ++  Z,  Z[i] = orig[M+L-X+i]*fout(i/X) + orig[M-X+i]*fin(i/X)
 // (M = introFrames, L = loopFrames, X = xfadeFrames). Tocar B e voltar do fim para B[M] é
 // contínuo: Z termina em orig[M], que é B[M]. O trecho [0, M+L-X) é idêntico ao original.
+//
+// Arquivo codificado = B ++ B[M .. M+G) (cauda de guarda de G quadros, a continuação natural do
+// loop). loopEnd = (M+L)/SR fica estritamente dentro do buffer decodificado: o reamostrador do
+// decodeAudioData (44,1 -> 48 kHz) e qualquer corte de fim feito pelo decodificador atingem só a
+// cauda, nunca a emenda. O manifesto (loopStart/loopEnd) não muda.
 
 export const SR = 44100;
 export const BPM = 70;
@@ -36,6 +41,25 @@ export function buildLoopBuffer(pcm, introFrames, mode, { loopFrames, xfadeFrame
         pcm[2 * (introFrames - xfadeFrames + i) + c] * fi;
     }
   }
+  return out;
+}
+
+export const GUARD_FRAMES = 22050; // 0,5 s
+
+/**
+ * B (intro + loop quadros, estéreo intercalado) seguido de B[M .. M+G): a cauda de guarda.
+ * Devolve um buffer novo; B não é alterado.
+ */
+export function withGuardTail(B, introFrames, guardFrames, loopFrames) {
+  if (!Number.isInteger(guardFrames) || guardFrames < 0 || guardFrames > loopFrames) {
+    throw new Error(`guarda inválida: ${guardFrames} (esperado inteiro de 0 a ${loopFrames})`);
+  }
+  if (B.length !== 2 * (introFrames + loopFrames)) {
+    throw new Error('buffer sem intro + loop quadros: não dá para anexar a guarda');
+  }
+  const out = new Float32Array(B.length + 2 * guardFrames);
+  out.set(B, 0);
+  out.set(B.subarray(2 * introFrames, 2 * (introFrames + guardFrames)), B.length);
   return out;
 }
 
@@ -130,4 +154,21 @@ export function checkAgainstManifest(report, manifest) {
     if (!expected.has(file)) errors.push(`arquivo fora do manifesto: ${file}`);
   }
   return errors;
+}
+
+/** Linha impressa antes do envio: onde, qual versão e quantos arquivos. */
+export function describeUploadTarget({ bucket, emulatorHost, version, count }) {
+  const where = emulatorHost ? `emulador ${emulatorHost}` : 'PRODUÇÃO';
+  return `Destino: bucket ${bucket} (${where}), versão ${version}, ${count} arquivos`;
+}
+
+/** Erro (ou null) quando algum destino já existe: os loops são imutáveis, então não se sobrescreve. */
+export function existingObjectsError(existing, version) {
+  if (existing.length === 0) return null;
+  const next = `v${Number(/^v(\d+)$/.exec(version)?.[1] ?? 0) + 1}`;
+  return [
+    'Estes objetos já existem e não são sobrescritos (imutáveis, com cache de 1 ano):',
+    ...existing.map((d) => `  ${d}`),
+    `Para regenerar os loops suba a "version" em apps/web/src/pad/padManifest.json (${version} -> ${next}) e lance o app.`,
+  ].join('\n');
 }

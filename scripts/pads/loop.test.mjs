@@ -5,10 +5,13 @@ import {
   MAX_GAIN_DB,
   buildLoopBuffer,
   checkAgainstManifest,
+  describeUploadTarget,
+  existingObjectsError,
   seamScore,
   validatePadFiles,
   validateSourceAudio,
   validateSourceNames,
+  withGuardTail,
 } from './loop.mjs';
 
 const opts = { loopFrames: 16 * BAR, xfadeFrames: 2 * BAR };
@@ -192,4 +195,56 @@ test('checkAgainstManifest rejects a bad version', () => {
 
 test('validatePadFiles rejects two files with the same note', () => {
   assert.ok(validatePadFiles([...names.slice(0, 11), 'DS13-C.m4a']).length > 0);
+});
+
+test('withGuardTail acrescenta a continuação natural do loop após o fim do buffer', () => {
+  const guardFrames = 22050;
+  const B = buildLoopBuffer(noise(total), intro, 'equalPower', opts);
+  const G = withGuardTail(B, intro, guardFrames, opts.loopFrames);
+  assert.equal(G.length, 2 * (intro + opts.loopFrames + guardFrames));
+  assert.deepEqual(G.subarray(0, B.length), B);
+  assert.deepEqual(G.subarray(B.length), B.subarray(2 * intro, 2 * (intro + guardFrames)));
+});
+
+test('withGuardTail com guarda zero devolve uma cópia idêntica', () => {
+  const B = noise(intro + opts.loopFrames);
+  const G = withGuardTail(B, intro, 0, opts.loopFrames);
+  assert.deepEqual(G, B);
+});
+
+test('withGuardTail valida a guarda (0 a loopFrames, inteira)', () => {
+  const B = noise(intro + opts.loopFrames);
+  assert.throws(() => withGuardTail(B, intro, -1, opts.loopFrames), /guarda/);
+  assert.throws(() => withGuardTail(B, intro, opts.loopFrames + 1, opts.loopFrames), /guarda/);
+  assert.throws(() => withGuardTail(B, intro, 1.5, opts.loopFrames), /guarda/);
+  assert.doesNotThrow(() => withGuardTail(B, intro, opts.loopFrames, opts.loopFrames));
+});
+
+test('withGuardTail rejeita buffer que não tem intro + loop quadros', () => {
+  assert.throws(() => withGuardTail(noise(100), intro, 10, opts.loopFrames), /buffer/);
+});
+
+test('describeUploadTarget indica produção ou emulador, versão e quantidade', () => {
+  assert.equal(
+    describeUploadTarget({ bucket: 'b.app', emulatorHost: undefined, version: 'v1', count: 12 }),
+    'Destino: bucket b.app (PRODUÇÃO), versão v1, 12 arquivos',
+  );
+  assert.equal(
+    describeUploadTarget({
+      bucket: 'b.app',
+      emulatorHost: '127.0.0.1:9199',
+      version: 'v2',
+      count: 12,
+    }),
+    'Destino: bucket b.app (emulador 127.0.0.1:9199), versão v2, 12 arquivos',
+  );
+});
+
+test('existingObjectsError lista os destinos existentes e manda subir a versão', () => {
+  assert.equal(existingObjectsError([], 'v1'), null);
+  const message = existingObjectsError(['pads/v1/DS04-C.m4a', 'pads/v1/DS05-Cs.m4a'], 'v1');
+  assert.match(message, /pads\/v1\/DS04-C\.m4a/);
+  assert.match(message, /pads\/v1\/DS05-Cs\.m4a/);
+  assert.match(message, /padManifest\.json/);
+  assert.match(message, /v2/);
 });

@@ -47,8 +47,9 @@ Todo acesso exige login com conta Google; não há link público [decidido].
 - Editor de cifras no sistema (o PDF continua sendo feito no Google Docs).
 - Modo offline completo (internet da igreja é estável [decidido]); apenas cache de app/arquivos.
 - OCR/PDF escaneado, PDFs fora do padrão, upload de DOCX.
-- Comentários, playback de áudio.
+- Comentários.
 - ~~Setlists/repertório de culto~~ — **reaberto na Fase 8**; ver [Repertórios](2026-11-16-repertorios-design.md).
+- ~~Playback de áudio~~ — **o pad ambiente entrou na Fase 9** (base sustentada por tom, não é a música em si); ver [Pad ambiente](2026-11-17-pad-design.md). Tocar a música, mixer e efeitos seguem fora.
 
 **Anti-objetivos (falha mesmo que "funcione")**
 - Alterar qualquer coisa além dos acordes e do tom no título (layout, letra, espaçamento).
@@ -190,6 +191,7 @@ songs/{songId}/arrangements/{key}  // id do doc = tom normalizado ('D', 'Bb', 'A
 ```
 - **Storage:** `songs/{songId}/{key}-{fileId}.pdf` (`fileId` aleatório). Arquivos são imutáveis — substituir um tom grava
   um arquivo novo em outro caminho e apaga o antigo → `Cache-Control: public, max-age=31536000, immutable` é seguro.
+- **Storage (pads):** `pads/{versão}/{arquivo}.m4a` (leitura autenticada, escrita só por script administrativo); ver o design do pad §6.4.
 - **Unicidade de tom:** um `arrangements/{key}` só existe uma vez. Duas pessoas gerando `D` ao mesmo tempo → a segunda
   recebe "já existe" e o sistema abre o existente.
 - **Identidade da música:** `titleNormalized + artistId`. Usada para detectar upload de música já existente (§6.9).
@@ -285,6 +287,7 @@ Ao final, relatório baixável (CSV) dos que não entraram. Upload em fila com c
 - **Pessoas** (admin). **Importar em lote** (admin, computador).
 - **Repertórios (Fase 8):** aba na tela inicial, cartão "Próximo culto", tela do repertório e barra Anterior/Próxima no
   visualizador — ver [2026-11-16-repertorios-design.md](2026-11-16-repertorios-design.md) §6.6 e §6.7.
+- **Pad ambiente (Fase 9):** botão **Pad** na barra do visualizador (liga/desliga o pad do tom exibido, com volume) e controle compacto na tela do repertório — ver [2026-11-17-pad-design.md](2026-11-17-pad-design.md) §5 e §6.
 - Mockups da conversa salvos em `.superpowers/brainstorm/` (fora do Git).
 - Visual: cor de destaque neutra (roxo) até o ministério enviar logo/cores [proposta].
 
@@ -337,6 +340,7 @@ docker-compose.yml, .github/workflows/, .claude/ (harness), docs/
 6. Administração (apagar tom/música, editar metadados) + importação em lote.
 7. PWA, cache, polimento de performance, E2E completos.
 8. Repertórios (setlists): ver [2026-11-16-repertorios-design.md](2026-11-16-repertorios-design.md).
+9. Pad ambiente: ver [2026-11-17-pad-design.md](2026-11-17-pad-design.md); plano em `docs/superpowers/plans/2026-11-17-fase-9-pad.md`.
 
 ## 12. Harness (antes de qualquer implementação) [decidido]
 - **`AGENTS.md`** [decidido] com as regras do projeto: fluxo Git (fonte única da regra "só `develop` → `main`"), TDD,
