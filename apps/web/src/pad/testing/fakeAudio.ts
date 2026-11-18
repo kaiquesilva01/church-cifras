@@ -7,13 +7,22 @@ type GainEvent =
 
 export class FakeAudioParam {
   private events: GainEvent[] = [];
+  /** Last value given to setValueAtTime (or the value setter): what a naive getter would return. */
+  private intrinsic: number;
   constructor(
     private readonly ctx: FakeAudioContext,
     private readonly initial: number,
-  ) {}
+  ) {
+    this.intrinsic = initial;
+  }
 
-  /** Like the real getter: the automated value at the current time. */
+  /**
+   * Like the real getter (Chrome, Safari): the automated value at the current time.
+   * With `intrinsicOnlyGainGetter` it behaves like the feared Firefox getter: only the last
+   * setValueAtTime value, ignoring ramps and curves.
+   */
   get value(): number {
+    if (this.ctx.intrinsicOnlyGainGetter) return this.intrinsic;
     return this.valueAt(this.ctx.currentTime);
   }
   set value(v: number) {
@@ -32,6 +41,7 @@ export class FakeAudioParam {
         throw new Error('NotSupportedError: setValueAtTime inside a value curve');
       }
     }
+    this.intrinsic = value;
     return this.add({ type: 'set', time, value });
   }
 
@@ -157,7 +167,13 @@ export class FakeAudioContext {
   resumeCalls = 0;
   /** When false, resume() leaves the state unchanged (simulates a stuck/blocked context). */
   resumeSucceeds = true;
+  /** Makes `AudioParam.value` report only the last setValueAtTime value (see FakeAudioParam). */
+  intrinsicOnlyGainGetter: boolean;
   private listeners = new Set<() => void>();
+
+  constructor(options: { intrinsicOnlyGainGetter?: boolean } = {}) {
+    this.intrinsicOnlyGainGetter = options.intrinsicOnlyGainGetter ?? false;
+  }
 
   createGain(): FakeGainNode {
     const g = new FakeGainNode(this);

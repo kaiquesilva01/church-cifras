@@ -1,3 +1,4 @@
+import { GainSchedule } from './padGainModel';
 import { PAD_SAMPLES, type PadNote } from './padNotes';
 
 export const FADE = {
@@ -38,8 +39,49 @@ interface Voice {
   note: PadNote;
   source: AudioBufferSourceNode;
   gain: GainNode;
+  /** The engine's own model of `gain.gain` automation. */
+  gainAuto: Automation;
   /** Context time at which the source is scheduled to stop (Infinity while sustained). */
   endsAt: number;
+}
+
+/**
+ * An AudioParam plus a JS model of everything scheduled on it. The engine never reads
+ * `param.value` (its getter may not report the automated value on every browser): it computes
+ * the current value from the model.
+ */
+interface Automation {
+  setValueAtTime(value: number, time: number): void;
+  linearRampToValueAtTime(value: number, time: number): void;
+  setValueCurveAtTime(values: Float32Array<ArrayBuffer>, time: number, duration: number): void;
+  /** Cancels automation without ever jumping: re-pins the current value first. */
+  pin(now: number): number;
+}
+
+function track(param: AudioParam, initial: number): Automation {
+  const model = new GainSchedule(initial);
+  return {
+    setValueAtTime(value, time) {
+      model.setValueAtTime(value, time);
+      param.setValueAtTime(value, time);
+    },
+    linearRampToValueAtTime(value, time) {
+      model.linearRampToValueAtTime(value, time);
+      param.linearRampToValueAtTime(value, time);
+    },
+    setValueCurveAtTime(values, time, duration) {
+      model.setValueCurveAtTime(values, time, duration);
+      param.setValueCurveAtTime(values, time, duration);
+    },
+    pin(now) {
+      const current = model.valueAt(now);
+      model.cancelScheduledValues(now);
+      model.setValueAtTime(current, now);
+      param.cancelScheduledValues(now);
+      param.setValueAtTime(current, now);
+      return current;
+    },
+  };
 }
 
 /** cos(pi/2 * t) scaled by `from`, ending at exactly 0. */
@@ -55,6 +97,7 @@ function fadeOutCurve(from: number): Float32Array<ArrayBuffer> {
 export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngine {
   const master = ctx.createGain();
   master.connect(ctx.destination);
+  const masterAuto = track(master.gain, 1); // a fresh GainNode starts at 1
 
   const voices = new Set<Voice>();
   let playing: Voice | null = null;
@@ -63,15 +106,6 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
   let target: PadNote | null = null;
   let disposed = false;
   let giveUpTimer: ReturnType<typeof setTimeout> | null = null;
-
-  /** Cancels automation without ever jumping: re-pins the current value first. */
-  function pin(param: AudioParam): number {
-    const now = ctx.currentTime;
-    const current = param.value;
-    param.cancelScheduledValues(now);
-    param.setValueAtTime(current, now);
-    return current;
-  }
 
   function release(voice: Voice): void {
     voice.source.onended = null;
@@ -83,8 +117,8 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
 
   function fadeOut(voice: Voice, seconds: number): void {
     const now = ctx.currentTime;
-    const from = pin(voice.gain.gain);
-    voice.gain.gain.setValueCurveAtTime(fadeOutCurve(from), now, seconds);
+    const from = voice.gainAuto.pin(now);
+    voice.gainAuto.setValueCurveAtTime(fadeOutCurve(from), now, seconds);
     voice.source.stop(now + seconds);
     voice.endsAt = now + seconds;
     voice.source.onended = () => release(voice);
@@ -104,8 +138,9 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
     const now = ctx.currentTime;
     const gain = ctx.createGain();
     gain.gain.value = 0;
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(1, now + FADE.startRampSec);
+    const gainAuto = track(gain.gain, 0);
+    gainAuto.setValueAtTime(0, now);
+    gainAuto.linearRampToValueAtTime(1, now + FADE.startRampSec);
     gain.connect(master);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -113,7 +148,7 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
     source.loopStart = sample.loopStartSec;
     source.loopEnd = sample.loopEndSec;
     source.connect(gain);
-    const voice: Voice = { note, source, gain, endsAt: Infinity };
+    const voice: Voice = { note, source, gain, gainAuto, endsAt: Infinity };
     source.onended = () => release(voice);
     voices.add(voice);
     source.start(now, 0);
@@ -196,8 +231,8 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
     setVolume(volume) {
       const v = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0;
       volumeSquared = v * v;
-      pin(master.gain);
-      master.gain.linearRampToValueAtTime(volumeSquared, ctx.currentTime + FADE.volumeRampSec);
+      masterAuto.pin(ctx.currentTime);
+      masterAuto.linearRampToValueAtTime(volumeSquared, ctx.currentTime + FADE.volumeRampSec);
     },
     get note() {
       return target;
