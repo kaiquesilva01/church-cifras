@@ -156,7 +156,7 @@ describe('emulator host', () => {
 
 describe('pad runtime caching', () => {
   const url = (value: string) => new URL(value);
-  const pad = 'https://firebasestorage.googleapis.com/v0/b/b1/o/pads%2FDS04-C.m4a';
+  const pad = 'https://firebasestorage.googleapis.com/v0/b/b1/o/pads%2Fv1%2FDS04-C.m4a';
   const song = 'https://firebasestorage.googleapis.com/v0/b/b1/o/songs%2FDS04-C.m4a';
 
   it('matches only GET media downloads of pad objects from Storage', () => {
@@ -165,7 +165,10 @@ describe('pad runtime caching', () => {
     expect(isPadObjectRequest(url(pad), 'GET')).toBe(false);
     expect(isPadObjectRequest(url(`${pad}?alt=media`), 'POST')).toBe(false);
     expect(
-      isPadObjectRequest(url('https://example.com/v0/b/b1/o/pads%2FDS04-C.m4a?alt=media'), 'GET'),
+      isPadObjectRequest(
+        url('https://example.com/v0/b/b1/o/pads%2Fv1%2FDS04-C.m4a?alt=media'),
+        'GET',
+      ),
     ).toBe(false);
   });
 
@@ -174,7 +177,7 @@ describe('pad runtime caching', () => {
   });
 
   it('matches the Storage emulator only when built for emulators', () => {
-    const emulator = url('http://localhost:9199/v0/b/b1/o/pads%2FDS04-C.m4a?alt=media');
+    const emulator = url('http://localhost:9199/v0/b/b1/o/pads%2Fv1%2FDS04-C.m4a?alt=media');
     expect(isPadObjectRequest(emulator, 'GET')).toBe(false);
     expect(isPadObjectRequest(emulator, 'GET', true)).toBe(true);
   });

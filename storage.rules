@@ -22,7 +22,7 @@ service firebase.storage {
     }
 
     // Loops do pad ambiente: leitura para autenticados; escrita só via script admin (fora das rules).
-    match /pads/{fileName} {
+    match /pads/{version}/{fileName} {
       allow read: if request.auth != null;
       allow write: if false;
     }
