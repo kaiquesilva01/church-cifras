@@ -20,11 +20,37 @@ const CROSSFADE_NOTICE = 'Não foi possível trocar o tom do pad.';
  * and resumed inside the user's tap (iOS), before any await. The engine and loader
  * (decodeAudioData, buffer sources) come from the lazy chunk.
  */
+function closeQuietly(ctx: AudioContext): void {
+  try {
+    void Promise.resolve(ctx.close()).catch(() => {});
+  } catch {
+    // already closed or unsupported: nothing to release
+  }
+}
+
 const defaultCreateEngine: CreateEngine = async (fetchBytes, onGiveUp) => {
   const ctx = new AudioContext();
   void ctx.resume();
-  const { buildPadEngine } = await import('./padBuild');
-  return buildPadEngine({ ctx, fetchBytes, onGiveUp });
+  try {
+    const { buildPadEngine } = await import('./padBuild');
+    const engine = buildPadEngine({ ctx, fetchBytes, onGiveUp });
+    // The factory owns the context: disposing the engine releases it too.
+    return new Proxy(engine, {
+      get(target, prop) {
+        if (prop === 'dispose') {
+          return () => {
+            target.dispose();
+            closeQuietly(ctx);
+          };
+        }
+        const value: unknown = Reflect.get(target, prop, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  } catch (error) {
+    closeQuietly(ctx);
+    throw error;
+  }
 };
 
 function readVolume(storage: Pick<Storage, 'getItem'> | undefined): number {
@@ -70,6 +96,9 @@ export function PadProvider({
   const noteRef = useRef<PadNote | null>(null);
   const volumeRef = useRef(volume);
   const desiredRef = useRef<PadNote | null>(null);
+  /** Note the engine is heading to (differs from noteRef while a crossfade is in flight). */
+  const targetRef = useRef<PadNote | null>(null);
+  const crossfadeSeqRef = useRef(0);
   const tokenRef = useRef(0);
   const enginePromiseRef = useRef<Promise<PadEngine> | null>(null);
   const engineRef = useRef<PadEngine | null>(null);
@@ -97,20 +126,37 @@ export function PadProvider({
     if (engineRef.current) engineRef.current.stop();
     else enginePromiseRef.current = null; // the pending run disposes the engine once created
     desiredRef.current = null;
+    targetRef.current = null;
     changeStatus('off');
     changeNote(null);
     setNotice(null);
   }, [changeNote, changeStatus]);
 
+  /** Hard teardown: the next toggle builds a fresh engine (and AudioContext). */
+  const teardown = useCallback(() => {
+    tokenRef.current += 1;
+    const engine = engineRef.current;
+    engineRef.current = null;
+    enginePromiseRef.current = null; // a pending run disposes the engine once created
+    desiredRef.current = null;
+    targetRef.current = null;
+    engine?.dispose();
+  }, []);
+
   const crossfade = useCallback(
     async (engine: PadEngine, target: PadNote, token: number) => {
+      crossfadeSeqRef.current += 1;
+      const seq = crossfadeSeqRef.current;
+      targetRef.current = target;
+      const stale = () => tokenRef.current !== token || crossfadeSeqRef.current !== seq;
       try {
         await engine.crossfadeTo(target);
-        if (tokenRef.current !== token) return;
+        if (stale()) return;
         changeNote(target);
         setNotice(null);
       } catch {
-        if (tokenRef.current !== token) return;
+        if (stale()) return;
+        targetRef.current = noteRef.current;
         setNotice(CROSSFADE_NOTICE);
       }
     },
@@ -125,10 +171,11 @@ export function PadProvider({
         promise = createEngineRef.current(
           (p) => fetchBytesRef.current(p),
           () => {
-            tokenRef.current += 1;
-            desiredRef.current = null;
+            // The context stalled: hard cut, so it can't come back as ghost audio.
+            teardown();
             changeStatus('off');
             changeNote(null);
+            setNotice(null);
           },
         );
         enginePromiseRef.current = promise;
@@ -163,12 +210,13 @@ export function PadProvider({
       }
       if (tokenRef.current !== token) return;
       changeNote(target);
+      targetRef.current = target;
       changeStatus('playing');
       const desired = desiredRef.current;
       desiredRef.current = null;
       if (desired && desired !== target) await crossfade(engine, desired, token);
     },
-    [changeNote, changeStatus, crossfade],
+    [changeNote, changeStatus, crossfade, teardown],
   );
 
   const toggle = useCallback(
@@ -181,6 +229,7 @@ export function PadProvider({
       if (!target) return;
       tokenRef.current += 1;
       desiredRef.current = null;
+      targetRef.current = target;
       setNotice(null);
       setOwner(nextOwner);
       changeNote(target);
@@ -201,7 +250,7 @@ export function PadProvider({
         return;
       }
       const engine = engineRef.current;
-      if (current !== 'playing' || !engine || noteRef.current === target) return;
+      if (current !== 'playing' || !engine || targetRef.current === target) return;
       void crossfade(engine, target, tokenRef.current);
     },
     [crossfade],
@@ -241,16 +290,7 @@ export function PadProvider({
 
   useWakeLock(status === 'playing');
 
-  useEffect(
-    () => () => {
-      tokenRef.current += 1;
-      const engine = engineRef.current;
-      engineRef.current = null;
-      enginePromiseRef.current = null;
-      engine?.dispose();
-    },
-    [],
-  );
+  useEffect(() => teardown, [teardown]);
 
   const value = useMemo<PadContextValue>(
     () => ({ status, note, owner, volume, notice, toggle, follow, setVolume, prefetch }),

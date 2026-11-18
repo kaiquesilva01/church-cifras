@@ -7,6 +7,9 @@ import type { PadEngine } from './padEngine';
 import type { PadNote } from './padNotes';
 import type { PadOwner } from './padRoute';
 import { usePad } from './usePad';
+import { buildPadEngine } from './padBuild';
+
+vi.mock('./padBuild', () => ({ buildPadEngine: vi.fn() }));
 
 type Deferred<T> = { promise: Promise<T>; resolve(v: T): void; reject(e: unknown): void };
 function deferred<T = void>(): Deferred<T> {
@@ -278,6 +281,46 @@ describe('PadProvider', () => {
       expect(result.current.note).toBe('E');
     });
 
+    it('goes back to the original key mid-crossfade (C -> D -> C)', async () => {
+      const { result, engine } = await playing('C');
+      const d = deferred();
+      engine.crossfadeTo.mockImplementationOnce(() => d.promise);
+      act(() => result.current.follow('D'));
+      act(() => result.current.follow('C'));
+      expect(engine.crossfadeTo).toHaveBeenLastCalledWith('C');
+      await act(async () => d.resolve());
+      expect(result.current.note).toBe('C');
+    });
+
+    it('applies only the latest crossfade when they resolve out of order', async () => {
+      const { result, engine } = await playing('C');
+      const dD = deferred();
+      const dE = deferred();
+      engine.crossfadeTo.mockImplementationOnce(() => dD.promise);
+      engine.crossfadeTo.mockImplementationOnce(() => dE.promise);
+      act(() => result.current.follow('D'));
+      act(() => result.current.follow('E'));
+      await act(async () => dE.resolve());
+      expect(result.current.note).toBe('E');
+      await act(async () => dD.resolve());
+      expect(result.current.note).toBe('E');
+    });
+
+    it('ignores a stale crossfade failure and reverts the target when the latest fails', async () => {
+      const { result, engine } = await playing('C');
+      const dD = deferred();
+      engine.crossfadeTo.mockImplementationOnce(() => dD.promise);
+      engine.crossfadeTo.mockRejectedValueOnce(new Error('load'));
+      act(() => result.current.follow('D'));
+      act(() => result.current.follow('E'));
+      await flush();
+      expect(result.current.notice).not.toBeNull();
+      await act(async () => dD.reject(new Error('stale')));
+      expect(result.current.note).toBe('C');
+      act(() => result.current.follow('C'));
+      expect(engine.crossfadeTo).toHaveBeenCalledTimes(2);
+    });
+
     it('does not crossfade after loading when the desired note is the same', async () => {
       const { result, engine } = setup();
       const d = deferred();
@@ -369,14 +412,19 @@ describe('PadProvider', () => {
       expect(engine.dispose).toHaveBeenCalledTimes(1);
     });
 
-    it('goes off when the engine gives up', async () => {
-      const { result, giveUp } = setup();
+    it('hard-cuts the engine when it gives up and builds a fresh one next time', async () => {
+      const { result, giveUp, engine, createEngine } = setup();
       act(() => result.current.toggle('C', song));
       await flush();
       expect(result.current.status).toBe('playing');
       act(() => giveUp());
       expect(result.current.status).toBe('off');
       expect(result.current.note).toBeNull();
+      expect(engine.dispose).toHaveBeenCalledTimes(1);
+      act(() => result.current.toggle('C', song));
+      await flush();
+      expect(createEngine).toHaveBeenCalledTimes(2);
+      expect(result.current.status).toBe('playing');
     });
   });
 
@@ -406,6 +454,66 @@ describe('PadProvider', () => {
       const { result } = renderHook(() => usePad()!, { wrapper });
       act(() => result.current.toggle('C', song));
       expect(calls).toEqual(['new', 'resume']);
+    });
+  });
+
+  describe('default factory AudioContext lifecycle', () => {
+    function stubCtx() {
+      const close = vi.fn(() => Promise.resolve());
+      class FakeCtx {
+        resume() {
+          return Promise.resolve();
+        }
+        close = close;
+      }
+      vi.stubGlobal('AudioContext', FakeCtx);
+      return close;
+    }
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={['/musicas/s1']}>
+        <PadProvider fetchBytes={() => Promise.resolve(new Uint8Array())} storage={memoryStorage()}>
+          {children}
+        </PadProvider>
+      </MemoryRouter>
+    );
+
+    it('closes the context when cancelled before the engine is created', async () => {
+      const close = stubCtx();
+      const engine = makeEngine();
+      vi.mocked(buildPadEngine).mockReturnValue(engine);
+      const { result } = renderHook(() => usePad()!, { wrapper });
+      act(() => result.current.toggle('C', song));
+      act(() => result.current.toggle('C', song));
+      await flush();
+      await flush();
+      expect(engine.dispose).toHaveBeenCalled();
+      expect(engine.start).not.toHaveBeenCalled();
+      expect(close).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes the context on unmount and reuses it across stop/start', async () => {
+      const close = stubCtx();
+      vi.mocked(buildPadEngine).mockReturnValue(makeEngine());
+      const { result, unmount } = renderHook(() => usePad()!, { wrapper });
+      act(() => result.current.toggle('C', song));
+      await flush();
+      act(() => result.current.toggle('C', song));
+      expect(close).not.toHaveBeenCalled();
+      unmount();
+      expect(close).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes the context and reports error when building the engine fails', async () => {
+      const close = stubCtx();
+      vi.mocked(buildPadEngine).mockImplementation(() => {
+        throw new Error('chunk');
+      });
+      const { result } = renderHook(() => usePad()!, { wrapper });
+      act(() => result.current.toggle('C', song));
+      await flush();
+      await flush();
+      expect(result.current.status).toBe('error');
+      expect(close).toHaveBeenCalledTimes(1);
     });
   });
 
