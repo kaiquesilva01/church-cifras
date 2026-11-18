@@ -162,7 +162,7 @@ continuar/parar vive no provider, não espalhada pelas telas.
 
 ### 6.4 Hospedagem e cache
 
-- **Storage** `pads/{nn}-{nota}.m4a` (ou formato que a validação do §6.5 aprovar). Regra nova em `storage.rules`:
+- **Storage** `pads/{versão}/{arquivo}.m4a` (hoje `pads/v1/…`; a **versão sobe** sempre que os loops são regerados, porque o arquivo é imutável e fica 1 ano em cache; ou outro formato, se a validação do §6.5 mandar). Regra nova em `storage.rules`:
   leitura para autenticado, **escrita negada** a todos; o envio é feito por script administrativo (SDK Admin).
 - **PWA:** `pdfObjectPattern` cobre só `songs%2F`; acrescentar padrão equivalente para `pads%2F` (`CacheFirst`, cache
   próprio `cifras-pads`), com teste em `pwaConfig.test.ts`.
