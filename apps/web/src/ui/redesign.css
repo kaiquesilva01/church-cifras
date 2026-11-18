@@ -57,6 +57,7 @@
   border: 1px solid var(--color-border-strong);
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  -webkit-backdrop-filter: blur(24px);
   backdrop-filter: blur(24px);
   box-shadow: 0 12px 30px rgb(0 0 0 / 18%);
 }
@@ -169,7 +170,7 @@
   padding: 2px 8px;
   border: 1px solid var(--color-accent);
   border-radius: 6px;
-  background: var(--color-warn-soft);
+  background: var(--color-accent-soft);
   color: var(--color-accent-text);
   font-size: 0.6875rem;
   font-weight: 700;
@@ -268,7 +269,7 @@
 
 .pad-card.is-playing {
   border-color: var(--color-accent);
-  background: var(--color-warn-soft);
+  background: var(--color-accent-soft);
 }
 
 .pad-note {
@@ -354,7 +355,7 @@
 
 .pad-sequence-list li.is-current {
   border: 1px solid var(--color-accent);
-  background: var(--color-warn-soft);
+  background: var(--color-accent-soft);
   color: var(--color-accent-text);
 }
 
@@ -450,7 +451,7 @@
 
 .viewer-head .chip[aria-current='true'],
 .song-card .chip.is-default {
-  background: var(--color-warn-soft);
+  background: var(--color-accent-soft);
   box-shadow: inset 0 0 0 1px var(--color-accent);
   color: var(--color-accent-text);
   font-weight: 700;
@@ -487,5 +488,5 @@
 
 .next-culto .list-card {
   border-color: var(--color-accent);
-  background: var(--color-warn-soft);
+  background: var(--color-accent-soft);
 }

@@ -31,11 +31,7 @@ export function PadControl({ keyName, owner }: { keyName: KeyName | null; owner:
         aria-busy={status === 'loading' || undefined}
         onClick={() => pad.toggle(target, owner)}
       >
-        {label ?? (
-          <>
-            <span aria-hidden="true">♪ </span>Pad
-          </>
-        )}
+        {label ?? 'Pad'}
       </button>
       {status === 'playing' && <PadVolume volume={pad.volume} onChange={pad.setVolume} />}
       {/* Always mounted so screen readers register the live region before the notice appears. */}
