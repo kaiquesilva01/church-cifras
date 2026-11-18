@@ -3,6 +3,7 @@ import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-rout
 import { AuthProvider, type AuthGateway } from './auth/AuthProvider';
 import type { CatalogApi } from './catalog/catalogApi';
 import { SongsProvider } from './catalog/SongsProvider';
+import { PadProvider } from './pad/PadProvider';
 import { ActiveSetlistProvider } from './setlists/ActiveSetlistProvider';
 import type { SetlistApi } from './setlists/setlistApi';
 import { SetlistsProvider } from './setlists/SetlistsProvider';
@@ -52,7 +53,9 @@ function AppRoutes({
             <SongsProvider api={catalogApi}>
               <SetlistsProvider api={setlistApi}>
                 <ActiveSetlistProvider api={setlistApi}>
-                  <AppShell />
+                  <PadProvider fetchBytes={catalogApi.getPdfBytes}>
+                    <AppShell />
+                  </PadProvider>
                 </ActiveSetlistProvider>
               </SetlistsProvider>
             </SongsProvider>
