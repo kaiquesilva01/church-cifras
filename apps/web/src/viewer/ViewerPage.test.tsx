@@ -195,8 +195,9 @@ describe('ViewerPage share button', () => {
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
     const [data] = share.mock.calls[0] as [{ files: File[] }];
     expect(data.files).toHaveLength(1);
-    expect(data.files[0].name).toBe('Sonda-me - Aline Barros (G).pdf');
-    expect(data.files[0].type).toBe('application/pdf');
+    const file = data.files[0];
+    expect(file?.name).toBe('Sonda-me - Aline Barros (G).pdf');
+    expect(file?.type).toBe('application/pdf');
   });
 
   it('stays silent when the user dismisses the share sheet', async () => {

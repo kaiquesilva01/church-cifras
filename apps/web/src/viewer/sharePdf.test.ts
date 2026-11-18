@@ -29,8 +29,9 @@ describe('canSharePdf', () => {
     stubShare({ share: async () => {}, canShare });
     expect(canSharePdf()).toBe(true);
     const arg = (canShare.mock.calls[0] as unknown as [ShareData])[0];
-    expect(arg.files?.[0]).toBeInstanceOf(File);
-    expect(arg.files?.[0].type).toBe('application/pdf');
+    const file = arg.files?.[0];
+    expect(file).toBeInstanceOf(File);
+    expect(file?.type).toBe('application/pdf');
   });
 });
 
