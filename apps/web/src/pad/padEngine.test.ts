@@ -274,11 +274,20 @@ describe('gain continuity', () => {
     const { ctx, engine } = setup();
     const last = new Map<unknown, number>();
     let worst = 0;
+    let maxSustained = 0;
+    let maxTotal = 0;
     const sample = () => {
+      const now = ctx.currentTime;
+      const live = ctx.sources.filter((s) => !s.disconnected);
+      // A voice being retired (stop within ~100 ms) no longer counts as sustained.
+      const sustained = live.filter((s) => s.stopAt === null || s.stopAt - now > 0.1);
+      maxSustained = Math.max(maxSustained, sustained.length);
+      maxTotal = Math.max(maxTotal, live.length);
       for (const g of ctx.gains) {
         if (g.createdAt > ctx.currentTime) continue;
         const v = g.gain.valueAt(ctx.currentTime);
-        const prev = last.get(g);
+        // Voice gains must start from 0 (master, the first gain, may start at 1).
+        const prev = last.get(g) ?? (g === ctx.gains[0] ? undefined : 0);
         if (prev !== undefined) worst = Math.max(worst, Math.abs(v - prev));
         last.set(g, v);
       }
@@ -302,6 +311,8 @@ describe('gain continuity', () => {
     }
     expect(ctx.sources.length).toBeGreaterThanOrEqual(4);
     expect(worst).toBeLessThanOrEqual(0.05);
+    expect(maxSustained).toBeLessThanOrEqual(2);
+    expect(maxTotal).toBeLessThanOrEqual(3);
   });
 });
 
@@ -343,6 +354,58 @@ describe('interruptions', () => {
     await engine.start('C');
     vi.advanceTimersByTime(3100);
     expect(onGiveUp).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('voice cap', () => {
+  it('chained crossfades retire the older tails: never more than 2 sustained voices', async () => {
+    const { ctx, engine, alive } = setup();
+    await engine.start('C');
+    await engine.crossfadeTo('D');
+    ctx.advanceBy(1);
+    await engine.crossfadeTo('E');
+    // C was mid-fade: it now has only a short fade left, ending well before D's.
+    expect(ctx.sources[0]!.stopAt!).toBeLessThanOrEqual(ctx.currentTime + 0.1);
+    expect(alive()).toBe(3);
+    ctx.advanceBy(0.1);
+    expect(alive()).toBe(2);
+  });
+
+  it('start right after stop retires the 3 s tail quickly', async () => {
+    const { ctx, engine, alive } = setup();
+    await engine.start('C');
+    engine.stop();
+    ctx.advanceBy(0.5);
+    await engine.start('D');
+    expect(ctx.sources[0]!.stopAt!).toBeLessThanOrEqual(ctx.currentTime + 0.1);
+    ctx.advanceBy(0.1);
+    expect(alive()).toBe(1);
+  });
+});
+
+describe('give-up timer vs stop', () => {
+  it('stop() cancels a pending give-up', async () => {
+    vi.useFakeTimers();
+    const onGiveUp = vi.fn();
+    const { ctx, engine } = setup({ onGiveUp });
+    ctx.state = 'suspended';
+    ctx.resumeSucceeds = false;
+    await engine.start('C');
+    engine.stop();
+    vi.advanceTimersByTime(5000);
+    expect(onGiveUp).not.toHaveBeenCalled();
+  });
+
+  it('a failed load that leaves nothing playing cancels the give-up', async () => {
+    vi.useFakeTimers();
+    const onGiveUp = vi.fn();
+    const { ctx, load, engine } = setup({ onGiveUp });
+    ctx.state = 'suspended';
+    ctx.resumeSucceeds = false;
+    load.mockRejectedValueOnce(new Error('offline'));
+    await expect(engine.start('C')).rejects.toThrow('offline');
+    vi.advanceTimersByTime(5000);
+    expect(onGiveUp).not.toHaveBeenCalled();
   });
 });
 

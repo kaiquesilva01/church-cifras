@@ -10,6 +10,8 @@ export const FADE = {
 /** How long a context may stay out of 'running' before the UI is told to give up. */
 const GIVE_UP_MS = 3000;
 const CURVE_POINTS = 128;
+/** Short equal-power fade that retires a lingering tail so at most 2 voices (buffers) stay alive. */
+const RETIRE_SEC = 0.08;
 
 export interface PadEngine {
   /** resume() + load + plays from the beginning (offset 0). */
@@ -36,6 +38,8 @@ interface Voice {
   note: PadNote;
   source: AudioBufferSourceNode;
   gain: GainNode;
+  /** Context time at which the source is scheduled to stop (Infinity while sustained). */
+  endsAt: number;
 }
 
 /** cos(pi/2 * t) scaled by `from`, ending at exactly 0. */
@@ -82,7 +86,17 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
     const from = pin(voice.gain.gain);
     voice.gain.gain.setValueCurveAtTime(fadeOutCurve(from), now, seconds);
     voice.source.stop(now + seconds);
+    voice.endsAt = now + seconds;
     voice.source.onended = () => release(voice);
+  }
+
+  /** Shortens any lingering fade-out tail (never an abrupt cut: it starts from the current value). */
+  function retireTails(): void {
+    const now = ctx.currentTime;
+    for (const voice of voices) {
+      if (voice === playing || voice.endsAt - now <= RETIRE_SEC) continue;
+      fadeOut(voice, RETIRE_SEC);
+    }
   }
 
   function enter(note: PadNote, buffer: AudioBuffer): Voice {
@@ -99,7 +113,7 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
     source.loopStart = sample.loopStartSec;
     source.loopEnd = sample.loopEndSec;
     source.connect(gain);
-    const voice: Voice = { note, source, gain };
+    const voice: Voice = { note, source, gain, endsAt: Infinity };
     source.onended = () => release(voice);
     voices.add(voice);
     source.start(now, 0);
@@ -146,9 +160,11 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
     } catch (error) {
       if (mine !== token || disposed) return; // superseded: nobody is waiting on this outcome
       target = playing ? playing.note : null;
+      if (target === null) clearGiveUpTimer();
       throw error;
     }
     if (mine !== token || disposed) return;
+    retireTails();
     const old = playing;
     if (old) fadeOut(old, FADE.crossfadeSec);
     playing = enter(note, buffer);
@@ -164,8 +180,10 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
       if (disposed) return;
       token += 1;
       target = null;
+      clearGiveUpTimer();
       const current = playing;
-      if (!current) return;
+      if (!current) return; // idle stop: leave any tail alone
+      retireTails();
       playing = null;
       fadeOut(current, FADE.outSec);
     },
