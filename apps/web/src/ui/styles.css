@@ -684,6 +684,16 @@ section:last-child > .section-title + .list {
   flex-basis: 100%;
 }
 
+.pad-control .muted:empty {
+  /* Stays in the accessibility tree (a live region) but takes no space or gap. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
 .pad-control input[type='range'] {
   min-width: 96px;
   min-height: 44px;

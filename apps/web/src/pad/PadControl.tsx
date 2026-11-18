@@ -38,11 +38,10 @@ export function PadControl({ keyName, owner }: { keyName: KeyName | null; owner:
         )}
       </button>
       {status === 'playing' && <PadVolume volume={pad.volume} onChange={pad.setVolume} />}
-      {pad.notice && (
-        <p role="status" className="muted">
-          {pad.notice}
-        </p>
-      )}
+      {/* Always mounted so screen readers register the live region before the notice appears. */}
+      <p role="status" className="muted">
+        {pad.notice}
+      </p>
     </div>
   );
 }

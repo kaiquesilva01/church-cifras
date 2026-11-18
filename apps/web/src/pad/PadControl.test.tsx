@@ -96,6 +96,11 @@ describe('PadControl', () => {
     expect(value.toggle).toHaveBeenCalledWith('Bb', owner);
   });
 
+  it('always renders the status region, empty until there is a notice', () => {
+    render(<PadControl keyName="Bb" owner={owner} />, { wrapper: wrap(fake()) });
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
   it('shows the notice as a status', () => {
     render(<PadControl keyName="Bb" owner={owner} />, {
       wrapper: wrap(fake({ notice: 'Sem conexão' })),
