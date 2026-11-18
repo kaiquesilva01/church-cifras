@@ -174,6 +174,12 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
     start: (note) => play(note),
     crossfadeTo(note) {
       if (note === target) return Promise.resolve();
+      if (playing && playing.note === note) {
+        // Back to the sustained note: drop the pending load, never restart the voice.
+        token += 1;
+        target = note;
+        return Promise.resolve();
+      }
       return play(note);
     },
     stop() {

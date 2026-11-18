@@ -55,4 +55,19 @@ describe('createPadLoader', () => {
     await expect(loader.load('C')).resolves.toBeDefined();
     expect(fetchBytes).toHaveBeenCalledTimes(2);
   });
+
+  it('does not cache a buffer the keep predicate rejects', async () => {
+    const decode = vi.fn().mockImplementation(async () => ({}) as AudioBuffer);
+    const loader = createPadLoader({
+      fetchBytes: vi.fn().mockResolvedValue(new Uint8Array([1])),
+      decode,
+      keep: (note) => note === 'C',
+    });
+    await loader.load('D');
+    await loader.load('D');
+    expect(decode).toHaveBeenCalledTimes(2);
+    await loader.load('C');
+    await loader.load('C');
+    expect(decode).toHaveBeenCalledTimes(3);
+  });
 });

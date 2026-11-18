@@ -4,12 +4,14 @@ export interface PadLoaderDeps {
   fetchBytes: (path: string) => Promise<Uint8Array>;
   decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>;
   maxBuffers?: number;
+  /** Whether a finished decode is still wanted; unwanted buffers are returned but not cached. */
+  keep?: (note: PadNote) => boolean;
 }
 
 export function createPadLoader(deps: PadLoaderDeps): {
   load(note: PadNote): Promise<AudioBuffer>;
 } {
-  const { fetchBytes, decode, maxBuffers = 2 } = deps;
+  const { fetchBytes, decode, maxBuffers = 2, keep } = deps;
   const ready = new Map<PadNote, AudioBuffer>(); // ordem de inserção = LRU
   const inFlight = new Map<PadNote, Promise<AudioBuffer>>();
 
@@ -32,6 +34,7 @@ export function createPadLoader(deps: PadLoaderDeps): {
 
       const promise = fetchAndDecode(note)
         .then((buffer) => {
+          if (keep && !keep(note)) return buffer;
           ready.set(note, buffer);
           while (ready.size > maxBuffers) {
             const oldest = ready.keys().next().value;

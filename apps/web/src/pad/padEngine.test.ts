@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FADE, createPadEngine } from './padEngine';
+import { createPadLoader } from './padLoader';
 import { PAD_SAMPLES, type PadNote } from './padNotes';
 import { FakeAudioContext } from './testing/fakeAudio';
 
@@ -171,6 +172,34 @@ describe('crossfadeTo', () => {
     await engine.crossfadeTo('C');
     expect(ctx.sources).toHaveLength(1);
     expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('going back to the sustained note mid-crossfade keeps it (no restart)', async () => {
+    const { ctx, load, engine } = setup();
+    await engine.start('C');
+    const d = deferred<AudioBuffer>();
+    load.mockImplementationOnce(() => d.promise);
+    const pendingD = engine.crossfadeTo('D');
+    await engine.crossfadeTo('C');
+    expect(engine.note).toBe('C');
+    expect(ctx.sources).toHaveLength(1);
+    d.resolve({} as AudioBuffer);
+    await pendingD;
+    expect(ctx.sources).toHaveLength(1);
+    expect(engine.note).toBe('C');
+  });
+
+  it('a stale load failure after going back does not reject or change the note', async () => {
+    const { ctx, load, engine } = setup();
+    await engine.start('C');
+    const d = deferred<AudioBuffer>();
+    load.mockImplementationOnce(() => d.promise);
+    const pendingD = engine.crossfadeTo('D');
+    await engine.crossfadeTo('C');
+    d.reject(new Error('late'));
+    await expect(pendingD).resolves.toBeUndefined();
+    expect(engine.note).toBe('C');
+    expect(ctx.sources).toHaveLength(1);
   });
 
   it('behaves like start when idle', async () => {
@@ -431,5 +460,53 @@ describe('dispose', () => {
     d.resolve({} as AudioBuffer);
     await p;
     expect(ctx.sources).toHaveLength(0);
+  });
+});
+
+describe('engine + loader buffer budget', () => {
+  it('A -> B -> C with B superseded keeps at most 2 distinct buffers', async () => {
+    const ctx = new FakeAudioContext();
+    ctx.currentTime = T0;
+    const gates = new Map<string, ReturnType<typeof deferred<AudioBuffer>>>();
+    const decode = vi.fn((b: ArrayBuffer) => {
+      const key = String(new Uint8Array(b)[0]);
+      const g = deferred<AudioBuffer>();
+      gates.set(key, g);
+      return g.promise;
+    });
+    const fetchBytes = vi.fn(async (path: string) => {
+      const note = (Object.keys(PAD_SAMPLES) as PadNote[]).find(
+        (n) => PAD_SAMPLES[n].storagePath === path,
+      )!;
+      return new Uint8Array([note.charCodeAt(0)]);
+    });
+    let engine!: ReturnType<typeof createPadEngine>;
+    const loader = createPadLoader({
+      fetchBytes,
+      decode,
+      keep: (n) => engine.note === n,
+    });
+    engine = createPadEngine({ ctx: ctx.asContext(), load: loader.load });
+    const buf = (tag: string) => ({ tag }) as unknown as AudioBuffer;
+    const flushMicro = () => new Promise((r) => setTimeout(r, 0));
+
+    const a = engine.start('A');
+    await flushMicro();
+    gates.get(String('A'.charCodeAt(0)))!.resolve(buf('A'));
+    await a;
+    const b = engine.crossfadeTo('B');
+    await flushMicro();
+    const c = engine.crossfadeTo('C');
+    await flushMicro();
+    gates.get(String('B'.charCodeAt(0)))!.resolve(buf('B'));
+    gates.get(String('C'.charCodeAt(0)))!.resolve(buf('C'));
+    await Promise.all([b, c]);
+
+    const decodesBefore = decode.mock.calls.length;
+    void loader.load('B'); // B was superseded: it must not still be cached
+    await flushMicro();
+    expect(decode.mock.calls.length).toBe(decodesBefore + 1);
+    const live = new Set(ctx.sources.filter((s) => !s.disconnected).map((s) => s.buffer));
+    expect(live.size).toBeLessThanOrEqual(2);
   });
 });

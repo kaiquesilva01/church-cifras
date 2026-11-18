@@ -11,6 +11,13 @@ export function buildPadEngine({
   fetchBytes: (path: string) => Promise<Uint8Array>;
   onGiveUp: () => void;
 }): PadEngine {
-  const loader = createPadLoader({ fetchBytes, decode: (b) => ctx.decodeAudioData(b) });
-  return createPadEngine({ ctx, load: loader.load, onGiveUp });
+  // Late-bound: the loader only caches what the engine is still heading to.
+  let engine: PadEngine | null = null;
+  const loader = createPadLoader({
+    fetchBytes,
+    decode: (b) => ctx.decodeAudioData(b),
+    keep: (note) => engine?.note === note,
+  });
+  engine = createPadEngine({ ctx, load: loader.load, onGiveUp });
+  return engine;
 }
