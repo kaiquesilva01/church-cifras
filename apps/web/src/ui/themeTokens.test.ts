@@ -55,9 +55,15 @@ describe('theme tokens', () => {
   });
 
   it('keeps the update prompt readable in both themes (no text-on-text colors)', () => {
-    const rule = redesignCss.slice(redesignCss.indexOf('.update-prompt {'));
-    const body = rule.slice(0, rule.indexOf('}'));
-    expect(body).toContain('background: var(--color-elevated)');
-    expect(body).toContain('color: var(--color-text)');
+    // Every .update-prompt rule that sets a background or color, in load order: the last one wins.
+    const bodies = [...redesignCss.matchAll(/\n\.update-prompt \{([^}]*)\}/g)].map((m) => m[1]!);
+    expect(bodies.length).toBeGreaterThan(0);
+    const last = (property: string): string | undefined =>
+      bodies
+        .flatMap((body) => [...body.matchAll(new RegExp(`${property}: ([^;]+);`, 'g'))])
+        .map((m) => m[1])
+        .at(-1);
+    expect(last('background')).toBe('var(--color-elevated)');
+    expect(last('color')).toBe('var(--color-text)');
   });
 });

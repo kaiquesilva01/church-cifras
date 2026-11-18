@@ -3,21 +3,25 @@
  * Loaded last (see main.tsx). Colors come only from the theme tokens.
  */
 
-/* Update prompt: a pill at the top, so it never collides with the bottom bars. In the light theme
-   the base rule (text-colored card with accent-colored text) would be unreadable. */
+/* Update prompt: a small centered pill at the top, so it never collides with the bottom bars and
+   leaves the back button and the header actions on the sides reachable. In the light theme the
+   base rule (text-colored card with accent-colored text) would be unreadable. */
 .update-prompt {
-  top: calc(12px + env(safe-area-inset-top));
-  right: 16px;
+  top: calc(8px + env(safe-area-inset-top));
+  right: auto;
   bottom: auto;
-  left: 16px;
-  padding: 8px 8px 8px 18px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 6px 6px 6px 16px;
   border: 1px solid var(--color-border-strong);
   border-radius: 999px;
   background: var(--color-elevated);
   color: var(--color-text);
   font-size: 0.8125rem;
   font-weight: 600;
-  box-shadow: 0 16px 40px rgb(0 0 0 / 30%);
+  box-shadow: var(--shadow-pop);
+  transform: translateX(-50%);
 }
 
 .update-prompt button {
@@ -27,9 +31,9 @@
   font-weight: 800;
 }
 
-/* Alerts as soft boxes (inline field errors keep their plain text look) */
-p.error[role='alert'],
-div.error[role='alert'] {
+/* Page-level alerts as soft boxes. Inline field errors and alerts already inside a card or a
+   dialog keep their plain text look. */
+section > p.error[role='alert'] {
   padding: 12px 14px;
   border: 1px solid var(--color-error);
   border-radius: 14px;
@@ -37,9 +41,6 @@ div.error[role='alert'] {
 }
 
 .notice {
+  padding: 12px 14px;
   border-radius: 14px;
-}
-
-.status {
-  font-size: 0.875rem;
 }
