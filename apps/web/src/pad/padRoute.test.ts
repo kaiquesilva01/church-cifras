@@ -50,3 +50,13 @@ describe('padStaysOn with a setlist owner', () => {
     expect(padStaysOn(setlist, path, search)).toBe(expected);
   });
 });
+
+describe('padStaysOn on the Pad tab', () => {
+  it('keeps any owner playing so the status screen can show and stop it', () => {
+    expect(padStaysOn(song, '/pad', '')).toBe(true);
+    expect(padStaysOn(setlist, '/pad', '')).toBe(true);
+    expect(padStaysOn(song, '/pad/', '')).toBe(true);
+    expect(padStaysOn(song, '/padx', '')).toBe(false);
+    expect(padStaysOn(setlist, '/mais', '')).toBe(false);
+  });
+});

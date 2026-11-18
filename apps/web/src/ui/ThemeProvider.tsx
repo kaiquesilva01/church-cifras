@@ -16,7 +16,8 @@ interface ThemeValue {
   toggle: () => void;
 }
 
-const ThemeContext = createContext<ThemeValue | null>(null);
+// Without a provider (isolated component tests) the app reads as light and the button does nothing.
+const ThemeContext = createContext<ThemeValue>({ theme: 'light', toggle: () => {} });
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 
@@ -70,7 +71,5 @@ export function ThemeProvider({
 }
 
 export function useTheme(): ThemeValue {
-  const value = useContext(ThemeContext);
-  if (!value) throw new Error('useTheme precisa estar dentro do ThemeProvider');
-  return value;
+  return useContext(ThemeContext);
 }

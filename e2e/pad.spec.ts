@@ -43,7 +43,13 @@ test.afterEach(async ({ page }) => {
 const padButton = (page: Page) => page.locator('.pad-control').getByRole('button');
 const volume = (page: Page) => page.getByRole('slider', { name: 'Volume do pad' });
 const bar = (page: Page) => page.getByRole('navigation', { name: 'Repertório' });
-const home = (page: Page) => page.locator('a.brand');
+/** Leaves for the home page without a reload (the pad provider keeps its state), like a link would. */
+async function goHome(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+}
 /** Client-side navigation from the home page: no reload, so the provider keeps its state. */
 async function openFromSearch(page: Page, title: string): Promise<void> {
   await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(title);
@@ -92,7 +98,7 @@ test('pad button toggles, follows the key chip and does not cross to another vis
   // Outside a setlist the pad does not cross to another visit of the cifra.
   await padButton(page).click();
   await expect(padButton(page)).toHaveAttribute('aria-pressed', 'true');
-  await home(page).click();
+  await goHome(page);
   await expect(page).toHaveURL(/\/$/);
   await openFromSearch(page, song.title);
   await expectPdfRendered(page);
@@ -141,7 +147,7 @@ test('pad continues across the songs of a setlist and shows the compact control'
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(brisa.title);
   await padButton(page).click();
   await expect(padButton(page)).toHaveAttribute('aria-pressed', 'true');
-  await home(page).click();
+  await goHome(page);
   await expect(page).toHaveURL(/\/$/);
   await page
     .getByRole('region', { name: 'Próximo culto' })

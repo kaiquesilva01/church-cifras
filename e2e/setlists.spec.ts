@@ -102,8 +102,8 @@ test('admin builds a setlist: add, reorder, change key, order survives a reload'
   await signInAs(page, ADMIN, 'Admin');
 
   await page
-    .getByRole('navigation', { name: 'Seções' })
-    .getByRole('link', { name: 'Repertórios' })
+    .getByRole('navigation', { name: 'Principal' })
+    .getByRole('link', { name: 'Repertório' })
     .click();
   await expect(page.getByText('Nenhum repertório ainda.')).toBeVisible();
   await shot(page, testInfo, 'setlists-1-tab-empty');
@@ -348,8 +348,8 @@ test('an expired setlist is hidden from the tab and the next-culto card; a futur
   await shot(page, testInfo, 'setlists-9-next-culto-card');
 
   await page
-    .getByRole('navigation', { name: 'Seções' })
-    .getByRole('link', { name: 'Repertórios' })
+    .getByRole('navigation', { name: 'Principal' })
+    .getByRole('link', { name: 'Repertório' })
     .click();
   await expect(page.locator('a.setlist-row', { hasText: `Futuro ${tag}` }).first()).toBeVisible();
   await expect(page.getByText(`Vencido ${tag}`)).toHaveCount(0);

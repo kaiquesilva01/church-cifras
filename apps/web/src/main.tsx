@@ -6,6 +6,7 @@ import {
 } from './lib/preloadError';
 import { prefetchForPath } from './lib/prefetch';
 import './ui/styles.css';
+import './ui/redesign.css';
 
 const storage = getSessionStorage(window);
 installPreloadErrorReload(window, storage);

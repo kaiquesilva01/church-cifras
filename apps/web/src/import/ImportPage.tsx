@@ -1,4 +1,5 @@
 import { parseKey } from '@cifras/chords';
+import { Link } from 'react-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { ArrangementExistsError, saveUpload, type CatalogApi } from '../catalog/catalogApi';
 import { deriveArtists } from '../catalog/search';
@@ -346,6 +347,9 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   return (
     <section className="import-page">
       <header className="import-head">
+        <Link to="/mais" className="back">
+          ‹ Voltar
+        </Link>
         <h1 className="page-title">Importar em lote</h1>
         {rows.length > 0 && (
           <span className="chip">{`${rows.length} arquivos · ${ready} prontos`}</span>

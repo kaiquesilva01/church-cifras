@@ -15,7 +15,10 @@ import { RequireAuth } from './routes/RequireAuth';
 import { ErrorBoundary } from './routes/ErrorBoundary';
 import { RequireRole } from './routes/RequireRole';
 import { ArtistPage } from './search/ArtistPage';
+import { BuscaPage } from './search/BuscaPage';
 import { HomePage } from './search/HomePage';
+import { MaisPage } from './more/MaisPage';
+import { PadPage } from './pad/PadPage';
 import { AppShell } from './ui/AppShell';
 import { ThemeProvider } from './ui/ThemeProvider';
 
@@ -63,6 +66,9 @@ function AppRoutes({
           }
         >
           <Route index element={<HomePage setlistApi={setlistApi} />} />
+          <Route path="/busca" element={<BuscaPage />} />
+          <Route path="/pad" element={<PadPage />} />
+          <Route path="/mais" element={<MaisPage />} />
           <Route path="/cantores/:artistId" element={<ArtistPage />} />
           <Route
             path="/musicas/:songId"
