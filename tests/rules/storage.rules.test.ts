@@ -24,6 +24,7 @@ beforeAll(async () => {
     const storage = ctx.storage();
     await uploadBytes(ref(storage, 'songs/s1/original.pdf'), new Uint8Array([1, 2, 3]));
     await uploadBytes(ref(storage, 'other/file.txt'), new Uint8Array([1, 2, 3]));
+    await uploadBytes(ref(storage, 'pads/DS04-C.m4a'), new Uint8Array([1, 2, 3]));
   });
 });
 
@@ -115,6 +116,25 @@ describe('storage.rules', () => {
   it('denies deleting files', async () => {
     const storage = env.authenticatedContext('a1', { role: 'admin' }).storage();
     await assertFails(deleteObject(ref(storage, 'songs/s1/original.pdf')));
+  });
+
+  it('allows signed-in viewer to read pads/', async () => {
+    const storage = env.authenticatedContext('u1', { role: 'viewer' }).storage();
+    await assertSucceeds(getBytes(ref(storage, 'pads/DS04-C.m4a')));
+  });
+
+  it('denies unauthenticated read under pads/', async () => {
+    const storage = env.unauthenticatedContext().storage();
+    await assertFails(getBytes(ref(storage, 'pads/DS04-C.m4a')));
+  });
+
+  it('denies every role writing under pads/', async () => {
+    for (const role of ['viewer', 'member', 'admin']) {
+      const storage = env.authenticatedContext(`${role}-uid`, { role }).storage();
+      await assertFails(
+        uploadBytes(ref(storage, 'pads/DS99-X.m4a'), one, { contentType: 'audio/mp4' }),
+      );
+    }
   });
 
   it('denies reads outside songs/', async () => {
