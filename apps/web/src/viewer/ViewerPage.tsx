@@ -28,6 +28,7 @@ import { loadFontBytes } from './loadFonts';
 import { ManageMenu, type ManageAction } from './ManageMenu';
 import { PdfPages, type PdfDocument } from './PdfPages';
 import { saveGenerated } from './saveGenerated';
+import { canSharePdf, pdfFile, sharePdf } from './sharePdf';
 import { pickTransposeSource } from './transposeSource';
 import { SetlistNotices } from './SetlistNotices';
 import { useNextPreload } from './useNextPreload';
@@ -192,6 +193,9 @@ export function ViewerPage({
   const [failedPath, setFailedPath] = useState<string | null>(null);
   // The failure belongs to one path: moving to another one forgets it (a retry starts clean).
   if (failedPath !== null && failedPath !== path) setFailedPath(null);
+  // Like failedPath: the share failure belongs to one PDF, so another key (or the panel's source) forgets it.
+  const [shareError, setShareError] = useState<string | null>(null);
+  if (shareError !== null && shareError !== path) setShareError(null);
   const onPreviewError = useCallback(() => setPreviewFailed(path), [path]);
 
   useEffect(() => {
@@ -276,6 +280,8 @@ export function ViewerPage({
   const [manage, setManage] = useState<ManageState | null>(null);
   const [metaSaved, setMetaSaved] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [canShare] = useState(canSharePdf);
+  const [sharing, setSharing] = useState(false);
   // The key being deleted vanished (removed elsewhere): nothing left to confirm.
   const targetKey = manage?.action === 'delete-key' && !manage.busy ? manage.key : null;
   if (targetKey && arrStatus === 'ready' && !arrangements.some((a) => a.key === targetKey)) {
@@ -314,6 +320,8 @@ export function ViewerPage({
     setManage(null);
     setMetaSaved(false);
     setMenuOpen(false);
+    setShareError(null);
+    setSharing(false);
   }
   const open = (key: string): void => {
     navigate(viewerUrl(songId, key, setlist.extraQuery), { replace: true });
@@ -384,6 +392,20 @@ export function ViewerPage({
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  };
+
+  const share = async (): Promise<void> => {
+    if (current?.status !== 'ready' || !displayed) return;
+    const file = pdfFile(current.bytes, pdfFileName(song.title, song.artistName, displayed.key));
+    setShareError(null);
+    setSharing(true);
+    try {
+      await sharePdf(file);
+    } catch {
+      if (alive.current && songIdRef.current === songId) setShareError(path);
+    } finally {
+      if (alive.current && songIdRef.current === songId) setSharing(false);
+    }
   };
 
   const admin = isAdmin(role);
@@ -518,6 +540,11 @@ export function ViewerPage({
           </p>
         )}
         <SetlistNotices setlist={setlist} songId={songId} />
+        {shareError !== null && shareError === path && (
+          <p role="alert" className="error">
+            Não foi possível compartilhar. Tente de novo.
+          </p>
+        )}
         {arrStatus === 'error' || current?.status === 'error' ? (
           <p role="alert" className="error">
             Não foi possível abrir o PDF.
@@ -554,6 +581,19 @@ export function ViewerPage({
           >
             <span aria-hidden="true">⬇ </span>PDF
           </button>
+          {canShare && (
+            <button
+              type="button"
+              className="btn btn-icon"
+              aria-label="Compartilhar"
+              title="Compartilhar"
+              aria-busy={sharing || undefined}
+              onClick={() => void share()}
+              disabled={current?.status !== 'ready' || sharing}
+            >
+              <span aria-hidden="true">↗</span>
+            </button>
+          )}
           {canChange && (
             <button
               type="button"
