@@ -30,6 +30,10 @@ describe('viewer layout css', () => {
     expect(rule('.viewer.has-setlist .viewer-bar')).toMatch(/flex-wrap:\s*wrap/);
   });
 
+  it('gives the icon-only share button in the bar a 44px touch target', () => {
+    expect(rule('.viewer-bar .btn-icon')).toMatch(/min-width:\s*44px/);
+  });
+
   it('keeps the add-song focus ring inside the scrolling list', () => {
     expect(rule('.add-song-option:focus-visible')).toMatch(/outline-offset:\s*-2px/);
   });
