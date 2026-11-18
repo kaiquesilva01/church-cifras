@@ -155,3 +155,20 @@ export function checkAgainstManifest(report, manifest) {
   }
   return errors;
 }
+
+/** Linha impressa antes do envio: onde, qual versão e quantos arquivos. */
+export function describeUploadTarget({ bucket, emulatorHost, version, count }) {
+  const where = emulatorHost ? `emulador ${emulatorHost}` : 'PRODUÇÃO';
+  return `Destino: bucket ${bucket} (${where}), versão ${version}, ${count} arquivos`;
+}
+
+/** Erro (ou null) quando algum destino já existe: os loops são imutáveis, então não se sobrescreve. */
+export function existingObjectsError(existing, version) {
+  if (existing.length === 0) return null;
+  const next = `v${Number(/^v(\d+)$/.exec(version)?.[1] ?? 0) + 1}`;
+  return [
+    'Estes objetos já existem e não são sobrescritos (imutáveis, com cache de 1 ano):',
+    ...existing.map((d) => `  ${d}`),
+    `Para regenerar os loops suba a "version" em apps/web/src/pad/padManifest.json (${version} -> ${next}) e lance o app.`,
+  ].join('\n');
+}

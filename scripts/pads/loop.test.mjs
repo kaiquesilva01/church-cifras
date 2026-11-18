@@ -5,6 +5,8 @@ import {
   MAX_GAIN_DB,
   buildLoopBuffer,
   checkAgainstManifest,
+  describeUploadTarget,
+  existingObjectsError,
   seamScore,
   validatePadFiles,
   validateSourceAudio,
@@ -220,4 +222,29 @@ test('withGuardTail valida a guarda (0 a loopFrames, inteira)', () => {
 
 test('withGuardTail rejeita buffer que não tem intro + loop quadros', () => {
   assert.throws(() => withGuardTail(noise(100), intro, 10, opts.loopFrames), /buffer/);
+});
+
+test('describeUploadTarget indica produção ou emulador, versão e quantidade', () => {
+  assert.equal(
+    describeUploadTarget({ bucket: 'b.app', emulatorHost: undefined, version: 'v1', count: 12 }),
+    'Destino: bucket b.app (PRODUÇÃO), versão v1, 12 arquivos',
+  );
+  assert.equal(
+    describeUploadTarget({
+      bucket: 'b.app',
+      emulatorHost: '127.0.0.1:9199',
+      version: 'v2',
+      count: 12,
+    }),
+    'Destino: bucket b.app (emulador 127.0.0.1:9199), versão v2, 12 arquivos',
+  );
+});
+
+test('existingObjectsError lista os destinos existentes e manda subir a versão', () => {
+  assert.equal(existingObjectsError([], 'v1'), null);
+  const message = existingObjectsError(['pads/v1/DS04-C.m4a', 'pads/v1/DS05-Cs.m4a'], 'v1');
+  assert.match(message, /pads\/v1\/DS04-C\.m4a/);
+  assert.match(message, /pads\/v1\/DS05-Cs\.m4a/);
+  assert.match(message, /padManifest\.json/);
+  assert.match(message, /v2/);
 });
