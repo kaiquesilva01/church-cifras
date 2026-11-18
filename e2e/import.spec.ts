@@ -13,8 +13,12 @@ test('admin imports two synthetic PDFs in batch, ignoring a non-PDF, and downloa
     { title: `Lote Segunda ${tag}`, key: 'G' },
   ];
   await signInAs(page, ADMIN, 'Admin');
-  // Importar in Mais is greyed out ("Em breve") for now: the batch import is reached by its url.
-  await page.goto('/importar');
+  // Admins reach the batch import from Mais.
+  await page
+    .getByRole('navigation', { name: 'Principal' })
+    .getByRole('link', { name: 'Mais' })
+    .click();
+  await page.getByRole('link', { name: /Importar/ }).click();
   await expect(page.getByRole('heading', { name: 'Importar em lote' })).toBeVisible();
   await shot(page, testInfo, 'import-1-empty');
 
