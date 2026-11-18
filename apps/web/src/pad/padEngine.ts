@@ -162,11 +162,16 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
     }
   }
 
+  const pageHidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
   function ensureRunning(): void {
     if (ctx.state === 'running') {
       clearGiveUpTimer();
       return;
     }
+    // Backgrounded pages freeze timers and the system owns the audio: neither resume nor count
+    // down now. visibilitychange re-enters here once the page is back.
+    if (pageHidden()) return;
     ctx.resume().catch(() => undefined);
     if (giveUpTimer !== null) return;
     giveUpTimer = setTimeout(() => {
@@ -181,6 +186,14 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
     else if (target !== null) ensureRunning();
   }
   ctx.addEventListener('statechange', onStateChange);
+
+  function onVisibilityChange(): void {
+    if (disposed) return;
+    if (pageHidden()) clearGiveUpTimer();
+    else if (target !== null) ensureRunning(); // resume() first, then the 3 s countdown starts
+  }
+  if (typeof document !== 'undefined')
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
   let volumeSquared = 1;
 
@@ -244,6 +257,9 @@ export function createPadEngine({ ctx, load, onGiveUp }: PadEngineDeps): PadEngi
       target = null;
       clearGiveUpTimer();
       ctx.removeEventListener('statechange', onStateChange);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
       for (const voice of [...voices]) {
         try {
           voice.source.stop();

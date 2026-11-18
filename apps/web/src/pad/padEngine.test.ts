@@ -400,6 +400,102 @@ describe.each([
     });
   });
 
+  describe('give-up vs page visibility', () => {
+    let visibility: DocumentVisibilityState = 'visible';
+    const setVisibility = (v: DocumentVisibilityState) => {
+      visibility = v;
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    beforeEach(() => {
+      visibility = 'visible';
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => visibility,
+      });
+    });
+    afterEach(() => {
+      delete (document as unknown as Record<string, unknown>).visibilityState;
+    });
+
+    it('does not give up while the page stays hidden', async () => {
+      vi.useFakeTimers();
+      const onGiveUp = vi.fn();
+      const { ctx, engine } = setup({ onGiveUp });
+      await engine.start('C');
+      setVisibility('hidden');
+      ctx.resumeSucceeds = false;
+      ctx.setState('interrupted');
+      vi.advanceTimersByTime(10_000);
+      expect(onGiveUp).not.toHaveBeenCalled();
+    });
+
+    it('a pending countdown is dropped when the page becomes hidden', async () => {
+      vi.useFakeTimers();
+      const onGiveUp = vi.fn();
+      const { ctx, engine } = setup({ onGiveUp });
+      await engine.start('C');
+      ctx.resumeSucceeds = false;
+      ctx.setState('interrupted');
+      vi.advanceTimersByTime(1000);
+      setVisibility('hidden');
+      vi.advanceTimersByTime(10_000);
+      expect(onGiveUp).not.toHaveBeenCalled();
+    });
+
+    it('resumes on return and does not give up when the resume works', async () => {
+      vi.useFakeTimers();
+      const onGiveUp = vi.fn();
+      const { ctx, engine } = setup({ onGiveUp });
+      await engine.start('C');
+      setVisibility('hidden');
+      ctx.resumeSucceeds = false;
+      ctx.setState('interrupted');
+      vi.advanceTimersByTime(10_000);
+      const before = ctx.resumeCalls;
+      ctx.resumeSucceeds = true;
+      setVisibility('visible');
+      expect(ctx.resumeCalls).toBeGreaterThan(before);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(ctx.state).toBe('running');
+      expect(onGiveUp).not.toHaveBeenCalled();
+    });
+
+    it('gives up once, 3 s after returning, when the resume never succeeds', async () => {
+      vi.useFakeTimers();
+      const onGiveUp = vi.fn();
+      const { ctx, engine } = setup({ onGiveUp });
+      await engine.start('C');
+      setVisibility('hidden');
+      ctx.resumeSucceeds = false;
+      ctx.setState('interrupted');
+      vi.advanceTimersByTime(10_000);
+      setVisibility('visible');
+      vi.advanceTimersByTime(2900);
+      expect(onGiveUp).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(200);
+      expect(onGiveUp).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores visibility changes while idle or after dispose', async () => {
+      vi.useFakeTimers();
+      const onGiveUp = vi.fn();
+      const { ctx, engine } = setup({ onGiveUp });
+      ctx.state = 'suspended';
+      ctx.resumeSucceeds = false;
+      setVisibility('visible');
+      vi.advanceTimersByTime(5000);
+      expect(ctx.resumeCalls).toBe(0);
+      await engine.start('C');
+      engine.dispose();
+      const calls = ctx.resumeCalls;
+      setVisibility('hidden');
+      setVisibility('visible');
+      vi.advanceTimersByTime(5000);
+      expect(ctx.resumeCalls).toBe(calls);
+      expect(onGiveUp).not.toHaveBeenCalled();
+    });
+  });
+
   describe('voice cap', () => {
     it('chained crossfades retire the older tails: never more than 2 sustained voices', async () => {
       const { ctx, engine, alive } = setup();
