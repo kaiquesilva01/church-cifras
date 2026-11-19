@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthState } from '../auth/useAuth';
+import { LyricsProvider } from '../catalog/LyricsProvider';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { ArtistPage } from '../search/ArtistPage';
 import { BuscaPage } from '../search/BuscaPage';
@@ -83,15 +84,17 @@ function renderApp(initialEntries: string[], initialIndex = 0) {
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={initialEntries} initialIndex={initialIndex}>
         <SongsProvider api={api}>
-          <SetlistsProvider api={setlistApi}>
-            <Where />
-            <Routes>
-              <Route path="/" element={<HomePage setlistApi={setlistApi} />} />
-              <Route path="/busca" element={<BuscaPage />} />
-              <Route path="/cantores/:artistId" element={<ArtistPage />} />
-              <Route path="/musicas/:songId" element={<ViewerRoute />} />
-            </Routes>
-          </SetlistsProvider>
+          <LyricsProvider api={api}>
+            <SetlistsProvider api={setlistApi}>
+              <Where />
+              <Routes>
+                <Route path="/" element={<HomePage setlistApi={setlistApi} />} />
+                <Route path="/busca" element={<BuscaPage />} />
+                <Route path="/cantores/:artistId" element={<ArtistPage />} />
+                <Route path="/musicas/:songId" element={<ViewerRoute />} />
+              </Routes>
+            </SetlistsProvider>
+          </LyricsProvider>
         </SongsProvider>
       </MemoryRouter>
     </AuthContext.Provider>,

@@ -587,6 +587,76 @@
   color: var(--color-muted);
 }
 
+/* "Na letra": the count beside the section title, the snippet under a song card */
+.lyric-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lyric-count {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.lyric-snippet {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.8125rem;
+  line-height: 19px;
+  color: var(--color-muted);
+}
+
+/* The matched words: amber text (--color-accent-text is amber in both themes), no highlight box */
+.lyric-hit {
+  background: none;
+  color: var(--color-accent-text);
+  font-weight: 700;
+}
+
+/* Loading skeleton: the card's tile and bars in the elevated tone, without text */
+.lyric-skeleton-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lyric-skeleton-tile {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--color-elevated);
+}
+
+.lyric-skeleton-text,
+.lyric-skeleton-snippet {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lyric-skeleton-snippet {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.lyric-skeleton-bar {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--color-elevated);
+}
+
+.lyric-skeleton-short {
+  width: 55%;
+}
+
 /* The key pills sit under the title, aligned with the text column. */
 .song-card .chips-compact {
   padding-left: calc(var(--tile) + var(--tile-gap));

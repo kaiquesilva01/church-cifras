@@ -1,4 +1,6 @@
+import { Fragment } from 'react';
 import { Link } from 'react-router';
+import type { SnippetPart } from '../catalog/lyricsSearch';
 import type { SongSummary } from '../catalog/types';
 import { defaultKeyFor } from '../setlists/items';
 import { KeyChips } from './KeyChips';
@@ -19,11 +21,37 @@ const CHEVRON = (
   </svg>
 );
 
-export function SongList({ songs }: { songs: SongSummary[] }) {
+/** Parts are joined by a space, except the "…" marks, which sit against their neighbour. */
+function LyricSnippet({ parts }: { parts: SnippetPart[] }) {
+  return (
+    <p className="lyric-snippet">
+      {parts.map((part, index) => {
+        const previous = parts[index - 1];
+        const space = previous && previous.text !== '…' && part.text !== '…' ? ' ' : '';
+        return (
+          <Fragment key={index}>
+            {space}
+            {part.match ? <mark className="lyric-hit">{part.text}</mark> : part.text}
+          </Fragment>
+        );
+      })}
+    </p>
+  );
+}
+
+export function SongList({
+  songs,
+  snippets,
+}: {
+  songs: SongSummary[];
+  /** Lyrics snippet per song id, shown at the bottom of the card when there is one. */
+  snippets?: ReadonlyMap<string, SnippetPart[]>;
+}) {
   return (
     <ul className="list">
       {songs.map((song) => {
         const key = defaultKeyFor(song);
+        const snippet = snippets?.get(song.id);
         return (
           <li key={song.id} className="list-card song-card">
             <Link to={`/musicas/${song.id}`} className="list-main song-main">
@@ -44,6 +72,7 @@ export function SongList({ songs }: { songs: SongSummary[] }) {
               selected={key ?? undefined}
               compact
             />
+            {snippet && <LyricSnippet parts={snippet} />}
           </li>
         );
       })}

@@ -58,4 +58,34 @@ describe('SongList', () => {
     expect(rows[0]).toHaveTextContent('TomD');
     expect(rows[1]).toHaveTextContent('Tom–');
   });
+
+  it('renders the lyrics snippet with the matched words highlighted', () => {
+    render(
+      <MemoryRouter>
+        <SongList
+          songs={[song]}
+          snippets={
+            new Map([
+              [
+                's1',
+                [
+                  { text: 'Santo', match: true },
+                  { text: 'é o Senhor', match: false },
+                ],
+              ],
+            ])
+          }
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Santo').tagName).toBe('MARK');
+    expect(screen.getByText('Santo').closest('.lyric-snippet')).toHaveTextContent(
+      'Santo é o Senhor',
+    );
+  });
+
+  it('shows no snippet when the song has none', () => {
+    const { container } = renderList();
+    expect(container.querySelector('.lyric-snippet')).toBeNull();
+  });
 });

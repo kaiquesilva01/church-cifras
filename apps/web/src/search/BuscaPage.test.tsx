@@ -1,19 +1,64 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
+import { LyricsProvider } from '../catalog/LyricsProvider';
 import { SongsProvider } from '../catalog/SongsProvider';
-import { fakeCatalogApi, sampleSongs } from '../test/fakeCatalogApi';
+import type { CatalogApi } from '../catalog/catalogApi';
+import type { SongSummary } from '../catalog/types';
+import { fakeCatalogApi, makeSong, sampleSongs } from '../test/fakeCatalogApi';
 import { BuscaPage } from './BuscaPage';
 
-function renderBusca(path = '/busca') {
+const lyrics = new Map([
+  ['s1', 'Santo, santo, santo é o Senhor Deus todo poderoso'],
+  ['s3', 'Grande é o Senhor, digno de louvor'],
+]);
+
+function renderBusca(
+  path = '/busca',
+  api: CatalogApi = fakeCatalogApi(sampleSongs, {
+    subscribeLyrics: (cb) => {
+      cb(lyrics);
+      return () => undefined;
+    },
+  }),
+) {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <SongsProvider api={fakeCatalogApi(sampleSongs)}>
-        <BuscaPage />
+      <SongsProvider api={api}>
+        <LyricsProvider api={api}>
+          <BuscaPage />
+        </LyricsProvider>
       </SongsProvider>
     </MemoryRouter>,
   );
 }
+
+/** Songs with a Harpa hymn, to check which section each one lands in. */
+const mixedSongs: SongSummary[] = [
+  makeSong({
+    id: 's1',
+    title: 'Sonda-me',
+    titleNormalized: 'sonda me',
+    artistName: 'Aline Barros',
+  }),
+  makeSong({
+    id: 'h1',
+    title: 'Hino de louvor',
+    titleNormalized: 'hino de louvor',
+    artistId: 'harpa',
+    artistName: 'Harpa',
+  }),
+];
+const mixedLyrics = new Map([
+  ['s1', 'Santo, santo, santo é o Senhor'],
+  ['h1', 'Santo é o Senhor Deus'],
+]);
+const mixedApi = fakeCatalogApi(mixedSongs, {
+  subscribeLyrics: (cb) => {
+    cb(mixedLyrics);
+    return () => undefined;
+  },
+});
 
 describe('BuscaPage', () => {
   it('asks for a search before showing anything', () => {
@@ -82,5 +127,117 @@ describe('BuscaPage', () => {
     renderBusca('/busca?q=ressuscita');
     expect(screen.getByText('Ressuscita-me')).toBeInTheDocument();
     expect(screen.queryByText('Sonda-me')).not.toBeInTheDocument();
+  });
+
+  it('places the search in the Busca placeholder and label', () => {
+    renderBusca();
+    const field = screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' });
+    expect(field).toHaveAttribute('placeholder', 'Buscar música, cantor ou letra…');
+  });
+
+  it('shows a "Na letra" section with the snippet and the highlighted words', () => {
+    renderBusca('/busca?q=santo');
+    expect(screen.getByRole('heading', { name: 'Na letra' })).toBeInTheDocument();
+    // The snippet highlights the located occurrence (the first one), as searchLyrics returns it.
+    expect(screen.getByText('Santo,').tagName).toBe('MARK');
+    expect(screen.getByText('1 música')).toBeInTheDocument();
+  });
+
+  it('does not repeat a song already listed by title', () => {
+    renderBusca(
+      '/busca?q=sonda',
+      fakeCatalogApi(sampleSongs, {
+        subscribeLyrics: (cb) => {
+          cb(new Map([['s1', 'Sonda-me, sonda-me']]));
+          return () => undefined;
+        },
+      }),
+    );
+    expect(screen.getByRole('heading', { name: 'Músicas' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+  });
+
+  it('hides "Na letra" under the Cantores filter', () => {
+    renderBusca('/busca?q=santo&tipo=cantores', mixedApi);
+    expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+  });
+
+  it('shows "Na letra" under Tudo with songs and hymns, only songs under Músicas, only hymns under Harpa', () => {
+    const tudo = renderBusca('/busca?q=santo', mixedApi);
+    expect(screen.getByRole('heading', { name: 'Na letra' })).toBeInTheDocument();
+    expect(screen.getByText('2 músicas')).toBeInTheDocument();
+    tudo.unmount();
+
+    const musicas = renderBusca('/busca?q=santo&tipo=musicas', mixedApi);
+    expect(screen.getByText('1 música')).toBeInTheDocument();
+    expect(screen.queryByText('Hino de louvor')).not.toBeInTheDocument();
+    musicas.unmount();
+
+    renderBusca('/busca?q=santo&tipo=harpa', mixedApi);
+    expect(screen.getByText('1 música')).toBeInTheDocument();
+    expect(screen.queryByText('Sonda-me')).not.toBeInTheDocument();
+    expect(screen.getByText('Hino de louvor')).toBeInTheDocument();
+  });
+
+  it('shows skeleton cards while lyrics load, with title results already visible', () => {
+    const { container } = renderBusca(
+      '/busca?q=aline',
+      fakeCatalogApi(sampleSongs, { subscribeLyrics: () => () => undefined }),
+    );
+    expect(screen.getByRole('heading', { name: 'Na letra' })).toBeInTheDocument();
+    expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
+    expect(screen.getByText('Sonda-me')).toBeInTheDocument();
+  });
+
+  it('does not show "Nada encontrado" while lyrics are loading', () => {
+    renderBusca(
+      '/busca?q=zzz',
+      fakeCatalogApi(sampleSongs, { subscribeLyrics: () => () => undefined }),
+    );
+    expect(screen.getByRole('heading', { name: 'Na letra' })).toBeInTheDocument();
+    expect(screen.queryByText(/Nada encontrado/)).not.toBeInTheDocument();
+  });
+
+  it('shows "Nada encontrado" when lyrics are ready and nothing matched', () => {
+    renderBusca('/busca?q=zzz');
+    expect(screen.getByText('Nada encontrado para “zzz”.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+  });
+
+  it('shows nothing in "Na letra" when lyrics fail, and titles keep working', () => {
+    renderBusca(
+      '/busca?q=aline',
+      fakeCatalogApi(sampleSongs, {
+        subscribeLyrics: (_cb, onError) => {
+          onError(new Error('falhou'));
+          return () => undefined;
+        },
+      }),
+    );
+    expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+    expect(screen.getByText('Sonda-me')).toBeInTheDocument();
+  });
+
+  it('does not search lyrics for queries under 3 characters', () => {
+    const { container } = renderBusca(
+      '/busca?q=ab',
+      fakeCatalogApi(sampleSongs, { subscribeLyrics: () => () => undefined }),
+    );
+    expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
+  it('shows a song without a lyrics entry by its title', () => {
+    renderBusca(
+      '/busca?q=ressuscita',
+      fakeCatalogApi(sampleSongs, {
+        subscribeLyrics: (cb) => {
+          cb(new Map());
+          return () => undefined;
+        },
+      }),
+    );
+    expect(screen.getByText('Ressuscita-me')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
   });
 });
