@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
-import { deriveArtists, filterArtists, filterSongs } from '../catalog/search';
+import { deriveArtists, filterArtists, filterSongs, splitHarpa } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { NextCultoCard } from '../setlists/NextCultoCard';
 import { todayLocal } from '../setlists/dates';
@@ -18,10 +18,16 @@ import { SongList } from './SongList';
 const TABS = [
   { id: 'musicas', label: 'Músicas', placeholder: 'Buscar música ou cantor…' },
   { id: 'cantores', label: 'Cantores', placeholder: 'Buscar cantor…' },
+  { id: 'harpa', label: 'Harpa', placeholder: 'Buscar na Harpa…' },
   { id: 'repertorios', label: 'Repertórios', placeholder: '' },
 ] as const;
 
-const TAB_PATHS = { musicas: '/', cantores: '/?aba=cantores', repertorios: '/?aba=repertorios' };
+const TAB_PATHS = {
+  musicas: '/',
+  cantores: '/?aba=cantores',
+  harpa: '/?aba=harpa',
+  repertorios: '/?aba=repertorios',
+};
 
 export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
   const { role } = useAuth();
@@ -52,19 +58,20 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
   const abaParam = params.get('aba');
   const tab = TABS.find((t) => t.id === abaParam) ?? TABS[0];
 
-  const artists = useMemo(() => deriveArtists(songs), [songs]);
+  const { regular, harpa } = useMemo(() => splitHarpa(songs), [songs]);
+  const artists = useMemo(() => deriveArtists(regular), [regular]);
   const visibleSongs = useMemo(
     () =>
-      filterSongs(songs, query).sort((a, b) =>
+      filterSongs(tab.id === 'harpa' ? harpa : regular, query).sort((a, b) =>
         a.titleNormalized.localeCompare(b.titleNormalized, 'pt-BR'),
       ),
-    [songs, query],
+    [tab.id, harpa, regular, query],
   );
   const visibleArtists = useMemo(() => filterArtists(artists, query), [artists, query]);
 
   const setQuery = (value: string) => {
     const next: Record<string, string> = {};
-    if (tab.id === 'cantores') next.aba = 'cantores';
+    if (tab.id !== 'musicas') next.aba = tab.id;
     if (value) next.q = value;
     setParams(next, { replace: true });
   };
@@ -72,7 +79,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
   const emptyText = query.trim()
     ? `Nada encontrado para “${query.trim()}”.`
     : 'Nenhuma cifra ainda.';
-  const items = tab.id === 'musicas' ? visibleSongs : visibleArtists;
+  const items = tab.id === 'cantores' ? visibleArtists : visibleSongs;
 
   const createSetlist = async (value: { date: string; label: string }): Promise<void> => {
     setCreateBusy(true);
@@ -95,7 +102,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
       )}
       <ScreenHeader
         eyebrow={dayEyebrow(now)}
-        title={tab.id === 'repertorios' ? 'Repertório' : 'Músicas'}
+        title={tab.id === 'repertorios' ? 'Repertório' : tab.id === 'harpa' ? 'Harpa' : 'Músicas'}
       />
       {tab.id !== 'repertorios' && (
         <input
@@ -158,10 +165,10 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
             </p>
           )}
           {status === 'ready' && items.length === 0 && <p className="status">{emptyText}</p>}
-          {tab.id === 'musicas' ? (
-            <SongList songs={visibleSongs} />
-          ) : (
+          {tab.id === 'cantores' ? (
             <ArtistList artists={visibleArtists} />
+          ) : (
+            <SongList songs={visibleSongs} />
           )}
         </div>
       )}
