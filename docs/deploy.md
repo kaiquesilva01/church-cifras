@@ -65,7 +65,7 @@ Esses valores não são segredos (os `VITE_*` vão para o site publicado; `ADMIN
 ## 6. Service account (`secrets`)
 
 1. No Google Cloud Console do projeto: IAM e administrador > Contas de serviço > Criar conta de serviço.
-2. Conceda os papéis **Firebase Admin**, **Cloud Functions Admin**, **Service Account User**, **Cloud Build Editor** (`roles/cloudbuild.builds.editor`), **Artifact Registry Administrator** (`roles/artifactregistry.admin`) **Cloud Run Admin** (`roles/run.admin`) e **Cloud Scheduler Admin** (`roles/cloudscheduler.admin`, para criar o job diário de Estatísticas). A lista exigida pela documentação do Firebase pode mudar; consulte-a se o deploy falhar por permissão.
+2. Conceda os papéis **Firebase Admin**, **Cloud Functions Admin**, **Service Account User**, **Cloud Build Editor** (`roles/cloudbuild.builds.editor`), **Artifact Registry Administrator** (`roles/artifactregistry.admin`), **Cloud Run Admin** (`roles/run.admin`) e **Cloud Scheduler Admin** (`roles/cloudscheduler.admin`, para criar o job diário de Estatísticas). A lista exigida pela documentação do Firebase pode mudar; consulte-a se o deploy falhar por permissão.
 3. Em Chaves > Adicionar chave > JSON, baixe o arquivo.
 4. No GitHub, aba **Secrets**, crie `FIREBASE_SERVICE_ACCOUNT` com o **conteúdo inteiro** do JSON.
 5. Apague o arquivo JSON local. Nunca o commite.
