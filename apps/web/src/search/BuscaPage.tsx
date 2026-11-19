@@ -1,12 +1,6 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import {
-  compareTitles,
-  deriveArtists,
-  filterArtists,
-  filterSongs,
-  splitHarpa,
-} from '../catalog/search';
+import { deriveArtists, filterArtists, searchSongSections, splitHarpa } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { ScreenHeader } from '../ui/ScreenHeader';
 import { ArtistList } from './ArtistList';
@@ -38,19 +32,13 @@ export function BuscaPage() {
   };
   const trimmed = query.trim();
 
-  const { regular, harpa } = useMemo(() => splitHarpa(songs), [songs]);
-  const artists = useMemo(() => filterArtists(deriveArtists(regular), query), [regular, query]);
-  const matches = useMemo(
-    () =>
-      filterSongs(regular, query).sort((a, b) =>
-        compareTitles(a.titleNormalized, b.titleNormalized),
-      ),
-    [regular, query],
+  const artists = useMemo(
+    () => filterArtists(deriveArtists(splitHarpa(songs).regular), query),
+    [songs, query],
   );
-  const harpaMatches = useMemo(
-    () =>
-      filterSongs(harpa, query).sort((a, b) => compareTitles(a.titleNormalized, b.titleNormalized)),
-    [harpa, query],
+  const { musicas: matches, harpa: harpaMatches } = useMemo(
+    () => searchSongSections(songs, query),
+    [songs, query],
   );
   const showArtists = filter === 'Tudo' || filter === 'Cantores';
   const showSongs = filter === 'Tudo' || filter === 'Músicas';
