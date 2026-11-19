@@ -99,6 +99,36 @@ test('non pr-create allowed commands carry no reminder', () => {
   assert.deepEqual(r, { allow: true });
 });
 
+test('never approves a PR, on any base', () => {
+  for (const command of [
+    'gh pr review 5 --approve',
+    'gh pr review --approve 5 -b "ok"',
+    'gh pr review 5 -a',
+    'gh -R o/r pr review 5 --approve',
+    'git checkout develop && gh pr review 5 -a -b lgtm',
+  ]) {
+    const r = evaluateCommand({ command, branch: 'feat/a', stagedFiles: [] });
+    assert.equal(r.allow, false, command);
+    assert.match(r.reason ?? r.message ?? '', /Aprovar PR/, command);
+  }
+});
+
+test('still allows commenting or requesting changes on a PR', () => {
+  for (const command of ['gh pr review 5 --comment -b "nit"', 'gh pr review 5 -r -b "fix"', 'gh pr view 5']) {
+    const r = evaluateCommand({ command, branch: 'feat/a', stagedFiles: [] });
+    assert.equal(r.allow, true, command);
+  }
+});
+
+test('allows opening the release PR develop -> main (the human approves and merges it)', () => {
+  const r = evaluateCommand({
+    command: 'gh pr create --base main --head develop --title "release" --body "x"',
+    branch: 'feat/a',
+    stagedFiles: [],
+  });
+  assert.equal(r.allow, true);
+});
+
 const merge = (command, resolvePrBase) =>
   evaluateCommand({ command, branch: 'feat/a', stagedFiles: [], resolvePrBase });
 
