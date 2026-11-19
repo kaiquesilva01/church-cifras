@@ -443,9 +443,20 @@ describe('songLyrics rules', () => {
     await assertSucceeds(songAndLyrics(memberDb(), lyricsData({ text: 'x'.repeat(20000) })));
   });
 
-  it('denies viewer creating songLyrics', async () => {
+  const seedSong = (songId: string) =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `songs/${songId}`), { title: 'Sonda-me' });
+    });
+
+  it('denies viewer creating songLyrics for an existing song', async () => {
+    await seedSong('s9');
     const db = env.authenticatedContext('m1', { role: 'viewer' }).firestore();
-    await assertFails(songAndLyrics(db));
+    await assertFails(setDoc(doc(db, 'songLyrics/s9'), lyricsData()));
+  });
+
+  it('member creates songLyrics for an already-existing song', async () => {
+    await seedSong('s9');
+    await assertSucceeds(setDoc(doc(memberDb(), 'songLyrics/s9'), lyricsData()));
   });
 
   it('denies songLyrics without the song in the same write', async () => {
