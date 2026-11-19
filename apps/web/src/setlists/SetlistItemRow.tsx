@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import type { SongSummary } from '../catalog/types';
-import { ChevronDownIcon, ChevronUpIcon, CloseIcon, OpenChevronIcon } from './icons';
+import { CloseIcon, OpenChevronIcon } from './icons';
 import { itemHref } from './navigation';
 import type { RowDrag } from './SortableItems';
 import type { SetlistItem } from './types';
@@ -12,10 +12,6 @@ export interface SetlistItemRowProps {
   song: SongSummary | undefined;
   position: number;
   editable: boolean;
-  isFirst: boolean;
-  isLast: boolean;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
   onRemove: () => void;
   onPickKey: () => void;
   /** Presente só para quem edita: ref/estilo do `li` e a alça `≡`. */
@@ -28,10 +24,6 @@ export function SetlistItemRow({
   song,
   position,
   editable,
-  isFirst,
-  isLast,
-  onMoveUp,
-  onMoveDown,
   onRemove,
   onPickKey,
   drag,
@@ -82,24 +74,6 @@ export function SetlistItemRow({
       )}
       {editable && (
         <span className="setlist-item-actions">
-          <button
-            type="button"
-            className="btn btn-icon"
-            aria-label={`Mover ${title} para cima`}
-            disabled={isFirst}
-            onClick={onMoveUp}
-          >
-            <ChevronUpIcon />
-          </button>
-          <button
-            type="button"
-            className="btn btn-icon"
-            aria-label={`Mover ${title} para baixo`}
-            disabled={isLast}
-            onClick={onMoveDown}
-          >
-            <ChevronDownIcon />
-          </button>
           <button
             type="button"
             className="btn btn-icon"
