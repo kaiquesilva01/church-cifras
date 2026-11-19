@@ -138,4 +138,67 @@ describe('PdfFrame', () => {
     expect(document.body.style.overflow).toBe('');
     expect(exit).toHaveBeenCalled();
   });
+
+  it('does not close on an unrelated fullscreenchange when real fullscreen never started', () => {
+    render(
+      <PdfFrame>
+        <p>cifra</p>
+      </PdfFrame>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Tela cheia' }));
+    fireEvent(document, new Event('fullscreenchange'));
+    expect(frame()).toHaveClass('is-fullscreen');
+  });
+
+  it('leaves real fullscreen if it is granted after the overlay was already closed', async () => {
+    let grant: () => void = () => undefined;
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: function (this: Element) {
+        return new Promise<void>((resolve) => {
+          grant = () => {
+            doc.fullscreenElement = this;
+            resolve();
+          };
+        });
+      },
+    });
+    const exit = vi.fn(() => {
+      doc.fullscreenElement = null;
+      return Promise.resolve();
+    });
+    doc.exitFullscreen = exit;
+    render(
+      <PdfFrame>
+        <p>cifra</p>
+      </PdfFrame>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Tela cheia' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sair da tela cheia' }));
+    expect(exit).not.toHaveBeenCalled();
+    grant();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(exit).toHaveBeenCalledTimes(1);
+  });
+
+  it('is a modal dialog with focus on the exit button while maximized', () => {
+    render(
+      <PdfFrame>
+        <p>cifra</p>
+      </PdfFrame>,
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tela cheia' }));
+    expect(screen.getByRole('dialog', { name: 'PDF em tela cheia' })).toHaveAttribute(
+      'aria-modal',
+      'true',
+    );
+    const exit = screen.getByRole('button', { name: 'Sair da tela cheia' });
+    expect(exit).toHaveFocus();
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    document.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(true);
+    expect(exit).toHaveFocus();
+  });
 });

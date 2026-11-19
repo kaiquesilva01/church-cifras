@@ -58,14 +58,15 @@
   z-index: 200;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
   background: var(--color-bg);
 }
 
 .pdf-frame.is-fullscreen .pdf-expand {
   position: fixed;
   top: calc(12px + env(safe-area-inset-top));
-  right: 12px;
+  right: calc(12px + env(safe-area-inset-right));
   width: 44px;
   height: 44px;
   border-radius: 12px;
