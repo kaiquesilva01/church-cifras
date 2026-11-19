@@ -93,6 +93,7 @@ Descartadas: contar abertura de cifra (a regra de uso vem do repertório, não d
 - `pads/` fora do armazenamento.
 - Contagem também dentro do `getStats`, além do agendador.
 - Se o agendador ficasse parado por mais de ~28 dias, repertórios expirariam sem serem contados: risco aceito.
+- `setlistUsage` usa só o id do repertório como chave: se um repertório já contado for depois re-datado ou reaproveitado (a data editada), ele não é contado de novo. A alternativa (chave `${setlistId}_${date}`) contaria duas vezes as correções de data errada. Fica para o dono decidir antes do release para main.
 
 ## Fica para o builder
 

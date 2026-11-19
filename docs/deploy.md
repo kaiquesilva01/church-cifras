@@ -65,7 +65,7 @@ Esses valores não são segredos (os `VITE_*` vão para o site publicado; `ADMIN
 ## 6. Service account (`secrets`)
 
 1. No Google Cloud Console do projeto: IAM e administrador > Contas de serviço > Criar conta de serviço.
-2. Conceda os papéis **Firebase Admin**, **Cloud Functions Admin**, **Service Account User**, **Cloud Build Editor** (`roles/cloudbuild.builds.editor`), **Artifact Registry Administrator** (`roles/artifactregistry.admin`) e **Cloud Run Admin** (`roles/run.admin`). A lista exigida pela documentação do Firebase pode mudar; consulte-a se o deploy falhar por permissão.
+2. Conceda os papéis **Firebase Admin**, **Cloud Functions Admin**, **Service Account User**, **Cloud Build Editor** (`roles/cloudbuild.builds.editor`), **Artifact Registry Administrator** (`roles/artifactregistry.admin`) **Cloud Run Admin** (`roles/run.admin`) e **Cloud Scheduler Admin** (`roles/cloudscheduler.admin`, para criar o job diário de Estatísticas). A lista exigida pela documentação do Firebase pode mudar; consulte-a se o deploy falhar por permissão.
 3. Em Chaves > Adicionar chave > JSON, baixe o arquivo.
 4. No GitHub, aba **Secrets**, crie `FIREBASE_SERVICE_ACCOUNT` com o **conteúdo inteiro** do JSON.
 5. Apague o arquivo JSON local. Nunca o commite.
@@ -137,7 +137,8 @@ Os repertórios somem sozinhos 30 dias após o culto (campo `expiresAt`). Depois
 
 ## 11. Estatísticas: Cloud Scheduler e setlistUsage
 
-- Antes do primeiro deploy, ative a API **Cloud Scheduler** no projeto (APIs e serviços > Biblioteca, ou `gcloud services enable cloudscheduler.googleapis.com --project <id>`). Sem ela, o deploy da função `countSetlistUsage` falha.
-- Depois do deploy, confira no console do Google Cloud (Cloud Scheduler) que o job de `countSetlistUsage` existe e roda todo dia às 04:00 (horário de Brasília, `America/Sao_Paulo`).
+- O Firebase CLI normalmente ativa sozinho a API `cloudscheduler.googleapis.com` no primeiro deploy da função `countSetlistUsage`. Se o CLI ou a conta de deploy não conseguir ativá-la, ative-a manualmente antes do primeiro deploy (APIs e serviços > Biblioteca, ou `gcloud services enable cloudscheduler.googleapis.com --project <id>`); sem ela, o deploy da função falha.
+- Depois do deploy, confira no console do Google Cloud (Cloud Scheduler) que o job `firebase-schedule-countSetlistUsage-southamerica-east1` existe e roda todo dia às 04:00 (horário de Brasília, `America/Sao_Paulo`).
+- Após o primeiro deploy, force a execução do job no Cloud Scheduler ("Forçar execução") e abra Estatísticas uma vez como admin para conferir os dados reais.
 - A coleção `setlistUsage` **não** deve ter política de TTL (Firestore > TTL e índices): ela guarda o histórico de uso das músicas, que precisa durar.
 - A primeira visita de um admin a Estatísticas já conta os repertórios fechados que ainda existem; o job diário faz o mesmo para os demais.
