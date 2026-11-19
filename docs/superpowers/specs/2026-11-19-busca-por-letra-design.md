@@ -12,7 +12,8 @@ Vale para músicas e para os hinos da Harpa, que as pessoas costumam procurar po
 ## Metas
 
 - A Busca acha músicas pelo texto da letra, dentro dos filtros **Tudo**, **Músicas** e **Harpa**.
-- A aba **Músicas** da Home também (decisão da pessoa): mesma seção **Na letra**, só entre músicas comuns.
+- As abas **Músicas** e **Harpa** da Home também (decisão da pessoa): mesma seção **Na letra**, cada aba só entre
+  as suas músicas (comuns em Músicas, hinos em Harpa).
 - Uma seção **Na letra** mostra, por música, o cartão normal (tom, título, cantor) e um trecho da letra com
   as palavras buscadas em âmbar e negrito (Paper 03b).
 - A busca continua instantânea: nunca abre PDF na hora de buscar.
@@ -23,7 +24,7 @@ Vale para músicas e para os hinos da Harpa, que as pessoas costumam procurar po
 ## Fora de escopo e anti-metas
 
 - Não funciona no filtro **Cantores** da Busca nem na aba Cantores da Home (decisão da pessoa).
-- Ficam sem busca por letra, por ora: a aba **Harpa** da Home, a aba Repertórios e o seletor de músicas do repertório
+- Ficam sem busca por letra, por ora: a aba Repertórios da Home e o seletor de músicas do repertório
   (`AddSongSheet`). Dá para estender depois com o mesmo componente.
 - Sem tolerância a erro de digitação, sem ranking por relevância além do descrito abaixo, sem OCR de PDF escaneado,
   sem edição manual da letra, sem buscar por acorde.
@@ -85,11 +86,12 @@ Upload e importação em lote já passam por `saveUpload`, então os dois ganham
 - **Na letra** é uma seção só (músicas e hinos da Harpa juntos; o cartão mostra o cantor). Em **Tudo** aparece depois de
   Cantores, Músicas e Harpa; em **Músicas** só com músicas comuns; em **Harpa** só com hinos; em **Cantores** não aparece.
 - Campo de busca: placeholder "Buscar música, cantor ou letra…" (e o `aria-label` correspondente).
-- **Home, aba Músicas:** o campo passa a dizer "Buscar música, cantor ou letra…". Com a busca vazia a aba lista o catálogo
-  todo, como hoje. Com busca de 3 ou mais caracteres, a lista por título/cantor continua igual e a seção **Na letra**
-  aparece abaixo dela (mesmo cartão com trecho, mesmo esqueleto enquanto carrega, sem repetir o que já casou por título).
-  Se só a letra casar, aparece só **Na letra**. "Nada encontrado" só aparece quando as letras já carregaram e nada casou.
-  É o mesmo componente da Busca. Hinos da Harpa não entram aqui (a aba Músicas já os exclui).
+- **Home, abas Músicas e Harpa:** o campo da aba Músicas passa a dizer "Buscar música, cantor ou letra…" e o da aba
+  Harpa "Buscar na Harpa ou na letra…" (texto da Harpa é escolha minha). Com a busca vazia a aba lista tudo, como hoje.
+  Com busca de 3 ou mais caracteres, a lista por título/cantor continua igual e a seção **Na letra** aparece abaixo dela
+  (mesmo cartão com trecho, mesmo esqueleto enquanto carrega, sem repetir o que já casou por título). Se só a letra casar,
+  aparece só **Na letra**. "Nada encontrado" só aparece quando as letras já carregaram e nada casou. É o mesmo componente da
+  Busca. Cada aba só procura nas suas músicas: Músicas exclui os hinos e Harpa só tem hinos. A aba Cantores não busca letra.
 - Erro ao carregar letras: a seção **Na letra** simplesmente não aparece; título e cantor seguem funcionando.
 - "Nada encontrado" só aparece quando nenhuma seção (incluindo **Na letra**) tem resultado e as letras já carregaram.
 
@@ -104,7 +106,7 @@ acesso, no Cloud Shell, depois do deploy. Até lá, só músicas novas são acha
 
 Unitários para `extractLyrics`, para o casamento/trecho/ordem da busca por letra e para o provider; regras
 (`tests/rules`) para criar/negar `songLyrics`; teste da Cloud Function `deleteSong`; testes da `BuscaPage`
-(filtros, esqueleto, erro, "nada encontrado"), da `HomePage` (aba Músicas com letra; abas Cantores e Harpa sem);
+(filtros, esqueleto, erro, "nada encontrado"), da `HomePage` (abas Músicas e Harpa com letra; aba Cantores sem);
 um e2e no emulador (envia PDF novo → busca por um verso na Busca e na Home → acha).
 
 ## O que fica para quem implementa
@@ -114,7 +116,7 @@ nomes/estilos de CSS da seção e do esqueleto (seguir o Paper e o design system
 
 ## Escolhas minhas (não vieram da conversa)
 
-3 caracteres mínimos para consultar letra; limite de 20.000 caracteres por letra; "Na letra" única misturando
+3 caracteres mínimos para consultar letra; texto do campo da aba Harpa; limite de 20.000 caracteres por letra; "Na letra" única misturando
 Harpa e músicas; esconder **Na letra** quando as letras falham; não repetir em **Na letra** o que já casou por título.
 
 ## Lançamento

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A Busca (Tudo, Músicas e Harpa; nunca Cantores) e a aba Músicas da Home acham músicas pelo texto da letra, mostrando um trecho com a frase destacada.
+**Goal:** A Busca (Tudo, Músicas e Harpa; nunca Cantores) e as abas Músicas e Harpa da Home acham músicas pelo texto da letra, mostrando um trecho com a frase destacada.
 
 **Architecture:** A letra é extraída do PDF no navegador, no upload, e gravada em `songLyrics/{songId}` (Firestore) no mesmo `writeBatch` da música nova. Um provider assina `songLyrics` em segundo plano depois que `songs` está pronta, e um componente/hook compartilhado (`LyricsResults`, `useLyricSearch`) filtra tudo em memória na `BuscaPage` e na `HomePage`. Músicas antigas são preenchidas por um script único (Admin SDK).
 
@@ -12,9 +12,9 @@
 
 ## Global Constraints
 
-- Escopo: `BuscaPage` (`/busca`) e a aba **Músicas** da `HomePage`. Não mexer nas abas Cantores, Harpa e Repertórios da Home, nem no `AddSongSheet`.
-- A seção se chama **Na letra**; o campo de busca da Busca e o da aba Músicas da Home passam a dizer `Buscar música, cantor ou letra…` (placeholder e `aria-label`). Os demais campos de busca não mudam.
-- Na Busca: **Cantores** não busca letra; **Tudo**, **Músicas** e **Harpa** buscam. Em Músicas só músicas comuns; em Harpa só hinos. Na Home: só a aba Músicas busca, e só entre músicas comuns.
+- Escopo: `BuscaPage` (`/busca`) e as abas **Músicas** e **Harpa** da `HomePage`. Não mexer nas abas Cantores e Repertórios da Home, nem no `AddSongSheet`.
+- A seção se chama **Na letra**; o campo de busca da Busca e o da aba Músicas da Home passam a dizer `Buscar música, cantor ou letra…`, e o da aba Harpa `Buscar na Harpa ou na letra…` (placeholder e `aria-label`). Os demais campos de busca não mudam.
+- Na Busca: **Cantores** não busca letra; **Tudo**, **Músicas** e **Harpa** buscam. Em Músicas só músicas comuns; em Harpa só hinos. Na Home: as abas Músicas (só músicas comuns) e Harpa (só hinos) buscam; Cantores não.
 - Letra só é consultada com a busca de **3 ou mais caracteres** normalizados (`normalizeText`).
 - Letra: no máximo **20.000 caracteres** (`MAX_LYRICS_CHARS`); texto legível (com acento, linhas separadas por `\n`), sem linhas de acorde.
 - Trecho de **~120 caracteres**, com palavras buscadas destacadas.
@@ -32,7 +32,7 @@
 - Música antiga sem documento de letra: aparece por título normalmente, nunca quebra (Tarefas 6 e 7).
 - Letra com mais de 20.000 caracteres: é cortada no cliente e o `create` não é negado pelas regras (Tarefa 3).
 - Letras ainda carregando com resultados por título: o título aparece na hora e "Nada encontrado" não pisca (Tarefas 6 e 7).
-- Home Músicas sem busca digitada: lista o catálogo todo como hoje, sem seção "Na letra" nem esqueleto (Tarefa 7).
+- Home Músicas e Harpa sem busca digitada: listam tudo como hoje, sem seção "Na letra" nem esqueleto (Tarefa 7).
 
 ## File Structure
 
@@ -199,7 +199,7 @@ Modificar: `apps/web/src/search/HomePage.tsx` (+ teste), `packages/chords/src/in
 
 ---
 
-### Task 7: Letra na aba Músicas da Home
+### Task 7: Letra nas abas Músicas e Harpa da Home
 
 **Files:**
 - Modify: `apps/web/src/search/HomePage.tsx`, `apps/web/src/search/HomePage.test.tsx`, `apps/web/src/routes/routes.test.tsx`
@@ -213,14 +213,15 @@ Modificar: `apps/web/src/search/HomePage.tsx` (+ teste), `packages/chords/src/in
   - `shows skeleton cards while lyrics load, with the title matches already visible`.
   - `does not show "Nada encontrado" while lyrics load; shows it when ready and nothing matched`.
   - `shows only "Na letra" when no title matches but a lyric does` (sem o texto "Nada encontrado").
-  - `Cantores and Harpa tabs do not search lyrics` (mesma busca nessas abas: sem `Na letra`).
-  - `does not search Harpa hymns by lyric on the Músicas tab`.
+  - `Harpa tab shows a "Na letra" section for a hymn whose lyrics match`, com o mesmo comportamento de esqueleto, sem repetição e "Nada encontrado".
+  - `Cantores tab does not search lyrics` (mesma busca: sem `Na letra`).
+  - `Músicas tab does not search Harpa hymns by lyric` e `Harpa tab does not search regular songs by lyric`.
   - `lists the whole catalog and no "Na letra" when the search is empty`.
-  - `Músicas tab search field is named "Buscar música, cantor ou letra…"` e o das outras abas continua igual.
+  - `Músicas tab search field is named "Buscar música, cantor ou letra…"`, o da aba Harpa `Buscar na Harpa ou na letra…`, e o da aba Cantores continua `Buscar cantor…`.
 - [ ] **Step 2: Run** `npm test -w @cifras/web -- HomePage routes` → FAIL.
-- [ ] **Step 3: Implement** em `HomePage`: na aba `musicas`, `useLyricSearch(regular, query, ids de visibleSongs)` e `<LyricsResults>` depois da `SongList`; o texto "Nada encontrado" só aparece quando `settled` (ou a busca não é `active`) e não há título nem letra; placeholder e `aria-label` da aba Músicas viram `Buscar música, cantor ou letra…` (a constante `TABS` é a fonte). Nas abas `cantores` e `harpa` o hook recebe lista vazia (nada é consultado). Atualize `routes.test.tsx` e os testes que usam o nome antigo do campo da aba Músicas.
+- [ ] **Step 3: Implement** em `HomePage`: nas abas `musicas` e `harpa`, `useLyricSearch(candidatos, query, ids de visibleSongs)` com candidatos = `regular` na aba Músicas e `harpa` na aba Harpa, e `<LyricsResults>` depois da `SongList`; o texto "Nada encontrado" só aparece quando `settled` (ou a busca não é `active`) e não há título nem letra; os placeholders/`aria-label` em `TABS` viram `Buscar música, cantor ou letra…` (Músicas) e `Buscar na Harpa ou na letra…` (Harpa). Na aba `cantores` o hook recebe lista vazia (nada é consultado). Atualize `routes.test.tsx` e os testes que usam os nomes antigos desses campos.
 - [ ] **Step 4: Run** `npm test -w @cifras/web`, `npm run lint`, `npm run typecheck` → PASS.
-- [ ] **Step 5: Commit** `feat(web): letra na aba Músicas da Home`.
+- [ ] **Step 5: Commit** `feat(web): letra nas abas Músicas e Harpa da Home`.
 
 ---
 
@@ -262,7 +263,7 @@ Modificar: `apps/web/src/search/HomePage.tsx` (+ teste), `packages/chords/src/in
 **Files:**
 - Create: `e2e/lyrics.spec.ts`
 
-- [ ] **Step 1: Write the test** (padrão de `e2e/upload.spec.ts`: `signInAs(page, ADMIN, 'Admin')`, `syntheticPdf`, `lettersTag`): admin envia um PDF sintético novo (título único) e salva; vai à Busca, digita `campo verde` (verso de `LYRICS` em `e2e/fixtures/pdf.ts`); espera o heading `Na letra`, o cartão com o título da música e um `mark` com `campo verde`; ao escolher **Cantores**, a seção some; ao buscar `ab`, a seção não aparece. Na Home, aba **Músicas**, a mesma busca também mostra `Na letra` com o cartão da música.
+- [ ] **Step 1: Write the test** (padrão de `e2e/upload.spec.ts`: `signInAs(page, ADMIN, 'Admin')`, `syntheticPdf`, `lettersTag`): admin envia um PDF sintético novo (título único) e salva; vai à Busca, digita `campo verde` (verso de `LYRICS` em `e2e/fixtures/pdf.ts`); espera o heading `Na letra`, o cartão com o título da música e um `mark` com `campo verde`; ao escolher **Cantores**, a seção some; ao buscar `ab`, a seção não aparece. Na Home, aba **Músicas**, a mesma busca também mostra `Na letra` com o cartão da música; na aba **Cantores** não mostra. (A aba Harpa fica coberta pelos testes de componente da Tarefa 7.)
 - [ ] **Step 2: Run** `npm run test:e2e` (inclui a nova spec) → PASS.
 - [ ] **Step 3: Commit** `test(e2e): busca por letra`.
 
@@ -270,6 +271,6 @@ Modificar: `apps/web/src/search/HomePage.tsx` (+ teste), `packages/chords/src/in
 
 ## Self-review
 
-- Cobertura do spec: dados e regras (T2), extração (T1), gravação só em música nova + sem letra (T3), `deleteSong` (T2), assinatura em segundo plano (T5), casamento/trecho/ordem/exclusão de duplicadas/3 caracteres (T4), filtros, esqueleto, erro e "nada encontrado" na Busca (T6), aba Músicas da Home (T7), preenchimento (T8), e2e e lançamento (T8/T9, `docs/deploy.md`).
+- Cobertura do spec: dados e regras (T2), extração (T1), gravação só em música nova + sem letra (T3), `deleteSong` (T2), assinatura em segundo plano (T5), casamento/trecho/ordem/exclusão de duplicadas/3 caracteres (T4), filtros, esqueleto, erro e "nada encontrado" na Busca (T6), abas Músicas e Harpa da Home (T7), preenchimento (T8), e2e e lançamento (T8/T9, `docs/deploy.md`).
 - Nomes consistentes entre tarefas: `extractLyrics`, `searchLyrics`, `LyricHit`, `SnippetPart`, `subscribeLyrics`, `useLyrics`, `LyricsProvider`, `useLyricsContext`, `useLyricSearch`, `LyricsResults`, `MAX_LYRICS_CHARS`, `MIN_LYRICS_QUERY`, `deleteLyricsDoc`.
 - Ordem: T1 e T2 independentes; T3 depende de T1 (e cria `lyricsLimits.ts`, que a T4 completa); T5 antes de T6; T7 depende de T6; T8 depende de T1; T9 por último.
