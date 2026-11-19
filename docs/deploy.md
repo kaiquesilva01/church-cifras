@@ -134,3 +134,10 @@ Os repertórios somem sozinhos 30 dias após o culto (campo `expiresAt`). Depois
 - a política de TTL da coleção `setlists` no campo `expiresAt` está ativa;
 - o índice ascendente de `setlists.expiresAt` está criado e ativo;
 - a conta de serviço do deploy consegue gerenciar índices (se o deploy falhar ao criar o índice, conceda o papel de administrador do Cloud Datastore/Firestore a ela).
+
+## 11. Estatísticas: Cloud Scheduler e setlistUsage
+
+- Antes do primeiro deploy, ative a API **Cloud Scheduler** no projeto (APIs e serviços > Biblioteca, ou `gcloud services enable cloudscheduler.googleapis.com --project <id>`). Sem ela, o deploy da função `countSetlistUsage` falha.
+- Depois do deploy, confira no console do Google Cloud (Cloud Scheduler) que o job de `countSetlistUsage` existe e roda todo dia às 04:00 (horário de Brasília, `America/Sao_Paulo`).
+- A coleção `setlistUsage` **não** deve ter política de TTL (Firestore > TTL e índices): ela guarda o histórico de uso das músicas, que precisa durar.
+- A primeira visita de um admin a Estatísticas já conta os repertórios fechados que ainda existem; o job diário faz o mesmo para os demais.
