@@ -71,6 +71,7 @@ interface Setup {
   storage?: { getItem(k: string): string | null; setItem(k: string, v: string): void };
   fetchBytes?: (p: string) => Promise<Uint8Array>;
   createEngine?: (f: unknown, g: () => void) => Promise<PadEngine>;
+  readCached?: () => Promise<Set<PadNote>>;
 }
 
 function setup(opts: Setup = {}) {
@@ -96,6 +97,7 @@ function setup(opts: Setup = {}) {
         fetchBytes={fetchBytes}
         createEngine={createEngine as never}
         storage={opts.storage ?? memoryStorage()}
+        readCachedNotes={opts.readCached ?? (() => Promise.resolve(new Set<PadNote>()))}
       >
         {children}
       </PadProvider>
@@ -114,6 +116,7 @@ function setup(opts: Setup = {}) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('PadProvider', () => {
@@ -848,5 +851,74 @@ describe('PadProvider', () => {
   it('usePad returns null outside the provider', () => {
     const { result } = renderHook(() => usePad());
     expect(result.current).toBeNull();
+  });
+
+  describe('cached notes', () => {
+    it('starts with the tones the pad cache already holds', async () => {
+      const { result } = setup({ readCached: () => Promise.resolve(new Set<PadNote>(['D'])) });
+      expect(result.current.cachedNotes.size).toBe(0);
+      await flush();
+      expect([...result.current.cachedNotes]).toEqual(['D']);
+    });
+
+    it('re-reads the cache once a sample is downloaded, until the service worker has stored it', async () => {
+      vi.useFakeTimers();
+      let stored = new Set<PadNote>();
+      const readCached = vi.fn(() => Promise.resolve(new Set(stored)));
+      const { result } = setup({ readCached });
+      await flush();
+      act(() => result.current.prefetch(['G']));
+      await flush(); // the download resolves; the worker has not stored it yet
+      expect(result.current.cachedNotes.has('G')).toBe(false);
+      stored = new Set<PadNote>(['G']);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(result.current.cachedNotes.has('G')).toBe(true);
+    });
+
+    it('stops re-reading when the sample never shows up (no service worker)', async () => {
+      vi.useFakeTimers();
+      const readCached = vi.fn(() => Promise.resolve(new Set<PadNote>()));
+      const { result } = setup({ readCached });
+      await flush();
+      act(() => result.current.prefetch(['G']));
+      await flush();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      const calls = readCached.mock.calls.length;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      expect(readCached.mock.calls.length).toBe(calls);
+      expect(result.current.cachedNotes.size).toBe(0);
+    });
+
+    it('marks the tone after a tap downloads it', async () => {
+      vi.useFakeTimers();
+      let stored = new Set<PadNote>();
+      const fetchBytes = vi.fn((path: string) => {
+        if (path.includes('DS11-G')) stored = new Set<PadNote>(['G']);
+        return Promise.resolve(new Uint8Array());
+      });
+      const engine = makeEngine();
+      const { result } = setup({
+        engine,
+        fetchBytes,
+        readCached: () => Promise.resolve(new Set(stored)),
+        createEngine: (f) => {
+          void (f as (p: string) => Promise<Uint8Array>)('pads/v1/DS11-G.m4a');
+          return Promise.resolve(engine as PadEngine);
+        },
+      });
+      await flush();
+      act(() => result.current.toggle('G', song));
+      await flush();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(result.current.cachedNotes.has('G')).toBe(true);
+    });
   });
 });
