@@ -32,15 +32,16 @@ export function SetlistItemRow({
   // O tom salvo deixou de existir entre os tons da música: aparece riscado.
   const keyGone = song !== undefined && !song.keys.includes(item.key);
   const keyLabel = keyGone ? <s>{item.key}</s> : item.key;
+  const rowClass = [
+    'list-card setlist-item',
+    song === undefined && 'setlist-item-missing',
+    !editable && 'is-readonly',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <li
-      className={`list-card setlist-item${song === undefined ? ' setlist-item-missing' : ''}${
-        editable ? '' : ' is-readonly'
-      }`}
-      ref={drag?.setNodeRef}
-      style={drag?.style}
-    >
+    <li className={rowClass} ref={drag?.setNodeRef} style={drag?.style}>
       {drag?.handle(title)}
       <span className="setlist-item-number muted">{position}</span>
       <span className="setlist-item-main">
