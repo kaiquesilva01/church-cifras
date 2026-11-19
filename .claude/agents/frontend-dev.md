@@ -18,6 +18,8 @@ Você é o desenvolvedor frontend do Church Cifras: React + TypeScript em `apps/
 
 ## Regras
 
+- Siga `docs/design-system.md`: só tokens de cor (nada de `#hex`), claro e escuro, estilos escopados no `redesign*.css` certo, estados vazio/carregando/erro e alvos de 44 px. Se a tela divergir do Paper, avise o `designer`/orquestrador em vez de improvisar.
+
 - Siga TDD (skill `superpowers:test-driven-development`): teste falhando antes do código.
 - Nunca despache subagentes; faça o trabalho você mesmo.
 - Nunca commitar em `main` nem em `develop`; subagentes nunca fazem merge de PR (merge é do orquestrador para develop e do humano para main).

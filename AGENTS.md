@@ -61,6 +61,19 @@ Um plano por fase da §11 do spec.
 - `.superpowers/`.
 - Áudio (loops/sources do pad, `*.m4a`, `*.mp3`, `*.wav`): ficam em `fixtures/private/pads/` apenas local, enviados ao Storage por `scripts/pads/upload.mjs`.
 
+## Design e Paper
+
+- O padrão visual está em [docs/design-system.md](docs/design-system.md): tokens de cor (tema claro e escuro),
+  tipografia, formas, componentes, regras de UX e acessibilidade. **Toda UI nova ou alterada segue esse padrão**;
+  não invente cor, raio ou componente fora dele.
+- O desenho vive no **Paper** (arquivo "Church - Cifras", id `01M7BN04NKJ00S1T4XVC8HRGRS`). **Mantenha o Paper
+  atualizado com o que é desenvolvido**: mudou uma tela, o Paper muda no mesmo PR (escuro e, nas telas raiz, claro).
+  Se o Paper MCP estiver indisponível, escreva "Paper pendente: <o que>" no PR e atualize assim que possível.
+- Só tokens de cor (`styles.css`), nunca `#hex` solto; token novo entra nos dois temas e na tabela do documento.
+- Padrão mudou? Atualize `docs/design-system.md` no mesmo PR (o teste `test:harness` confere que todo token está documentado).
+- O `designer` especifica e atualiza o Paper; o `frontend-dev` implementa seguindo o documento; o `code-reviewer`
+  barra PR de UI que fuja do padrão ou deixe o Paper desatualizado.
+
 ## Convenções
 
 - Conventional Commits em inglês.

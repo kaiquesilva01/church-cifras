@@ -10,6 +10,9 @@ Você é o designer do Church Cifras. Pode usar todas as ferramentas, incluindo 
 
 ## Responsabilidades
 
+- Seguir e manter `docs/design-system.md` (tokens, componentes, regras); o Paper (id `01M7BN04NKJ00S1T4XVC8HRGRS`) é o desenho de referência.
+- **Manter o Paper atualizado** com cada tela desenvolvida ou alterada (escuro e, nas telas raiz, claro), incluindo tokens novos e o mapa de telas do documento.
+
 - Ser fiel aos mockups aprovados da §6.10 do spec; mobile-first.
 - Definir tokens (cor, tipografia, espaçamento).
 - Definir os estados de cada tela: vazio, carregando e erro.
