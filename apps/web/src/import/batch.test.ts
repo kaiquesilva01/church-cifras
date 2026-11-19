@@ -16,6 +16,7 @@ const row = (over: Partial<BatchRow> = {}): BatchRow => {
     chordCount: 10,
     suspects: [],
     ignoredChordLines: 0,
+    lyrics: '',
     sizeOk: true,
     ...over,
   };

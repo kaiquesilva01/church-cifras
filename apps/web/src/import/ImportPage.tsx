@@ -173,6 +173,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
         file,
         suspects: [],
         ignoredChordLines: 0,
+        lyrics: '',
         sizeOk,
       };
       let row: BatchRow;
@@ -192,6 +193,7 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
             chordCount: read.chordCount,
             suspects: [...new Set(read.suspects.flat())],
             ignoredChordLines: read.ignoredChordLines,
+            lyrics: read.lyrics,
           };
         } catch (error) {
           // Unreadable PDF: shows up as "fora do padrão" so it lands in the report.
@@ -286,7 +288,13 @@ export function ImportPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
       const base = { file: row.file, key: row.key!, chordCount: row.chordCount };
       const songId = created.get(identity) ?? index.get(identity)?.id;
       const plan: UploadPlan = !songId
-        ? { ...base, action: 'new-song', title: row.title.trim(), artistName: row.artist.trim() }
+        ? {
+            ...base,
+            action: 'new-song',
+            title: row.title.trim(),
+            artistName: row.artist.trim(),
+            lyrics: row.lyrics,
+          }
         : row.status === 'substitui gerado'
           ? { ...base, action: 'replace-generated', songId }
           : { ...base, action: 'add-key', songId };
