@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { SongsProvider } from '../catalog/SongsProvider';
@@ -50,11 +50,15 @@ function renderPage(pad: PadContextValue | null) {
 }
 
 describe('PadPage', () => {
-  it('says the pad is off and points to the cifra, with the saved volume', () => {
+  it('says the pad is off and explains the tones, with the saved volume', () => {
     renderPage(fake());
     expect(screen.getByRole('heading', { level: 1, name: 'Pad' })).toBeInTheDocument();
     expect(screen.getByText('Pad desligado')).toBeInTheDocument();
-    expect(screen.getByText(/Abra uma cifra e toque em/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Toque em um tom para tocar. Com o pad ligado, toque em outro tom para trocar com transição suave.',
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText('60%')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Parar pad' })).not.toBeInTheDocument();
   });
@@ -98,5 +102,86 @@ describe('PadPage', () => {
   it('renders without a pad provider', () => {
     renderPage(null);
     expect(screen.getByText('Pad desligado')).toBeInTheDocument();
+  });
+});
+
+describe('PadPage tone grid', () => {
+  const free = { kind: 'free' } as const;
+  const TONES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+  function grid() {
+    return screen.getByRole('group', { name: 'Tons do pad' });
+  }
+
+  it('shows the 12 tones as buttons', () => {
+    renderPage(fake());
+    const buttons = within(grid()).getAllByRole('button');
+    expect(buttons.map((b) => b.textContent)).toEqual(TONES);
+  });
+
+  it('starts the pad from the Pad tab when it is off', () => {
+    const toggle = vi.fn();
+    const follow = vi.fn();
+    renderPage(fake({ toggle, follow }));
+    fireEvent.click(within(grid()).getByRole('button', { name: 'D' }));
+    expect(toggle).toHaveBeenCalledWith('D', free);
+    expect(follow).not.toHaveBeenCalled();
+  });
+
+  it('starts again after an error', () => {
+    const toggle = vi.fn();
+    renderPage(fake({ status: 'error', toggle }));
+    fireEvent.click(within(grid()).getByRole('button', { name: 'D' }));
+    expect(toggle).toHaveBeenCalledWith('D', free);
+  });
+
+  it('stops the pad when the tone that is playing is tapped', () => {
+    const toggle = vi.fn();
+    const follow = vi.fn();
+    renderPage(
+      fake({ status: 'playing', note: 'G', owner: { kind: 'song', songId: 's1' }, toggle, follow }),
+    );
+    fireEvent.click(within(grid()).getByRole('button', { name: 'G' }));
+    expect(toggle).toHaveBeenCalledWith('G', free);
+    expect(follow).not.toHaveBeenCalled();
+  });
+
+  it('crossfades to another tone without stopping or changing the owner', () => {
+    const toggle = vi.fn();
+    const follow = vi.fn();
+    renderPage(
+      fake({ status: 'playing', note: 'G', owner: { kind: 'song', songId: 's1' }, toggle, follow }),
+    );
+    fireEvent.click(within(grid()).getByRole('button', { name: 'D' }));
+    expect(follow).toHaveBeenCalledWith('D');
+    expect(toggle).not.toHaveBeenCalled();
+  });
+
+  it('while loading, a tap goes to toggle (stops the pad) as before', () => {
+    const toggle = vi.fn();
+    const follow = vi.fn();
+    renderPage(fake({ status: 'loading', toggle, follow }));
+    fireEvent.click(within(grid()).getByRole('button', { name: 'D' }));
+    expect(toggle).toHaveBeenCalledWith('D', free);
+    expect(follow).not.toHaveBeenCalled();
+  });
+
+  it('marks the playing tone with aria-pressed', () => {
+    renderPage(fake({ status: 'playing', note: 'G', owner: free }));
+    expect(within(grid()).getByRole('button', { name: 'G' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(within(grid()).getByRole('button', { name: 'D' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('marks no tone when the pad is off', () => {
+    renderPage(fake());
+    for (const button of within(grid()).getAllByRole('button')) {
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+    }
   });
 });
