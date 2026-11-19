@@ -30,6 +30,7 @@ import { EditSongDialog } from './EditSongDialog';
 import { KeyPanel } from './KeyPanel';
 import { loadFontBytes } from './loadFonts';
 import { ManageMenu, type ManageAction } from './ManageMenu';
+import { PdfFrame } from './PdfFrame';
 import { PdfPages, type PdfDocument } from './PdfPages';
 import { saveGenerated } from './saveGenerated';
 import { canSharePdf, pdfFile, sharePdf } from './sharePdf';
@@ -587,11 +588,13 @@ export function ViewerPage({
                 Não foi possível mostrar a prévia.
               </p>
             )}
-            <PdfPages
-              doc={current.doc}
-              overlays={panelOpen ? ops : NO_OVERLAYS}
-              onPreviewError={onPreviewError}
-            />
+            <PdfFrame>
+              <PdfPages
+                doc={current.doc}
+                overlays={panelOpen ? ops : NO_OVERLAYS}
+                onPreviewError={onPreviewError}
+              />
+            </PdfFrame>
           </>
         ) : (
           <p role="status" className="status">

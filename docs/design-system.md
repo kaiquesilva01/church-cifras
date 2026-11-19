@@ -91,6 +91,7 @@ componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.tes
 | **Segmento** | Músicas / Cantores em pílula | `HomePage` `.tabs` |
 | **Cartão de repertório** | selo (Próximo verde, Agendado/Realizado neutro), título, prévia de 4 louvores com tom, `+ N` | `SetlistsTab` |
 | **Barra da cifra** | pílula flutuante: ⬇ (ícone, `aria-label="Baixar PDF"`), WhatsApp (glifo verde; abre a folha de compartilhar do aparelho), **Pad** (texto; "Pad G" em âmbar tocando), **Mudar tom** (âmbar). Sem ícone de nota musical | `ViewerPage`, `viewer/barIcons.tsx` |
+| **PDF em tela cheia** | quadradinho 36 px no canto superior direito da 1ª página (`aria-label="Tela cheia"`; claro: `--color-primary`, escuro: `--color-elevated` com borda); aberto, a folha cobre a tela toda (overlay CSS + Fullscreen API onde existir), rola sozinha e o mesmo botão vira "Sair da tela cheia" (44 px, fixo no canto); Esc também fecha | `PdfFrame`, `.pdf-frame` |
 | **Anterior · N de M · Próxima** | pílulas dentro da barra da cifra; avisos de repertório flutuam sem empurrar o PDF | `SetlistBar` |
 | **Painel Mudar tom** | folha inferior: 12 tons (salvos em verde, escolhido em âmbar), − ½ / + ½, Cancelar/Confirmar; **sem** stepper − + no cabeçalho | `KeyPanel` |
 | **Aba Pad** | **status, grade de 12 tons e volume**: nota grande, música/repertório, toque num tom para tocar (ou trocar com transição, se já toca), sequência do repertório, Parar. Grade 6 × 2, tom atual em âmbar. O pad iniciado pela aba é de origem livre e não para ao trocar de tela | `PadPage`, `padStaysOn` (origem `free`), `.pad-tones` |
@@ -124,7 +125,7 @@ Estados obrigatórios por tela: **carregando, vazio, erro** (e "somente leitura"
 
 Linha 1 (originais): `01 Músicas`, `02 Repertório`, `03 Busca`, `04 Pad (tocando)`, `05 Mais (admin)`,
 `06 Cifra (overlay)`. Demais: `04b Pad (desligado)`, `05b Mais (membro/visitante)`, `07 Músicas (membro)`,
-`08 Cantores`, `09 Cantor`, `10 Cifra (PDF)`, `11 Mudar tom (painel)`, `12 Repertório (editar)`,
+`08 Cantores`, `09 Cantor`, `10 Cifra (PDF)`, `10b Cifra (PDF em tela cheia)`, `11 Mudar tom (painel)`, `12 Repertório (editar)`,
 `13 Repertório (visitante)`, `14 Adicionar louvor`, `15 Tom do item`, `16 Repertório · menu e diálogos`,
 `17 Cifra no repertório`, `18 Cifra · menu admin`, `19 Admin · editar e apagar`, `20 Login`, `21 Nova cifra`,
 `22 Nova cifra · escolher / erro`, `23 Importar em lote`, `24 Pessoas`, `25 Estados e avisos`.
