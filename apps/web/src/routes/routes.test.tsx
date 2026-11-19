@@ -4,7 +4,7 @@ import { App } from '../App';
 import type { Role } from '../auth/roles';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { createFakeGateway, testUser } from '../test/fakeGateway';
-import { fakeSetlistApi } from '../test/fakeSetlistApi';
+import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import type { PeopleApi } from '../people/peopleApi';
 
 const peopleApi: PeopleApi = {
@@ -158,6 +158,31 @@ describe('routes', () => {
     expect(screen.getByText('Membro')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Sair/ }));
     expect(gateway.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns to the protected screen after signing in, not to home', async () => {
+    const gateway = createFakeGateway();
+    const setlistApi = fakeSetlistApi([makeSetlist({ id: 'r1', label: 'Culto de domingo' })]);
+    render(
+      <App
+        gateway={gateway}
+        peopleApi={peopleApi}
+        catalogApi={fakeCatalogApi()}
+        setlistApi={setlistApi}
+        initialPath="/repertorios/r1"
+      />,
+    );
+    act(() => gateway.emitUser(null));
+    expect(screen.getByText('Entrar com Google')).toBeInTheDocument();
+
+    act(() => gateway.emitUser(testUser));
+    act(() => gateway.emitRole('member'));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Culto de domingo' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('searchbox', { name: 'Buscar música ou cantor…' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows the bottom bar on the root screens and hides it on details', () => {

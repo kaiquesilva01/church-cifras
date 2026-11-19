@@ -18,6 +18,11 @@ export function splitHarpa(songs: SongSummary[]): {
   return { regular, harpa };
 }
 
+/** Ordena títulos já normalizados; números contam como número ("15 -" antes de "134 -"). */
+export function compareTitles(a: string, b: string): number {
+  return a.localeCompare(b, 'pt-BR', { numeric: true });
+}
+
 function matchesAll(haystack: string, query: string): boolean {
   const words = normalizeText(query).split(' ').filter(Boolean);
   return words.every((w) => haystack.includes(w));

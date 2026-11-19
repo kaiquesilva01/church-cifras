@@ -1,12 +1,13 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi, makeSong, sampleSongs } from '../test/fakeCatalogApi';
 import { testUser } from '../test/fakeGateway';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
+import { stubShare, unstubShare } from '../test/shareStub';
 import { ActiveSetlistProvider } from './ActiveSetlistProvider';
 import { SetlistFullError } from './ops';
 import { SetlistGoneError } from './setlistApi';
@@ -167,7 +168,9 @@ describe('SetlistPage catalog error', () => {
 describe('SetlistPage visitor', () => {
   it('has no editing controls and the key is not a button', () => {
     mount(withItems([a, b]), { role: 'viewer' });
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    // O único botão para visitante é o de compartilhar.
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Compartilhar repertório' })).toBeInTheDocument();
     expect(screen.queryByText(/Adicionar/)).not.toBeInTheDocument();
     expect(screen.queryByText('≡')).not.toBeInTheDocument();
     expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('G');
@@ -342,5 +345,189 @@ describe('SetlistPage menu', () => {
   it('is hidden for visitors', () => {
     mount(withItems([a]), { role: 'viewer' });
     expect(screen.queryByRole('button', { name: 'Menu do repertório' })).not.toBeInTheDocument();
+  });
+});
+
+describe('SetlistPage share button', () => {
+  const shareButton = () => screen.queryByRole('button', { name: 'Compartilhar repertório' });
+  const withMissing = () => withItems([a, { id: 'x', songId: 'gone', key: 'C' }, b]);
+
+  afterEach(() => {
+    unstubShare();
+    delete (navigator as { clipboard?: unknown }).clipboard;
+  });
+
+  it.each(['viewer', 'member', 'admin'] as const)('shows it for %s', (role) => {
+    mount(withItems([a]), { role });
+    expect(shareButton()).toBeInTheDocument();
+  });
+
+  it('hides it when the setlist was removed', () => {
+    const api = withItems([a]);
+    mount(api);
+    act(() => api.push('r1', { setlist: null, fromCache: false }));
+    expect(shareButton()).not.toBeInTheDocument();
+  });
+
+  it('shares the message through Web Share, with the link inside the text only', async () => {
+    const share = vi.fn<(data: ShareData) => Promise<void>>(async () => {});
+    stubShare({ share });
+    mount(withMissing(), { role: 'viewer' });
+    fireEvent.click(shareButton()!);
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    const arg = share.mock.calls[0]?.[0];
+    expect(arg).toEqual({
+      text: [
+        '🎵 *Culto de domingo* — 20/11',
+        '1. Sonda-me (G)',
+        '2. Ressuscita-me (F#m)',
+        `${window.location.origin}/repertorios/r1`,
+      ].join('\n'),
+    });
+    expect(arg).not.toHaveProperty('url');
+  });
+
+  it('ignores a cancelled share sheet silently', async () => {
+    stubShare({
+      share: async () => {
+        throw new DOMException('x', 'AbortError');
+      },
+    });
+    mount(withItems([a]));
+    await act(async () => {
+      fireEvent.click(shareButton()!);
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Link copiado.')).not.toBeInTheDocument();
+  });
+
+  it('shows an alert when sharing fails', async () => {
+    stubShare({
+      share: async () => {
+        throw new DOMException('x', 'NotAllowedError');
+      },
+    });
+    mount(withItems([a]));
+    fireEvent.click(shareButton()!);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível compartilhar.');
+  });
+
+  it('always renders the status live region, silent and empty until the link is copied', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    mount(withItems([a]));
+    const shareStatus = () =>
+      screen.getAllByRole('status').find((el) => el.matches('p:not(.status)'))!;
+    const region = shareStatus();
+    expect(region).toBeEmptyDOMElement();
+    expect(region).toHaveClass('sr-only');
+    fireEvent.click(shareButton()!);
+    await screen.findByText('Link copiado.');
+    expect(shareStatus()).toBe(region);
+    expect(region).toHaveClass('setlist-share-note');
+    expect(region).not.toHaveClass('sr-only');
+  });
+
+  it('copies the message and confirms when Web Share is missing (computer)', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    mount(withItems([a]));
+    fireEvent.click(shareButton()!);
+    expect(await screen.findByText('Link copiado.')).toHaveAttribute('role', 'status');
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/repertorios/r1'));
+  });
+
+  it('hides the copied confirmation as soon as the next tap starts', async () => {
+    const writeText = vi
+      .fn<(text: string) => Promise<void>>()
+      .mockResolvedValueOnce(undefined)
+      .mockReturnValueOnce(new Promise(() => undefined));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    mount(withItems([a]));
+    fireEvent.click(shareButton()!);
+    expect(await screen.findByText('Link copiado.')).toBeInTheDocument();
+    fireEvent.click(shareButton()!);
+    expect(screen.queryByText('Link copiado.')).not.toBeInTheDocument();
+  });
+
+  it('hides the copied confirmation by itself after a few seconds', async () => {
+    vi.useFakeTimers();
+    try {
+      const writeText = vi.fn(async () => {});
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+      mount(withItems([a]));
+      await act(async () => {
+        fireEvent.click(shareButton()!);
+      });
+      expect(screen.getByText('Link copiado.')).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(4000);
+      });
+      expect(screen.queryByText('Link copiado.')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the error alert when the clipboard fails too', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error('denied')) },
+    });
+    mount(withItems([a]));
+    fireEvent.click(shareButton()!);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível compartilhar.');
+  });
+});
+
+describe('SetlistPage read-only view (Paper 13)', () => {
+  const NOTE = 'Somente leitura · só membros e admins editam o repertório';
+
+  it('shows the song count under the title', () => {
+    mount(withItems([a, b]), { role: 'viewer' });
+    const title = screen.getByRole('heading', { level: 1, name: 'Culto de domingo' });
+    expect(title.nextElementSibling).toHaveTextContent('2 louvores');
+  });
+
+  it('uses the singular for a single louvor', () => {
+    mount(withItems([a]), { role: 'viewer' });
+    expect(screen.getByText('1 louvor')).toBeInTheDocument();
+  });
+
+  it('keeps the name as the link without the chevron inside it', () => {
+    mount(withItems([a]), { role: 'viewer' });
+    const link = screen.getByRole('link', { name: 'Sonda-me' });
+    expect(link).toHaveAttribute('href', '/musicas/s1?tom=G&repertorio=r1&item=a');
+    expect(link.querySelector('svg')).toBeNull();
+    // The grey chevron sits at the right edge of the row, after the key pill.
+    const row = screen.getAllByRole('listitem')[0]!;
+    expect(row.querySelector('.setlist-item-chevron svg')).not.toBeNull();
+  });
+
+  it('shows the key as a read-only pill, not a button', () => {
+    mount(withItems([a]), { role: 'viewer' });
+    const row = screen.getByRole('listitem');
+    expect(within(row).queryByRole('button')).not.toBeInTheDocument();
+    expect(row.querySelector('.setlist-item-key')).toHaveTextContent('G');
+  });
+
+  it('keeps a removed song dashed and without link or chevron', () => {
+    mount(withItems([{ id: 'x', songId: 'gone', key: 'C' }]), { role: 'viewer' });
+    const row = screen.getByRole('listitem');
+    expect(row).toHaveClass('setlist-item-missing');
+    expect(within(row).queryByRole('link')).not.toBeInTheDocument();
+    expect(row.querySelector('.setlist-item-chevron')).toBeNull();
+  });
+
+  it('ends the list with the read-only note for visitors', () => {
+    mount(withItems([a]), { role: 'viewer' });
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+  });
+
+  it('keeps the edit screen as it is: no count line and no read-only note for editors', () => {
+    mount(withItems([a, b]), { role: 'member' });
+    expect(screen.queryByText('2 louvores')).not.toBeInTheDocument();
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sonda-me' }).querySelector('svg')).not.toBeNull();
   });
 });

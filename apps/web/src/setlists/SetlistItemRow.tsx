@@ -32,20 +32,24 @@ export function SetlistItemRow({
   // O tom salvo deixou de existir entre os tons da música: aparece riscado.
   const keyGone = song !== undefined && !song.keys.includes(item.key);
   const keyLabel = keyGone ? <s>{item.key}</s> : item.key;
+  const rowClass = [
+    'list-card setlist-item',
+    song === undefined && 'setlist-item-missing',
+    !editable && 'is-readonly',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <li
-      className={`list-card setlist-item${song === undefined ? ' setlist-item-missing' : ''}`}
-      ref={drag?.setNodeRef}
-      style={drag?.style}
-    >
+    <li className={rowClass} ref={drag?.setNodeRef} style={drag?.style}>
       {drag?.handle(title)}
       <span className="setlist-item-number muted">{position}</span>
       <span className="setlist-item-main">
         {song ? (
           <Link to={itemHref(setlistId, item)} className="song-title setlist-item-link">
             <span className="setlist-item-name">{song.title}</span>
-            <OpenChevronIcon />
+            {/* Quem edita vê o chevron ao lado do nome; quem só lê, à direita da linha. */}
+            {editable && <OpenChevronIcon />}
           </Link>
         ) : (
           <span className="song-title">{title}</span>
@@ -70,6 +74,11 @@ export function SetlistItemRow({
         <span className="setlist-item-key">
           {keyLabel}
           {keyGone && <span className="sr-only"> (tom indisponível)</span>}
+        </span>
+      )}
+      {!editable && song && (
+        <span className="setlist-item-chevron" aria-hidden="true">
+          <OpenChevronIcon />
         </span>
       )}
       {editable && (

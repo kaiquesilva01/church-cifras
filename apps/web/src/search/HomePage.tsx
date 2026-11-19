@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
-import { deriveArtists, filterArtists, filterSongs, splitHarpa } from '../catalog/search';
+import {
+  compareTitles,
+  deriveArtists,
+  filterArtists,
+  filterSongs,
+  splitHarpa,
+} from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { NextCultoCard } from '../setlists/NextCultoCard';
 import { todayLocal } from '../setlists/dates';
@@ -63,7 +69,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
   const visibleSongs = useMemo(
     () =>
       filterSongs(tab.id === 'harpa' ? harpa : regular, query).sort((a, b) =>
-        a.titleNormalized.localeCompare(b.titleNormalized, 'pt-BR'),
+        compareTitles(a.titleNormalized, b.titleNormalized),
       ),
     [tab.id, harpa, regular, query],
   );

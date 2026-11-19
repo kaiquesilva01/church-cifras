@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { filterSongs } from '../catalog/search';
+import { compareTitles, filterSongs } from '../catalog/search';
 import type { SongSummary } from '../catalog/types';
 import { Dialog } from '../viewer/Dialog';
 import { defaultKeyFor } from './items';
@@ -16,9 +16,7 @@ export function AddSongSheet({ songs, presentSongIds, onAdd, onClose }: AddSongS
   const [query, setQuery] = useState('');
   const visible = useMemo(
     () =>
-      filterSongs(songs, query).sort((x, y) =>
-        x.titleNormalized.localeCompare(y.titleNormalized, 'pt-BR'),
-      ),
+      filterSongs(songs, query).sort((x, y) => compareTitles(x.titleNormalized, y.titleNormalized)),
     [songs, query],
   );
 
