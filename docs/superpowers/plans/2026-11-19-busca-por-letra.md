@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A Busca acha músicas pelo texto da letra (Tudo, Músicas e Harpa; nunca em Cantores), mostrando um trecho com a frase destacada.
+**Goal:** A Busca (Tudo, Músicas e Harpa; nunca Cantores) e a aba Músicas da Home acham músicas pelo texto da letra, mostrando um trecho com a frase destacada.
 
-**Architecture:** A letra é extraída do PDF no navegador, no upload, e gravada em `songLyrics/{songId}` (Firestore) no mesmo `writeBatch` da música nova. Um provider assina `songLyrics` em segundo plano depois que `songs` está pronta, e a `BuscaPage` filtra tudo em memória. Músicas antigas são preenchidas por um script único (Admin SDK).
+**Architecture:** A letra é extraída do PDF no navegador, no upload, e gravada em `songLyrics/{songId}` (Firestore) no mesmo `writeBatch` da música nova. Um provider assina `songLyrics` em segundo plano depois que `songs` está pronta, e um componente/hook compartilhado (`LyricsResults`, `useLyricSearch`) filtra tudo em memória na `BuscaPage` e na `HomePage`. Músicas antigas são preenchidas por um script único (Admin SDK).
 
 **Tech Stack:** TypeScript, React 19, Firebase (Firestore rules, Cloud Functions v2, Admin SDK), pdf.js via `@cifras/pdf`, Vitest, Playwright.
 
@@ -12,9 +12,9 @@
 
 ## Global Constraints
 
-- Escopo: só `BuscaPage` (`/busca`). Não mexer na busca da Home nem na do `AddSongSheet`.
-- A seção se chama **Na letra**; o campo de busca da Busca passa a dizer `Buscar música, cantor ou letra…` (placeholder e `aria-label`).
-- **Cantores** não busca letra. **Tudo**, **Músicas** e **Harpa** buscam. Em Músicas só músicas comuns; em Harpa só hinos.
+- Escopo: `BuscaPage` (`/busca`) e a aba **Músicas** da `HomePage`. Não mexer nas abas Cantores, Harpa e Repertórios da Home, nem no `AddSongSheet`.
+- A seção se chama **Na letra**; o campo de busca da Busca e o da aba Músicas da Home passam a dizer `Buscar música, cantor ou letra…` (placeholder e `aria-label`). Os demais campos de busca não mudam.
+- Na Busca: **Cantores** não busca letra; **Tudo**, **Músicas** e **Harpa** buscam. Em Músicas só músicas comuns; em Harpa só hinos. Na Home: só a aba Músicas busca, e só entre músicas comuns.
 - Letra só é consultada com a busca de **3 ou mais caracteres** normalizados (`normalizeText`).
 - Letra: no máximo **20.000 caracteres** (`MAX_LYRICS_CHARS`); texto legível (com acento, linhas separadas por `\n`), sem linhas de acorde.
 - Trecho de **~120 caracteres**, com palavras buscadas destacadas.
@@ -29,9 +29,10 @@
 
 - Busca de 1–2 caracteres ou só pontuação ("a", "é", "—"): nenhuma letra consultada, sem erro (Tarefa 4 e 6).
 - PDF sem texto: salvar funciona e não grava `songLyrics` (Tarefa 3).
-- Música antiga sem documento de letra: aparece por título normalmente, nunca quebra (Tarefa 6).
+- Música antiga sem documento de letra: aparece por título normalmente, nunca quebra (Tarefas 6 e 7).
 - Letra com mais de 20.000 caracteres: é cortada no cliente e o `create` não é negado pelas regras (Tarefa 3).
-- Letras ainda carregando com resultados por título: o título aparece na hora e "Nada encontrado" não pisca (Tarefa 6).
+- Letras ainda carregando com resultados por título: o título aparece na hora e "Nada encontrado" não pisca (Tarefas 6 e 7).
+- Home Músicas sem busca digitada: lista o catálogo todo como hoje, sem seção "Na letra" nem esqueleto (Tarefa 7).
 
 ## File Structure
 
@@ -40,10 +41,11 @@ Criar:
 - `apps/web/src/catalog/lyricsLimits.ts`: `MAX_LYRICS_CHARS`, `MIN_LYRICS_QUERY`.
 - `apps/web/src/catalog/lyricsSearch.ts` (+ teste): `searchLyrics` e tipos do trecho.
 - `apps/web/src/catalog/useLyrics.ts`, `LyricsProvider.tsx` (+ testes): assinatura das letras.
+- `apps/web/src/search/LyricsResults.tsx` (+ teste): hook `useLyricSearch` e componente `LyricsResults`, usados pela Busca e pela Home.
 - `apps/functions/src/lyrics/backfill.ts` (+ teste), `backfillCli.ts`, `apps/functions/tsup.backfill.config.ts`: preenchimento das músicas antigas.
 - `e2e/lyrics.spec.ts`.
 
-Modificar: `packages/chords/src/index.ts`, `firestore.rules`, `tests/rules/firestore.rules.test.ts`, `apps/functions/src/songs/adminSongs.ts` (+ teste), `apps/functions/src/index.ts`, `apps/web/src/upload/readPdfSuggestion.ts` (+ teste), `apps/web/src/catalog/types.ts`, `catalogApi.ts`, `apps/web/src/test/fakeCatalogApi.ts`, `apps/web/src/upload/UploadPage.tsx`, `apps/web/src/import/batch.ts`, `ImportPage.tsx`, `apps/web/src/App.tsx`, `apps/web/src/search/BuscaPage.tsx`, `SongList.tsx` (+ testes), `apps/web/src/ui/redesign.css`, `docs/deploy.md`.
+Modificar: `apps/web/src/search/HomePage.tsx` (+ teste), `packages/chords/src/index.ts`, `firestore.rules`, `tests/rules/firestore.rules.test.ts`, `apps/functions/src/songs/adminSongs.ts` (+ teste), `apps/functions/src/index.ts`, `apps/web/src/upload/readPdfSuggestion.ts` (+ teste), `apps/web/src/catalog/types.ts`, `catalogApi.ts`, `apps/web/src/test/fakeCatalogApi.ts`, `apps/web/src/upload/UploadPage.tsx`, `apps/web/src/import/batch.ts`, `ImportPage.tsx`, `apps/web/src/App.tsx`, `apps/web/src/search/BuscaPage.tsx`, `SongList.tsx` (+ testes), `apps/web/src/ui/redesign.css`, `docs/deploy.md`.
 
 ---
 
@@ -166,16 +168,20 @@ Modificar: `packages/chords/src/index.ts`, `firestore.rules`, `tests/rules/fires
 
 ---
 
-### Task 6: Seção "Na letra" na Busca
+### Task 6: Seção "Na letra" compartilhada e Busca
 
 **Files:**
+- Create: `apps/web/src/search/LyricsResults.tsx`, `LyricsResults.test.tsx`
 - Modify: `apps/web/src/search/BuscaPage.tsx` (+ `BuscaPage.test.tsx`), `apps/web/src/search/SongList.tsx` (+ `SongList.test.tsx`), `apps/web/src/ui/redesign.css`, `apps/web/src/routes/routes.test.tsx` (nome acessível novo)
 
 **Interfaces:**
-- Consumes: `searchLyrics`, `MIN_LYRICS_QUERY` (de `lyricsLimits.ts`), `LyricHit`, `SnippetPart` (Tarefa 4); `useLyricsContext` (Tarefa 5).
-- Produces: `SongList` aceita `snippets?: ReadonlyMap<string, SnippetPart[]>` e, quando há trecho da música, renderiza abaixo do link um bloco `.lyric-snippet` com `<mark class="lyric-hit">` nas partes com `match`.
+- Consumes: `searchLyrics`, `LyricHit`, `SnippetPart` (Tarefa 4); `MIN_LYRICS_QUERY` (de `lyricsLimits.ts`); `useLyricsContext` (Tarefa 5).
+- Produces:
+  - `SongList` aceita `snippets?: ReadonlyMap<string, SnippetPart[]>` e, quando há trecho da música, renderiza abaixo do link um bloco `.lyric-snippet` com `<mark class="lyric-hit">` nas partes com `match`.
+  - `useLyricSearch(candidates: SongSummary[], query: string, exclude: ReadonlySet<string>): { hits: LyricHit[]; active: boolean; pending: boolean; settled: boolean }` em `LyricsResults.tsx`: `active` = busca com 3 ou mais caracteres normalizados; `pending` = `active` e letras `idle`/`loading`; `settled` = letras `ready` ou `error` (usado para decidir "Nada encontrado"); `hits` vazio enquanto `pending` ou em `error`.
+  - `LyricsResults({ hits, pending }: { hits: LyricHit[]; pending: boolean })`: com `pending`, heading `Na letra` + 2 cartões de esqueleto (`aria-busy="true"`, sem texto); com `hits`, heading `Na letra`, contador (`1 música` / `N músicas`) e `SongList` com `snippets`; sem nenhum dos dois, não renderiza nada.
 
-- [ ] **Step 1: Write the failing tests** (`BuscaPage.test.tsx`, `fakeCatalogApi(songs, { subscribeLyrics })` com letras de exemplo; `renderBusca('/busca?q=...')`):
+- [ ] **Step 1: Write the failing tests** (`LyricsResults.test.tsx` para o componente e o hook: esqueleto quando `pending`, lista com `mark` e contador, nada quando vazio, `settled` só com `ready`/`error`, `active` falso abaixo de 3 caracteres; e `BuscaPage.test.tsx`, `fakeCatalogApi(songs, { subscribeLyrics })` com letras de exemplo; `renderBusca('/busca?q=...')`):
   - `shows a "Na letra" section with the snippet and the highlighted words` (heading `Na letra`, `mark` com o texto buscado, contador `1 música`).
   - `does not repeat a song already listed by title` (música que casa por título e por letra só em Músicas).
   - `hides "Na letra" under the Cantores filter`; `shows it under Tudo, Músicas and Harpa` e `Músicas` só com músicas comuns, `Harpa` só com hinos (use um `makeSong` com `artistName: 'Harpa'`).
@@ -186,14 +192,39 @@ Modificar: `packages/chords/src/index.ts`, `firestore.rules`, `tests/rules/fires
   - `song without a lyrics entry still shows up by title`.
   - Placeholder/`aria-label` `Buscar música, cantor ou letra…`.
   - `SongList.test.tsx`: renderiza o trecho com `mark` quando `snippets` tem a música; sem `snippets` nada muda.
-- [ ] **Step 2: Run** `npm test -w @cifras/web -- BuscaPage SongList routes` → FAIL.
-- [ ] **Step 3: Implement** em `BuscaPage`: candidatos = `splitHarpa(songs)` conforme o filtro (`Tudo`: todas; `Músicas`: `regular`; `Harpa`: `harpa`; `Cantores`: nenhuma); `exclude` = ids de `matches` e `harpaMatches`; seção **Na letra** depois de **Harpa** (cartões via `SongList` com `snippets`); com `status` `idle`/`loading` e busca ≥ `MIN_LYRICS_QUERY`, heading + 2 cartões de esqueleto (`aria-busy="true"`, sem texto); `error` não renderiza a seção; `nothing` só quando as letras não estão carregando. CSS em `redesign.css` seguindo o Paper 03b/03c: bloco do trecho com `border-top: 1px solid var(--color-border)`, `padding-top: 10px`, texto 13px/19px `--color-text-muted`; `.lyric-hit` com `color: var(--color-amber)` (tema claro: `--color-light-amber-text`), `font-weight: 700`, sem fundo; esqueleto com `--color-elevated`. Atualize os testes de `routes.test.tsx` para o novo nome acessível.
+- [ ] **Step 2: Run** `npm test -w @cifras/web -- LyricsResults BuscaPage SongList routes` → FAIL.
+- [ ] **Step 3: Implement** `useLyricSearch`/`LyricsResults` e o suporte a `snippets` no `SongList`. Em `BuscaPage`: candidatos = `splitHarpa(songs)` conforme o filtro (`Tudo`: todas; `Músicas`: `regular`; `Harpa`: `harpa`; `Cantores`: lista vazia); `exclude` = ids de `matches` e `harpaMatches`; `<LyricsResults>` depois da seção **Harpa**; `nothing` só quando `settled` (ou a busca não é `active`). CSS em `redesign.css` seguindo o Paper 03b/03c: bloco do trecho com `border-top: 1px solid var(--color-border)`, `padding-top: 10px`, texto 13px/19px `--color-text-muted`; `.lyric-hit` com `color: var(--color-amber)` (tema claro: `--color-light-amber-text`), `font-weight: 700`, sem fundo; esqueleto com `--color-elevated`. Atualize os testes de `routes.test.tsx` para o novo nome acessível.
 - [ ] **Step 4: Run** `npm test -w @cifras/web`, `npm run lint`, `npm run typecheck` → PASS.
 - [ ] **Step 5: Commit** `feat(web): seção "Na letra" na Busca`.
 
 ---
 
-### Task 7: Preenchimento das músicas antigas
+### Task 7: Letra na aba Músicas da Home
+
+**Files:**
+- Modify: `apps/web/src/search/HomePage.tsx`, `apps/web/src/search/HomePage.test.tsx`, `apps/web/src/routes/routes.test.tsx`
+
+**Interfaces:**
+- Consumes: `useLyricSearch`, `LyricsResults` (Tarefa 6).
+
+- [ ] **Step 1: Write the failing tests** (`HomePage.test.tsx`, mesmo padrão dos existentes, `fakeCatalogApi(songs, { subscribeLyrics })`):
+  - `Músicas tab shows a "Na letra" section for a lyric match` (busca por um verso que só está na letra: heading `Na letra`, cartão da música com `mark`).
+  - `does not repeat in "Na letra" a song already listed by title`.
+  - `shows skeleton cards while lyrics load, with the title matches already visible`.
+  - `does not show "Nada encontrado" while lyrics load; shows it when ready and nothing matched`.
+  - `shows only "Na letra" when no title matches but a lyric does` (sem o texto "Nada encontrado").
+  - `Cantores and Harpa tabs do not search lyrics` (mesma busca nessas abas: sem `Na letra`).
+  - `does not search Harpa hymns by lyric on the Músicas tab`.
+  - `lists the whole catalog and no "Na letra" when the search is empty`.
+  - `Músicas tab search field is named "Buscar música, cantor ou letra…"` e o das outras abas continua igual.
+- [ ] **Step 2: Run** `npm test -w @cifras/web -- HomePage routes` → FAIL.
+- [ ] **Step 3: Implement** em `HomePage`: na aba `musicas`, `useLyricSearch(regular, query, ids de visibleSongs)` e `<LyricsResults>` depois da `SongList`; o texto "Nada encontrado" só aparece quando `settled` (ou a busca não é `active`) e não há título nem letra; placeholder e `aria-label` da aba Músicas viram `Buscar música, cantor ou letra…` (a constante `TABS` é a fonte). Nas abas `cantores` e `harpa` o hook recebe lista vazia (nada é consultado). Atualize `routes.test.tsx` e os testes que usam o nome antigo do campo da aba Músicas.
+- [ ] **Step 4: Run** `npm test -w @cifras/web`, `npm run lint`, `npm run typecheck` → PASS.
+- [ ] **Step 5: Commit** `feat(web): letra na aba Músicas da Home`.
+
+---
+
+### Task 8: Preenchimento das músicas antigas
 
 **Files:**
 - Create: `apps/functions/src/lyrics/backfill.ts`, `backfill.test.ts`, `backfillCli.ts`, `apps/functions/tsup.backfill.config.ts`
@@ -226,12 +257,12 @@ Modificar: `packages/chords/src/index.ts`, `firestore.rules`, `tests/rules/fires
 
 ---
 
-### Task 8: E2E
+### Task 9: E2E
 
 **Files:**
 - Create: `e2e/lyrics.spec.ts`
 
-- [ ] **Step 1: Write the test** (padrão de `e2e/upload.spec.ts`: `signInAs(page, ADMIN, 'Admin')`, `syntheticPdf`, `lettersTag`): admin envia um PDF sintético novo (título único) e salva; vai à Busca, digita `campo verde` (verso de `LYRICS` em `e2e/fixtures/pdf.ts`); espera o heading `Na letra`, o cartão com o título da música e um `mark` com `campo verde`; ao escolher **Cantores**, a seção some; ao buscar `ab`, a seção não aparece.
+- [ ] **Step 1: Write the test** (padrão de `e2e/upload.spec.ts`: `signInAs(page, ADMIN, 'Admin')`, `syntheticPdf`, `lettersTag`): admin envia um PDF sintético novo (título único) e salva; vai à Busca, digita `campo verde` (verso de `LYRICS` em `e2e/fixtures/pdf.ts`); espera o heading `Na letra`, o cartão com o título da música e um `mark` com `campo verde`; ao escolher **Cantores**, a seção some; ao buscar `ab`, a seção não aparece. Na Home, aba **Músicas**, a mesma busca também mostra `Na letra` com o cartão da música.
 - [ ] **Step 2: Run** `npm run test:e2e` (inclui a nova spec) → PASS.
 - [ ] **Step 3: Commit** `test(e2e): busca por letra`.
 
@@ -239,6 +270,6 @@ Modificar: `packages/chords/src/index.ts`, `firestore.rules`, `tests/rules/fires
 
 ## Self-review
 
-- Cobertura do spec: dados e regras (T2), extração (T1), gravação só em música nova + sem letra (T3), `deleteSong` (T2), assinatura em segundo plano (T5), casamento/trecho/ordem/exclusão de duplicadas/3 caracteres (T4), filtros, esqueleto, erro e "nada encontrado" (T6), preenchimento (T7), e2e e lançamento (T7/T8, `docs/deploy.md`).
-- Nomes consistentes entre tarefas: `extractLyrics`, `searchLyrics`, `LyricHit`, `SnippetPart`, `subscribeLyrics`, `useLyrics`, `LyricsProvider`, `useLyricsContext`, `MAX_LYRICS_CHARS`, `MIN_LYRICS_QUERY`, `deleteLyricsDoc`.
-- Ordem: T1 e T2 independentes; T3 depende de T1 (e cria `lyricsLimits.ts`, que a T4 completa); T5 antes de T6; T7 depende de T1; T8 por último.
+- Cobertura do spec: dados e regras (T2), extração (T1), gravação só em música nova + sem letra (T3), `deleteSong` (T2), assinatura em segundo plano (T5), casamento/trecho/ordem/exclusão de duplicadas/3 caracteres (T4), filtros, esqueleto, erro e "nada encontrado" na Busca (T6), aba Músicas da Home (T7), preenchimento (T8), e2e e lançamento (T8/T9, `docs/deploy.md`).
+- Nomes consistentes entre tarefas: `extractLyrics`, `searchLyrics`, `LyricHit`, `SnippetPart`, `subscribeLyrics`, `useLyrics`, `LyricsProvider`, `useLyricsContext`, `useLyricSearch`, `LyricsResults`, `MAX_LYRICS_CHARS`, `MIN_LYRICS_QUERY`, `deleteLyricsDoc`.
+- Ordem: T1 e T2 independentes; T3 depende de T1 (e cria `lyricsLimits.ts`, que a T4 completa); T5 antes de T6; T7 depende de T6; T8 depende de T1; T9 por último.
