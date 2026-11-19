@@ -89,6 +89,16 @@ service cloud.firestore {
         && data.key.matches('.*m$') == data.derivedFromKey.matches('.*m$');
     }
 
+    function validLyrics(data, songId) {
+      return validId(songId)
+        && data.keys().hasOnly(['text', 'createdBy', 'createdAt'])
+        && data.keys().hasAll(['text', 'createdBy', 'createdAt'])
+        && data.text is string
+        && data.text.size() >= 1 && data.text.size() <= 20000
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time;
+    }
+
     function validSetlist(data, setlistId) {
       return validId(setlistId)
         && data.keys().hasOnly([
@@ -132,6 +142,14 @@ service cloud.firestore {
           && validArrangement(request.resource.data, songId, slug);
         allow update, delete: if false;
       }
+    }
+
+    match /songLyrics/{songId} {
+      allow read: if signedIn();
+      allow create: if isEditor()
+        && existsAfter(/databases/$(database)/documents/songs/$(songId))
+        && validLyrics(request.resource.data, songId);
+      allow update, delete: if false;
     }
 
     match /setlists/{setlistId} {

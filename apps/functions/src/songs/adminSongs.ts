@@ -15,6 +15,8 @@ export type AdminDeps = {
     songId: string,
     decide: (all: ArrangementInfo[]) => ArrangementInfo,
   ): Promise<ArrangementInfo>;
+  /** Apaga `songLyrics/{songId}`; doc inexistente não é erro. */
+  deleteLyricsDoc(songId: string): Promise<void>;
   deleteSongDoc(songId: string): Promise<void>;
   deleteFile(path: string): Promise<void>;
   /** Ids (até 2) das músicas com essa identidade (título normalizado + cantor). */
@@ -115,6 +117,7 @@ export async function deleteSong(
     await deps.deleteArrangementDoc(songId, arrangement.slug);
     await removeFile(deps, arrangement.storagePath);
   }
+  await deps.deleteLyricsDoc(songId);
   await deps.deleteSongDoc(songId);
   return { songId };
 }

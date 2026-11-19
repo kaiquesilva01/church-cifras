@@ -21,6 +21,7 @@ function setup(
     arrangements?: ArrangementInfo[];
     identityOwners?: string[];
     failFileDelete?: boolean;
+    lyricsExists?: boolean;
   } = {},
 ) {
   const log: string[] = [];
@@ -40,6 +41,11 @@ function setup(
     },
     deleteSongDoc: async (songId) => {
       log.push(`song:${songId}`);
+    },
+    // Como o Admin SDK: apagar doc inexistente não falha.
+    deleteLyricsDoc: async (songId) => {
+      if (opts.lyricsExists === false) return;
+      log.push(`lyrics:${songId}`);
     },
     deleteFile: async (path) => {
       if (opts.failFileDelete) throw new Error('boom');
@@ -202,20 +208,35 @@ describe('deleteSong', () => {
       'file:songs/s1/G-x.pdf',
       'doc:s1/A',
       'file:songs/s1/A-x.pdf',
+      'lyrics:s1',
       'song:s1',
     ]);
+  });
+
+  it('deleteSong also deletes the lyrics doc', async () => {
+    const { deps, log } = setup({ arrangements: [arr('G', 'handmade')] });
+    await deleteSong(deps, { songId: 's1' });
+    const lyricsAt = log.indexOf('lyrics:s1');
+    expect(lyricsAt).toBeGreaterThan(log.indexOf('doc:s1/G'));
+    expect(lyricsAt).toBeLessThan(log.indexOf('song:s1'));
+  });
+
+  it('deleteSong is idempotent when there is no lyrics doc', async () => {
+    const { deps, log } = setup({ lyricsExists: false, arrangements: [arr('G', 'handmade')] });
+    await expect(deleteSong(deps, { songId: 's1' })).resolves.toEqual({ songId: 's1' });
+    expect(log).toEqual(['doc:s1/G', 'file:songs/s1/G-x.pdf', 'song:s1']);
   });
 
   it('deleting a missing song is ok', async () => {
     const { deps, log } = setup({ song: false });
     await expect(deleteSong(deps, { songId: 's1' })).resolves.toEqual({ songId: 's1' });
-    expect(log).toEqual(['song:s1']);
+    expect(log).toEqual(['lyrics:s1', 'song:s1']);
   });
 
   it('keeps going when a file delete fails', async () => {
     const { deps, log } = setup({ arrangements: [arr('G', 'handmade')], failFileDelete: true });
     await deleteSong(deps, { songId: 's1' });
-    expect(log).toEqual(['doc:s1/G', 'song:s1']);
+    expect(log).toEqual(['doc:s1/G', 'lyrics:s1', 'song:s1']);
   });
 });
 
