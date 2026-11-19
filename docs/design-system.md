@@ -101,7 +101,7 @@ componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.tes
 | **Campo de busca** | pílula 46 px; × à direita (alvo 44 px, disco 22 px `--color-elevated`, ícone `--color-muted`) só enquanto há texto; limpa pelo mesmo `onChange` e devolve o foco ao campo; o × nativo do `type=search` é escondido | `SearchInput`, `.search-field` |
 | **Campos** | 46 px, raio 12, rótulo 13 px muted, selo "· lido do PDF" verde | `.input`, `.field` |
 | **Alertas** | caixa suave vermelha (alerta de página); aviso de sucesso `.notice`; erro de campo só texto | `redesign-states.css` |
-| **Diálogos** | cartão 22 px com ações em pílula; destrutivo em vermelho suave | `.dialog` |
+| **Diálogos** | cartão 22 px com ações em pílula. **Destrutivo** = Cancelar neutro à esquerda + botão de confirmar vermelho sólido à direita (`--color-error`, texto `--color-on-primary`), ambos 46 px; foco inicial no Cancelar; Escape cancela; sem digitar nada para confirmar | `.dialog`, `ConfirmDialog`, `.confirm-actions` |
 | **Aviso de atualização** | pílula no topo, centralizada, botão âmbar "Atualizar" | `UpdatePrompt` |
 
 Estados obrigatórios por tela: **carregando, vazio, erro** (e "somente leitura" para visitante). Ver a tela

@@ -997,7 +997,7 @@ section:last-child > .section-title + .list {
 .btn-danger {
   background: var(--color-error);
   border-color: var(--color-error);
-  color: var(--color-on-accent);
+  color: var(--color-on-primary);
 }
 
 /* Importar em lote (desktop) */

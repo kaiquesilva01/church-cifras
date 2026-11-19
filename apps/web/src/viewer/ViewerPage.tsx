@@ -682,7 +682,6 @@ export function ViewerPage({
         <ConfirmDialog
           title="Apagar música"
           confirmLabel="Apagar música"
-          requireText={song.title}
           busy={manage.busy}
           error={manage.error}
           onConfirm={() => void deleteWholeSong()}

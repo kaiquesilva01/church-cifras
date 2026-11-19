@@ -297,28 +297,17 @@ describe('ViewerPage manage', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('?tom=G');
   });
 
-  it('delete song requires typing the title', async () => {
+  it('delete song asks for confirmation only, without typing the title', async () => {
     const api = setup();
     const dialog = await openMenu('Apagar música');
-    const button = within(dialog).getByRole('button', { name: 'Apagar música' });
-    expect(button).toBeDisabled();
-    fireEvent.change(within(dialog).getByLabelText(/Digite o título/), {
-      target: { value: 'sonda' },
-    });
-    expect(button).toBeDisabled();
-    fireEvent.change(within(dialog).getByLabelText(/Digite o título/), {
-      target: { value: 'SONDA-ME' },
-    });
-    expect(button).toBeEnabled();
+    expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Apagar música' })).toBeEnabled();
     expect(api.deleteSong).not.toHaveBeenCalled();
   });
 
   it('deletes song and returns home', async () => {
     const api = setup();
     const dialog = await openMenu('Apagar música');
-    fireEvent.change(within(dialog).getByLabelText(/Digite o título/), {
-      target: { value: 'sonda me' },
-    });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Apagar música' }));
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/));
     expect(api.deleteSong).toHaveBeenCalledWith('s1');
