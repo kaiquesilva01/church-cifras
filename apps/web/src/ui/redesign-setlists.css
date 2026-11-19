@@ -253,7 +253,7 @@ span.setlist-item-key {
 }
 
 .setlist-fab {
-  box-shadow: 0 8px 24px rgb(245 166 35 / 35%);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-accent) 35%, transparent);
 }
 
 .setlist-fab:not(:disabled) {
