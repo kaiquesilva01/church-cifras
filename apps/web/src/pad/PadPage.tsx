@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { shortDate } from '../setlists/format';
 import { useSetlistsContext } from '../setlists/SetlistsProvider';
@@ -6,6 +7,26 @@ import { PAD_NOTES, padNoteFor, type PadNote } from './padNotes';
 import type { PadOwner } from './padRoute';
 import { PadVolume } from './PadVolume';
 import { usePad } from './usePad';
+
+/** Paper spelling of the tones (the pad itself keeps sharps). */
+const TONE_LABEL: Record<PadNote, string> = {
+  C: 'C',
+  'C#': 'C#',
+  D: 'D',
+  'D#': 'Eb',
+  E: 'E',
+  F: 'F',
+  'F#': 'F#',
+  G: 'G',
+  'G#': 'Ab',
+  A: 'A',
+  'A#': 'Bb',
+  B: 'B',
+};
+
+const TONE_ORDER: readonly PadNote[] = PAD_NOTES;
+
+const EQ_BARS = [10, 18, 24, 16, 8];
 
 const FREE_OWNER: PadOwner = { kind: 'free' };
 
@@ -37,79 +58,98 @@ export function PadPage() {
         ? `${setlist.label} · ${shortDate(setlist.date)}`
         : null
     : null;
-  const sequence = setlist ? setlist.items.map((item) => padNoteFor(item.key) ?? item.key) : [];
+  const sequence: string[] = setlist
+    ? setlist.items.map((item) => padNoteFor(item.key) ?? item.key)
+    : [];
 
   let title = 'Pad desligado';
   if (pad?.status === 'loading') title = 'Carregando pad…';
-  else if (pad?.status === 'playing') title = 'Tocando · seguindo a cifra';
+  else if (pad?.status === 'playing')
+    title = `Tocando em ${TONE_LABEL[pad.note as PadNote] ?? pad.note ?? ''}`.trim();
   else if (pad?.status === 'error') title = 'Pad indisponível';
 
   return (
     <section>
       <ScreenHeader eyebrow="Fundo musical" title="Pad" />
       <div className={playing ? 'pad-card is-playing' : 'pad-card'}>
-        <span className="pad-note" aria-label={playing ? `Nota ${pad?.note ?? ''}` : 'Sem nota'}>
-          {playing ? (pad?.note ?? '–') : '–'}
-        </span>
-        <p role="status" className="pad-title">
-          {title}
-        </p>
-        {context && <p className="pad-context">{context}</p>}
-        <p className="muted pad-hint">
-          Toque em um tom para tocar. Com o pad ligado, toque em outro tom para trocar com transição
-          suave.
-        </p>
-        {pad?.notice && <p className="muted">{pad.notice}</p>}
+        <div className="pad-card-row">
+          <span className="pad-eq" aria-hidden="true">
+            {EQ_BARS.map((height) => (
+              <span key={height} style={{ height }} />
+            ))}
+          </span>
+          <div className="pad-card-text">
+            <p role="status" className="pad-title">
+              {title}
+            </p>
+            {context && <p className="pad-context">{context}</p>}
+          </div>
+          {playing && owner && pad && (
+            <button
+              type="button"
+              className="pad-stop"
+              onClick={() => pad.toggle(pad.note ?? 'C', owner)}
+            >
+              Parar
+            </button>
+          )}
+        </div>
+        {!playing && (
+          <p className="muted pad-hint">
+            Toque em um tom para tocar. Com o pad ligado, toque em outro tom para trocar com
+            transição suave.
+          </p>
+        )}
+        {pad?.notice && <p className="muted pad-hint">{pad.notice}</p>}
+        <div
+          className="pad-volume"
+          style={{ '--pad-volume': `${Math.round(volume * 100)}%` } as CSSProperties}
+        >
+          <div className="pad-volume-head">
+            <span>Volume</span>
+            <span className="pad-volume-value">{Math.round(volume * 100)}%</span>
+          </div>
+          {pad && <PadVolume volume={volume} onChange={pad.setVolume} />}
+        </div>
       </div>
       {pad && (
-        <div className="pad-tones" role="group" aria-label="Tons do pad">
-          {PAD_NOTES.map((tone) => {
-            const current = pad.status === 'playing' && pad.note === tone;
-            return (
-              <button
-                key={tone}
-                type="button"
-                className={current ? 'pad-tone is-current' : 'pad-tone'}
-                aria-pressed={current}
-                onClick={() => onTone(tone)}
-              >
-                {tone}
-              </button>
-            );
-          })}
-        </div>
+        <>
+          <h2 className="pad-label">Tons · toque para trocar</h2>
+          <div className="pad-tones" role="group" aria-label="Tons do pad">
+            {TONE_ORDER.map((tone) => {
+              const current = pad.status === 'playing' && pad.note === tone;
+              return (
+                <button
+                  key={tone}
+                  type="button"
+                  className={current ? 'pad-tone is-current' : 'pad-tone'}
+                  aria-pressed={current}
+                  aria-label={`Tocar tom ${TONE_LABEL[tone]}`}
+                  onClick={() => onTone(tone)}
+                >
+                  <span className="pad-tone-name">{TONE_LABEL[tone]}</span>
+                  {current && <span className="pad-tone-tag">ATIVO</span>}
+                  {current && <span className="pad-tone-dot" aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
-      <div className="pad-volume-card">
-        <div className="pad-volume-head">
-          <span>Volume</span>
-          <span className="pad-volume-value">{Math.round(volume * 100)}%</span>
-        </div>
-        {pad && <PadVolume volume={volume} onChange={pad.setVolume} />}
-        <p className="muted">Fica salvo neste aparelho.</p>
-      </div>
       {sequence.length > 0 && (
         <div className="pad-sequence">
-          <h2 className="section-title">No repertório · tons</h2>
+          <h2 className="pad-label">No repertório · tons</h2>
           <ol className="pad-sequence-list">
             {sequence.map((note, index) => (
               <li
                 key={`${index}-${note}`}
                 className={playing && note === pad?.note ? 'is-current' : undefined}
               >
-                {note}
+                {TONE_LABEL[note as PadNote] ?? note}
               </li>
             ))}
           </ol>
         </div>
-      )}
-      {playing && owner && pad && (
-        <button
-          type="button"
-          className="btn pad-stop"
-          onClick={() => pad.toggle(pad.note ?? 'C', owner)}
-        >
-          Parar pad
-        </button>
       )}
     </section>
   );

@@ -253,90 +253,172 @@
   color: var(--color-muted);
 }
 
-/* Pad tab */
+/* Pad tab (Paper "04 · Pad · Opção B (com volume)") */
 .pad-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 26px 20px 22px;
-  border: 1px solid var(--color-border);
-  border-radius: 24px;
-  background: var(--color-surface);
-  text-align: center;
-}
-
-.pad-card.is-playing {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-}
-
-.pad-note {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 6rem;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  color: var(--color-muted);
-}
-
-.pad-card.is-playing .pad-note {
-  color: var(--color-accent-text);
-}
-
-.pad-title {
-  margin: 0;
-  font-weight: 700;
-}
-
-.pad-context {
-  margin: 0;
-  padding: 6px 14px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
-  font-size: 0.8125rem;
-  color: var(--color-muted);
-}
-
-.pad-hint {
-  max-width: 270px;
-  margin: 0;
-  font-size: 0.8125rem;
-}
-
-.pad-volume-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 20px;
   padding: 14px 16px;
   border: 1px solid var(--color-border);
   border-radius: 18px;
   background: var(--color-surface);
 }
 
-.pad-volume-card p {
+.pad-card.is-playing {
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+.pad-card-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pad-eq {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--color-accent-soft);
+}
+
+.pad-eq > span {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--color-accent);
+}
+
+.pad-card:not(.is-playing) .pad-eq {
+  opacity: 0.5;
+}
+
+.pad-card-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pad-title {
   margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.pad-context {
+  margin: 2px 0 0;
+  overflow: hidden;
   font-size: 0.75rem;
+  color: var(--color-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pad-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.pad-stop {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-error) 40%, transparent);
+  border-radius: 999px;
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pad-volume {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .pad-volume-head {
   display: flex;
   justify-content: space-between;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--color-muted);
 }
 
 .pad-volume-value {
   color: var(--color-text);
-  font-weight: 700;
+  font-weight: 600;
+}
+
+/* The native slider, drawn as a 6px track with an amber fill (--pad-volume). */
+.pad-volume input[type='range'] {
+  width: 100%;
+  height: 24px;
+  margin: -9px 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+}
+
+.pad-volume input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-accent) var(--pad-volume),
+    var(--color-elevated) var(--pad-volume)
+  );
+}
+
+.pad-volume input[type='range']::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-elevated);
+}
+
+.pad-volume input[type='range']::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+
+.pad-volume input[type='range']::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+  margin-top: -7px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-accent);
+  appearance: none;
+}
+
+.pad-volume input[type='range']::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.pad-label {
+  margin: 0 0 10px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
 }
 
 .pad-sequence-list {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   margin: 0 0 16px;
   padding: 0;
@@ -344,40 +426,66 @@
 }
 
 .pad-sequence-list li {
-  min-width: 46px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--color-elevated);
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: 'Roboto Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+}
+
+.pad-sequence-list li + li::before {
+  content: '›';
+  position: absolute;
+  margin-left: -15px;
   color: var(--color-muted);
-  font-weight: 700;
-  text-align: center;
+}
+
+.pad-sequence-list li {
+  position: relative;
+  margin-left: 12px;
+}
+
+.pad-sequence-list li:first-child {
+  margin-left: 0;
 }
 
 .pad-sequence-list li.is-current {
-  border: 1px solid var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
   background: var(--color-accent-soft);
   color: var(--color-accent-text);
+  font-weight: 600;
 }
 
-/* 6 × 2 grid, as in the Paper design (screens 04, 04b, L5). */
+/* 3 × 4 grid of 80px tiles. */
 .pad-tones {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
 .pad-tone {
-  min-height: 44px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-elevated);
-  color: var(--color-muted);
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 0.875rem;
-  font-weight: 700;
+  border-radius: 18px;
+  background: var(--color-surface);
+  color: var(--color-text);
   cursor: pointer;
+}
+
+.pad-tone-name {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 32px;
 }
 
 .pad-tone.is-current {
@@ -386,14 +494,20 @@
   color: var(--color-accent-text);
 }
 
-.pad-stop {
-  width: 100%;
-  min-height: 52px;
-  border-color: var(--color-error);
-  border-radius: 999px;
-  background: var(--color-error-soft);
-  color: var(--color-error);
-  font-weight: 800;
+.pad-tone-tag {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.pad-tone-dot {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
 }
 
 /* Song and singer lists */
