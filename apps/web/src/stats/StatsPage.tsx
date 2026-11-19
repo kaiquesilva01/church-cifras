@@ -9,6 +9,11 @@ const RANGES: { value: Range; label: string }[] = [
   { value: 'last30Days', label: 'Últimos 30 dias' },
 ];
 
+const EMPTY_MESSAGE: Record<Range, string> = {
+  allTime: 'Ainda não há repertórios fechados.',
+  last30Days: 'Nenhuma cifra usada nos últimos 30 dias.',
+};
+
 const RANKING_KEY: Record<Range, keyof Pick<Stats, 'topAllTime' | 'topLast30Days'>> = {
   allTime: 'topAllTime',
   last30Days: 'topLast30Days',
@@ -97,7 +102,7 @@ export function StatsPage({ api }: { api: StatsApi }) {
             <p className="eyebrow">PDFs</p>
             <p className="stats-figure">{formatCount(stats.pdfCount)}</p>
             <p className="stats-sub">
-              {`${formatCount(stats.handmadeCount)} à mão · ${formatCount(stats.generatedCount)} gerados`}
+              {`${formatCount(stats.handmadeCount)} à mão · ${formatCount(stats.generatedCount)} ${stats.generatedCount === 1 ? 'gerado' : 'gerados'}`}
             </p>
           </div>
           <div className="stats-card stats-card-songs">
@@ -138,7 +143,7 @@ export function StatsPage({ api }: { api: StatsApi }) {
             ))}
           </div>
           {ranking.length === 0 ? (
-            <p className="stats-empty">Ainda não há repertórios fechados.</p>
+            <p className="stats-empty">{EMPTY_MESSAGE[range]}</p>
           ) : (
             <ol className="menu-card stats-ranking">
               {ranking.map((song, index) => (
