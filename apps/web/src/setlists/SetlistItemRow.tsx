@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import type { SongSummary } from '../catalog/types';
+import { ChevronDownIcon, ChevronUpIcon, CloseIcon, OpenChevronIcon } from './icons';
 import { itemHref } from './navigation';
 import type { RowDrag } from './SortableItems';
 import type { SetlistItem } from './types';
@@ -41,17 +42,24 @@ export function SetlistItemRow({
   const keyLabel = keyGone ? <s>{item.key}</s> : item.key;
 
   return (
-    <li className="list-card setlist-item" ref={drag?.setNodeRef} style={drag?.style}>
+    <li
+      className={`list-card setlist-item${song === undefined ? ' setlist-item-missing' : ''}`}
+      ref={drag?.setNodeRef}
+      style={drag?.style}
+    >
       {drag?.handle(title)}
       <span className="setlist-item-number muted">{position}</span>
       <span className="setlist-item-main">
         {song ? (
-          <Link to={itemHref(setlistId, item)} className="song-title">
-            {song.title}
+          <Link to={itemHref(setlistId, item)} className="song-title setlist-item-link">
+            <span className="setlist-item-name">{song.title}</span>
+            <OpenChevronIcon />
           </Link>
         ) : (
           <span className="song-title">{title}</span>
         )}
+        {song && <span className="setlist-item-artist">{song.artistName}</span>}
+        {keyGone && <span className="setlist-item-warn">Tom {item.key} removido</span>}
       </span>
       {song === undefined ? (
         <span className="setlist-item-key muted" aria-hidden="true">
@@ -81,7 +89,7 @@ export function SetlistItemRow({
             disabled={isFirst}
             onClick={onMoveUp}
           >
-            ▲
+            <ChevronUpIcon />
           </button>
           <button
             type="button"
@@ -90,7 +98,7 @@ export function SetlistItemRow({
             disabled={isLast}
             onClick={onMoveDown}
           >
-            ▼
+            <ChevronDownIcon />
           </button>
           <button
             type="button"
@@ -98,7 +106,7 @@ export function SetlistItemRow({
             aria-label={`Remover ${title}`}
             onClick={onRemove}
           >
-            ✕
+            <CloseIcon />
           </button>
         </span>
       )}

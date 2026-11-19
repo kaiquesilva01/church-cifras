@@ -292,7 +292,8 @@ describe('SetlistPage menu', () => {
       }),
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Novo nome · 20/11');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Novo nome');
+    expect(screen.getByText('sexta-feira · 20/11')).toBeInTheDocument();
     expect(screen.queryByText('O repertório foi alterado.')).not.toBeInTheDocument();
   });
 
