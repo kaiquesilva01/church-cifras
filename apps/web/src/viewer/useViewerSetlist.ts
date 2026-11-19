@@ -16,7 +16,7 @@ export interface ViewerSetlist {
   extraQuery: string;
   /** Para onde o "‹" do cabeçalho leva. */
   backHref: string;
-  /** Fora de um repertório com entrada anterior no app: o "‹" volta pelo histórico (`navigate(-1)`). */
+  /** Sem repertório na URL e com entrada anterior no app: o "‹" volta pelo histórico (`navigate(-1)`). */
   backInApp: boolean;
   /** `null` fora de um repertório (ou antes de ele carregar): sem barra. */
   nav: ItemNav | null;
@@ -97,7 +97,7 @@ export function useViewerSetlist({
     extraQuery,
     backHref: inSetlist ? `/repertorios/${encodeURIComponent(setlistId)}` : '/',
     // 'default' é a primeira entrada da sessão (link direto ou recarga sem histórico do app).
-    backInApp: !inSetlist && location.key !== 'default',
+    backInApp: setlistId === null && location.key !== 'default',
     nav,
     next: nav?.next ?? null,
     go: (target) => navigate(itemHref(setlistId ?? '', target), { replace: true }),

@@ -24,6 +24,13 @@ export function AddSongSheet({ songs, presentSongIds, onAdd, onClose }: AddSongS
   const showHarpa = filter !== 'Músicas';
   const shownCount = (showMusicas ? musicas.length : 0) + (showHarpa ? harpa.length : 0);
   const trimmed = query.trim();
+  const emptyMessage = trimmed
+    ? `Nada encontrado para “${trimmed}”.`
+    : songs.length === 0
+      ? 'Nenhuma cifra ainda.'
+      : filter === 'Harpa'
+        ? 'Nenhum hino da Harpa ainda.'
+        : 'Nenhuma música ainda.';
 
   const section = (title: string, list: SongSummary[]) => (
     <>
@@ -71,11 +78,7 @@ export function AddSongSheet({ songs, presentSongIds, onAdd, onClose }: AddSongS
           </button>
         ))}
       </div>
-      {shownCount === 0 && (
-        <p className="status">
-          {trimmed ? `Nada encontrado para “${trimmed}”.` : 'Nenhuma cifra ainda.'}
-        </p>
-      )}
+      {shownCount === 0 && <p className="status">{emptyMessage}</p>}
       {showMusicas && musicas.length > 0 && section('Músicas', musicas)}
       {showHarpa && harpa.length > 0 && section('Harpa', harpa)}
       <div className="dialog-actions">

@@ -120,4 +120,35 @@ describe('AddSongSheet sections (like Busca)', () => {
     expect(screen.getByRole('button', { name: /Sonda-me/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Ressuscita-me/ })).toBeInTheDocument();
   });
+
+  it('says there is no cifra only when the catalog is empty', () => {
+    render(
+      <AddSongSheet songs={[]} presentSongIds={new Set()} onAdd={vi.fn()} onClose={vi.fn()} />,
+    );
+    expect(screen.getByText('Nenhuma cifra ainda.')).toBeInTheDocument();
+  });
+
+  it('explains an empty chip when the search is empty but the catalog is not', () => {
+    render(
+      <AddSongSheet
+        songs={sampleSongs}
+        presentSongIds={new Set()}
+        onAdd={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    const group = screen.getByRole('group', { name: 'Filtrar resultados' });
+    fireEvent.click(within(group).getByRole('button', { name: 'Harpa' }));
+    expect(screen.getByText('Nenhum hino da Harpa ainda.')).toBeInTheDocument();
+    expect(screen.queryByText('Nenhuma cifra ainda.')).not.toBeInTheDocument();
+  });
+
+  it('explains an empty Músicas chip when only hymns exist', () => {
+    render(
+      <AddSongSheet songs={[hymn]} presentSongIds={new Set()} onAdd={vi.fn()} onClose={vi.fn()} />,
+    );
+    const group = screen.getByRole('group', { name: 'Filtrar resultados' });
+    fireEvent.click(within(group).getByRole('button', { name: 'Músicas' }));
+    expect(screen.getByText('Nenhuma música ainda.')).toBeInTheDocument();
+  });
 });

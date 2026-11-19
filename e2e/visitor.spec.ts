@@ -2,7 +2,7 @@ import { expect, expectPdfRendered, newAccount, shot, signInAs, test } from './f
 import { seedSong } from './fixtures/emulator';
 import { lettersTag } from './fixtures/names';
 
-test('visitor can read and download but cannot create, change keys or manage', async ({
+test('visitor can read and share but cannot create, change keys or manage', async ({
   page,
 }, testInfo) => {
   const tag = lettersTag();

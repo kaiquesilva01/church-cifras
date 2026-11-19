@@ -26,6 +26,7 @@ import { testUser } from '../test/fakeGateway';
 import { stubShare, unstubShare } from '../test/shareStub';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import { ActiveSetlistProvider } from '../setlists/ActiveSetlistProvider';
+import type { SetlistApi } from '../setlists/setlistApi';
 import type { SetlistItem } from '../setlists/types';
 import { loadFontFromDisk, sheetInG } from './transposeFixtures';
 import type { ChordWriter } from '@cifras/overlay';
@@ -93,7 +94,21 @@ function Page({ api, writer }: { api: ReturnType<typeof fakeCatalogApi>; writer?
 function setup(
   path: string,
   items: SetlistItem[] = [ia, ix, ib, ic],
-  { role = 'member', writer }: { role?: Role; writer?: ChordWriter } = {},
+  {
+    role = 'member',
+    writer,
+    history = [],
+    setlistOverrides,
+    provider = true,
+  }: {
+    role?: Role;
+    writer?: ChordWriter;
+    /** Entries before `path` in the history (so `navigate(-1)` has somewhere to go). */
+    history?: string[];
+    setlistOverrides?: Partial<SetlistApi>;
+    /** `false` renders the viewer with no active-setlist context at all. */
+    provider?: boolean;
+  } = {},
 ) {
   const api = fakeCatalogApi(sampleSongs, {
     deleteArrangement: vi.fn(() => Promise.resolve()),
@@ -104,7 +119,7 @@ function setup(
       }),
     ),
   });
-  const setlistApi = fakeSetlistApi([makeSetlist({ id: 'r1', items })]);
+  const setlistApi = fakeSetlistApi([makeSetlist({ id: 'r1', items })], setlistOverrides);
   const auth: AuthState = {
     status: 'signed-in',
     user: testUser,
@@ -115,9 +130,24 @@ function setup(
   };
   const { container, unmount } = render(
     <AuthContext.Provider value={auth}>
-      <MemoryRouter initialEntries={[path]}>
+      <MemoryRouter initialEntries={[...history, path]} initialIndex={history.length}>
         <Probe />
-        <ActiveSetlistProvider api={setlistApi}>
+        {provider ? (
+          <ActiveSetlistProvider api={setlistApi}>
+            <Routes>
+              <Route
+                path="/musicas/:songId"
+                element={
+                  <SongsProvider api={api}>
+                    <Page api={api} writer={writer} />
+                  </SongsProvider>
+                }
+              />
+              <Route path="/repertorios/:id" element={<p>lista</p>} />
+              <Route path="/" element={<p>home</p>} />
+            </Routes>
+          </ActiveSetlistProvider>
+        ) : (
           <Routes>
             <Route
               path="/musicas/:songId"
@@ -130,7 +160,7 @@ function setup(
             <Route path="/repertorios/:id" element={<p>lista</p>} />
             <Route path="/" element={<p>home</p>} />
           </Routes>
-        </ActiveSetlistProvider>
+        )}
       </MemoryRouter>
     </AuthContext.Provider>,
   );
@@ -159,6 +189,28 @@ describe('ViewerPage in a setlist', () => {
     await screen.findByTestId('pdf-pages');
     expect(screen.getByText('2 de 3')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Voltar' })).toHaveAttribute('href', '/repertorios/r1');
+  });
+
+  it('back goes to the setlist, not the history, while the setlist is still loading', async () => {
+    setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, {
+      history: ['/'],
+      setlistOverrides: { subscribeSetlist: () => () => undefined },
+    });
+    await screen.findByTestId('pdf-pages');
+    const back = screen.getByRole('link', { name: 'Voltar' });
+    expect(back).toHaveAttribute('href', '/repertorios/r1');
+    fireEvent.click(back);
+    expect(where()).toBe('/repertorios/r1');
+  });
+
+  it('back never uses the history while a setlist is in the URL, even without its context', async () => {
+    setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, {
+      history: ['/repertorios/other'],
+      provider: false,
+    });
+    await screen.findByTestId('pdf-pages');
+    fireEvent.click(screen.getByRole('link', { name: 'Voltar' }));
+    expect(where()).toBe('/');
   });
 
   it('Anterior and Próxima replace-navigate, skipping removed songs', async () => {

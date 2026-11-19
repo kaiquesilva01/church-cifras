@@ -19,8 +19,8 @@ export function useDismissable({ open, onClose, root, trigger }: DismissableOpti
     if (!open) return;
     const onKeyDown = (event: globalThis.KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
-      const modal = document.querySelector('[aria-modal="true"]');
-      if (modal && !root.current?.contains(modal)) return;
+      const modals = [...document.querySelectorAll('[aria-modal="true"]')];
+      if (modals.some((modal) => !root.current?.contains(modal))) return;
       onClose();
       trigger.current?.focus();
     };

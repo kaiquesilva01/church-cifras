@@ -3,7 +3,13 @@ import { useRef, useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { useDismissable } from './useDismissable';
 
-function Menu({ withDialog = false }: { withDialog?: boolean }) {
+function Menu({
+  withDialog = false,
+  innerDialog = false,
+}: {
+  withDialog?: boolean;
+  innerDialog?: boolean;
+}) {
   const [open, setOpen] = useState(true);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -20,6 +26,7 @@ function Menu({ withDialog = false }: { withDialog?: boolean }) {
           Menu
         </button>
         {open && <button type="button">Item</button>}
+        {innerDialog && <div role="dialog" aria-modal="true" aria-label="Interno" />}
       </div>
       <button type="button">Fora</button>
       {withDialog && (
@@ -71,5 +78,31 @@ describe('useDismissable', () => {
       key: 'Escape',
     });
     expect(screen.getByRole('button', { name: 'Item' })).toBeInTheDocument();
+  });
+
+  it('ignores Escape when a modal outside the menu is open after one inside it', () => {
+    render(<Menu innerDialog withDialog />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Item' })).toBeInTheDocument();
+  });
+
+  it('still closes on Escape when the only modal is inside the menu', () => {
+    function Inside() {
+      const [open, setOpen] = useState(true);
+      const root = useRef<HTMLDivElement>(null);
+      const trigger = useRef<HTMLButtonElement>(null);
+      useDismissable({ open, onClose: () => setOpen(false), root, trigger });
+      return (
+        <div ref={root}>
+          <button ref={trigger} type="button">
+            Menu
+          </button>
+          {open && <div role="dialog" aria-modal="true" aria-label="Interno" />}
+        </div>
+      );
+    }
+    render(<Inside />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Interno' })).not.toBeInTheDocument();
   });
 });
