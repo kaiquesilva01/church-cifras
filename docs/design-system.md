@@ -93,7 +93,7 @@ componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.tes
 | **Barra da cifra** | pílula flutuante: ⬇ (ícone, `aria-label="Baixar PDF"`), WhatsApp (glifo verde; abre a folha de compartilhar do aparelho), **Pad** (texto; "Pad G" em âmbar tocando), **Mudar tom** (âmbar). Sem ícone de nota musical | `ViewerPage`, `viewer/barIcons.tsx` |
 | **Anterior · N de M · Próxima** | pílulas dentro da barra da cifra; avisos de repertório flutuam sem empurrar o PDF | `SetlistBar` |
 | **Painel Mudar tom** | folha inferior: 12 tons (salvos em verde, escolhido em âmbar), − ½ / + ½, Cancelar/Confirmar; **sem** stepper − + no cabeçalho | `KeyPanel` |
-| **Aba Pad** | só **status e volume**: nota grande, música/repertório, sequência de tons, Parar; o pad não para ao abrir `/pad` | `PadPage`, `padStaysOn` |
+| **Aba Pad** | **status, grade de 12 tons e volume**: nota grande, música/repertório, toque num tom para tocar (ou trocar com transição, se já toca), sequência do repertório, Parar. Grade 6 × 2, tom atual em âmbar. O pad iniciado pela aba é de origem livre e não para ao trocar de tela | `PadPage`, `padStaysOn` (origem `free`), `.pad-tones` |
 | **Aba Mais** | perfil + selo de papel; **Admin** (só admin → Pessoas), **Importar** (só admin → importação em lote), **Pessoas** (músicos) cinza "Em breve", Sair | `MaisPage` |
 | **Botões** | secundário: pílula `--color-elevated`; **ação**: pílula âmbar (`.btn-primary`, peso 800); neutro: `--color-primary` (login, chip ativo, avatar) | `styles.css`, `redesign-forms.css` |
 | **Campos** | 46 px, raio 12, rótulo 13 px muted, selo "· lido do PDF" verde | `.input`, `.field` |

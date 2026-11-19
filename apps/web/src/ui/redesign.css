@@ -359,22 +359,23 @@
   color: var(--color-accent-text);
 }
 
+/* 6 × 2 grid, as in the Paper design (screens 04, 04b, L5). */
 .pad-tones {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 16px;
 }
 
 .pad-tone {
-  min-height: 48px;
+  min-height: 44px;
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--color-elevated);
-  color: var(--color-text);
+  color: var(--color-muted);
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
 }
