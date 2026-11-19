@@ -49,7 +49,9 @@ test('admin deletes one key and the viewer moves to the remaining one', async ({
   await expect(chip(page, song.title, 'C')).toHaveAttribute('aria-current', 'true');
 });
 
-test('admin deletes a whole song after confirming with Apagar música', async ({ page }, testInfo) => {
+test('admin deletes a whole song after confirming with Apagar música', async ({
+  page,
+}, testInfo) => {
   const tag = lettersTag();
   const song = await seedSong(`Para Apagar ${tag}`, `Cantor Teste ${tag}`, [{ key: 'G' }]);
   await signInAs(page, ADMIN, 'Admin');

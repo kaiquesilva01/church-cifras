@@ -80,8 +80,7 @@ describe('AddSongSheet sections (like Busca)', () => {
     if (query) fireEvent.change(screen.getByRole('searchbox'), { target: { value: query } });
   }
 
-  const headings = () =>
-    screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+  const headings = () => screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent);
 
   it('shows Músicas before Harpa with the whole catalog when the search is empty', () => {
     renderWithHarpa();
@@ -94,11 +93,11 @@ describe('AddSongSheet sections (like Busca)', () => {
   it('has the Tudo | Músicas | Harpa chips, Tudo pressed by default', () => {
     renderWithHarpa();
     const group = screen.getByRole('group', { name: 'Filtrar resultados' });
-    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual([
-      'Tudo',
-      'Músicas',
-      'Harpa',
-    ]);
+    expect(
+      within(group)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Tudo', 'Músicas', 'Harpa']);
     expect(within(group).getByRole('button', { name: 'Tudo' })).toHaveAttribute(
       'aria-pressed',
       'true',

@@ -35,11 +35,7 @@ export function ManageMenu({
   };
 
   return (
-    <div
-      ref={root}
-      className="manage"
-      onBlur={onBlur}
-    >
+    <div ref={root} className="manage" onBlur={onBlur}>
       <button
         ref={trigger}
         type="button"

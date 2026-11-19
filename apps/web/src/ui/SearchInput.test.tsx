@@ -31,7 +31,9 @@ describe('SearchInput', () => {
       <SearchInput aria-label="Buscar" placeholder="Buscar…" value="" onChange={vi.fn()} />,
     );
     expect(screen.queryByRole('button', { name: 'Limpar busca' })).not.toBeInTheDocument();
-    rerender(<SearchInput aria-label="Buscar" placeholder="Buscar…" value="x" onChange={vi.fn()} />);
+    rerender(
+      <SearchInput aria-label="Buscar" placeholder="Buscar…" value="x" onChange={vi.fn()} />,
+    );
     expect(screen.getByRole('button', { name: 'Limpar busca' })).toHaveAttribute('type', 'button');
   });
 

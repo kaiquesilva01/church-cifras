@@ -2,9 +2,7 @@ import { chip, expect, expectPdfRendered, shot, signInAs, ADMIN, test } from './
 import { seedSong } from './fixtures/emulator';
 import { lettersTag } from './fixtures/names';
 
-test('viewer shows the keys and switches between them', async ({
-  page,
-}, testInfo) => {
+test('viewer shows the keys and switches between them', async ({ page }, testInfo) => {
   const tag = lettersTag();
   const song = await seedSong(`Estrada Antiga ${tag}`, `Cantor Teste ${tag}`, [
     { key: 'C' },

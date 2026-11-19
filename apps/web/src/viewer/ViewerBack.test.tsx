@@ -156,4 +156,3 @@ describe('Voltar da cifra volta ao cenário anterior', () => {
     expect(where()).toBe('/');
   });
 });
-

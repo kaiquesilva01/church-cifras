@@ -54,12 +54,7 @@ export function ArtistPage() {
       <p className="muted">
         {artistSongs.length === 1 ? '1 música' : `${artistSongs.length} músicas`}
       </p>
-      <SearchInput
-        aria-label={label}
-        placeholder={label}
-        value={query}
-        onChange={setQuery}
-      />
+      <SearchInput aria-label={label} placeholder={label} value={query} onChange={setQuery} />
       {visible.length === 0 && <p className="status">Nada encontrado para “{query.trim()}”.</p>}
       <SongList songs={visible} />
     </section>
