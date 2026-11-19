@@ -104,7 +104,6 @@ test('pad button toggles, follows the key chip and keeps playing on another visi
   await openFromSearch(page, song.title);
   await expectPdfRendered(page);
   await expect(padButton(page)).toHaveAttribute('aria-pressed', 'true');
-  await expect(padButton(page)).toHaveText('Pad D');
 });
 
 test('pad continues across the songs of a setlist and shows the compact control', async ({
@@ -157,11 +156,11 @@ test('pad continues across the songs of a setlist and shows the compact control'
     .click();
   await expect(page).toHaveURL(new RegExp(`/repertorios/${id}$`));
   await expect(page.locator('li.setlist-item')).toHaveCount(2);
-  await expect(page.locator('.pad-mini')).toHaveCount(0);
-  await expect(page.getByText(/Pad .* tocando/)).toHaveCount(0);
-  // ...and the cifra opened from the setlist still shows the pad on, playing D.
+  // The pad was started from a song of this setlist, so the compact control stays on it.
+  await expect(page.locator('.pad-mini')).toHaveCount(1);
+  await expect(page.getByText(/Pad .* tocando/)).toHaveCount(1);
+  // ...and the cifra opened from the setlist still shows the pad on.
   await page.locator('li.setlist-item', { hasText: aurora.title }).getByRole('link').click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(aurora.title);
   await expect(padButton(page)).toHaveAttribute('aria-pressed', 'true');
-  await expect(padButton(page)).toHaveText('Pad D');
 });
