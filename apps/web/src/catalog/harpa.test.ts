@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isHarpa, splitHarpa } from './search';
+import { compareTitles, isHarpa, splitHarpa } from './search';
 import { makeSong } from '../test/fakeCatalogApi';
 
 describe('harpa section', () => {
@@ -24,5 +24,23 @@ describe('harpa section', () => {
     const { regular, harpa } = splitHarpa(songs);
     expect(regular.map((s) => s.id)).toEqual(['1', '3']);
     expect(harpa.map((s) => s.id)).toEqual(['2', '4']);
+  });
+
+  it('sorts numbered hymns by number, not by text (15 before 134)', () => {
+    const titles = ['134 - trabalhai e orai', '15 - conversao', '03 - plena paz', '107 - firmes'];
+    expect([...titles].sort(compareTitles)).toEqual([
+      '03 - plena paz',
+      '15 - conversao',
+      '107 - firmes',
+      '134 - trabalhai e orai',
+    ]);
+  });
+
+  it('still sorts plain titles alphabetically in pt-BR', () => {
+    expect(['sonda me', 'abre os olhos', 'ágape'].sort(compareTitles)).toEqual([
+      'abre os olhos',
+      'ágape',
+      'sonda me',
+    ]);
   });
 });

@@ -1,21 +1,28 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { deriveArtists, filterArtists, filterSongs, splitHarpa } from '../catalog/search';
+import {
+  compareTitles,
+  deriveArtists,
+  filterArtists,
+  filterSongs,
+  splitHarpa,
+} from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { ScreenHeader } from '../ui/ScreenHeader';
 import { ArtistList } from './ArtistList';
 import { SongList } from './SongList';
 
-const FILTERS = ['Tudo', 'Músicas', 'Cantores'] as const;
+const FILTERS = ['Tudo', 'Músicas', 'Cantores', 'Harpa'] as const;
 type Filter = (typeof FILTERS)[number];
 /** `?tipo=` in the url, so the filtered view survives back/reload and can be shared. */
 const TIPO: Record<Filter, string | null> = {
   Tudo: null,
   Músicas: 'musicas',
   Cantores: 'cantores',
+  Harpa: 'harpa',
 };
 
-/** Global search: singers and songs together, with a filter for one of them. */
+/** Global search: singers, songs and Harpa hymns together, with a filter for one of them. */
 export function BuscaPage() {
   const { status, songs } = useSongsContext();
   const [params, setParams] = useSearchParams();
@@ -31,22 +38,29 @@ export function BuscaPage() {
   };
   const trimmed = query.trim();
 
-  const regular = useMemo(() => splitHarpa(songs).regular, [songs]);
+  const { regular, harpa } = useMemo(() => splitHarpa(songs), [songs]);
   const artists = useMemo(() => filterArtists(deriveArtists(regular), query), [regular, query]);
   const matches = useMemo(
     () =>
       filterSongs(regular, query).sort((a, b) =>
-        a.titleNormalized.localeCompare(b.titleNormalized, 'pt-BR'),
+        compareTitles(a.titleNormalized, b.titleNormalized),
       ),
     [regular, query],
   );
-  const showArtists = filter !== 'Músicas';
-  const showSongs = filter !== 'Cantores';
+  const harpaMatches = useMemo(
+    () =>
+      filterSongs(harpa, query).sort((a, b) => compareTitles(a.titleNormalized, b.titleNormalized)),
+    [harpa, query],
+  );
+  const showArtists = filter === 'Tudo' || filter === 'Cantores';
+  const showSongs = filter === 'Tudo' || filter === 'Músicas';
+  const showHarpa = filter === 'Tudo' || filter === 'Harpa';
   const nothing =
     trimmed !== '' &&
     status === 'ready' &&
     (!showArtists || artists.length === 0) &&
-    (!showSongs || matches.length === 0);
+    (!showSongs || matches.length === 0) &&
+    (!showHarpa || harpaMatches.length === 0);
 
   return (
     <section>
@@ -96,6 +110,12 @@ export function BuscaPage() {
         <>
           <h2 className="section-title">Músicas</h2>
           <SongList songs={matches} />
+        </>
+      )}
+      {trimmed !== '' && showHarpa && harpaMatches.length > 0 && (
+        <>
+          <h2 className="section-title">Harpa</h2>
+          <SongList songs={harpaMatches} />
         </>
       )}
     </section>
