@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import type { PeopleApi } from './people/peopleApi';
+import { fakeStatsApi } from './test/fakeStatsApi';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway, testUser } from './test/fakeGateway';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
@@ -24,6 +25,7 @@ describe('/nova route failure', () => {
       <App
         gateway={gateway}
         peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
         initialPath="/nova"

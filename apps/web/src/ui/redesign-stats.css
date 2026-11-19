@@ -1,0 +1,249 @@
+/*
+ * Redesign (phase 11): admin statistics screen (StatsPage). Loaded last (see main.tsx).
+ * Colors come only from the theme tokens.
+ */
+
+.stats-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 20px 32px;
+}
+
+.stats-page .back {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.stats-page .eyebrow {
+  margin: 0;
+  line-height: 14px;
+}
+
+.stats-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats-title .screen-title {
+  font-size: 2rem;
+  line-height: 36px;
+  color: var(--color-text);
+}
+
+/* Acervo: PDFs and Músicas side by side */
+.stats-acervo {
+  display: flex;
+  gap: 10px;
+}
+
+.stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+}
+
+.stats-card-pdfs {
+  flex: 2 1 0;
+}
+
+.stats-card-songs {
+  flex: 1.2 1 0;
+}
+
+.stats-figure {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 36px;
+  color: var(--color-text);
+}
+
+.stats-sub {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 16px;
+  color: var(--color-muted);
+}
+
+/* Armazenamento: icon box, value and note in a row */
+.stats-storage {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+}
+
+.stats-storage-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-elevated);
+  color: var(--color-text);
+}
+
+.stats-storage-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stats-storage-value {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 28px;
+  color: var(--color-text);
+}
+
+/* Ranking */
+.stats-ranking-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding-top: 8px;
+}
+
+.stats-ranking-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+  line-height: 22px;
+  color: var(--color-text);
+}
+
+/* Segmented control: the active segment takes the primary (chip) colors, as .filter-chip does */
+.stats-segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-elevated);
+}
+
+.stats-segment {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.stats-segment[aria-pressed='true'] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.stats-ranking {
+  margin: 0;
+}
+
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.stats-rank {
+  flex-shrink: 0;
+  width: 24px;
+  color: var(--color-muted);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.stats-ranking > li:nth-child(-n + 3) .stats-rank {
+  color: var(--color-accent-text);
+}
+
+.stats-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stats-row-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.stats-row-artist {
+  font-size: 0.75rem;
+  line-height: 16px;
+  color: var(--color-muted);
+}
+
+.stats-count {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: flex-end;
+  gap: 1px;
+  width: 52px;
+  text-align: right;
+}
+
+.stats-count-number {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--color-text);
+}
+
+.stats-count-label {
+  font-size: 0.6875rem;
+  line-height: 14px;
+  color: var(--color-muted);
+}
+
+.stats-empty {
+  margin: 0;
+  padding: 24px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.stats-note {
+  margin: 0;
+  padding: 0 8px;
+  font-size: 0.8125rem;
+  line-height: 18px;
+  text-align: center;
+  color: var(--color-muted);
+}
