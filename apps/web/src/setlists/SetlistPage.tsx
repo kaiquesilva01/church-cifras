@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
@@ -18,6 +18,7 @@ import { SetlistItemRow } from './SetlistItemRow';
 import { SortableItems } from './SortableItems';
 import type { SetlistApi } from './setlistApi';
 import type { SetlistOp } from './types';
+import { useDismissable } from '../ui/useDismissable';
 import { UpdateBanner } from './UpdateBanner';
 import { useActiveSetlist } from './useActiveSetlist';
 import { shortDate, songCount, weekdayOf } from './format';
@@ -42,6 +43,15 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<Dialogs>('none');
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRoot = useRef<HTMLDivElement>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const { onBlur: onMenuBlur } = useDismissable({
+    open: menuOpen,
+    onClose: closeMenu,
+    root: menuRoot,
+    trigger: menuTrigger,
+  });
   const [pickingKeyOf, setPickingKeyOf] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -183,8 +193,9 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
           Voltar
         </Link>
         {editable && (
-          <div className="setlist-menu">
+          <div className="setlist-menu" ref={menuRoot} onBlur={onMenuBlur}>
             <button
+              ref={menuTrigger}
               type="button"
               className="btn btn-icon"
               aria-label="Menu do repertório"

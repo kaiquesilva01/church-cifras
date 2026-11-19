@@ -1,8 +1,8 @@
-import { expect, newAccount, shot, signInAs, test } from './fixtures/app';
+import { expect, expectPdfRendered, newAccount, shot, signInAs, test } from './fixtures/app';
 import { seedSong } from './fixtures/emulator';
 import { lettersTag } from './fixtures/names';
 
-test('visitor can read and download but cannot create, change keys or manage', async ({
+test('visitor can read and share but cannot create, change keys or manage', async ({
   page,
 }, testInfo) => {
   const tag = lettersTag();
@@ -26,9 +26,9 @@ test('visitor can read and download but cannot create, change keys or manage', a
   await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(song.title);
   await shot(page, testInfo, 'visitor-1-home');
 
-  // Viewer: PDF and download only.
+  // Viewer: PDF and share only.
   await page.locator('a.list-main', { hasText: song.title }).click();
-  await expect(page.getByRole('button', { name: /PDF$/ })).toBeEnabled();
+  await expectPdfRendered(page);
   await expect(page.getByRole('button', { name: /Mudar tom/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Gerenciar' })).toHaveCount(0);
   await shot(page, testInfo, 'visitor-2-viewer');

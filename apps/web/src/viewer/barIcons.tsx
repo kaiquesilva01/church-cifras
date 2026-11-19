@@ -1,23 +1,5 @@
 /** Icons of the cifra's bottom bar (icon-only buttons carry an aria-label in ViewerPage). */
 
-export function DownloadIcon() {
-  return (
-    <svg
-      width="17"
-      height="17"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 20h14" />
-    </svg>
-  );
-}
-
 /**
  * WhatsApp glyph. The button opens the device's share sheet (Web Share API), where WhatsApp is the
  * usual target; it does not open WhatsApp directly.

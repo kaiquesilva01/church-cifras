@@ -34,6 +34,20 @@ export function filterSongs(songs: SongSummary[], query: string): SongSummary[] 
   );
 }
 
+/** Músicas e Harpa filtradas pela mesma busca e ordenadas por título (como na Busca). */
+export function searchSongSections(
+  songs: SongSummary[],
+  query: string,
+): { musicas: SongSummary[]; harpa: SongSummary[] } {
+  const { regular, harpa } = splitHarpa(songs);
+  const byTitle = (a: SongSummary, b: SongSummary) =>
+    compareTitles(a.titleNormalized, b.titleNormalized);
+  return {
+    musicas: filterSongs(regular, query).sort(byTitle),
+    harpa: filterSongs(harpa, query).sort(byTitle),
+  };
+}
+
 export function deriveArtists(songs: SongSummary[]): ArtistSummary[] {
   const byId = new Map<string, ArtistSummary>();
   for (const s of songs) {

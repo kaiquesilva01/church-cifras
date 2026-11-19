@@ -1,6 +1,6 @@
 import { keyFromSlug, keySlug, type KeyName } from '@cifras/chords';
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { itemHref, navigateItems, type ItemNav } from '../setlists/navigation';
 import type { SetlistItem } from '../setlists/types';
@@ -16,6 +16,8 @@ export interface ViewerSetlist {
   extraQuery: string;
   /** Para onde o "‹" do cabeçalho leva. */
   backHref: string;
+  /** Sem repertório na URL e com entrada anterior no app: o "‹" volta pelo histórico (`navigate(-1)`). */
+  backInApp: boolean;
   /** `null` fora de um repertório (ou antes de ele carregar): sem barra. */
   nav: ItemNav | null;
   /** Item seguinte (para o pré-carregamento). */
@@ -49,6 +51,7 @@ export function useViewerSetlist({
   const active = useActiveSetlist();
   const { songs } = useSongsContext();
   const navigate = useNavigate();
+  const location = useLocation();
   // O id que chega à API é o do provedor (validado); da URL só sai o que volta para a URL.
   const inSetlist = setlistId !== null && active !== null && active.id === setlistId;
   const shown = inSetlist ? active.shown : null;
@@ -93,6 +96,8 @@ export function useViewerSetlist({
   return {
     extraQuery,
     backHref: inSetlist ? `/repertorios/${encodeURIComponent(setlistId)}` : '/',
+    // 'default' é a primeira entrada da sessão (link direto ou recarga sem histórico do app).
+    backInApp: setlistId === null && location.key !== 'default',
     nav,
     next: nav?.next ?? null,
     go: (target) => navigate(itemHref(setlistId ?? '', target), { replace: true }),

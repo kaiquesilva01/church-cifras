@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveArtists, filterArtists, filterSongs } from './search';
+import { deriveArtists, filterArtists, filterSongs, searchSongSections } from './search';
 import type { SongSummary } from './types';
 
 const song = (id: string, title: string, artistName: string, artistId: string): SongSummary => ({
@@ -38,5 +38,26 @@ describe('search', () => {
     const artists = deriveArtists(songs);
     expect(filterArtists(artists, 'damaris').map((a) => a.id)).toEqual(['damaris-andrade']);
     expect(filterArtists(artists, 'sonda')).toEqual([]);
+  });
+});
+
+describe('searchSongSections', () => {
+  const songs = [
+    song('h2', '134 Hino', 'Harpa', 'harpa'),
+    song('m1', 'Zeta', 'Ana', 'ana'),
+    song('h1', '15 Hino', 'Harpa', 'harpa'),
+    song('m2', 'Alfa', 'Ana', 'ana'),
+  ];
+
+  it('splits Músicas from Harpa and sorts each by title', () => {
+    const out = searchSongSections(songs, '');
+    expect(out.musicas.map((s) => s.id)).toEqual(['m2', 'm1']);
+    expect(out.harpa.map((s) => s.id)).toEqual(['h1', 'h2']);
+  });
+
+  it('filters both sections with the same query, including the singer name', () => {
+    expect(searchSongSections(songs, 'ana').musicas.map((s) => s.id)).toEqual(['m2', 'm1']);
+    expect(searchSongSections(songs, 'hino 134').harpa.map((s) => s.id)).toEqual(['h2']);
+    expect(searchSongSections(songs, 'hino 134').musicas).toEqual([]);
   });
 });

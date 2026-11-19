@@ -346,6 +346,30 @@ describe('SetlistPage menu', () => {
     mount(withItems([a]), { role: 'viewer' });
     expect(screen.queryByRole('button', { name: 'Menu do repertório' })).not.toBeInTheDocument();
   });
+
+  it('closes with Escape and gives focus back to the ⋯ button', () => {
+    mount(withItems([a]));
+    openMenu();
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Menu do repertório' })).toHaveFocus();
+  });
+
+  it('closes on pointerdown outside the menu', () => {
+    mount(withItems([a]));
+    openMenu();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('closes when focus leaves the menu', () => {
+    mount(withItems([a]));
+    openMenu();
+    const item = screen.getByRole('menuitem', { name: 'Duplicar' });
+    fireEvent.blur(item, { relatedTarget: document.body });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
 });
 
 describe('SetlistPage share button', () => {

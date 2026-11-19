@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { filterSongs } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
+import { SearchInput } from '../ui/SearchInput';
 import { SongList } from './SongList';
 
 export function ArtistPage() {
@@ -53,14 +54,7 @@ export function ArtistPage() {
       <p className="muted">
         {artistSongs.length === 1 ? '1 música' : `${artistSongs.length} músicas`}
       </p>
-      <input
-        type="search"
-        className="search"
-        aria-label={label}
-        placeholder={label}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      <SearchInput aria-label={label} placeholder={label} value={query} onChange={setQuery} />
       {visible.length === 0 && <p className="status">Nada encontrado para “{query.trim()}”.</p>}
       <SongList songs={visible} />
     </section>
