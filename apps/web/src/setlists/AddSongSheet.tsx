@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { searchSongSections } from '../catalog/search';
 import type { SongSummary } from '../catalog/types';
+import { SearchInput } from '../ui/SearchInput';
 import { Dialog } from '../viewer/Dialog';
 import { defaultKeyFor } from './items';
 
@@ -51,13 +52,11 @@ export function AddSongSheet({ songs, presentSongIds, onAdd, onClose }: AddSongS
       <h2 id="add-song-title" className="dialog-title">
         Adicionar música
       </h2>
-      <input
-        type="search"
-        className="search"
+      <SearchInput
         aria-label="Buscar música ou cantor…"
         placeholder="Buscar música ou cantor…"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={setQuery}
       />
       <div className="filter-row" role="group" aria-label="Filtrar resultados">
         {FILTERS.map((name) => (

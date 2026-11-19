@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import { deriveArtists, filterArtists, searchSongSections, splitHarpa } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { ScreenHeader } from '../ui/ScreenHeader';
+import { SearchInput } from '../ui/SearchInput';
 import { ArtistList } from './ArtistList';
 import { SongList } from './SongList';
 
@@ -53,13 +54,11 @@ export function BuscaPage() {
   return (
     <section>
       <ScreenHeader eyebrow="Encontrar" title="Busca" />
-      <input
-        type="search"
-        className="search"
+      <SearchInput
         aria-label="Buscar música ou cantor"
         placeholder="Buscar música ou cantor…"
         value={query}
-        onChange={(e) => update({ q: e.target.value })}
+        onChange={(value) => update({ q: value })}
       />
       <div className="filter-row" role="group" aria-label="Filtrar resultados">
         {FILTERS.map((name) => (

@@ -46,6 +46,17 @@ describe('BuscaPage', () => {
     );
   });
 
+  it('clears the query with the × button and keeps the chosen filter', () => {
+    renderBusca('/busca?q=aline&tipo=cantores');
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar busca' }));
+    expect(screen.getByRole('searchbox')).toHaveValue('');
+    expect(screen.getByText('Digite para buscar uma música ou um cantor.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cantores' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('keeps the filter in the url, next to the query', () => {
     renderBusca('/busca?q=aline&tipo=cantores');
     expect(screen.getByRole('button', { name: 'Cantores' })).toHaveAttribute(
