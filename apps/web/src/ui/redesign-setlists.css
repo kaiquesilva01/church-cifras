@@ -165,3 +165,97 @@ span.setlist-item-key {
 .setlist-bar > span {
   color: var(--color-muted);
 }
+
+/* Repertório (editar), desenho Paper "12 · Repertório (editar)": cabeçalho com dia e data,
+   louvor com sublinhado + chevron âmbar (é um link), chip de tom e ícones de linha. */
+.setlist-eyebrow {
+  margin: 0;
+  padding: 0 4px;
+  color: var(--color-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 14px;
+  text-transform: uppercase;
+}
+
+.setlist-header .btn-icon {
+  border-radius: 999px;
+}
+
+.setlist-item.list-card {
+  gap: 6px 8px;
+  padding: 10px 8px;
+  border-radius: 13px;
+}
+
+.setlist-item-main {
+  display: flex;
+  flex: 1 1 8rem;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.setlist-item-main a {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.setlist-item-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-decoration: underline;
+  text-decoration-color: var(--color-muted);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.setlist-item-link svg {
+  flex: none;
+  color: var(--color-accent-text);
+}
+
+.setlist-item-artist {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.setlist-item-warn {
+  color: var(--color-error);
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+/* Tom: chip compacto em mono; o tom removido aparece riscado em vermelho. */
+.setlist-item-key.btn {
+  min-height: 32px;
+  min-width: 40px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.setlist-item-key s {
+  color: var(--color-error);
+}
+
+/* Música removida: contorno tracejado e texto apagado; não é link nem clicável. */
+.setlist-item-missing.list-card {
+  border-style: dashed;
+  border-color: var(--color-border-strong);
+}
+
+.setlist-fab {
+  box-shadow: 0 8px 24px rgb(245 166 35 / 35%);
+}
+
+.setlist-fab:not(:disabled) {
+  font-weight: 700;
+}
