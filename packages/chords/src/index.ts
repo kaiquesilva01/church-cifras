@@ -18,6 +18,8 @@ export { findKeyIndicator } from './keyIndicator';
 export type { KeyIndicator } from './keyIndicator';
 export { findChords } from './findChords';
 export type { ChordOccurrence } from './findChords';
+export { extractLyrics } from './lyrics';
+export type { LyricsOptions } from './lyrics';
 export { buildTransposePlan } from './plan';
 export type { Replacement, SuspectSegment, TransposePlan } from './plan';
 export { artistIdFromName, compareKeys, keyFromSlug, keySlug } from './catalog';
