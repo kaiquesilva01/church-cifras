@@ -41,10 +41,10 @@ test('every agent has name matching file and a description', () => {
   }
 });
 
-test('implementers run on sonnet medium', () => {
+test('implementers run on haiku medium', () => {
   for (const n of ['frontend-dev', 'backend-dev', 'qa']) {
     const { fm } = parse(n);
-    assert.equal(fm.model, 'sonnet');
+    assert.equal(fm.model, 'haiku');
     assert.equal(fm.effort, 'medium');
   }
 });
