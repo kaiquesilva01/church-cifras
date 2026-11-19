@@ -30,6 +30,8 @@ const EQ_BARS = [10, 18, 24, 16, 8];
 
 const FREE_OWNER: PadOwner = { kind: 'free' };
 
+const IDLE_HINT = 'Toque em um tom para tocar';
+
 /**
  * Status, tones and volume of the pad. The tone grid starts the pad from this tab (owner "free")
  * or, while it plays, crossfades to another tone without changing the owner.
@@ -51,13 +53,16 @@ export function PadPage() {
   const song = owner?.kind === 'song' ? songs.find((s) => s.id === owner.songId) : undefined;
   const setlist =
     owner?.kind === 'setlist' ? setlists.find((s) => s.id === owner.setlistId) : undefined;
-  const context = playing
+  const playingContext = playing
     ? song
       ? `${song.title} · ${song.artistName}`
       : setlist
         ? `${setlist.label} · ${shortDate(setlist.date)}`
         : null
     : null;
+  // One line under the title keeps the card the same size off and playing: a failure notice
+  // wins, then what is playing, then (only while off) how to start.
+  const context = pad?.notice ?? playingContext ?? (playing ? null : IDLE_HINT);
   const sequence: string[] = setlist
     ? setlist.items.map((item) => padNoteFor(item.key) ?? item.key)
     : [];
@@ -94,13 +99,6 @@ export function PadPage() {
             </button>
           )}
         </div>
-        {!playing && (
-          <p className="muted pad-hint">
-            Toque em um tom para tocar. Com o pad ligado, toque em outro tom para trocar com
-            transição suave.
-          </p>
-        )}
-        {pad?.notice && <p className="muted pad-hint">{pad.notice}</p>}
         <div
           className="pad-volume"
           style={{ '--pad-volume': `${Math.round(volume * 100)}%` } as CSSProperties}
@@ -118,11 +116,14 @@ export function PadPage() {
           <div className="pad-tones" role="group" aria-label="Tons do pad">
             {TONE_ORDER.map((tone) => {
               const current = pad.status === 'playing' && pad.note === tone;
+              const saved = !current && pad.cachedNotes.has(tone);
               return (
                 <button
                   key={tone}
                   type="button"
-                  className={current ? 'pad-tone is-current' : 'pad-tone'}
+                  className={
+                    current ? 'pad-tone is-current' : saved ? 'pad-tone is-cached' : 'pad-tone'
+                  }
                   aria-pressed={current}
                   aria-label={`Tocar tom ${TONE_LABEL[tone]}`}
                   onClick={() => onTone(tone)}

@@ -17,6 +17,7 @@ function fake(over: Partial<PadContextValue> = {}): PadContextValue {
     toggle: vi.fn(),
     follow: vi.fn(),
     setVolume: vi.fn(),
+    cachedNotes: new Set(),
     prefetch: vi.fn(),
     ...over,
   };
