@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useLocation } from 'react-router';
 import { useAuth } from '../auth/useAuth';
+import { returnPathFrom } from './returnPath';
 
 export function LoginPage() {
   const { status, signIn, prepareSignIn } = useAuth();
+  const location = useLocation();
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -18,7 +20,7 @@ export function LoginPage() {
         Carregando…
       </p>
     );
-  if (status === 'signed-in') return <Navigate to="/" replace />;
+  if (status === 'signed-in') return <Navigate to={returnPathFrom(location.state)} replace />;
 
   const handleClick = () => {
     setFailed(false);
