@@ -58,6 +58,18 @@ describe('MaisPage', () => {
     expect(screen.getByText('Pessoas')).toBeInTheDocument();
   });
 
+  it('links Estatísticas to the stats screen, for admins only', () => {
+    renderMais('admin');
+    const link = screen.getByRole('link', { name: /Estatísticas/ });
+    expect(link).toHaveAttribute('href', '/estatisticas');
+    expect(link).toHaveTextContent('PDFs, espaço e cifras mais usadas');
+  });
+
+  it.each(['member', 'viewer'] as const)('hides Estatísticas from %s', (role) => {
+    renderMais(role);
+    expect(screen.queryByText('Estatísticas')).not.toBeInTheDocument();
+  });
+
   it('keeps Pessoas disabled with "Em breve"', () => {
     renderMais('admin');
     for (const name of ['Pessoas']) {

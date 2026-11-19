@@ -5,6 +5,7 @@ import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway } from './test/fakeGateway';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
 import type { PeopleApi } from './people/peopleApi';
+import { fakeStatsApi } from './test/fakeStatsApi';
 
 const peopleApi: PeopleApi = {
   listUsers: () => Promise.resolve([]),
@@ -18,6 +19,7 @@ describe('App', () => {
       <App
         gateway={gateway}
         peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
         initialPath="/"

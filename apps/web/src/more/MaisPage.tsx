@@ -95,6 +95,20 @@ export function MaisPage() {
             </Link>
           </li>
         )}
+        {isAdmin(role) && (
+          <li>
+            <Link to="/estatisticas" className="menu-row">
+              <Icon>
+                <path d="M5 20v-9M12 20V4M19 20v-6" />
+              </Icon>
+              <span className="menu-text">
+                <strong>Estatísticas</strong>
+                <span className="muted">PDFs, espaço e cifras mais usadas</span>
+              </span>
+              {CHEVRON}
+            </Link>
+          </li>
+        )}
         <li>
           <button type="button" className="menu-row menu-row-danger" onClick={() => void signOut()}>
             <span className="menu-icon menu-icon-danger" aria-hidden="true">

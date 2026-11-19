@@ -11,6 +11,7 @@ import './ui/redesign-cifra.css';
 import './ui/redesign-setlists.css';
 import './ui/redesign-forms.css';
 import './ui/redesign-states.css';
+import './ui/redesign-stats.css';
 
 const storage = getSessionStorage(window);
 installPreloadErrorReload(window, storage);
