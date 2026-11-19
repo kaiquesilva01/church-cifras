@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useLocation } from 'react-router';
 import type { KeyName } from '@cifras/chords';
 import type { PadEngine } from './padEngine';
 import { padNoteFor, type PadNote } from './padNotes';
 import { createPadPrefetcher } from './padPrefetch';
-import { padStaysOn, type PadOwner } from './padRoute';
+import type { PadOwner } from './padRoute';
 import { PadContext, type PadContextValue } from './usePad';
 import { useWakeLock } from './useWakeLock';
 
@@ -101,7 +100,6 @@ export function PadProvider({
   storage?: Pick<Storage, 'getItem' | 'setItem'>;
 }) {
   const store = storage ?? defaultStorage();
-  const { pathname, search } = useLocation();
 
   const [status, setStatus] = useState<PadContextValue['status']>('off');
   const [note, setNote] = useState<PadNote | null>(null);
@@ -325,12 +323,6 @@ export function PadProvider({
     },
     [prefetchNotes],
   );
-
-  useEffect(() => {
-    // Reacting to an external system (the router location): stop the pad when it leaves its owner.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (status !== 'off' && owner && !padStaysOn(owner, pathname, search)) halt();
-  }, [status, owner, pathname, search, halt]);
 
   useWakeLock(status === 'playing');
 
