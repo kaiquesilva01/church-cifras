@@ -44,15 +44,23 @@ describe('MaisPage', () => {
     expect(screen.queryByRole('link', { name: /Admin/ })).not.toBeInTheDocument();
   });
 
-  it('shows Importar (admin tool) only to admins', () => {
+  it('links Importar to the batch import, for admins only', () => {
+    renderMais('admin');
+    const link = screen.getByRole('link', { name: /Importar/ });
+    expect(link).toHaveAttribute('href', '/importar');
+    expect(link).toHaveTextContent('Importar várias cifras em PDF de uma vez');
+    expect(link).not.toHaveTextContent('Em breve');
+  });
+
+  it('hides Importar from members (admin tool)', () => {
     renderMais('member');
     expect(screen.queryByText('Importar')).not.toBeInTheDocument();
     expect(screen.getByText('Pessoas')).toBeInTheDocument();
   });
 
-  it('keeps Pessoas and Importar disabled with "Em breve"', () => {
+  it('keeps Pessoas disabled with "Em breve"', () => {
     renderMais('admin');
-    for (const name of ['Pessoas', 'Importar']) {
+    for (const name of ['Pessoas']) {
       const row = screen.getByText(name).closest('.menu-row');
       expect(row).toHaveAttribute('aria-disabled', 'true');
       expect(row?.querySelector('a')).toBeNull();

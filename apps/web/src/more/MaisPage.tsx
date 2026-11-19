@@ -83,16 +83,16 @@ export function MaisPage() {
         </li>
         {isAdmin(role) && (
           <li>
-            <div className="menu-row is-soon" aria-disabled="true">
+            <Link to="/importar" className="menu-row">
               <Icon>
                 <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 20h14" />
               </Icon>
               <span className="menu-text">
                 <strong>Importar</strong>
-                <span className="muted">Trazer cifras via link Cifra Club ou ChordPro</span>
+                <span className="muted">Importar várias cifras em PDF de uma vez</span>
               </span>
-              <span className="soon-pill">Em breve</span>
-            </div>
+              {CHEVRON}
+            </Link>
           </li>
         )}
         <li>
