@@ -30,8 +30,9 @@ Abra só quando tudo isto for verdade, e diga no corpo do PR o que foi conferido
 
 ## Modelos e esforço
 
-- Escrita de código: Sonnet 5.5 com effort medium.
-- Ao despachar implementação via subagente, passar `model: "sonnet"` e `effort: "medium"`.
+- Implementação (escrever código e testes pela primeira vez): **Haiku 5.5 com effort medium** (`model: "haiku"`, `effort: "medium"`).
+- Refinamentos (ajustes após code review ou QA, correções pontuais, polimento visual): **Sonnet 5.5 com effort high** (`model: "sonnet"`, `effort: "high"`).
+- Ao despachar via subagente, passar sempre o `model` e o `effort` acima; não herdar o modelo da sessão.
 - Design, plano e revisão podem usar Opus.
 
 ## Fluxo de trabalho
