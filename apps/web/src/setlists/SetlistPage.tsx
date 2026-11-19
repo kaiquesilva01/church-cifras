@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../viewer/ConfirmDialog';
 import { AddSongSheet } from './AddSongSheet';
 import { copyItems, defaultKeyFor, newItemId } from './items';
 import { KeyPicker } from './KeyPicker';
+import { BackChevronIcon } from './icons';
 import { SetlistFormDialog } from './SetlistFormDialog';
 import { SetlistItemRow } from './SetlistItemRow';
 import { SortableItems } from './SortableItems';
@@ -16,7 +17,7 @@ import type { SetlistApi } from './setlistApi';
 import type { SetlistOp } from './types';
 import { UpdateBanner } from './UpdateBanner';
 import { useActiveSetlist } from './useActiveSetlist';
-import { shortDate } from './format';
+import { shortDate, weekdayOf } from './format';
 
 const BACK = '/?aba=repertorios';
 
@@ -151,6 +152,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
     <section>
       <div className="setlist-header">
         <Link to={BACK} className="back">
+          <BackChevronIcon />
           Voltar
         </Link>
         {editable && (
@@ -191,9 +193,10 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
           </div>
         )}
       </div>
-      <h1 className="page-title">
-        {shown.label} · {shortDate(shown.date)}
-      </h1>
+      <p className="setlist-eyebrow">
+        {weekdayOf(shown.date)} · {shortDate(shown.date)}
+      </p>
+      <h1 className="page-title">{shown.label}</h1>
       <PadMini setlistId={shown.id} />
       {active.removed && (
         <div role="status" className="notice">
@@ -249,7 +252,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
         />
       )}
       {editable && (
-        <button type="button" className="fab" onClick={() => setDialog('add')}>
+        <button type="button" className="fab setlist-fab" onClick={() => setDialog('add')}>
           ＋ Adicionar
         </button>
       )}

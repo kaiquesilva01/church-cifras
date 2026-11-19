@@ -60,17 +60,16 @@ describe('PadPage', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText('60%')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Parar pad' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Parar' })).not.toBeInTheDocument();
   });
 
   it('shows the note, the song and a stop button while it plays a cifra', () => {
     const toggle = vi.fn();
     const owner = { kind: 'song', songId: 's1' } as const;
     renderPage(fake({ status: 'playing', note: 'G', owner, toggle }));
-    expect(screen.getByText('Tocando · seguindo a cifra')).toBeInTheDocument();
-    expect(screen.getByLabelText('Nota G')).toHaveTextContent('G');
+    expect(screen.getByText('Tocando em G')).toBeInTheDocument();
     expect(screen.getByText('Sonda-me · Aline Barros')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Parar pad' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Parar' }));
     expect(toggle).toHaveBeenCalledWith('G', owner);
   });
 
@@ -79,8 +78,8 @@ describe('PadPage', () => {
     renderPage(fake({ status: 'playing', note: 'A#', owner }));
     expect(await screen.findByText(/Domingo · /)).toBeInTheDocument();
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
-    expect(items).toEqual(['D', 'A#', 'G']);
-    expect(screen.getByText('A#', { selector: 'li' })).toHaveClass('is-current');
+    expect(items).toEqual(['D', 'Bb', 'G']);
+    expect(screen.getByText('Bb', { selector: 'li' })).toHaveClass('is-current');
   });
 
   it('adjusts the volume', () => {
@@ -96,7 +95,7 @@ describe('PadPage', () => {
     renderPage(fake({ status: 'error', notice: 'Não foi possível trocar o tom do pad.' }));
     expect(screen.getByText('Pad indisponível')).toBeInTheDocument();
     expect(screen.getByText('Não foi possível trocar o tom do pad.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Parar pad' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Parar' })).not.toBeInTheDocument();
   });
 
   it('renders without a pad provider', () => {
@@ -107,7 +106,7 @@ describe('PadPage', () => {
 
 describe('PadPage tone grid', () => {
   const free = { kind: 'free' } as const;
-  const TONES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const TONES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
   function grid() {
     return screen.getByRole('group', { name: 'Tons do pad' });
@@ -123,7 +122,7 @@ describe('PadPage tone grid', () => {
     const toggle = vi.fn();
     const follow = vi.fn();
     renderPage(fake({ toggle, follow }));
-    fireEvent.click(within(grid()).getByRole('button', { name: 'D' }));
+    fireEvent.click(within(grid()).getByRole('button', { name: 'Tocar tom D' }));
     expect(toggle).toHaveBeenCalledWith('D', free);
     expect(follow).not.toHaveBeenCalled();
   });
@@ -131,7 +130,7 @@ describe('PadPage tone grid', () => {
   it('starts again after an error', () => {
     const toggle = vi.fn();
     renderPage(fake({ status: 'error', toggle }));
-    fireEvent.click(within(grid()).getByRole('button', { name: 'D' }));
+    fireEvent.click(within(grid()).getByRole('button', { name: 'Tocar tom D' }));
     expect(toggle).toHaveBeenCalledWith('D', free);
   });
 
@@ -141,7 +140,7 @@ describe('PadPage tone grid', () => {
     renderPage(
       fake({ status: 'playing', note: 'G', owner: { kind: 'song', songId: 's1' }, toggle, follow }),
     );
-    fireEvent.click(within(grid()).getByRole('button', { name: 'G' }));
+    fireEvent.click(within(grid()).getByRole('button', { name: 'Tocar tom G' }));
     expect(toggle).toHaveBeenCalledWith('G', free);
     expect(follow).not.toHaveBeenCalled();
   });
@@ -152,7 +151,7 @@ describe('PadPage tone grid', () => {
     renderPage(
       fake({ status: 'playing', note: 'G', owner: { kind: 'song', songId: 's1' }, toggle, follow }),
     );
-    fireEvent.click(within(grid()).getByRole('button', { name: 'D' }));
+    fireEvent.click(within(grid()).getByRole('button', { name: 'Tocar tom D' }));
     expect(follow).toHaveBeenCalledWith('D');
     expect(toggle).not.toHaveBeenCalled();
   });
@@ -161,21 +160,29 @@ describe('PadPage tone grid', () => {
     const toggle = vi.fn();
     const follow = vi.fn();
     renderPage(fake({ status: 'loading', toggle, follow }));
-    fireEvent.click(within(grid()).getByRole('button', { name: 'D' }));
+    fireEvent.click(within(grid()).getByRole('button', { name: 'Tocar tom D' }));
     expect(toggle).toHaveBeenCalledWith('D', free);
     expect(follow).not.toHaveBeenCalled();
   });
 
   it('marks the playing tone with aria-pressed', () => {
     renderPage(fake({ status: 'playing', note: 'G', owner: free }));
-    expect(within(grid()).getByRole('button', { name: 'G' })).toHaveAttribute(
+    expect(within(grid()).getByRole('button', { name: 'Tocar tom G' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    expect(within(grid()).getByRole('button', { name: 'D' })).toHaveAttribute(
+    expect(within(grid()).getByRole('button', { name: 'Tocar tom D' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
+  });
+
+  it('shows the ATIVO tag only on the playing tone', () => {
+    renderPage(fake({ status: 'playing', note: 'A#', owner: free }));
+    const active = within(grid()).getByRole('button', { name: 'Tocar tom Bb' });
+    expect(active).toHaveAttribute('aria-pressed', 'true');
+    expect(active).toHaveTextContent('ATIVO');
+    expect(within(grid()).getAllByText('ATIVO')).toHaveLength(1);
   });
 
   it('marks no tone when the pad is off', () => {

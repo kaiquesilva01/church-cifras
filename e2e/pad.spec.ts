@@ -66,7 +66,7 @@ test.afterAll(async () => {
   await clearSetlists();
 });
 
-test('pad button toggles, follows the key chip and does not cross to another visit', async ({
+test('pad button toggles, follows the key chip and keeps playing on another visit', async ({
   page,
 }) => {
   const tag = lettersTag();
@@ -95,14 +95,15 @@ test('pad button toggles, follows the key chip and does not cross to another vis
   await expect(padButton(page)).toHaveAttribute('aria-pressed', 'false');
   await expect(volume(page)).toHaveCount(0);
 
-  // Outside a setlist the pad does not cross to another visit of the cifra.
+  // Leaving the cifra does not stop the pad (it keeps playing on any screen): the next visit
+  // shows it on, with the note that is playing.
   await padButton(page).click();
   await expect(padButton(page)).toHaveAttribute('aria-pressed', 'true');
   await goHome(page);
   await expect(page).toHaveURL(/\/$/);
   await openFromSearch(page, song.title);
   await expectPdfRendered(page);
-  await expect(padButton(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect(padButton(page)).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('pad continues across the songs of a setlist and shows the compact control', async ({
@@ -142,7 +143,7 @@ test('pad continues across the songs of a setlist and shows the compact control'
   await page.getByRole('button', { name: 'Parar', exact: true }).click();
   await expect(page.getByText('Pad D tocando')).toHaveCount(0);
 
-  // Leaving the setlist for the home page with the pad on stops it for good.
+  // Leaving for the home page with the pad on does not stop it: it keeps playing.
   await page.locator('li.setlist-item', { hasText: brisa.title }).getByRole('link').click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(brisa.title);
   await padButton(page).click();
@@ -155,10 +156,11 @@ test('pad continues across the songs of a setlist and shows the compact control'
     .click();
   await expect(page).toHaveURL(new RegExp(`/repertorios/${id}$`));
   await expect(page.locator('li.setlist-item')).toHaveCount(2);
-  await expect(page.locator('.pad-mini')).toHaveCount(0);
-  await expect(page.getByText(/Pad .* tocando/)).toHaveCount(0);
-  // ...and the cifra opened from the setlist starts with the pad off.
+  // The pad was started from a song of this setlist, so the compact control stays on it.
+  await expect(page.locator('.pad-mini')).toHaveCount(1);
+  await expect(page.getByText(/Pad .* tocando/)).toHaveCount(1);
+  // ...and the cifra opened from the setlist still shows the pad on.
   await page.locator('li.setlist-item', { hasText: aurora.title }).getByRole('link').click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(aurora.title);
-  await expect(padButton(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect(padButton(page)).toHaveAttribute('aria-pressed', 'true');
 });
