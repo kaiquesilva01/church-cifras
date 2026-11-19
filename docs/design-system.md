@@ -85,12 +85,12 @@ componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.tes
 |---|---|---|
 | **Cabeçalho de tela** | sobretítulo + título grande à esquerda; botão sol/lua (44 px, círculo) à direita | `ScreenHeader` |
 | **Barra inferior** | 5 abas (Músicas, Repertório, Busca, Pad, Mais), pílula flutuante, aba ativa com fundo suave; **só nas 5 telas raiz**. Com o pad tocando, **bolinha verde** (`--color-success`, 8 px) no canto do ícone da aba Pad, em qualquer tela com a barra | `BottomNav`, `navTabs.ts` |
-| **Telas de detalhe** | tela cheia, sem barra inferior, link `‹ Voltar` (cifra, repertório, cantor, Nova cifra, Importar, Pessoas) | cada página |
+| **Telas de detalhe** | tela cheia, sem barra inferior, link `‹ Voltar` (cifra, repertório, cantor, Nova cifra, Importar, Pessoas). O `‹` da cifra volta pelo histórico à tela anterior (mesma busca, aba e tipo); sem entrada anterior no app (link direto), vai para `/`. Repertório volta sempre ao repertório | cada página, `useViewerSetlist` |
 | **Linha de música** | tile `TOM` (tom padrão) + título/cantor + chevron; pílulas dos tons salvos embaixo (padrão em âmbar suave) | `SongList`, `KeyChips compact` |
 | **Cantor** | círculo com 2 iniciais + nome + contagem | `ArtistList`, `ui/initials.ts` |
 | **Segmento** | Músicas / Cantores em pílula | `HomePage` `.tabs` |
 | **Cartão de repertório** | selo (Próximo verde, Agendado/Realizado neutro), título, prévia de 4 louvores com tom, `+ N` | `SetlistsTab` |
-| **Barra da cifra** | pílula flutuante: ⬇ (ícone, `aria-label="Baixar PDF"`), WhatsApp (glifo verde; abre a folha de compartilhar do aparelho), **Pad** (texto; "Pad G" em âmbar tocando), **Mudar tom** (âmbar). Sem ícone de nota musical | `ViewerPage`, `viewer/barIcons.tsx` |
+| **Barra da cifra** | pílula flutuante: WhatsApp (glifo verde; abre a folha de compartilhar do aparelho), **Pad** (texto; "Pad G" em âmbar tocando), **Mudar tom** (âmbar). Sem download (⬇) e sem ícone de nota musical | `ViewerPage`, `viewer/barIcons.tsx` |
 | **PDF em tela cheia** | quadradinho 36 px no canto superior direito da 1ª página (`aria-label="Tela cheia"`; claro: `--color-primary`, escuro: `--color-elevated` com borda); aberto, a folha cobre a tela toda (overlay CSS + Fullscreen API onde existir), rola sozinha e o mesmo botão vira "Sair da tela cheia" (44 px, fixo no canto); Esc também fecha | `PdfFrame`, `.pdf-frame` |
 | **Anterior · N de M · Próxima** | pílulas dentro da barra da cifra; avisos de repertório flutuam sem empurrar o PDF | `SetlistBar` |
 | **Compartilhar repertório** | botão redondo 48 px no canto inferior esquerdo da tela do repertório (glifo WhatsApp verde, qualquer papel; some em repertório removido). Abre a folha de compartilhar com a lista e o link; sem Web Share (computador) copia e mostra "Link copiado." por alguns segundos | `SetlistPage`, `setlists/shareMessage.ts`, `redesign-setlists.css` |
@@ -98,9 +98,10 @@ componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.tes
 | **Aba Pad** | **status, grade de 12 tons e volume**: card de status de **112 px fixos** (desligado e tocando; uma linha sob o título: dica "Toque em um tom para tocar", música/repertório ou aviso de falha), toque num tom para tocar (ou trocar com transição, se já toca), sequência do repertório, Parar. Rótulo "Tons · toque para trocar" acima da grade 3 × 4 nos dois estados. Tom atual em âmbar com ATIVO; tom **já salvo no aparelho** (cache do pad) e que não toca, com **borda âmbar** (`.is-cached`). O pad iniciado pela aba é de origem livre e não para ao trocar de tela | `PadPage`, `padStaysOn` (origem `free`), `.pad-tones` |
 | **Aba Mais** | perfil + selo de papel; **Admin** (só admin → Pessoas), **Importar** (só admin → importação em lote), **Pessoas** (músicos) cinza "Em breve", Sair | `MaisPage` |
 | **Botões** | secundário: pílula `--color-elevated`; **ação**: pílula âmbar (`.btn-primary`, peso 800); neutro: `--color-primary` (login, chip ativo, avatar) | `styles.css`, `redesign-forms.css` |
+| **Campo de busca** | pílula 46 px; × à direita (alvo 44 px, disco 22 px `--color-elevated`, ícone `--color-muted`) só enquanto há texto; limpa pelo mesmo `onChange` e devolve o foco ao campo; o × nativo do `type=search` é escondido | `SearchInput`, `.search-field` |
 | **Campos** | 46 px, raio 12, rótulo 13 px muted, selo "· lido do PDF" verde | `.input`, `.field` |
 | **Alertas** | caixa suave vermelha (alerta de página); aviso de sucesso `.notice`; erro de campo só texto | `redesign-states.css` |
-| **Diálogos** | cartão 22 px com ações em pílula; destrutivo em vermelho suave | `.dialog` |
+| **Diálogos** | cartão 22 px com ações em pílula. **Destrutivo** = Cancelar neutro à esquerda + botão de confirmar vermelho sólido à direita (`--color-error`, texto `--color-on-primary`), ambos 46 px; foco inicial no Cancelar; Escape cancela; sem digitar nada para confirmar | `.dialog`, `ConfirmDialog`, `.confirm-actions` |
 | **Aviso de atualização** | pílula no topo, centralizada, botão âmbar "Atualizar" | `UpdatePrompt` |
 
 Estados obrigatórios por tela: **carregando, vazio, erro** (e "somente leitura" para visitante). Ver a tela

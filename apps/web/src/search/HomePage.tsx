@@ -17,6 +17,7 @@ import { SetlistFormDialog } from '../setlists/SetlistFormDialog';
 import { useSetlistsContext } from '../setlists/SetlistsProvider';
 import { SetlistsTab } from '../setlists/SetlistsTab';
 import { ScreenHeader } from '../ui/ScreenHeader';
+import { SearchInput } from '../ui/SearchInput';
 import { dayEyebrow } from '../ui/screenDate';
 import { ArtistList } from './ArtistList';
 import { SongList } from './SongList';
@@ -111,13 +112,11 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
         title={tab.id === 'repertorios' ? 'Repertório' : tab.id === 'harpa' ? 'Harpa' : 'Músicas'}
       />
       {tab.id !== 'repertorios' && (
-        <input
-          type="search"
-          className="search"
+        <SearchInput
           aria-label={tab.placeholder}
           placeholder={tab.placeholder}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={setQuery}
         />
       )}
       {tab.id !== 'repertorios' && (

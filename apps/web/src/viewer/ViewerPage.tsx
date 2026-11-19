@@ -41,7 +41,7 @@ import { useNextPreload } from './useNextPreload';
 import { useSongArrangements } from './useSongArrangements';
 import { useTranspose } from './useTranspose';
 import { useViewerSetlist, viewerUrl } from './useViewerSetlist';
-import { DownloadIcon, WhatsAppIcon } from './barIcons';
+import { WhatsAppIcon } from './barIcons';
 
 type Loaded = { status: 'ready'; doc: PdfDocument; bytes: Uint8Array } | { status: 'error' };
 
@@ -406,20 +406,6 @@ export function ViewerPage({
     );
   }
 
-  const download = (): void => {
-    if (current?.status !== 'ready' || !displayed) return;
-    const url = URL.createObjectURL(
-      new Blob([current.bytes as BlobPart], { type: 'application/pdf' }),
-    );
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = pdfFileName(song.title, song.artistName, displayed.key);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  };
-
   const share = async (): Promise<void> => {
     if (current?.status !== 'ready' || !displayed) return;
     const file = pdfFile(current.bytes, pdfFileName(song.title, song.artistName, displayed.key));
@@ -532,7 +518,19 @@ export function ViewerPage({
       <div className="viewer-body" inert={panelOpen && !wide}>
         <header className="viewer-head">
           <div className="viewer-title">
-            <Link to={setlist.backHref} className="back-icon" aria-label="Voltar">
+            <Link
+              to={setlist.backHref}
+              className="back-icon"
+              aria-label="Voltar"
+              onClick={(event) => {
+                // Back to the exact previous screen (query, tab, scroll), not a fixed route.
+                if (!setlist.backInApp) return;
+                // Keep the browser's own handling of ctrl/cmd/shift/middle clicks (new tab/window).
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+                event.preventDefault();
+                navigate(-1);
+              }}
+            >
               <span aria-hidden="true">‹</span>
             </Link>
             <h1>{song.title}</h1>
@@ -600,15 +598,6 @@ export function ViewerPage({
           {setlist.nav && (
             <SetlistBar nav={setlist.nav} onGo={setlist.go} backHref={setlist.backHref} />
           )}
-          <button
-            type="button"
-            className="btn btn-icon"
-            aria-label="Baixar PDF"
-            onClick={download}
-            disabled={current?.status !== 'ready'}
-          >
-            <DownloadIcon />
-          </button>
           {canShare && (
             <button
               type="button"
@@ -672,7 +661,6 @@ export function ViewerPage({
         <ConfirmDialog
           title="Apagar música"
           confirmLabel="Apagar música"
-          requireText={song.title}
           busy={manage.busy}
           error={manage.error}
           onConfirm={() => void deleteWholeSong()}

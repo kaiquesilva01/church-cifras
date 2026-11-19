@@ -49,7 +49,9 @@ test('admin deletes one key and the viewer moves to the remaining one', async ({
   await expect(chip(page, song.title, 'C')).toHaveAttribute('aria-current', 'true');
 });
 
-test('admin deletes a whole song only after typing its title', async ({ page }, testInfo) => {
+test('admin deletes a whole song after confirming with Apagar música', async ({
+  page,
+}, testInfo) => {
   const tag = lettersTag();
   const song = await seedSong(`Para Apagar ${tag}`, `Cantor Teste ${tag}`, [{ key: 'G' }]);
   await signInAs(page, ADMIN, 'Admin');
@@ -59,10 +61,7 @@ test('admin deletes a whole song only after typing its title', async ({ page }, 
   await page.getByRole('button', { name: 'Apagar música' }).click();
   const dialog = page.getByRole('dialog', { name: 'Apagar música' });
   const confirm = dialog.getByRole('button', { name: 'Apagar música' });
-  await expect(confirm).toBeDisabled();
-  await dialog.getByLabel('Digite o título para confirmar').fill('titulo errado');
-  await expect(confirm).toBeDisabled();
-  await dialog.getByLabel('Digite o título para confirmar').fill(song.title);
+  await expect(dialog.getByRole('textbox')).toHaveCount(0);
   await expect(confirm).toBeEnabled();
   await shot(page, testInfo, 'manage-4-delete-song-dialog');
   await confirm.click();

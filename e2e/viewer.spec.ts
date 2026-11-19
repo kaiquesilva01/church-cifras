@@ -2,9 +2,7 @@ import { chip, expect, expectPdfRendered, shot, signInAs, ADMIN, test } from './
 import { seedSong } from './fixtures/emulator';
 import { lettersTag } from './fixtures/names';
 
-test('viewer shows the keys, switches between them and downloads the PDF', async ({
-  page,
-}, testInfo) => {
+test('viewer shows the keys and switches between them', async ({ page }, testInfo) => {
   const tag = lettersTag();
   const song = await seedSong(`Estrada Antiga ${tag}`, `Cantor Teste ${tag}`, [
     { key: 'C' },
@@ -24,11 +22,7 @@ test('viewer shows the keys, switches between them and downloads the PDF', async
   await expect(chip(page, song.title, 'C')).not.toHaveAttribute('aria-current', 'true');
   await expectPdfRendered(page);
   await shot(page, testInfo, 'viewer-2-key-d');
-
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: /PDF$/ }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe(`${song.title} - ${song.artist} (D).pdf`);
+  await expect(page.getByRole('button', { name: 'Baixar PDF' })).toHaveCount(0);
 });
 
 test('the pdf can be maximized to read it full screen and restored', async ({ page }) => {
