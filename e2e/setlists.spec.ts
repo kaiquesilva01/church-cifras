@@ -35,6 +35,22 @@ test.afterAll(async () => {
 const rows = (page: Page) => page.locator('li.setlist-item');
 const rowTitles = (page: Page) => rows(page).locator('.song-title');
 const rowFor = (page: Page, title: string) => rows(page).filter({ hasText: title });
+/**
+ * Reorder with the keyboard on the drag handle (Space picks up, arrows move, Space drops):
+ * the same dnd-kit path a drag takes, without depending on pointer coordinates.
+ */
+async function moveItem(page: Page, title: string, direction: 'up' | 'down', steps = 1) {
+  const handle = rowFor(page, title).getByRole('button', { name: `Arrastar ${title}` });
+  await handle.focus();
+  await page.keyboard.press('Space');
+  // dnd-kit attaches its keyboard listeners on the next tick after the pick-up.
+  await page.waitForTimeout(100);
+  for (let i = 0; i < steps; i++) {
+    await page.keyboard.press(direction === 'up' ? 'ArrowUp' : 'ArrowDown');
+    await page.waitForTimeout(100);
+  }
+  await page.keyboard.press('Space');
+}
 const bar = (page: Page) => page.getByRole('navigation', { name: 'Repertório' });
 const next = (page: Page) => bar(page).getByRole('button', { name: /Próxima/ });
 const previous = (page: Page) => bar(page).getByRole('button', { name: /Anterior/ });
@@ -124,13 +140,10 @@ test('admin builds a setlist: add, reorder, change key, order survives a reload'
   await expect(sheet).toHaveCount(0);
   await expect(rowTitles(page)).toHaveText([aurora!.title, brisa!.title, cais!.title]);
 
-  // Reorder: Cais goes to the top with two ▲.
-  await page.getByRole('button', { name: `Mover ${cais!.title} para cima` }).click();
-  await expect(rowTitles(page)).toHaveText([aurora!.title, cais!.title, brisa!.title]);
-  await page.getByRole('button', { name: `Mover ${cais!.title} para cima` }).click();
+  // Reorder with the drag handle: Cais goes to the top, then back one place.
+  await moveItem(page, cais!.title, 'up', 2);
   await expect(rowTitles(page)).toHaveText([cais!.title, aurora!.title, brisa!.title]);
-  // ▼ moves it back one place.
-  await page.getByRole('button', { name: `Mover ${cais!.title} para baixo` }).click();
+  await moveItem(page, cais!.title, 'down');
   await expect(rowTitles(page)).toHaveText([aurora!.title, cais!.title, brisa!.title]);
 
   // Key of Brisa: C -> D through the picker.
@@ -216,7 +229,7 @@ test('live update: a second session sees the banner, the list stays until Atuali
     await signInAs(page, ADMIN, 'Admin');
     await page.goto(`/repertorios/${id}`);
     await expect(rowTitles(page)).toHaveText([aurora!.title, brisa!.title, cais!.title]);
-    await page.getByRole('button', { name: `Mover ${cais!.title} para cima` }).click();
+    await moveItem(page, cais!.title, 'up');
     await expect(rowTitles(page)).toHaveText([aurora!.title, cais!.title, brisa!.title]);
     // The editor does not get a banner for its own change.
     await expect(banner(page)).toHaveCount(0);
@@ -259,7 +272,7 @@ test('live update inside a cifra: banner without swapping the PDF, then the new 
     const before = await settledSignature(other);
 
     // A moves Brisa to the top.
-    await page.getByRole('button', { name: `Mover ${brisa!.title} para cima` }).click();
+    await moveItem(page, brisa!.title, 'up');
     await expect(rowTitles(page)).toHaveText([brisa!.title, aurora!.title, cais!.title]);
 
     await expect(banner(other)).toContainText('O repertório foi alterado.');

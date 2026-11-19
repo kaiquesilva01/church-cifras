@@ -182,33 +182,10 @@ describe('SetlistPage editing', () => {
     expect(screen.getAllByRole('button', { name: /^Arrastar / })).toHaveLength(2);
   });
 
-  it('moves with the neighbour semantics and disables the edges', async () => {
-    const api = withItems([a, b, c]);
-    mount(api);
-    expect(screen.getByRole('button', { name: 'Mover Sonda-me para cima' })).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Mover Grande é o Senhor para baixo' }),
-    ).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Mover Grande é o Senhor para cima' }));
-    expect(api.applyOp).toHaveBeenCalledWith('r1', {
-      type: 'move',
-      itemId: 'c',
-      afterItemId: 'a',
-    });
-    await waitFor(() => expect(order()[1]).toContain('Grande'));
-    fireEvent.click(screen.getByRole('button', { name: 'Mover Grande é o Senhor para cima' }));
-    expect(api.applyOp).toHaveBeenLastCalledWith('r1', {
-      type: 'move',
-      itemId: 'c',
-      afterItemId: null,
-    });
-    await waitFor(() => expect(order()[0]).toContain('Grande'));
-    fireEvent.click(screen.getByRole('button', { name: 'Mover Grande é o Senhor para baixo' }));
-    expect(api.applyOp).toHaveBeenLastCalledWith('r1', {
-      type: 'move',
-      itemId: 'c',
-      afterItemId: 'a',
-    });
+  it('has no up/down buttons: reordering is only by the drag handle', () => {
+    mount(withItems([a, b, c]));
+    expect(screen.queryByRole('button', { name: /^Mover / })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Arrastar / })).toHaveLength(3);
   });
 
   it('removes an item', async () => {
@@ -324,8 +301,8 @@ describe('SetlistPage menu', () => {
       applyOp: vi.fn(() => new Promise<never>(() => {})),
     });
     mount(api);
-    fireEvent.click(screen.getByRole('button', { name: 'Mover Grande é o Senhor para cima' }));
-    expect(order()[1]).toContain('Grande é o Senhor');
+    fireEvent.click(screen.getByRole('button', { name: 'Remover Sonda-me' }));
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
     expect(screen.queryByText('O repertório foi alterado.')).not.toBeInTheDocument();
   });
 
