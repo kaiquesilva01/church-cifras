@@ -20,7 +20,7 @@ import type { SetlistApi } from './setlistApi';
 import type { SetlistOp } from './types';
 import { UpdateBanner } from './UpdateBanner';
 import { useActiveSetlist } from './useActiveSetlist';
-import { shortDate, weekdayOf } from './format';
+import { shortDate, songCount, weekdayOf } from './format';
 
 const BACK = '/?aba=repertorios';
 /** Tempo que a confirmação "Link copiado." fica na tela (computador, sem Web Share). */
@@ -224,6 +224,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
         {weekdayOf(shown.date)} · {shortDate(shown.date)}
       </p>
       <h1 className="page-title">{shown.label}</h1>
+      {!editable && <p className="setlist-count">{songCount(shown)}</p>}
       <PadMini setlistId={shown.id} />
       {active.removed && (
         <div role="status" className="notice">
@@ -261,6 +262,11 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
             />
           )}
         />
+      )}
+      {!editable && (
+        <p className="setlist-readonly-note">
+          Somente leitura · só membros e admins editam o repertório
+        </p>
       )}
       {editable && (
         <button type="button" className="fab setlist-fab" onClick={() => setDialog('add')}>

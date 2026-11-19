@@ -35,7 +35,9 @@ export function SetlistItemRow({
 
   return (
     <li
-      className={`list-card setlist-item${song === undefined ? ' setlist-item-missing' : ''}`}
+      className={`list-card setlist-item${song === undefined ? ' setlist-item-missing' : ''}${
+        editable ? '' : ' is-readonly'
+      }`}
       ref={drag?.setNodeRef}
       style={drag?.style}
     >
@@ -45,7 +47,8 @@ export function SetlistItemRow({
         {song ? (
           <Link to={itemHref(setlistId, item)} className="song-title setlist-item-link">
             <span className="setlist-item-name">{song.title}</span>
-            <OpenChevronIcon />
+            {/* Quem edita vê o chevron ao lado do nome; quem só lê, à direita da linha. */}
+            {editable && <OpenChevronIcon />}
           </Link>
         ) : (
           <span className="song-title">{title}</span>
@@ -70,6 +73,11 @@ export function SetlistItemRow({
         <span className="setlist-item-key">
           {keyLabel}
           {keyGone && <span className="sr-only"> (tom indisponível)</span>}
+        </span>
+      )}
+      {!editable && song && (
+        <span className="setlist-item-chevron" aria-hidden="true">
+          <OpenChevronIcon />
         </span>
       )}
       {editable && (

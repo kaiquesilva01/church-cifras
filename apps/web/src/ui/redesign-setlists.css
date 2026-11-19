@@ -303,3 +303,53 @@ span.setlist-item-key {
   border-color: var(--color-error);
   color: var(--color-error);
 }
+
+/* Repertório (leitura, visitante), desenho Paper "13": contagem sob o título; louvor em negrito
+   sem sublinhado; tom em pílula âmbar; chevron cinza à direita da linha. Modo edição não muda. */
+.setlist-count {
+  margin: 0 0 12px;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+
+.setlist-item.is-readonly .setlist-item-name {
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.setlist-item.is-readonly span.setlist-item-key {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 40px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--color-accent);
+  border-radius: 10px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.setlist-item.is-readonly span.setlist-item-key s {
+  color: var(--color-error);
+}
+
+.setlist-item-chevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-muted);
+}
+
+.setlist-readonly-note {
+  margin: 16px 0 0;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  text-align: center;
+}

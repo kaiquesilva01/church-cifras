@@ -463,3 +463,55 @@ describe('SetlistPage share button', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível compartilhar.');
   });
 });
+
+describe('SetlistPage read-only view (Paper 13)', () => {
+  const NOTE = 'Somente leitura · só membros e admins editam o repertório';
+
+  it('shows the song count under the title', () => {
+    mount(withItems([a, b]), { role: 'viewer' });
+    const title = screen.getByRole('heading', { level: 1, name: 'Culto de domingo' });
+    expect(title.nextElementSibling).toHaveTextContent('2 louvores');
+  });
+
+  it('uses the singular for a single louvor', () => {
+    mount(withItems([a]), { role: 'viewer' });
+    expect(screen.getByText('1 louvor')).toBeInTheDocument();
+  });
+
+  it('keeps the name as the link without the chevron inside it', () => {
+    mount(withItems([a]), { role: 'viewer' });
+    const link = screen.getByRole('link', { name: 'Sonda-me' });
+    expect(link).toHaveAttribute('href', '/musicas/s1?tom=G&repertorio=r1&item=a');
+    expect(link.querySelector('svg')).toBeNull();
+    // The grey chevron sits at the right edge of the row, after the key pill.
+    const row = screen.getAllByRole('listitem')[0]!;
+    expect(row.querySelector('.setlist-item-chevron svg')).not.toBeNull();
+  });
+
+  it('shows the key as a read-only pill, not a button', () => {
+    mount(withItems([a]), { role: 'viewer' });
+    const row = screen.getByRole('listitem');
+    expect(within(row).queryByRole('button')).not.toBeInTheDocument();
+    expect(row.querySelector('.setlist-item-key')).toHaveTextContent('G');
+  });
+
+  it('keeps a removed song dashed and without link or chevron', () => {
+    mount(withItems([{ id: 'x', songId: 'gone', key: 'C' }]), { role: 'viewer' });
+    const row = screen.getByRole('listitem');
+    expect(row).toHaveClass('setlist-item-missing');
+    expect(within(row).queryByRole('link')).not.toBeInTheDocument();
+    expect(row.querySelector('.setlist-item-chevron')).toBeNull();
+  });
+
+  it('ends the list with the read-only note for visitors', () => {
+    mount(withItems([a]), { role: 'viewer' });
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+  });
+
+  it('keeps the edit screen as it is: no count line and no read-only note for editors', () => {
+    mount(withItems([a, b]), { role: 'member' });
+    expect(screen.queryByText('2 louvores')).not.toBeInTheDocument();
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sonda-me' }).querySelector('svg')).not.toBeNull();
+  });
+});
