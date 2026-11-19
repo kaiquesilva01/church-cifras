@@ -88,6 +88,17 @@ describe('ViewerPage', () => {
     expect(api.getPdfBytes).toHaveBeenCalledWith('songs/s1/A-abc.pdf');
   });
 
+  it('offers to maximize the pdf once it is on screen', async () => {
+    renderViewer('/musicas/s1?tom=A');
+    expect(screen.queryByRole('button', { name: 'Tela cheia' })).not.toBeInTheDocument();
+    await screen.findByTestId('pdf-pages');
+    fireEvent.click(screen.getByRole('button', { name: 'Tela cheia' }));
+    expect(screen.getByTestId('pdf-frame')).toHaveClass('is-fullscreen');
+    expect(screen.getByTestId('pdf-pages')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sair da tela cheia' }));
+    expect(screen.getByTestId('pdf-frame')).not.toHaveClass('is-fullscreen');
+  });
+
   it('defaults to first handmade key', async () => {
     const song = makeSong({ id: 's5', title: 'X', keys: ['C', 'D'], handmadeKeys: ['D'] });
     const { api } = renderViewer('/musicas/s5', fakeCatalogApi([song]));

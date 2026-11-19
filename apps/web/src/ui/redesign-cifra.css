@@ -14,6 +14,69 @@
   letter-spacing: -0.01em;
 }
 
+/* Maximize the pdf: a small square on the first page's corner; the page then covers the whole screen. */
+.pdf-frame {
+  position: relative;
+  min-width: 0;
+}
+
+.pdf-expand {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 18%);
+  cursor: pointer;
+}
+
+:root[data-theme='dark'] .pdf-expand {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-elevated);
+  color: var(--color-text);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 35%);
+}
+
+.pdf-expand:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Maximized: covers the screen (also where the browser has no element fullscreen) and scrolls by itself. */
+.pdf-frame.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  background: var(--color-bg);
+}
+
+.pdf-frame.is-fullscreen .pdf-expand {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.pdf-frame.is-fullscreen .pdf-pages {
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
 /* Floating action bar: ⬇ · WhatsApp · Pad · Mudar tom (the setlist row sits above them). */
 .viewer-bar {
   right: 12px;

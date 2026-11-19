@@ -3,6 +3,12 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const css = readFileSync(resolve(import.meta.dirname, 'styles.css'), 'utf8');
+const cifraCss = readFileSync(resolve(import.meta.dirname, 'redesign-cifra.css'), 'utf8');
+const cifraRule = (selector: string): string => {
+  const start = cifraCss.indexOf(`
+${selector} {`);
+  return start < 0 ? '' : cifraCss.slice(start, cifraCss.indexOf('}', start));
+};
 const rule = (selector: string): string => {
   const start = css.indexOf(`
 ${selector} {`);
@@ -40,5 +46,15 @@ describe('viewer layout css', () => {
 
   it('keeps the add-song focus ring inside the scrolling list', () => {
     expect(rule('.add-song-option:focus-visible')).toMatch(/outline-offset:\s*-2px/);
+  });
+
+  it('maximizes the pdf over the whole screen, above the bottom bar, scrolling by itself', () => {
+    const maximized = cifraRule('.pdf-frame.is-fullscreen');
+    expect(maximized).toMatch(/position:\s*fixed/);
+    expect(maximized).toMatch(/inset:\s*0/);
+    expect(maximized).toMatch(/overflow:\s*auto/);
+    expect(Number(/z-index:\s*(\d+)/.exec(maximized)?.[1])).toBeGreaterThan(30);
+    expect(cifraRule('.pdf-frame.is-fullscreen .pdf-expand')).toMatch(/position:\s*fixed/);
+    expect(cifraRule('.pdf-expand')).toMatch(/position:\s*absolute/);
   });
 });
