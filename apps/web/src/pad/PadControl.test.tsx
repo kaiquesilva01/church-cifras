@@ -109,6 +109,22 @@ describe('PadControl', () => {
     });
     expect(screen.getByRole('status')).toHaveTextContent('Sem conexão');
   });
+
+  it('crossfades to the cifra key when the pad plays another tone, without stopping', () => {
+    const value = fake({ status: 'playing', note: 'A#' });
+    render(<PadControl keyName="G" owner={owner} />, { wrapper: wrap(value) });
+    fireEvent.click(screen.getByRole('button', { name: 'Pad A#' }));
+    expect(value.follow).toHaveBeenCalledWith('G');
+    expect(value.toggle).not.toHaveBeenCalled();
+  });
+
+  it('stops the pad when the cifra key is the tone already playing', () => {
+    const value = fake({ status: 'playing', note: 'A#' });
+    render(<PadControl keyName="Bb" owner={owner} />, { wrapper: wrap(value) });
+    fireEvent.click(screen.getByRole('button', { name: 'Pad A#' }));
+    expect(value.toggle).toHaveBeenCalledWith('Bb', owner);
+    expect(value.follow).not.toHaveBeenCalled();
+  });
 });
 
 describe('usePadViewerSync', () => {

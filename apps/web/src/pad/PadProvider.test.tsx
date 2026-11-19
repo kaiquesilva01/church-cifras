@@ -378,6 +378,21 @@ describe('PadProvider', () => {
       expect(engine.stop).toHaveBeenCalled();
     });
 
+    it('keeps a pad started from the Pad tab on any route, stops only by toggle', async () => {
+      const free: PadOwner = { kind: 'free' };
+      const { result, engine, navigate } = setup({ path: '/pad' });
+      act(() => result.current.toggle('C', free));
+      await flush();
+      await navigate('/musicas/s1');
+      await navigate('/repertorios/r1');
+      await navigate('/');
+      expect(engine.stop).not.toHaveBeenCalled();
+      expect(result.current.status).toBe('playing');
+      act(() => result.current.toggle('C', free));
+      expect(engine.stop).toHaveBeenCalledTimes(1);
+      expect(result.current.status).toBe('off');
+    });
+
     it('stops while loading when the route leaves the owner', async () => {
       const { result, engine, navigate } = setup({ path: '/musicas/s1' });
       const d = deferred();

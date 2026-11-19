@@ -1,6 +1,23 @@
 import { normalizeText } from '@cifras/chords';
 import type { ArtistSummary, SongSummary } from './types';
 
+const HARPA_SINGER = 'harpa';
+
+/** Músicas do cantor "Harpa" ficam só na seção Harpa, fora de Músicas, Cantores e Busca. */
+export function isHarpa(song: SongSummary): boolean {
+  return normalizeText(song.artistName.trim()) === HARPA_SINGER;
+}
+
+export function splitHarpa(songs: SongSummary[]): {
+  regular: SongSummary[];
+  harpa: SongSummary[];
+} {
+  const regular: SongSummary[] = [];
+  const harpa: SongSummary[] = [];
+  for (const song of songs) (isHarpa(song) ? harpa : regular).push(song);
+  return { regular, harpa };
+}
+
 function matchesAll(haystack: string, query: string): boolean {
   const words = normalizeText(query).split(' ').filter(Boolean);
   return words.every((w) => haystack.includes(w));

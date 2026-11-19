@@ -2,7 +2,7 @@
 name: frontend-dev
 description: Desenvolvedor frontend React + TypeScript em apps/web; use para implementar telas e componentes seguindo o designer, com TDD.
 tools: Read, Grep, Glob, Bash, Write, Edit, Skill
-model: sonnet
+model: haiku
 effort: medium
 ---
 

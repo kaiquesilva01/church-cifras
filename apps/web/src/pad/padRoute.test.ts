@@ -60,3 +60,19 @@ describe('padStaysOn on the Pad tab', () => {
     expect(padStaysOn(setlist, '/mais', '')).toBe(false);
   });
 });
+
+describe('padStaysOn with a free owner', () => {
+  const free: PadOwner = { kind: 'free' };
+
+  it.each([
+    ['/musicas/s1', ''],
+    ['/musicas/s2', '?repertorio=r1'],
+    ['/repertorios/r1', ''],
+    ['/', ''],
+    ['/cantores/a', ''],
+    ['/pessoas', ''],
+    ['/padx', ''],
+  ])('keeps playing on %s %s', (path, search) => {
+    expect(padStaysOn(free, path, search)).toBe(true);
+  });
+});

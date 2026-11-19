@@ -31,6 +31,9 @@ const NOTES_BY_PC: readonly PadNote[] = [
   'B',
 ];
 
+/** The 12 tones, in chromatic order from C (the Pad tab's tone grid). */
+export const PAD_NOTES: readonly PadNote[] = NOTES_BY_PC;
+
 function sample(note: PadNote): PadSample {
   const { file, introBars } = manifest.files[note];
   return {

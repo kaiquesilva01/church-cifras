@@ -22,6 +22,15 @@ export function PadControl({ keyName, owner }: { keyName: KeyName | null; owner:
           ? 'Pad indisponível · tentar de novo'
           : null;
 
+  // A playing pad moves to another key with a crossfade and keeps its owner; the same tone stops it.
+  const onClick = () => {
+    if (status === 'playing' && validKey !== null && padNoteFor(validKey) !== pad.note) {
+      pad.follow(validKey);
+    } else {
+      pad.toggle(target, owner);
+    }
+  };
+
   return (
     <div className="pad-control">
       <button
@@ -29,7 +38,7 @@ export function PadControl({ keyName, owner }: { keyName: KeyName | null; owner:
         className="btn"
         aria-pressed={status === 'playing'}
         aria-busy={status === 'loading' || undefined}
-        onClick={() => pad.toggle(target, owner)}
+        onClick={onClick}
       >
         {label ?? 'Pad'}
       </button>
