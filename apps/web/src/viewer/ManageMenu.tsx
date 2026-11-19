@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
+import { useDismissable } from '../ui/useDismissable';
 
 export type ManageAction = 'edit' | 'delete-key' | 'delete-song';
 
@@ -23,24 +24,8 @@ export function ManageMenu({
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        onOpenChange(false);
-        trigger.current?.focus();
-      }
-    };
-    const onPointerDown = (event: Event): void => {
-      if (!root.current?.contains(event.target as Node)) onOpenChange(false);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('pointerdown', onPointerDown);
-    };
-  }, [open, onOpenChange]);
+  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const { onBlur } = useDismissable({ open, onClose: close, root, trigger });
 
   const choose = (action: ManageAction): void => {
     onOpenChange(false);
@@ -53,10 +38,7 @@ export function ManageMenu({
     <div
       ref={root}
       className="manage"
-      onBlur={(event) => {
-        const next = event.relatedTarget as Node | null;
-        if (open && next && !root.current?.contains(next)) onOpenChange(false);
-      }}
+      onBlur={onBlur}
     >
       <button
         ref={trigger}
