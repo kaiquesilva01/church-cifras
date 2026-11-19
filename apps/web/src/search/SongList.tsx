@@ -44,7 +44,7 @@ export function SongList({
   snippets,
 }: {
   songs: SongSummary[];
-  /** Lyrics snippet per song id, shown at the bottom of the card when there is one. */
+  /** Lyrics snippet per song id, shown right under the title row (above the key chips) when there is one. */
   snippets?: ReadonlyMap<string, SnippetPart[]>;
 }) {
   return (
@@ -65,6 +65,7 @@ export function SongList({
               </span>
               <span className="song-chevron">{CHEVRON}</span>
             </Link>
+            {snippet && <LyricSnippet parts={snippet} />}
             <KeyChips
               songId={song.id}
               title={song.title}
@@ -72,7 +73,6 @@ export function SongList({
               selected={key ?? undefined}
               compact
             />
-            {snippet && <LyricSnippet parts={snippet} />}
           </li>
         );
       })}

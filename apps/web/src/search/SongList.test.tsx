@@ -84,6 +84,25 @@ describe('SongList', () => {
     );
   });
 
+  it('places the snippet right after the main link and before the key chips', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <SongList
+          songs={[song]}
+          snippets={new Map([['s1', [{ text: 'Santo é o Senhor', match: false }]]])}
+        />
+      </MemoryRouter>,
+    );
+    const li = container.querySelector('li')!;
+    const children = Array.from(li.children);
+    const main = screen.getByRole('link', { name: 'Bondade de Deus Isaías Saad' });
+    expect(children.map((c) => c.className)).toEqual([
+      main.className,
+      'lyric-snippet',
+      'chips chips-compact',
+    ]);
+  });
+
   it('shows no snippet when the song has none', () => {
     const { container } = renderList();
     expect(container.querySelector('.lyric-snippet')).toBeNull();
