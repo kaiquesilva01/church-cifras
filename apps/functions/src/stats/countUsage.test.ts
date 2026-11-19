@@ -64,6 +64,28 @@ describe('countSettledSetlists', () => {
     expect(recorded).toEqual([{ setlistId: 's1', date: '2026-11-20', songIds: ['a', 'b'] }]);
   });
 
+  it('drops invalid song ids before deduplicating and recording', async () => {
+    const { deps, recorded } = setup({
+      now: '2026-11-22T15:00:00Z',
+      setlists: [{ id: 's1', date: '2026-11-20', songIds: ['ok', 'a/b', '', '__x__', 'ok2'] }],
+    });
+
+    await countSettledSetlists(deps);
+
+    expect(recorded).toEqual([{ setlistId: 's1', date: '2026-11-20', songIds: ['ok', 'ok2'] }]);
+  });
+
+  it('still records a setlist that only has invalid song ids, with an empty list', async () => {
+    const { deps, recorded } = setup({
+      now: '2026-11-22T15:00:00Z',
+      setlists: [{ id: 's1', date: '2026-11-20', songIds: ['a/b', ''] }],
+    });
+
+    await countSettledSetlists(deps);
+
+    expect(recorded).toEqual([{ setlistId: 's1', date: '2026-11-20', songIds: [] }]);
+  });
+
   it('records an empty setlist with an empty songIds list', async () => {
     const { deps, recorded } = setup({
       now: '2026-11-22T15:00:00Z',

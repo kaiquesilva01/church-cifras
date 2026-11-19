@@ -1,4 +1,5 @@
 import { addDays, todayInSaoPaulo } from './dates';
+import { isSongId } from './songId';
 
 export type SettledSetlist = { id: string; date: string; songIds: string[] };
 
@@ -28,7 +29,7 @@ export async function countSettledSetlists(
   let created = 0;
   let alreadyCounted = 0;
   for (const setlist of setlists) {
-    const songIds = [...new Set(setlist.songIds)];
+    const songIds = [...new Set(setlist.songIds.filter(isSongId))];
     const outcome = await deps.recordUsage({ setlistId: setlist.id, date: setlist.date, songIds });
     if (outcome === 'created') created += 1;
     else alreadyCounted += 1;

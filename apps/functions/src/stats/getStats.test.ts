@@ -139,6 +139,22 @@ describe('getStats rankings', () => {
     expect(getSongsCalls[0]).toEqual(expect.arrayContaining(['gone', ...existing]));
   });
 
+  it('ignores stored invalid song ids: getSongs only receives valid ids and nothing throws', async () => {
+    const { deps, getSongsCalls } = setup({
+      usage: [
+        { date: '2026-11-20', songIds: ['ok', 'a/b', '', '__x__'] },
+        { date: '2026-11-21', songIds: ['ok'] },
+      ],
+      songs: { ok: { title: 'Boa', artistName: 'Artista' } },
+    });
+    const result = await getStats(deps);
+    expect(getSongsCalls).toEqual([['ok']]);
+    expect(result.topAllTime).toEqual([
+      { songId: 'ok', title: 'Boa', artistName: 'Artista', uses: 2 },
+    ]);
+    expect(result.topLast30Days.map((s) => s.songId)).toEqual(['ok']);
+  });
+
   it('returns empty rankings when there is no usage', async () => {
     const result = await getStats(setup().deps);
     expect(result.topAllTime).toEqual([]);

@@ -1,6 +1,7 @@
 import { requireRole, type RoleDeps } from '../auth/requireRole';
 import { countSettledSetlists, type UsageDeps } from './countUsage';
 import { addDays, todayInSaoPaulo } from './dates';
+import { isSongId } from './songId';
 
 export type TopSong = { songId: string; title: string; artistName: string; uses: number };
 
@@ -31,7 +32,7 @@ const WINDOW_DAYS = 30;
 function tally(usages: Usage[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const usage of usages) {
-    for (const songId of new Set(usage.songIds)) {
+    for (const songId of new Set(usage.songIds.filter(isSongId))) {
       counts.set(songId, (counts.get(songId) ?? 0) + 1);
     }
   }
