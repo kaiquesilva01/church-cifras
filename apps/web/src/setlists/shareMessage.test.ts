@@ -47,6 +47,21 @@ describe('buildShareMessage', () => {
     });
     expect(text.split('\n')[0]).toBe('🎵 *Culto especial — 1ª & "Noite" (vigília)* — 20/11');
   });
+
+  it('falls back to the default title when the label is empty after cleaning', () => {
+    const text = buildShareMessage({ label: '**', date: '2026-11-20', items: [], link });
+    expect(text.split('\n')[0]).toBe('🎵 *Repertório* — 20/11');
+  });
+
+  it('drops asterisks from song titles too, but keeps _ and ~', () => {
+    const text = buildShareMessage({
+      label: 'Culto',
+      date: '2026-11-20',
+      items: [{ title: '*Sonda* me_ ~já~', key: 'G' }],
+      link,
+    });
+    expect(text.split('\n')[1]).toBe('1. Sonda me_ ~já~ (G)');
+  });
 });
 
 describe('resolveShareLines', () => {

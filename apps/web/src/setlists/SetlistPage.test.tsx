@@ -412,6 +412,22 @@ describe('SetlistPage share button', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível compartilhar.');
   });
 
+  it('always renders the status live region, silent and empty until the link is copied', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    mount(withItems([a]));
+    const shareStatus = () =>
+      screen.getAllByRole('status').find((el) => el.matches('p:not(.status)'))!;
+    const region = shareStatus();
+    expect(region).toBeEmptyDOMElement();
+    expect(region).toHaveClass('sr-only');
+    fireEvent.click(shareButton()!);
+    await screen.findByText('Link copiado.');
+    expect(shareStatus()).toBe(region);
+    expect(region).toHaveClass('setlist-share-note');
+    expect(region).not.toHaveClass('sr-only');
+  });
+
   it('copies the message and confirms when Web Share is missing (computer)', async () => {
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });

@@ -33,15 +33,20 @@ export function resolveShareLines(
   return lines;
 }
 
+/** No WhatsApp, `*` é negrito: asteriscos no rótulo ou no título quebrariam a formatação. */
+function stripBold(text: string): string {
+  return text.replace(/\*/g, '').trim();
+}
+
 /**
  * Texto enviado pelo compartilhamento (WhatsApp e outros apps). O link fica no próprio texto.
  * Asteriscos do rótulo saem: no WhatsApp, `*` é negrito e quebraria o título em negrito.
  */
 export function buildShareMessage({ label, date, items, link }: ShareMessageInput): string {
-  const title = label.replace(/\*/g, '').trim();
+  const title = stripBold(label) || 'Repertório';
   const lines = [`🎵 *${title}* — ${shortDate(date)}`];
   items.forEach((item, index) => {
-    lines.push(`${index + 1}. ${item.title} (${item.key})`);
+    lines.push(`${index + 1}. ${stripBold(item.title)} (${item.key})`);
   });
   lines.push(link);
   return lines.join('\n');

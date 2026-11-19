@@ -283,11 +283,9 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
           <WhatsAppIcon />
         </button>
       )}
-      {shareNote === 'copied' && (
-        <p role="status" className="setlist-share-note">
-          Link copiado.
-        </p>
-      )}
+      <p role="status" className={shareNote === 'copied' ? 'setlist-share-note' : 'sr-only'}>
+        {shareNote === 'copied' ? 'Link copiado.' : ''}
+      </p>
       {shareNote === 'error' && (
         <p role="alert" className="setlist-share-note is-error">
           Não foi possível compartilhar.
