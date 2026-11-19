@@ -9,6 +9,8 @@ import type { SetlistApi } from './setlists/setlistApi';
 import { SetlistsProvider } from './setlists/SetlistsProvider';
 import type { PeopleApi } from './people/peopleApi';
 import { PeoplePage } from './people/PeoplePage';
+import type { StatsApi } from './stats/statsApi';
+import { StatsPage } from './stats/StatsPage';
 import { loadViewerRoute } from './lib/prefetch';
 import { LoginPage } from './routes/LoginPage';
 import { RequireAuth } from './routes/RequireAuth';
@@ -31,6 +33,7 @@ const SetlistRoute = lazy(() => import('./setlists/SetlistRoute'));
 export interface AppProps {
   gateway: AuthGateway;
   peopleApi: PeopleApi;
+  statsApi: StatsApi;
   catalogApi: CatalogApi;
   setlistApi: SetlistApi;
   initialPath?: string;
@@ -40,11 +43,13 @@ export interface AppProps {
 
 function AppRoutes({
   peopleApi,
+  statsApi,
   catalogApi,
   setlistApi,
   onReload,
 }: {
   peopleApi: PeopleApi;
+  statsApi: StatsApi;
   catalogApi: CatalogApi;
   setlistApi: SetlistApi;
   onReload: () => void;
@@ -117,6 +122,7 @@ function AppRoutes({
           </Route>
           <Route element={<RequireRole roles={['admin']} />}>
             <Route path="/pessoas" element={<PeoplePage api={peopleApi} />} />
+            <Route path="/estatisticas" element={<StatsPage api={statsApi} />} />
             <Route
               path="/importar"
               element={
@@ -146,6 +152,7 @@ const reloadPage = () => window.location.reload();
 export function App({
   gateway,
   peopleApi,
+  statsApi,
   catalogApi,
   setlistApi,
   initialPath,
@@ -157,6 +164,7 @@ export function App({
         <MemoryRouter initialEntries={[initialPath]}>
           <AppRoutes
             peopleApi={peopleApi}
+            statsApi={statsApi}
             catalogApi={catalogApi}
             setlistApi={setlistApi}
             onReload={onReload}
@@ -166,13 +174,14 @@ export function App({
         <BrowserRouter>
           <AppRoutes
             peopleApi={peopleApi}
+            statsApi={statsApi}
             catalogApi={catalogApi}
             setlistApi={setlistApi}
             onReload={onReload}
           />
         </BrowserRouter>
       ),
-    [initialPath, peopleApi, catalogApi, setlistApi, onReload],
+    [initialPath, peopleApi, statsApi, catalogApi, setlistApi, onReload],
   );
   return (
     <ThemeProvider>

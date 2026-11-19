@@ -6,6 +6,7 @@ import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { createFakeGateway, testUser } from '../test/fakeGateway';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import type { PeopleApi } from '../people/peopleApi';
+import { fakeStatsApi } from '../test/fakeStatsApi';
 
 const peopleApi: PeopleApi = {
   listUsers: () => Promise.resolve([]),
@@ -18,6 +19,7 @@ function setup(path: string, signedIn?: Role) {
     <App
       gateway={gateway}
       peopleApi={peopleApi}
+      statsApi={fakeStatsApi()}
       catalogApi={fakeCatalogApi()}
       setlistApi={fakeSetlistApi()}
       initialPath={path}
@@ -60,6 +62,7 @@ describe('routes', () => {
       <App
         gateway={gateway}
         peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
         initialPath="/login"
@@ -79,6 +82,7 @@ describe('routes', () => {
         <App
           gateway={gateway}
           peopleApi={peopleApi}
+          statsApi={fakeStatsApi()}
           catalogApi={fakeCatalogApi()}
           setlistApi={fakeSetlistApi()}
           initialPath="/login"
@@ -119,12 +123,22 @@ describe('routes', () => {
     expect(screen.getByRole('searchbox', { name: 'Buscar música ou cantor…' })).toBeInTheDocument();
   });
 
+  it('RequireRole sends non-admins from /estatisticas to home and lets admins in', () => {
+    setup('/estatisticas', 'member');
+    expect(screen.getByRole('searchbox', { name: 'Buscar música ou cantor…' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Estatísticas' })).not.toBeInTheDocument();
+    cleanup();
+    setup('/estatisticas', 'admin');
+    expect(screen.getByRole('heading', { level: 1, name: 'Estatísticas' })).toBeInTheDocument();
+  });
+
   it('waits for the role before deciding on /pessoas', () => {
     const gateway = createFakeGateway();
     render(
       <App
         gateway={gateway}
         peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
         initialPath="/pessoas"
@@ -143,6 +157,7 @@ describe('routes', () => {
       <App
         gateway={gateway}
         peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
         initialPath="/login"
@@ -167,6 +182,7 @@ describe('routes', () => {
       <App
         gateway={gateway}
         peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={setlistApi}
         initialPath="/repertorios/r1"
