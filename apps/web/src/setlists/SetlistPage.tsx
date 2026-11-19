@@ -228,22 +228,6 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
               song={songsById.get(item.songId)}
               position={index + 1}
               editable={editable}
-              isFirst={index === 0}
-              isLast={index === items.length - 1}
-              onMoveUp={() =>
-                void run({
-                  type: 'move',
-                  itemId: item.id,
-                  afterItemId: items[index - 2]?.id ?? null,
-                })
-              }
-              onMoveDown={() =>
-                void run({
-                  type: 'move',
-                  itemId: item.id,
-                  afterItemId: items[index + 1]?.id ?? null,
-                })
-              }
               onRemove={() => void run({ type: 'remove', itemId: item.id })}
               onPickKey={() => setPickingKeyOf(item.id)}
               drag={drag}

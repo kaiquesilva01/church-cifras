@@ -12,22 +12,6 @@ const SVG_PROPS = {
   focusable: 'false',
 } as const;
 
-export function ChevronUpIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      <path d="M6 14l6-6 6 6" />
-    </svg>
-  );
-}
-
-export function ChevronDownIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      <path d="M6 10l6 6 6-6" />
-    </svg>
-  );
-}
-
 export function CloseIcon() {
   return (
     <svg {...SVG_PROPS}>

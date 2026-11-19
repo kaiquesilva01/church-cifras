@@ -30,3 +30,25 @@ test('viewer shows the keys, switches between them and downloads the PDF', async
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe(`${song.title} - ${song.artist} (D).pdf`);
 });
+
+test('the pdf can be maximized to read it full screen and restored', async ({ page }) => {
+  const tag = lettersTag();
+  const song = await seedSong(`Tela Cheia ${tag}`, `Cantor Teste ${tag}`, [{ key: 'C' }]);
+  await signInAs(page, ADMIN, 'Admin');
+  await page.goto(`/musicas/${song.id}?tom=C`);
+  await expectPdfRendered(page);
+
+  const viewport = page.viewportSize()!;
+  await page.getByRole('button', { name: 'Tela cheia' }).click();
+  const frame = page.locator('.pdf-frame');
+  await expect(frame).toHaveClass(/is-fullscreen/);
+  await expect(frame).toHaveCSS('position', 'fixed');
+  const box = (await frame.boundingBox())!;
+  expect(box.width).toBeGreaterThanOrEqual(viewport.width - 1);
+  expect(box.height).toBeGreaterThanOrEqual(viewport.height - 1);
+  await expectPdfRendered(page);
+
+  await page.getByRole('button', { name: 'Sair da tela cheia' }).click();
+  await expect(frame).not.toHaveClass(/is-fullscreen/);
+  await expect(page.getByRole('button', { name: 'Tela cheia' })).toBeVisible();
+});

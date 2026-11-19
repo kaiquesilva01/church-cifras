@@ -29,3 +29,33 @@ export function WhatsAppIcon() {
     </svg>
   );
 }
+
+const frameIconProps = {
+  width: 18,
+  height: 18,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+} as const;
+
+/** Maximize the pdf (arrows pointing out). */
+export function ExpandIcon() {
+  return (
+    <svg {...frameIconProps}>
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+    </svg>
+  );
+}
+
+/** Leave the maximized pdf (arrows pointing in). */
+export function ShrinkIcon() {
+  return (
+    <svg {...frameIconProps}>
+      <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
+    </svg>
+  );
+}
