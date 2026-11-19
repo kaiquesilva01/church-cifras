@@ -85,7 +85,7 @@ componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.tes
 |---|---|---|
 | **Cabeçalho de tela** | sobretítulo + título grande à esquerda; botão sol/lua (44 px, círculo) à direita | `ScreenHeader` |
 | **Barra inferior** | 5 abas (Músicas, Repertório, Busca, Pad, Mais), pílula flutuante, aba ativa com fundo suave; **só nas 5 telas raiz**. Com o pad tocando, **bolinha verde** (`--color-success`, 8 px) no canto do ícone da aba Pad, em qualquer tela com a barra | `BottomNav`, `navTabs.ts` |
-| **Telas de detalhe** | tela cheia, sem barra inferior, link `‹ Voltar` (cifra, repertório, cantor, Nova cifra, Importar, Pessoas) | cada página |
+| **Telas de detalhe** | tela cheia, sem barra inferior, link `‹ Voltar` (cifra, repertório, cantor, Nova cifra, Importar, Pessoas). O `‹` da cifra volta pelo histórico à tela anterior (mesma busca, aba e tipo); sem entrada anterior no app (link direto), vai para `/`. Repertório volta sempre ao repertório | cada página, `useViewerSetlist` |
 | **Linha de música** | tile `TOM` (tom padrão) + título/cantor + chevron; pílulas dos tons salvos embaixo (padrão em âmbar suave) | `SongList`, `KeyChips compact` |
 | **Cantor** | círculo com 2 iniciais + nome + contagem | `ArtistList`, `ui/initials.ts` |
 | **Segmento** | Músicas / Cantores em pílula | `HomePage` `.tabs` |

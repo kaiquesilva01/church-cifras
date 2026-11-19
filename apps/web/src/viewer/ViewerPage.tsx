@@ -532,7 +532,17 @@ export function ViewerPage({
       <div className="viewer-body" inert={panelOpen && !wide}>
         <header className="viewer-head">
           <div className="viewer-title">
-            <Link to={setlist.backHref} className="back-icon" aria-label="Voltar">
+            <Link
+              to={setlist.backHref}
+              className="back-icon"
+              aria-label="Voltar"
+              onClick={(event) => {
+                // Back to the exact previous screen (query, tab, scroll), not a fixed route.
+                if (!setlist.backInApp) return;
+                event.preventDefault();
+                navigate(-1);
+              }}
+            >
               <span aria-hidden="true">‹</span>
             </Link>
             <h1>{song.title}</h1>
