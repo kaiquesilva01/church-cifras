@@ -20,6 +20,7 @@ import { HomePage } from './search/HomePage';
 import { MaisPage } from './more/MaisPage';
 import { PadPage } from './pad/PadPage';
 import { AppShell } from './ui/AppShell';
+import { CifraLoader } from './ui/CifraLoader';
 import { ThemeProvider } from './ui/ThemeProvider';
 
 const UploadRoute = lazy(() => import('./upload/UploadRoute'));
@@ -74,13 +75,7 @@ function AppRoutes({
             path="/musicas/:songId"
             element={
               <ErrorBoundary onReload={onReload}>
-                <Suspense
-                  fallback={
-                    <p role="status" className="status">
-                      Carregando cifra…
-                    </p>
-                  }
-                >
+                <Suspense fallback={<CifraLoader />}>
                   <ViewerRoute api={catalogApi} />
                 </Suspense>
               </ErrorBoundary>

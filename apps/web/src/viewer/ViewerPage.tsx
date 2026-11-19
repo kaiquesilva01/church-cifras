@@ -21,6 +21,7 @@ import { KeyChips } from '../search/KeyChips';
 import { PadControl } from '../pad/PadControl';
 import { padOwnerFor } from '../pad/padRoute';
 import { usePadViewerSync } from '../pad/usePadViewerSync';
+import { CifraLoader } from '../ui/CifraLoader';
 import { SetlistBar } from '../setlists/SetlistBar';
 import { useActiveSetlist } from '../setlists/useActiveSetlist';
 import { pdfFileName } from './fileName';
@@ -391,11 +392,7 @@ export function ViewerPage({
   };
 
   if (status === 'loading') {
-    return (
-      <p role="status" className="status">
-        Carregando cifra…
-      </p>
-    );
+    return <CifraLoader />;
   }
   if (!song) {
     return status === 'error' ? (
@@ -597,9 +594,7 @@ export function ViewerPage({
             </PdfFrame>
           </>
         ) : (
-          <p role="status" className="status">
-            Carregando cifra…
-          </p>
+          <CifraLoader />
         )}
         <div className="viewer-bar" ref={barRef}>
           {setlist.nav && (
