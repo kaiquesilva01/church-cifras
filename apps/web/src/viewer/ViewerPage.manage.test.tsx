@@ -329,7 +329,7 @@ describe('ViewerPage manage', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(trigger);
     fireEvent.blur(screen.getByRole('button', { name: 'Apagar música' }), {
-      relatedTarget: screen.getByRole('button', { name: 'Baixar PDF' }),
+      relatedTarget: document.body,
     });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(trigger);

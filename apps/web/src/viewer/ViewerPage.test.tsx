@@ -107,26 +107,11 @@ describe('ViewerPage', () => {
     expect(api.getPdfBytes).toHaveBeenCalledWith('songs/s5/D-abc.pdf');
   });
 
-  it('downloads with a friendly file name', async () => {
-    const createObjectURL = vi.fn(() => 'blob:cifra');
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL }));
-    const downloads: string[] = [];
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
-      this: HTMLAnchorElement,
-    ) {
-      downloads.push(`${this.download}|${this.href}|${this.isConnected}`);
-    });
+  it('has no PDF download button: the bar is WhatsApp (share), Pad and Mudar tom', async () => {
     renderViewer('/musicas/s1?tom=G');
     await screen.findByTestId('pdf-pages');
-    vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: 'Baixar PDF' }));
-    expect(downloads).toEqual(['Sonda-me - Aline Barros (G).pdf|blob:cifra|true']);
-    expect(createObjectURL).toHaveBeenCalledTimes(1);
-    expect(revokeObjectURL).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(10_000);
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:cifra');
-    vi.useRealTimers();
+    expect(screen.queryByRole('button', { name: 'Baixar PDF' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /PDF$/ })).not.toBeInTheDocument();
   });
 
   it('shows not found for unknown song', () => {
@@ -190,13 +175,10 @@ describe('ViewerPage share button', () => {
     expect(screen.queryByRole('button', { name: 'Compartilhar' })).toBeNull();
   });
 
-  it('uses icon-only buttons: PDF download and the WhatsApp glyph, both with a name', async () => {
+  it('uses an icon-only share button: the WhatsApp glyph, with a name', async () => {
     supported();
     renderViewer('/musicas/s1?tom=G');
     await screen.findByTestId('pdf-pages');
-    const download = screen.getByRole('button', { name: 'Baixar PDF' });
-    expect(download.textContent).toBe('');
-    expect(download.querySelector('svg')).not.toBeNull();
     expect(shareButton().querySelector('svg.whatsapp-icon')).not.toBeNull();
     expect(shareButton().textContent).toBe('');
   });

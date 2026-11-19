@@ -154,7 +154,7 @@ const where = () => screen.getByTestId('location').textContent;
 describe('ViewerPage change key', () => {
   it('visitor does not see Mudar tom', async () => {
     renderViewer({ role: 'viewer' });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Baixar PDF' })).toBeEnabled());
+    await waitFor(() => expect(document.querySelector('.pdf-pages')).not.toBeNull());
     expect(screen.queryByRole('button', { name: 'Mudar tom' })).not.toBeInTheDocument();
   });
 
@@ -312,7 +312,7 @@ describe('ViewerPage change key', () => {
     const song = makeSong({ id: 's3', title: 'Só gerada', keys: ['C'], handmadeKeys: [] });
     renderViewer({ songs: [song], path: '/musicas/s3' });
     const button = await screen.findByRole('button', { name: 'Mudar tom' });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Baixar PDF' })).toBeEnabled());
+    await waitFor(() => expect(document.querySelector('.pdf-pages')).not.toBeNull());
     expect(button).toBeDisabled();
     expect(screen.getByText('Não há PDF feito à mão para transpor.')).toBeInTheDocument();
   });
@@ -335,7 +335,7 @@ describe('ViewerPage change key', () => {
     fireEvent.click(screen.getByRole('button', { name: 'D' }));
     expect(await screen.findByTestId('layer')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Baixar PDF' })).toBeEnabled());
+    await waitFor(() => expect(document.querySelector('.pdf-pages')).not.toBeNull());
     expect(screen.queryByTestId('layer')).not.toBeInTheDocument();
     // Tom A's document came back from the cache: no second download.
     expect(api.getPdfBytes).toHaveBeenCalledTimes(2);
@@ -428,13 +428,13 @@ describe('ViewerPage change key', () => {
 
   it('reuses cached pdf documents across key switches', async () => {
     const { api, openPdf, unmount } = renderViewer({ path: '/musicas/s1?tom=G' });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Baixar PDF' })).toBeEnabled());
+    await waitFor(() => expect(document.querySelector('.pdf-pages')).not.toBeNull());
     fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom A' }));
     await waitFor(() => expect(where()).toBe('/musicas/s1?tom=A'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Baixar PDF' })).toBeEnabled());
+    await waitFor(() => expect(document.querySelector('.pdf-pages')).not.toBeNull());
     fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom G' }));
     await waitFor(() => expect(where()).toBe('/musicas/s1?tom=G'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Baixar PDF' })).toBeEnabled());
+    await waitFor(() => expect(document.querySelector('.pdf-pages')).not.toBeNull());
     expect(openPdf).toHaveBeenCalledTimes(2);
     expect(api.getPdfBytes).toHaveBeenCalledTimes(2);
     const docs = await Promise.all(
@@ -494,7 +494,7 @@ describe('ViewerPage change key', () => {
     await waitFor(() =>
       expect(screen.queryByText('Esse tom já tinha sido salvo. Abrimos o existente.')).toBeNull(),
     );
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Baixar PDF' })).toBeEnabled());
+    await waitFor(() => expect(document.querySelector('.pdf-pages')).not.toBeNull());
   });
 
   it('uses the side panel on wide screens', async () => {

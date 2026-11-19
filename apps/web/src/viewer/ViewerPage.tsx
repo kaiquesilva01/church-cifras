@@ -41,7 +41,7 @@ import { useNextPreload } from './useNextPreload';
 import { useSongArrangements } from './useSongArrangements';
 import { useTranspose } from './useTranspose';
 import { useViewerSetlist, viewerUrl } from './useViewerSetlist';
-import { DownloadIcon, WhatsAppIcon } from './barIcons';
+import { WhatsAppIcon } from './barIcons';
 
 type Loaded = { status: 'ready'; doc: PdfDocument; bytes: Uint8Array } | { status: 'error' };
 
@@ -406,20 +406,6 @@ export function ViewerPage({
     );
   }
 
-  const download = (): void => {
-    if (current?.status !== 'ready' || !displayed) return;
-    const url = URL.createObjectURL(
-      new Blob([current.bytes as BlobPart], { type: 'application/pdf' }),
-    );
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = pdfFileName(song.title, song.artistName, displayed.key);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  };
-
   const share = async (): Promise<void> => {
     if (current?.status !== 'ready' || !displayed) return;
     const file = pdfFile(current.bytes, pdfFileName(song.title, song.artistName, displayed.key));
@@ -610,15 +596,6 @@ export function ViewerPage({
           {setlist.nav && (
             <SetlistBar nav={setlist.nav} onGo={setlist.go} backHref={setlist.backHref} />
           )}
-          <button
-            type="button"
-            className="btn btn-icon"
-            aria-label="Baixar PDF"
-            onClick={download}
-            disabled={current?.status !== 'ready'}
-          >
-            <DownloadIcon />
-          </button>
           {canShare && (
             <button
               type="button"
