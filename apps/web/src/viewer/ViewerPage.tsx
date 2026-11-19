@@ -525,6 +525,8 @@ export function ViewerPage({
               onClick={(event) => {
                 // Back to the exact previous screen (query, tab, scroll), not a fixed route.
                 if (!setlist.backInApp) return;
+                // Keep the browser's own handling of ctrl/cmd/shift/middle clicks (new tab/window).
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
                 event.preventDefault();
                 navigate(-1);
               }}
