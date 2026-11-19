@@ -347,8 +347,14 @@ span.setlist-item-key {
   color: var(--color-muted);
 }
 
+/* Leitura: o respiro para o botão flutuante vem depois da nota, que fica colada à lista (Paper 13). */
+.list:has(> .setlist-item.is-readonly) {
+  padding-bottom: 0;
+}
+
 .setlist-readonly-note {
   margin: 16px 0 0;
+  padding-bottom: 80px;
   color: var(--color-muted);
   font-size: 0.8125rem;
   text-align: center;
