@@ -37,7 +37,8 @@
 
 Criar:
 - `packages/chords/src/lyrics.ts` (+ `lyrics.test.ts`): `extractLyrics`.
-- `apps/web/src/catalog/lyricsSearch.ts` (+ teste): `searchLyrics`, constantes e tipos do trecho.
+- `apps/web/src/catalog/lyricsLimits.ts`: `MAX_LYRICS_CHARS`, `MIN_LYRICS_QUERY`.
+- `apps/web/src/catalog/lyricsSearch.ts` (+ teste): `searchLyrics` e tipos do trecho.
 - `apps/web/src/catalog/useLyrics.ts`, `LyricsProvider.tsx` (+ testes): assinatura das letras.
 - `apps/functions/src/lyrics/backfill.ts` (+ teste), `backfillCli.ts`, `apps/functions/tsup.backfill.config.ts`: preenchimento das músicas antigas.
 - `e2e/lyrics.spec.ts`.
@@ -240,4 +241,4 @@ Modificar: `packages/chords/src/index.ts`, `firestore.rules`, `tests/rules/fires
 
 - Cobertura do spec: dados e regras (T2), extração (T1), gravação só em música nova + sem letra (T3), `deleteSong` (T2), assinatura em segundo plano (T5), casamento/trecho/ordem/exclusão de duplicadas/3 caracteres (T4), filtros, esqueleto, erro e "nada encontrado" (T6), preenchimento (T7), e2e e lançamento (T7/T8, `docs/deploy.md`).
 - Nomes consistentes entre tarefas: `extractLyrics`, `searchLyrics`, `LyricHit`, `SnippetPart`, `subscribeLyrics`, `useLyrics`, `LyricsProvider`, `useLyricsContext`, `MAX_LYRICS_CHARS`, `MIN_LYRICS_QUERY`, `deleteLyricsDoc`.
-- Ordem: T1 e T2 independentes; T3 depende de T1 e do `MAX_LYRICS_CHARS` (T4 completa o arquivo); T5 antes de T6; T7 depende de T1; T8 por último.
+- Ordem: T1 e T2 independentes; T3 depende de T1 (e cria `lyricsLimits.ts`, que a T4 completa); T5 antes de T6; T7 depende de T1; T8 por último.
