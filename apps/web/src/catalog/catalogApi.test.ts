@@ -6,6 +6,10 @@ function fakeApi(overrides: Partial<CatalogApi> = {}): CatalogApi {
   return {
     subscribeSongs: vi.fn(() => () => undefined),
     subscribeArrangements: vi.fn(() => () => undefined),
+    subscribeLyrics: vi.fn((cb: (l: Map<string, string>) => void) => {
+      cb(new Map());
+      return () => undefined;
+    }),
     findSong: vi.fn(() => Promise.resolve(null)),
     getArrangement: vi.fn(() => Promise.resolve(null)),
     newSongId: vi.fn(() => 'song1'),

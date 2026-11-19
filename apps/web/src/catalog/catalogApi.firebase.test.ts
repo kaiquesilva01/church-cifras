@@ -242,6 +242,30 @@ describe('createCatalogApi payloads', () => {
     expect(stop).toBe(unsubscribe);
   });
 
+  it('subscribeLyrics maps songLyrics docs to a Map and skips invalid text', () => {
+    const unsubscribe = vi.fn();
+    vi.mocked(onSnapshot).mockImplementationOnce(((
+      _ref: { path: string },
+      next: (snap: unknown) => void,
+    ) => {
+      const docData = (id: string, data: Record<string, unknown>) => ({ id, data: () => data });
+      next({
+        docs: [
+          docData('s1', { text: 'Sonda-me, Senhor' }),
+          docData('s2', { text: '' }),
+          docData('s3', { text: 42 }),
+          docData('s4', { createdBy: 'u1' }),
+        ],
+      });
+      return unsubscribe;
+    }) as never);
+    const cb = vi.fn();
+    const stop = createCatalogApi(services).subscribeLyrics(cb, vi.fn());
+    expect(vi.mocked(onSnapshot).mock.calls[0]?.[0]).toMatchObject({ path: 'songLyrics' });
+    expect(cb).toHaveBeenCalledWith(new Map([['s1', 'Sonda-me, Senhor']]));
+    expect(stop).toBe(unsubscribe);
+  });
+
   it('getArrangement maps missing and known sources, null for unknown', async () => {
     const api = createCatalogApi(services);
     const snap = (exists: boolean, source?: unknown) => ({

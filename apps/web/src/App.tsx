@@ -2,6 +2,7 @@ import { Suspense, lazy, useMemo } from 'react';
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router';
 import { AuthProvider, type AuthGateway } from './auth/AuthProvider';
 import type { CatalogApi } from './catalog/catalogApi';
+import { LyricsProvider } from './catalog/LyricsProvider';
 import { SongsProvider } from './catalog/SongsProvider';
 import { PadProvider } from './pad/PadProvider';
 import { ActiveSetlistProvider } from './setlists/ActiveSetlistProvider';
@@ -56,13 +57,15 @@ function AppRoutes({
         <Route
           element={
             <SongsProvider api={catalogApi}>
-              <SetlistsProvider api={setlistApi}>
-                <ActiveSetlistProvider api={setlistApi}>
-                  <PadProvider fetchBytes={catalogApi.getPdfBytes}>
-                    <AppShell />
-                  </PadProvider>
-                </ActiveSetlistProvider>
-              </SetlistsProvider>
+              <LyricsProvider api={catalogApi}>
+                <SetlistsProvider api={setlistApi}>
+                  <ActiveSetlistProvider api={setlistApi}>
+                    <PadProvider fetchBytes={catalogApi.getPdfBytes}>
+                      <AppShell />
+                    </PadProvider>
+                  </ActiveSetlistProvider>
+                </SetlistsProvider>
+              </LyricsProvider>
             </SongsProvider>
           }
         >

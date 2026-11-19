@@ -35,6 +35,11 @@ export interface CatalogApi {
     cb: (arrangements: ArrangementSummary[]) => void,
     onError?: (e: unknown) => void,
   ): () => void;
+  /** Assina `songLyrics` (texto por música); ignora docs sem `text` string não vazio. */
+  subscribeLyrics(
+    cb: (lyrics: Map<string, string>) => void,
+    onError: (e: unknown) => void,
+  ): () => void;
   findSong(titleNormalized: string, artistId: string): Promise<SongSummary | null>;
   getArrangement(
     songId: string,
@@ -162,6 +167,19 @@ export function createCatalogApi({
               .filter((a): a is ArrangementSummary => a !== null)
               .sort((a, b) => compareKeys(a.key, b.key)),
           ),
+        onError,
+      ),
+    subscribeLyrics: (cb, onError) =>
+      onSnapshot(
+        collection(db, 'songLyrics'),
+        (snap) => {
+          const lyrics = new Map<string, string>();
+          for (const d of snap.docs) {
+            const text: unknown = d.data().text;
+            if (typeof text === 'string' && text !== '') lyrics.set(d.id, text);
+          }
+          cb(lyrics);
+        },
         onError,
       ),
     findSong: async (titleNormalized, artistId) => {

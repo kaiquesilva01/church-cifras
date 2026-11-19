@@ -65,6 +65,10 @@ export function fakeCatalogApi(
       cb(arrangements);
       return () => undefined;
     },
+    subscribeLyrics: (cb) => {
+      cb(new Map());
+      return () => undefined;
+    },
     findSong: vi.fn(() => Promise.resolve(null)),
     getArrangement: vi.fn(() =>
       Promise.resolve({ source: 'handmade' as const, storagePath: 'songs/s1/G-abc.pdf' }),
