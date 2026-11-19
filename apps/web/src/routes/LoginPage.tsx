@@ -34,11 +34,28 @@ export function LoginPage() {
 
   return (
     <main className="login">
+      <span className="login-mark" aria-hidden="true">
+        <svg
+          width="30"
+          height="30"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M9 18V5l12-2v13" />
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="18" cy="16" r="3" />
+        </svg>
+      </span>
       <h1>Cifras · Louvor</h1>
       <p className="muted">Acervo de cifras do ministério de louvor</p>
       <button type="button" className="btn btn-primary" onClick={handleClick} disabled={busy}>
         Entrar com Google
       </button>
+      <p className="login-note">Quem entra pela primeira vez começa como visitante.</p>
       {failed && (
         <p role="alert" className="error">
           Não foi possível entrar. Tente de novo.

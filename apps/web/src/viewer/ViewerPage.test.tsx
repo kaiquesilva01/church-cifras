@@ -109,7 +109,7 @@ describe('ViewerPage', () => {
     renderViewer('/musicas/s1?tom=G');
     await screen.findByTestId('pdf-pages');
     vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Baixar PDF' }));
     expect(downloads).toEqual(['Sonda-me - Aline Barros (G).pdf|blob:cifra|true']);
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).not.toHaveBeenCalled();
@@ -177,6 +177,17 @@ describe('ViewerPage share button', () => {
     renderViewer('/musicas/s1?tom=G');
     await screen.findByTestId('pdf-pages');
     expect(screen.queryByRole('button', { name: 'Compartilhar' })).toBeNull();
+  });
+
+  it('uses icon-only buttons: PDF download and the WhatsApp glyph, both with a name', async () => {
+    supported();
+    renderViewer('/musicas/s1?tom=G');
+    await screen.findByTestId('pdf-pages');
+    const download = screen.getByRole('button', { name: 'Baixar PDF' });
+    expect(download.textContent).toBe('');
+    expect(download.querySelector('svg')).not.toBeNull();
+    expect(shareButton().querySelector('svg.whatsapp-icon')).not.toBeNull();
+    expect(shareButton().textContent).toBe('');
   });
 
   it('disables share until the pdf has loaded', async () => {

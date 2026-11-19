@@ -1,0 +1,114 @@
+/*
+ * Redesign (phase 10): the cifra screen. Loaded after redesign.css (see main.tsx). Colors come
+ * from the theme tokens, except the WhatsApp brand green.
+ */
+
+.viewer {
+  /* The bar floats 20px above the bottom edge: leave room for it and for that gap. */
+  padding-bottom: calc(var(--bar-height, 72px) + 40px);
+}
+
+.viewer-title h1 {
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* Floating action bar: ⬇ · WhatsApp · Pad · Mudar tom (the setlist row sits above them). */
+.viewer-bar {
+  right: 12px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  left: 12px;
+  align-items: center;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px;
+  gap: 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 22%);
+}
+
+.viewer-bar .btn,
+.pad-control .btn {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-elevated);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.viewer-bar .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  padding: 0;
+}
+
+.viewer-bar .btn-primary {
+  padding: 0 16px;
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 800;
+}
+
+.pad-control .btn[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.whatsapp-icon {
+  fill: #25d366;
+}
+
+/* "Mudar tom" panel */
+.key-panel[data-layout='sheet'] {
+  padding: 14px 20px 26px;
+  border-top: 1px solid var(--color-border-strong);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -16px 40px rgb(0 0 0 / 25%);
+}
+
+.key-panel-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+
+.key-btn {
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--color-elevated);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.key-btn.saved {
+  border: 1px solid var(--color-success);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.key-btn[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 800;
+}
+
+.key-steps .btn {
+  min-height: 40px;
+  border-radius: 12px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-weight: 700;
+}
+
+.key-actions .btn {
+  min-height: 50px;
+  border-radius: 999px;
+}

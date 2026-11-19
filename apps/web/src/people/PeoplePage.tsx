@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { ROLE_LABELS, ROLES, type Role } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import type { PeopleApi, PersonRow } from './peopleApi';
@@ -128,6 +129,9 @@ export function PeoplePage({ api }: { api: PeopleApi }) {
 
   return (
     <section className="card">
+      <Link to="/mais" className="back">
+        ‹ Voltar
+      </Link>
       <h2>Pessoas</h2>
       <div role="status" className="success">
         {feedback?.kind === 'ok' && feedback.text}

@@ -12,11 +12,21 @@ Stack: React + Node + Firebase, em monorepo. Documento de design: [docs/superpow
 - Criar branch: `git checkout -b <tipo>/<nome> origin/develop`
 - Abrir PR: `gh pr create --base develop`
 - `--base` é obrigatório em `gh pr create`; o hook bloqueia PR sem base explícita.
-- Release: `gh pr create --base main --head develop`.
+- Release: `gh pr create --base main --head develop`. **O agente pode abrir esse PR** quando a feature estiver concluída, testada, validada e revisada (ver "PR de release" abaixo).
 - Após `git checkout <branch>` (sem `-b`), rode commit/push em outro comando — o hook bloqueia na mesma linha. `git checkout -b` / `git switch -c` podem ser encadeados com commit/push.
 - Prefixos de branch: `feat/`, `fix/`, `chore/`, `docs/`, `test/`, `refactor/`.
 - PRs para `develop`: revisados pelo agente `code-reviewer`; após aprovação, **somente o orquestrador** (sessão principal) faz o merge (`gh pr merge <n> --squash --delete-branch`). Subagentes nunca fazem merge. Isso é regra de conduta: o hook não distingue orquestrador de subagente, só impõe a base (`develop` permitido, `main` bloqueado, base indeterminada bloqueada). Informe sempre o número do PR (`gh pr merge <n> ...`); sem alvo explícito, com mais de um alvo, com `GH_REPO` ou mais de um merge por comando o hook bloqueia. `gh api` é só leitura (GET/graphql query); mutações (`-X` ≠ GET, `-f`/`-F`/`--input`, graphql `mutation`) são bloqueadas — para PRs use `gh pr ...`.
-- PR para `main` (`develop → main`): só o humano aprova e faz o merge. O hook bloqueia `gh pr merge` de PR com base `main` ou com base indeterminada.
+- PR para `main` (`develop → main`): o agente **pode abrir**, mas **NUNCA aprova nem faz merge**: só o humano aprova e faz o merge. O hook bloqueia `gh pr merge` de PR com base `main` (ou base indeterminada) e `gh pr review --approve`/`-a` em qualquer PR.
+
+### PR de release (develop → main)
+
+Abra só quando tudo isto for verdade, e diga no corpo do PR o que foi conferido:
+
+- A feature está **concluída** e todos os PRs dela já foram mergeados em `develop`.
+- **Testada e validada**: `npm test`, `lint`, `typecheck`, `build` e `test:harness` verdes; E2E do CI verde; regras (`test:rules`) quando mexeu em Rules/Functions.
+- **Code review** feito em todos os PRs (sem pendências críticas) e, em UI, o Paper atualizado e o design system respeitado.
+- Corpo do PR em pt-BR: o que muda para o usuário, o que **a pessoa deve conferir** antes de aprovar (passos de teste manual, risco, rollback, mudanças em Rules/índices/variáveis) e o que ficou de fora.
+- Depois de abrir: **pare**. Não aprove, não faça merge, não ative auto-merge e não peça a outro agente que o faça; avise a pessoa com o link e aguarde.
 
 ## Modelos e esforço
 
@@ -60,6 +70,19 @@ Um plano por fase da §11 do spec.
 - Credenciais, `.env` e service accounts.
 - `.superpowers/`.
 - Áudio (loops/sources do pad, `*.m4a`, `*.mp3`, `*.wav`): ficam em `fixtures/private/pads/` apenas local, enviados ao Storage por `scripts/pads/upload.mjs`.
+
+## Design e Paper
+
+- O padrão visual está em [docs/design-system.md](docs/design-system.md): tokens de cor (tema claro e escuro),
+  tipografia, formas, componentes, regras de UX e acessibilidade. **Toda UI nova ou alterada segue esse padrão**;
+  não invente cor, raio ou componente fora dele.
+- O desenho vive no **Paper** (arquivo "Church - Cifras", id `01M7BN04NKJ00S1T4XVC8HRGRS`). **Mantenha o Paper
+  atualizado com o que é desenvolvido**: mudou uma tela, o Paper muda no mesmo PR (escuro e, nas telas raiz, claro).
+  Se o Paper MCP estiver indisponível, escreva "Paper pendente: <o que>" no PR e atualize assim que possível.
+- Só tokens de cor (`styles.css`), nunca `#hex` solto; token novo entra nos dois temas e na tabela do documento.
+- Padrão mudou? Atualize `docs/design-system.md` no mesmo PR (o teste `test:harness` confere que todo token está documentado).
+- O `designer` especifica e atualiza o Paper; o `frontend-dev` implementa seguindo o documento; o `code-reviewer`
+  barra PR de UI que fuja do padrão ou deixe o Paper desatualizado.
 
 ## Convenções
 

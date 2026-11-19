@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { testUser } from '../test/fakeGateway';
@@ -28,9 +29,11 @@ function renderPage(api: PeopleApi) {
     signOut: () => Promise.resolve(),
   };
   return render(
-    <AuthContext.Provider value={auth}>
-      <PeoplePage api={api} />
-    </AuthContext.Provider>,
+    <MemoryRouter>
+      <AuthContext.Provider value={auth}>
+        <PeoplePage api={api} />
+      </AuthContext.Provider>
+    </MemoryRouter>,
   );
 }
 

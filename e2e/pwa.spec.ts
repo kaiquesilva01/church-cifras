@@ -23,8 +23,8 @@ test('the preview build serves the manifest and registers the service worker', a
     short_name: 'Cifras',
     display: 'standalone',
     lang: 'pt-BR',
-    theme_color: '#4f46e5',
-    background_color: '#f2f2f4',
+    theme_color: '#f4f5f7',
+    background_color: '#f4f5f7',
   });
   expect(manifest.icons.map((icon) => `${icon.sizes}:${icon.purpose}`)).toEqual(
     expect.arrayContaining(['192x192:any', '512x512:any', '512x512:maskable']),

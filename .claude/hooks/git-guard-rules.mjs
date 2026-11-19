@@ -417,6 +417,12 @@ function checkGh(tokens, state) {
   }
   if (area !== 'pr') return null;
   if (action === 'merge') return checkMerge(args, state, leadingRepo);
+  if (action === 'review' && args.some((a) => a === '--approve' || /^-[A-Za-z]*a[A-Za-z]*$/.test(a))) {
+    return block(
+      'Aprovar PR é decisão humana: agentes nunca rodam `gh pr review --approve`. ' +
+        'A revisão do code-reviewer é por relatório; a aprovação (e o merge) de develop → main é só da pessoa responsável.'
+    );
+  }
   if (action === 'edit' && optionValue(args, ['--base', '-B']) === 'main') {
     return block(
       'Base main só via PR develop → main criado com `gh pr create --base main --head develop`; ' +

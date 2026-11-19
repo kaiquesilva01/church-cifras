@@ -1,51 +1,16 @@
-import { Link, Outlet } from 'react-router';
-import { ROLE_LABELS, isAdmin } from '../auth/roles';
-import { useAuth } from '../auth/useAuth';
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('');
-}
+import { Outlet, useLocation } from 'react-router';
+import { BottomNav } from './BottomNav';
+import { activeNavTab } from './navTabs';
 
 export function AppShell() {
-  const { user, role, signOut } = useAuth();
-  const name = user?.displayName ?? user?.email ?? '';
+  const { pathname, search } = useLocation();
+  const active = activeNavTab(pathname, search);
   return (
     <>
-      <header className="header">
-        <div className="header-inner">
-          <Link to="/" className="brand">
-            Cifras · Louvor
-          </Link>
-          <nav aria-label="Principal">
-            {isAdmin(role) && (
-              <>
-                <Link to="/pessoas" className="nav-link">
-                  Pessoas
-                </Link>
-                <Link to="/importar" className="nav-link nav-link-wide">
-                  Importar
-                </Link>
-              </>
-            )}
-          </nav>
-          <span className="spacer" />
-          <span className="avatar" aria-hidden="true">
-            {initials(name)}
-          </span>
-          <span className="role">{ROLE_LABELS[role]}</span>
-          <button type="button" className="btn" onClick={() => void signOut()}>
-            Sair
-          </button>
-        </div>
-      </header>
-      <main className="page">
+      <main className={active ? 'page has-nav' : 'page'}>
         <Outlet />
       </main>
+      {active && <BottomNav active={active} />}
     </>
   );
 }

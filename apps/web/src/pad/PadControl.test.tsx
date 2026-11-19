@@ -64,6 +64,8 @@ describe('PadControl', () => {
     const value = fake();
     render(<PadControl keyName="Bb" owner={owner} />, { wrapper: wrap(value) });
     const button = screen.getByRole('button', { name: /Pad/ });
+    // Plain text, no note glyph: the design reads "Pad" (and "Pad G" while it plays).
+    expect(button).toHaveTextContent(/^Pad$/);
     expect(button).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(button);
     expect(value.toggle).toHaveBeenCalledWith('Bb', owner);

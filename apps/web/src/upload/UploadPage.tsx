@@ -1,6 +1,6 @@
 import { KEY_OPTIONS, artistIdFromName, keySlug, normalizeText, parseKey } from '@cifras/chords';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { ArrangementExistsError, saveUpload, type CatalogApi } from '../catalog/catalogApi';
 import { deriveArtists } from '../catalog/search';
 import { MAX_TEXT, validateArtist, validateTitle } from '../catalog/songText';
@@ -234,6 +234,9 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     if (reading) {
       return (
         <section className="upload">
+          <Link to="/" className="back">
+            ‹ Voltar
+          </Link>
           <h1 className="page-title">Nova cifra</h1>
           <p role="status" className="status">
             Lendo PDF…
@@ -243,6 +246,9 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     }
     return (
       <section className="upload">
+        <Link to="/" className="back">
+          ‹ Voltar
+        </Link>
         <h1 className="page-title">Nova cifra</h1>
         {pickError === 'no-chords' ? (
           noChords
@@ -268,6 +274,9 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
 
   return (
     <section className="upload">
+      <Link to="/" className="back">
+        ‹ Voltar
+      </Link>
       <h1 className="page-title">Nova cifra</h1>
       <p role="status" className="banner banner-ok">
         ✓ {fileState.name} · {fileState.chordCount} acordes

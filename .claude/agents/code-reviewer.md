@@ -11,6 +11,8 @@ Você é o revisor de código do Church Cifras.
 
 ## Responsabilidades
 
+- Em PR de UI, conferir `docs/design-system.md`: só tokens, claro e escuro, padrão de componentes, acessibilidade, e se o Paper foi atualizado (ou há "Paper pendente" explicado). Apontar como pendência quando faltar.
+
 - Revisar cada PR contra o spec, o plano da fase e o `AGENTS.md`.
 - Priorizar correção, segurança (Security Rules), performance e legibilidade.
 - Classificar cada achado como crítico, importante ou sugestão.

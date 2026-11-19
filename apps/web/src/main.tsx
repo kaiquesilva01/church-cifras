@@ -6,6 +6,11 @@ import {
 } from './lib/preloadError';
 import { prefetchForPath } from './lib/prefetch';
 import './ui/styles.css';
+import './ui/redesign.css';
+import './ui/redesign-cifra.css';
+import './ui/redesign-setlists.css';
+import './ui/redesign-forms.css';
+import './ui/redesign-states.css';
 
 const storage = getSessionStorage(window);
 installPreloadErrorReload(window, storage);

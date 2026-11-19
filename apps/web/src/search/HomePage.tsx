@@ -10,6 +10,9 @@ import type { SetlistApi } from '../setlists/setlistApi';
 import { SetlistFormDialog } from '../setlists/SetlistFormDialog';
 import { useSetlistsContext } from '../setlists/SetlistsProvider';
 import { SetlistsTab } from '../setlists/SetlistsTab';
+import { ScreenHeader } from '../ui/ScreenHeader';
+import { dayEyebrow } from '../ui/screenDate';
+import { ArtistList } from './ArtistList';
 import { SongList } from './SongList';
 
 const TABS = [
@@ -90,6 +93,10 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
           {notice}
         </p>
       )}
+      <ScreenHeader
+        eyebrow={dayEyebrow(now)}
+        title={tab.id === 'repertorios' ? 'Repertório' : 'Músicas'}
+      />
       {tab.id !== 'repertorios' && (
         <input
           type="search"
@@ -100,19 +107,23 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
           onChange={(e) => setQuery(e.target.value)}
         />
       )}
-      <NextCultoCard setlists={setlists} today={today} now={now} />
-      <nav aria-label="Seções" className="tabs">
-        {TABS.map((t) => (
-          <Link
-            key={t.id}
-            to={TAB_PATHS[t.id]}
-            aria-current={t.id === tab.id ? 'page' : undefined}
-            className="tab"
-          >
-            {t.label}
-          </Link>
-        ))}
-      </nav>
+      {tab.id !== 'repertorios' && (
+        <>
+          <NextCultoCard setlists={setlists} today={today} now={now} />
+          <nav aria-label="Seções" className="tabs">
+            {TABS.filter((t) => t.id !== 'repertorios').map((t) => (
+              <Link
+                key={t.id}
+                to={TAB_PATHS[t.id]}
+                aria-current={t.id === tab.id ? 'page' : undefined}
+                className="tab"
+              >
+                {t.label}
+              </Link>
+            ))}
+          </nav>
+        </>
+      )}
       {tab.id === 'repertorios' ? (
         <div>
           {setlistsStatus === 'loading' && (
@@ -126,7 +137,12 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
             </p>
           )}
           {setlistsStatus === 'ready' && (
-            <SetlistsTab setlists={setlists} today={today} now={now} />
+            <SetlistsTab
+              setlists={setlists}
+              today={today}
+              now={now}
+              songs={status === 'ready' ? songs : undefined}
+            />
           )}
         </div>
       ) : (
@@ -145,21 +161,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
           {tab.id === 'musicas' ? (
             <SongList songs={visibleSongs} />
           ) : (
-            <ul className="list">
-              {visibleArtists.map((artist) => (
-                <li key={artist.id} className="list-card">
-                  <Link to={`/cantores/${artist.id}`} className="list-main artist-row">
-                    <span className="avatar avatar-lg" aria-hidden="true">
-                      {artist.name.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="song-title">{artist.name}</span>
-                    <span className="muted">
-                      {artist.songCount === 1 ? '1 música' : `${artist.songCount} músicas`} ›
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <ArtistList artists={visibleArtists} />
           )}
         </div>
       )}

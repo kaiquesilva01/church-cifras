@@ -1,0 +1,167 @@
+/*
+ * Redesign (phase 10): setlists (cards on the Repertório tab, the editable list, banners, key
+ * picker and the Anterior/Próxima bar). Loaded after redesign-cifra.css (see main.tsx).
+ */
+
+.setlist-card {
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  padding: 16px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-elevated);
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.status-pill.is-next {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.setlist-card .setlist-row .song-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.setlist-tracks {
+  display: grid;
+  gap: 0;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setlist-tracks li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.setlist-track-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.key-tag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+/* Editable list */
+.setlist-item {
+  border: 1px solid var(--color-border);
+  border-radius: 13px;
+}
+
+.setlist-item-key {
+  border: 1px solid var(--color-accent);
+  border-radius: 10px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+span.setlist-item-key {
+  border: 0;
+  background: none;
+}
+
+.setlist-item .btn-icon {
+  border-color: transparent;
+  background: none;
+  color: var(--color-muted);
+}
+
+.setlist-item .btn-icon:disabled {
+  opacity: 0.35;
+}
+
+.update-banner {
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  background: var(--color-accent-soft);
+}
+
+.update-banner .btn {
+  border-color: var(--color-accent);
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 800;
+}
+
+.pad-mini {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 6px 10px 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+}
+
+.pad-mini-stop {
+  margin-left: auto;
+  border-color: var(--color-error);
+  border-radius: 999px;
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font-weight: 700;
+}
+
+.setlist-menu-list {
+  border-color: var(--color-border-strong);
+  border-radius: 16px;
+  background: var(--color-elevated);
+}
+
+/* Key picker dialog: neutral pills (the chosen one keeps the accent fill of .chip[aria-pressed]). */
+.dialog .chip {
+  background: var(--color-elevated);
+  border-radius: 12px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* Anterior · 2 de 5 · Próxima, inside the floating cifra bar. */
+.setlist-bar {
+  padding: 2px 4px;
+}
+
+.setlist-bar .btn {
+  min-height: 40px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-elevated);
+  font-weight: 700;
+}
+
+.setlist-bar > span {
+  color: var(--color-muted);
+}

@@ -35,13 +35,11 @@ describe('/importar route', () => {
   it('route is admin only', async () => {
     setup('admin');
     expect(await screen.findByText('Importar (marker)')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Importar' })).toBeInTheDocument();
   });
 
   it.each(['member', 'viewer'] as const)('redirects %s to the home page', async (role) => {
     setup(role);
     expect(await screen.findByRole('searchbox')).toBeInTheDocument();
     expect(screen.queryByText('Importar (marker)')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Importar' })).not.toBeInTheDocument();
   });
 });
