@@ -15,6 +15,7 @@ function fake(over: Partial<PadContextValue> = {}): PadContextValue {
     owner: null,
     volume: 0.6,
     notice: null,
+    cachedNotes: new Set(),
     toggle: vi.fn(),
     follow: vi.fn(),
     setVolume: vi.fn(),
@@ -54,11 +55,7 @@ describe('PadPage', () => {
     renderPage(fake());
     expect(screen.getByRole('heading', { level: 1, name: 'Pad' })).toBeInTheDocument();
     expect(screen.getByText('Pad desligado')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Toque em um tom para tocar. Com o pad ligado, toque em outro tom para trocar com transição suave.',
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Toque em um tom para tocar')).toBeInTheDocument();
     expect(screen.getByText('60%')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Parar' })).not.toBeInTheDocument();
   });
@@ -69,6 +66,7 @@ describe('PadPage', () => {
     renderPage(fake({ status: 'playing', note: 'G', owner, toggle }));
     expect(screen.getByText('Tocando em G')).toBeInTheDocument();
     expect(screen.getByText('Sonda-me · Aline Barros')).toBeInTheDocument();
+    expect(screen.queryByText('Toque em um tom para tocar')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Parar' }));
     expect(toggle).toHaveBeenCalledWith('G', owner);
   });
@@ -95,7 +93,16 @@ describe('PadPage', () => {
     renderPage(fake({ status: 'error', notice: 'Não foi possível trocar o tom do pad.' }));
     expect(screen.getByText('Pad indisponível')).toBeInTheDocument();
     expect(screen.getByText('Não foi possível trocar o tom do pad.')).toBeInTheDocument();
+    expect(screen.queryByText('Toque em um tom para tocar')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Parar' })).not.toBeInTheDocument();
+  });
+
+  it('shows the group label above the tones whether the pad is off or playing', () => {
+    const { unmount } = renderPage(fake());
+    expect(screen.getByText('Tons · toque para trocar')).toBeInTheDocument();
+    unmount();
+    renderPage(fake({ status: 'playing', note: 'G', owner: { kind: 'free' } }));
+    expect(screen.getByText('Tons · toque para trocar')).toBeInTheDocument();
   });
 
   it('renders without a pad provider', () => {
@@ -190,5 +197,32 @@ describe('PadPage tone grid', () => {
     for (const button of within(grid()).getAllByRole('button')) {
       expect(button).toHaveAttribute('aria-pressed', 'false');
     }
+  });
+
+  it('outlines the tones that are saved on the device, but not the one that plays', () => {
+    renderPage(
+      fake({
+        status: 'playing',
+        note: 'G',
+        owner: free,
+        cachedNotes: new Set(['D', 'G', 'A#'] as const),
+      }),
+    );
+    expect(within(grid()).getByRole('button', { name: 'Tocar tom D' })).toHaveClass('is-cached');
+    expect(within(grid()).getByRole('button', { name: 'Tocar tom Bb' })).toHaveClass('is-cached');
+    const playing = within(grid()).getByRole('button', { name: 'Tocar tom G' });
+    expect(playing).toHaveClass('is-current');
+    expect(playing).not.toHaveClass('is-cached');
+    expect(within(grid()).getByRole('button', { name: 'Tocar tom C' })).not.toHaveClass(
+      'is-cached',
+    );
+  });
+
+  it('outlines the saved tones while the pad is off', () => {
+    renderPage(fake({ cachedNotes: new Set(['F#'] as const) }));
+    const cached = within(grid())
+      .getAllByRole('button')
+      .filter((b) => b.classList.contains('is-cached'));
+    expect(cached.map((b) => b.textContent)).toEqual(['F#']);
   });
 });

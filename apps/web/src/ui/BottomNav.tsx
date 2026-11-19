@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
+import { usePad } from '../pad/usePad';
 import { NAV_TABS, type NavTab } from './navTabs';
 
 const ICONS: Record<NavTab, ReactNode> = {
@@ -42,6 +43,7 @@ const ICONS: Record<NavTab, ReactNode> = {
 
 /** Floating bottom bar with the five root screens. */
 export function BottomNav({ active }: { active: NavTab }) {
+  const padPlaying = usePad()?.status === 'playing';
   return (
     <nav className="bottom-nav" aria-label="Principal">
       {NAV_TABS.map((tab) => (
@@ -50,6 +52,7 @@ export function BottomNav({ active }: { active: NavTab }) {
           to={tab.to}
           className="bottom-nav-tab"
           aria-current={tab.id === active ? 'page' : undefined}
+          aria-label={tab.id === 'pad' && padPlaying ? `${tab.label}, tocando` : undefined}
         >
           <svg
             width="21"
@@ -64,6 +67,7 @@ export function BottomNav({ active }: { active: NavTab }) {
           >
             {ICONS[tab.id]}
           </svg>
+          {tab.id === 'pad' && padPlaying && <span className="bottom-nav-dot" aria-hidden="true" />}
           <span>{tab.label}</span>
         </Link>
       ))}

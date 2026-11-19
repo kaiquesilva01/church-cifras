@@ -56,6 +56,7 @@ function fake(): PadContextValue {
     toggle: vi.fn(),
     follow: vi.fn(),
     setVolume: vi.fn(),
+    cachedNotes: new Set(),
     prefetch: vi.fn(),
   };
 }
