@@ -12,11 +12,11 @@ Stack: React + Node + Firebase, em monorepo. Documento de design: [docs/superpow
 - Criar branch: `git checkout -b <tipo>/<nome> origin/develop`
 - Abrir PR: `gh pr create --base develop`
 - `--base` é obrigatório em `gh pr create`; o hook bloqueia PR sem base explícita.
-- Release: `gh pr create --base main --head develop`. **O agente pode abrir esse PR** quando a feature estiver concluída, testada, validada e revisada (ver "PR de release" abaixo).
+- Release: `gh pr create --base main --head develop`. **O agente DEVE abrir esse PR** quando a feature estiver concluída, testada, validada e revisada (ver "PR de release" abaixo).
 - Após `git checkout <branch>` (sem `-b`), rode commit/push em outro comando — o hook bloqueia na mesma linha. `git checkout -b` / `git switch -c` podem ser encadeados com commit/push.
 - Prefixos de branch: `feat/`, `fix/`, `chore/`, `docs/`, `test/`, `refactor/`.
 - PRs para `develop`: revisados pelo agente `code-reviewer`; após aprovação, **somente o orquestrador** (sessão principal) faz o merge (`gh pr merge <n> --squash --delete-branch`). Subagentes nunca fazem merge. Isso é regra de conduta: o hook não distingue orquestrador de subagente, só impõe a base (`develop` permitido, `main` bloqueado, base indeterminada bloqueada). Informe sempre o número do PR (`gh pr merge <n> ...`); sem alvo explícito, com mais de um alvo, com `GH_REPO` ou mais de um merge por comando o hook bloqueia. `gh api` é só leitura (GET/graphql query); mutações (`-X` ≠ GET, `-f`/`-F`/`--input`, graphql `mutation`) são bloqueadas — para PRs use `gh pr ...`.
-- PR para `main` (`develop → main`): o agente **pode abrir**, mas **NUNCA aprova nem faz merge**: só o humano aprova e faz o merge. O hook bloqueia `gh pr merge` de PR com base `main` (ou base indeterminada) e `gh pr review --approve`/`-a` em qualquer PR.
+- PR para `main` (`develop → main`): o agente **DEVE abrir**, mas **NUNCA aprova nem faz merge**: só o humano aprova e faz o merge. O hook bloqueia `gh pr merge` de PR com base `main` (ou base indeterminada) e `gh pr review --approve`/`-a` em qualquer PR.
 
 ### PR de release (develop → main)
 
