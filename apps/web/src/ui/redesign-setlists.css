@@ -255,3 +255,51 @@ span.setlist-item-key {
 .setlist-fab:not(:disabled) {
   font-weight: 700;
 }
+
+/* Compartilhar o repertório (WhatsApp), canto inferior esquerdo: o oposto do "Adicionar".
+   Fica em qualquer papel; o glifo verde vem de `.whatsapp-icon` (redesign-cifra.css). */
+.setlist-share {
+  position: fixed;
+  z-index: 5;
+  left: calc(20px + env(safe-area-inset-left, 0px));
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-pop);
+  cursor: pointer;
+}
+
+.setlist-share .whatsapp-icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Confirmação (copiado) e erro do compartilhamento: flutuam logo acima do botão. */
+.setlist-share-note {
+  position: fixed;
+  z-index: 5;
+  left: calc(20px + env(safe-area-inset-left, 0px));
+  bottom: calc(28px + 48px + 12px + env(safe-area-inset-bottom, 0px));
+  max-width: min(260px, calc(100vw - 40px));
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 14px;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-pop);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.setlist-share-note.is-error {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}

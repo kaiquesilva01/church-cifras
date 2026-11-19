@@ -1,15 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import type { SongSummary } from '../catalog/types';
 import { useSongsContext } from '../catalog/SongsProvider';
 import { PadMini } from '../pad/PadMini';
+import { WhatsAppIcon } from '../viewer/barIcons';
 import { ConfirmDialog } from '../viewer/ConfirmDialog';
 import { AddSongSheet } from './AddSongSheet';
 import { copyItems, defaultKeyFor, newItemId } from './items';
 import { KeyPicker } from './KeyPicker';
 import { BackChevronIcon } from './icons';
+import { buildShareMessage, resolveShareLines } from './shareMessage';
+import { shareText } from './shareText';
 import { SetlistFormDialog } from './SetlistFormDialog';
 import { SetlistItemRow } from './SetlistItemRow';
 import { SortableItems } from './SortableItems';
@@ -20,6 +23,8 @@ import { useActiveSetlist } from './useActiveSetlist';
 import { shortDate, weekdayOf } from './format';
 
 const BACK = '/?aba=repertorios';
+/** Tempo que a confirmação "Link copiado." fica na tela (computador, sem Web Share). */
+const COPIED_NOTE_MS = 3000;
 
 const RESULT_MESSAGES = {
   noop: 'Esse item já tinha sido alterado por outra pessoa.',
@@ -41,6 +46,13 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [shareNote, setShareNote] = useState<'copied' | 'error' | null>(null);
+
+  useEffect(() => {
+    if (shareNote !== 'copied') return;
+    const timer = window.setTimeout(() => setShareNote(null), COPIED_NOTE_MS);
+    return () => window.clearTimeout(timer);
+  }, [shareNote]);
 
   const songsById = useMemo(() => new Map(songs.map((s) => [s.id, s])), [songs]);
 
@@ -145,6 +157,21 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
     }
   };
 
+  const share = async (): Promise<void> => {
+    setShareNote(null);
+    const text = buildShareMessage({
+      label: shown.label,
+      date: shown.date,
+      items: resolveShareLines(items, songsById),
+      link: `${window.location.origin}/repertorios/${shown.id}`,
+    });
+    try {
+      if ((await shareText(text)) === 'copied') setShareNote('copied');
+    } catch {
+      setShareNote('error');
+    }
+  };
+
   const pickingItem = items.find((i) => i.id === pickingKeyOf);
   const pickingSong = pickingItem ? songsById.get(pickingItem.songId) : undefined;
 
@@ -239,6 +266,26 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
         <button type="button" className="fab setlist-fab" onClick={() => setDialog('add')}>
           ＋ Adicionar
         </button>
+      )}
+      {!active.removed && (
+        <button
+          type="button"
+          className="setlist-share"
+          aria-label="Compartilhar repertório"
+          onClick={() => void share()}
+        >
+          <WhatsAppIcon />
+        </button>
+      )}
+      {shareNote === 'copied' && (
+        <p role="status" className="setlist-share-note">
+          Link copiado.
+        </p>
+      )}
+      {shareNote === 'error' && (
+        <p role="alert" className="setlist-share-note is-error">
+          Não foi possível compartilhar.
+        </p>
       )}
       {dialog === 'add' && (
         <AddSongSheet
