@@ -346,36 +346,53 @@ describe('PadProvider', () => {
     });
   });
 
-  describe('route rules', () => {
-    it('stops a song pad when leaving the song, stays on the same song', async () => {
+  describe('navigation', () => {
+    it('keeps a song pad playing after leaving the song', async () => {
       const { result, engine, navigate } = setup({ path: '/musicas/s1' });
       act(() => result.current.toggle('C', song));
       await flush();
-      await navigate('/musicas/s1?tom=d');
+      const note = result.current.note;
+      for (const to of [
+        '/musicas/s1?tom=d',
+        '/',
+        '/busca',
+        '/repertorios/r1',
+        '/musicas/s2',
+        '/pad',
+      ]) {
+        await navigate(to);
+        expect(result.current.status).toBe('playing');
+        expect(result.current.note).toBe(note);
+      }
       expect(engine.stop).not.toHaveBeenCalled();
-      await navigate('/');
-      expect(engine.stop).toHaveBeenCalled();
-      expect(result.current.status).toBe('off');
     });
 
-    it('keeps a setlist pad across songs and the setlist page, stops elsewhere', async () => {
-      const { result, engine, navigate } = setup({ path: '/musicas/s2?repertorio=r1&item=i2' });
-      act(() => result.current.toggle('C', setlist));
-      await flush();
-      await navigate('/repertorios/r1');
-      await navigate('/musicas/s2?repertorio=r1&item=i2');
-      expect(engine.stop).not.toHaveBeenCalled();
-      await navigate('/musicas/s2');
-      expect(engine.stop).toHaveBeenCalledTimes(1);
-      expect(result.current.status).toBe('off');
-    });
-
-    it('stops a setlist pad when going home', async () => {
+    it('keeps a setlist pad playing after leaving the setlist', async () => {
       const { result, engine, navigate } = setup({ path: '/repertorios/r1' });
       act(() => result.current.toggle('C', setlist));
       await flush();
+      const note = result.current.note;
+      for (const to of ['/', '/busca', '/musicas/s2', '/musicas/s2?repertorio=r2', '/pad']) {
+        await navigate(to);
+        expect(result.current.status).toBe('playing');
+        expect(result.current.note).toBe(note);
+      }
+      expect(engine.stop).not.toHaveBeenCalled();
+      expect(result.current.owner).toEqual(setlist);
+    });
+
+    it('shows a pad started on a song as playing on the Pad tab after going home', async () => {
+      const { result, engine, navigate } = setup({ path: '/musicas/s1' });
+      act(() => result.current.toggle('C', song));
+      await flush();
+      const note = result.current.note;
       await navigate('/');
-      expect(engine.stop).toHaveBeenCalled();
+      expect(result.current.status).toBe('playing');
+      await navigate('/pad');
+      expect(result.current.status).toBe('playing');
+      expect(result.current.note).toBe(note);
+      expect(result.current.owner).toEqual(song);
+      expect(engine.stop).not.toHaveBeenCalled();
     });
 
     it('keeps a pad started from the Pad tab on any route, stops only by toggle', async () => {
@@ -393,16 +410,15 @@ describe('PadProvider', () => {
       expect(result.current.status).toBe('off');
     });
 
-    it('stops while loading when the route leaves the owner', async () => {
+    it('keeps loading and ends up playing when the route changes meanwhile', async () => {
       const { result, engine, navigate } = setup({ path: '/musicas/s1' });
       const d = deferred();
       engine.start.mockImplementationOnce(() => d.promise);
       act(() => result.current.toggle('C', song));
       await flush();
       await navigate('/');
-      expect(result.current.status).toBe('off');
       await act(async () => d.resolve());
-      expect(result.current.status).toBe('off');
+      expect(result.current.status).toBe('playing');
     });
   });
 
@@ -613,14 +629,14 @@ describe('PadProvider', () => {
       expect(result.current.status).toBe('playing');
     });
 
-    it('a route-driven stop also tears down, and unmount clears the timer', async () => {
+    it('a user stop also tears down, and unmount clears the timer', async () => {
       vi.useFakeTimers();
-      const { result, engine, navigate, unmount } = setup({ path: '/musicas/s1' });
+      const { result, engine, unmount } = setup({ path: '/musicas/s1' });
       act(() => result.current.toggle('C', song));
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0);
       });
-      await navigate('/');
+      act(() => result.current.toggle('C', song));
       act(() => {
         vi.advanceTimersByTime(3600);
       });

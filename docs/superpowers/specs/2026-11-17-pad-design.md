@@ -78,15 +78,15 @@ mapeados para os sustenidos dos arquivos (Bb → A#, Eb → D#, Ab → G#).
 
 | Situação | O que acontece com o pad ligado |
 |---|---|
-| Cifra aberta **fora** de repertório, usuário sai (voltar, busca, outra música) | Fade-out e para |
+| Cifra aberta **fora** de repertório, usuário sai (voltar, busca, outra música) | Continua (fica tocando; aparece e para pela aba Pad) |
 | Cifra aberta **fora** de repertório, usuário troca o tom salvo da própria cifra | Transição cruzada para o novo tom |
 | Cifra aberta **pelo repertório**, vai à anterior/próxima | Continua; transição cruzada se o tom mudou, nada se for o mesmo |
 | Vai da cifra do repertório para a **tela do mesmo repertório**, e volta | Continua |
-| Sai do contexto do repertório (home, busca, outro repertório, cifra sem `?repertorio`) | Fade-out e para [decidido] |
+| Sai do contexto do repertório (home, busca, outro repertório, cifra sem `?repertorio`) | Continua (fica tocando; aparece e para pela aba Pad) |
 | Usuário toca em **Pad** de novo | Fade-out e para |
 | Sair da conta ou fechar o app | Para |
 
-Enquanto o pad toca, ele precisa poder ser **parado de qualquer tela em que continua válido**, inclusive a tela do
+Enquanto o pad toca, ele precisa poder ser **parado de qualquer tela em que continua válido**, inclusive a aba Pad e a tela do
 repertório (controle compacto com parar e volume).
 
 ### 5.3 Fades
