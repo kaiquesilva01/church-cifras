@@ -93,7 +93,9 @@ describe('routes', () => {
 
   it('shows home for signed-in viewer without Pessoas link', () => {
     setup('/', 'viewer');
-    expect(screen.getByRole('searchbox', { name: 'Buscar música ou cantor…' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Pessoas' })).not.toBeInTheDocument();
   });
 
@@ -107,7 +109,9 @@ describe('routes', () => {
 
   it('redirects non-admin away from /pessoas', () => {
     setup('/pessoas', 'member');
-    expect(screen.getByRole('searchbox', { name: 'Buscar música ou cantor…' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
+    ).toBeInTheDocument();
   });
 
   it('RequireRole allows listed roles and redirects others', () => {
@@ -116,7 +120,9 @@ describe('routes', () => {
     cleanup();
     setup('/pessoas', 'viewer');
     expect(screen.queryByRole('heading', { name: 'Pessoas' })).not.toBeInTheDocument();
-    expect(screen.getByRole('searchbox', { name: 'Buscar música ou cantor…' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
+    ).toBeInTheDocument();
   });
 
   it('waits for the role before deciding on /pessoas', () => {
@@ -181,7 +187,7 @@ describe('routes', () => {
       await screen.findByRole('heading', { level: 1, name: 'Culto de domingo' }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('searchbox', { name: 'Buscar música ou cantor…' }),
+      screen.queryByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
     ).not.toBeInTheDocument();
   });
 
