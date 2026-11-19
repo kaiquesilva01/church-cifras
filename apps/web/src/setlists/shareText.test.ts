@@ -13,11 +13,11 @@ afterEach(() => {
 
 describe('shareText', () => {
   it('sends the text through Web Share without a separate url', async () => {
-    const share = vi.fn(async () => {});
+    const share = vi.fn<(data: ShareData) => Promise<void>>(async () => {});
     stubShare({ share });
     await expect(shareText('olá\nhttps://x/repertorios/r1')).resolves.toBe('shared');
     expect(share).toHaveBeenCalledWith({ text: 'olá\nhttps://x/repertorios/r1' });
-    const arg = share.mock.calls[0]?.[0] as ShareData;
+    const arg = share.mock.calls[0]?.[0];
     expect(arg).not.toHaveProperty('url');
   });
 

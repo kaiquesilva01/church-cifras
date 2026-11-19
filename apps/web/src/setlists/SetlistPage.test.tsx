@@ -370,12 +370,12 @@ describe('SetlistPage share button', () => {
   });
 
   it('shares the message through Web Share, with the link inside the text only', async () => {
-    const share = vi.fn(async () => {});
+    const share = vi.fn<(data: ShareData) => Promise<void>>(async () => {});
     stubShare({ share });
     mount(withMissing(), { role: 'viewer' });
     fireEvent.click(shareButton()!);
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
-    const arg = share.mock.calls[0]?.[0] as ShareData;
+    const arg = share.mock.calls[0]?.[0];
     expect(arg).toEqual({
       text: [
         '🎵 *Culto de domingo* — 20/11',
