@@ -84,7 +84,7 @@ describe('SongList', () => {
     );
   });
 
-  it('places the snippet right after the main link and before the key chips', () => {
+  it('shows the snippet in place of the key chips', () => {
     const { container } = render(
       <MemoryRouter>
         <SongList
@@ -94,13 +94,12 @@ describe('SongList', () => {
       </MemoryRouter>,
     );
     const li = container.querySelector('li')!;
-    const children = Array.from(li.children);
     const main = screen.getByRole('link', { name: 'Bondade de Deus Isaías Saad' });
-    expect(children.map((c) => c.className)).toEqual([
+    expect(Array.from(li.children).map((c) => c.className)).toEqual([
       main.className,
       'lyric-snippet',
-      'chips chips-compact',
     ]);
+    expect(container.querySelector('.chips')).toBeNull();
   });
 
   it('shows no snippet when the song has none', () => {
