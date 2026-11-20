@@ -1,0 +1,30 @@
+import { expect, test } from '@playwright/test';
+
+// Roda depois de cada deploy de produção (deploy.yml) e pode rodar à mão contra o site publicado.
+// EXPECTED_VERSION é o SHA do commit publicado; sem ela, só confere que o site carrega sem erro.
+test('o site está no ar e é a versão esperada', async ({ page }) => {
+  if (!process.env.SMOKE_URL) throw new Error('SMOKE_URL é obrigatória');
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+
+  const expected = process.env.EXPECTED_VERSION;
+  if (expected) {
+    // O Hosting pode levar alguns minutos para trocar a versão: recarrega até bater.
+    await expect
+      .poll(
+        async () => {
+          await page.goto('/');
+          return page.evaluate(
+            () => document.querySelector('meta[name="app-version"]')?.getAttribute('content') ?? null,
+          );
+        },
+        { timeout: 180_000, intervals: [10_000] },
+      )
+      .toBe(expected);
+  } else {
+    await page.goto('/');
+  }
+
+  await expect(page.getByRole('button', { name: 'Entrar com Google' })).toBeVisible();
+  expect(errors).toEqual([]);
+});

@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: production
@@ -87,6 +88,7 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_USE_EMULATORS: 'false'
+          VITE_APP_VERSION: ${{ github.sha }}
         run: npm run build
 
       - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
@@ -101,4 +103,84 @@ jobs:
           ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
         run: |
           printf 'ADMIN_EMAILS=%s\n' "$ADMIN_EMAILS" > "apps/functions/.env.$FIREBASE_PROJECT_ID"
-          npx firebase deploy --only hosting,functions,firestore,storage --project "$FIREBASE_PROJECT_ID" --non-interactive --force
+          npx firebase deploy --only hosting:louvor-hajaluz,hosting:cifras-louvor-5dd50,functions,firestore,storage --project "$FIREBASE_PROJECT_ID" --non-interactive --force
+
+      - name: Instalar Chromium da checagem
+        if: steps.config.outputs.configured == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Checar o site publicado
+        id: smoke
+        if: steps.config.outputs.configured == 'true'
+        env:
+          SMOKE_URL: https://louvor-hajaluz.web.app
+          EXPECTED_VERSION: ${{ github.sha }}
+        run: npm run smoke -w @cifras/e2e
+
+      # Volta automática: só quando a checagem do site novo falha num push para a main. Cada passo
+      # exige o anterior ok, para que uma falha no meio não deixe o deploy seguir.
+      - name: Preparar a volta (checkout do commit anterior)
+        id: rb_checkout
+        if: failure() && steps.smoke.outcome == 'failure' && github.event_name == 'push' && steps.config.outputs.configured == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.before }}
+          path: rollback
+
+      - name: Instalar dependências da volta
+        id: rb_install
+        if: failure() && steps.smoke.outcome == 'failure' && github.event_name == 'push' && steps.config.outputs.configured == 'true' && steps.rb_checkout.outcome == 'success'
+        working-directory: rollback
+        run: npm ci
+
+      - name: Build da volta
+        id: rb_build
+        if: failure() && steps.smoke.outcome == 'failure' && github.event_name == 'push' && steps.config.outputs.configured == 'true' && steps.rb_install.outcome == 'success'
+        working-directory: rollback
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_USE_EMULATORS: 'false'
+          VITE_APP_VERSION: ${{ github.event.before }}
+        run: npm run build
+
+      - name: Deploy da volta
+        id: rb_deploy
+        if: failure() && steps.smoke.outcome == 'failure' && github.event_name == 'push' && steps.config.outputs.configured == 'true' && steps.rb_build.outcome == 'success'
+        working-directory: rollback
+        env:
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+        run: |
+          printf 'ADMIN_EMAILS=%s\n' "$ADMIN_EMAILS" > "apps/functions/.env.$FIREBASE_PROJECT_ID"
+          npx firebase deploy --only hosting:louvor-hajaluz,hosting:cifras-louvor-5dd50,functions,firestore,storage --project "$FIREBASE_PROJECT_ID" --non-interactive --force
+
+      - name: Abrir incidente
+        if: failure() && steps.config.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BEFORE: ${{ github.event.before }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ROLLBACK_CHECKOUT: ${{ steps.rb_checkout.outcome }}
+          ROLLBACK_DEPLOY: ${{ steps.rb_deploy.outcome }}
+        run: |
+          body="Execução: $RUN_URL"
+          if [ "$ROLLBACK_DEPLOY" = "success" ]; then
+            body="$body
+
+          Volta automática: produção voltou para o commit anterior ($BEFORE)."
+          elif [ "$ROLLBACK_CHECKOUT" = "skipped" ]; then
+            body="$body
+
+          Sem volta automática: a falha foi antes da checagem do site publicado."
+          else
+            body="$body
+
+          A volta automática para $BEFORE falhou: produção precisa de intervenção manual."
+          fi
+          gh issue create --label incidente --title "Incidente: deploy de $SHA falhou" --body "$body"

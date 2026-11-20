@@ -241,7 +241,7 @@ Depois que as entregas estão na develop:
 
 ## Produção e incidente (§5.8)
 
-**Checagem depois do deploy** (planejada em `deploy.yml`, ainda em construção pela Tarefa 9): o `index.html` traz o SHA do commit (`<meta name="app-version">`) e a checagem espera a versão bater; o JS principal responde 200; a página inicial, sem login, carrega sem erro no console.
+**Checagem depois do deploy:** o `index.html` traz o SHA do commit (`<meta name="app-version">`) e a checagem espera a versão bater; o JS principal responde 200; a página inicial, sem login, carrega sem erro no console.
 
 **Acompanhar o deploy:**
 1. Ache a execução do release: `gh run list --workflow deploy.yml --json databaseId,headSha,status,conclusion` e pegue a de `headSha` igual ao `mergeCommit` do PR (`gh pr view <n> --json mergeCommit -q .mergeCommit.oid`).

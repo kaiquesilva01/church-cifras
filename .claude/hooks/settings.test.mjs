@@ -47,6 +47,21 @@ test('deploy skips pushes that only touch harness, docs or tests', () => {
   }
 });
 
+test('deploy checks the new version and rolls back on failure', () => {
+  const deploy = readFileSync(join(repoRoot, '.github', 'workflows', 'deploy.yml'), 'utf8');
+  for (const x of [
+    'VITE_APP_VERSION: ${{ github.sha }}',
+    'EXPECTED_VERSION: ${{ github.sha }}',
+    'npm run smoke -w @cifras/e2e',
+    'github.event.before',
+    '--label incidente',
+    'issues: write',
+    '--only hosting:louvor-hajaluz,hosting:cifras-louvor-5dd50,functions,firestore,storage',
+  ]) {
+    assert.ok(deploy.includes(x), `deploy.yml sem "${x}"`);
+  }
+});
+
 test('the project session opens on sonnet medium', () => {
   assert.equal(settings.model, 'sonnet');
   assert.equal(settings.effortLevel, 'medium');
