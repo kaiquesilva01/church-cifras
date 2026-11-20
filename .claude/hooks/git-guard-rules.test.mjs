@@ -110,6 +110,9 @@ const cases = [
   ['blocks bash -xc firebase deploy', 'bash -xc "npx firebase deploy"', 'feat/a', [], false, 'release'],
   ['blocks pwsh -Command firebase deploy after other flags', 'pwsh -NoProfile -ExecutionPolicy Bypass -Command "firebase deploy"', 'feat/a', [], false, 'release'],
   ['allows bash -o pipefail with a harmless -c script', 'bash -o pipefail -c "npm test"', 'feat/a', [], true],
+  ['blocks pwsh -c firebase deploy (short alias of -Command)', 'pwsh -NoProfile -c "firebase deploy"', 'feat/a', [], false, 'release'],
+  ['blocks powershell -c git push to main', 'powershell -c "git push origin main"', 'feat/a', [], false, 'Push para'],
+  ['allows pwsh with -ConfigurationName before -Command', 'pwsh -ConfigurationName x -NoProfile -Command "npm test"', 'feat/a', [], true],
 ];
 
 test('git-guard-rules.mjs is self-contained: no import statements', () => {

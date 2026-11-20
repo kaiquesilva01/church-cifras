@@ -660,14 +660,14 @@ function stripPrefixes(tokens) {
 // "/usr/bin/git" -> "git"; "C:\Git\git.EXE" -> "git"; "firebase.cmd" -> "firebase".
 const programName = (token) => token.split(/[\\/]/).pop().replace(/\.(exe|cmd)$/i, '');
 
-// Código inline de `bash -c "..."`, `bash -lc "..."`, `sh -ec "..."` ou `pwsh -Command "..."`, se houver.
-// Shells POSIX aceitam `c` dentro de um grupo de flags curtas; pwsh só o `-Command` exato
+// Código inline de `bash -c "..."`, `bash -lc "..."`, `sh -ec "..."`, `pwsh -Command "..."` ou `pwsh -c "..."`.
+// Shells POSIX aceitam `c` dentro de um grupo de flags curtas; pwsh só `-c` ou `-Command` exatos
 // (senão `-ExecutionPolicy` casaria pelo `c` e o valor seguinte seria tratado como script).
 const POSIX_SHELLS = new Set(['bash', 'sh', 'zsh']);
 function inlineScript(program, tokens) {
   const isInlineFlag = POSIX_SHELLS.has(program)
     ? (t) => /^-[a-zA-Z]*c[a-zA-Z]*$/.test(t)
-    : (t) => /^-command$/i.test(t);
+    : (t) => /^-c(ommand)?$/i.test(t);
   const i = tokens.findIndex(isInlineFlag);
   return i !== -1 ? tokens[i + 1] : undefined;
 }
