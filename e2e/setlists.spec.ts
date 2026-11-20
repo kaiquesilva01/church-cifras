@@ -466,7 +466,9 @@ test.describe('measurements', () => {
     const fromSetlist: number[] = [];
     for (let round = 0; round < 5; round++) {
       await page.goto('/');
-      await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(aurora!.title);
+      await page
+        .getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' })
+        .fill(aurora!.title);
       const link = page.locator('a.list-main', { hasText: aurora!.title });
       await expect(link).toBeVisible();
       await arm();

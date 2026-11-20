@@ -44,6 +44,17 @@ describe('readPdfSuggestion', () => {
     expect(result.suggestion.artist).toBe('Aline Barros');
   });
 
+  it('returns the lyrics without chord lines', async () => {
+    readTextLines.mockResolvedValue([
+      line([run('Sonda-me - Aline Barros', 40, 780, true)], 780),
+      line([run('G', 40, 700, true), run('D', 120, 700, true)], 700),
+      line([run('Sonda-me, Senhor', 40, 686, false)], 686),
+    ]);
+    const result = await readPdfSuggestion(pdfFile('x.pdf'), []);
+    expect(result.lyrics).toContain('Sonda-me, Senhor');
+    expect(result.lyrics).not.toContain('G D');
+  });
+
   it('reports zero chords for a text-only pdf', async () => {
     readTextLines.mockResolvedValue([line([run('Só letra', 40, 700, false)], 700)]);
     const result = await readPdfSuggestion(pdfFile('x.pdf'), []);

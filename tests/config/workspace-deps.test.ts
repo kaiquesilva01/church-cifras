@@ -34,4 +34,24 @@ describe('workspace packaging', () => {
     );
     expect(compose).toContain('/app/packages/overlay/node_modules');
   });
+
+  // Cloud Build installs apps/functions/package.json alone (npm 10, no lockfile). With npm 10.9.x the pair
+  // firebase-admin + firebase-functions crashes with "Cannot read properties of null (reading 'edgesOut')".
+  // legacy-peer-deps avoids the peer-resolution path that crashes; the file must reach the upload.
+  it('functions install config avoids the npm 10 peer-resolution crash on Cloud Build', () => {
+    const npmrc = readFileSync(resolve(root, 'apps/functions/.npmrc'), 'utf8');
+    const settings = npmrc
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line !== '' && !line.startsWith('#') && !line.startsWith(';'));
+    expect(settings).toContain('legacy-peer-deps=true');
+  });
+
+  it('functions deploy does not ignore dotfiles, so .npmrc is uploaded with the source', () => {
+    const config = JSON.parse(readFileSync(resolve(root, 'firebase.json'), 'utf8'));
+    const ignore: string[] = config.functions.ignore ?? [];
+    expect(
+      ignore.filter((pattern) => pattern.includes('.*') || pattern.includes('.npmrc')),
+    ).toEqual([]);
+  });
 });

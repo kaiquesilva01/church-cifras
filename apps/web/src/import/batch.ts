@@ -14,6 +14,8 @@ export interface BatchRow {
   chordCount: number;
   suspects: string[];
   ignoredChordLines: number;
+  /** Letra lida do PDF; vazia para linhas ilegíveis ou grandes demais. */
+  lyrics: string;
   sizeOk: boolean;
   /** The PDF could not be read at all: the reason shown as the row detail. */
   readError?: string;

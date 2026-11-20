@@ -13,7 +13,7 @@ test('search finds songs by title and by singer, and the singers tab lists artis
   const third = await seedSong(`Rio Manso ${tag}`, other, [{ key: 'A' }]);
   await signInAs(page, ADMIN, 'Admin');
 
-  const search = page.getByRole('searchbox', { name: 'Buscar música ou cantor…' });
+  const search = page.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' });
   const songLink = (title: string) => page.locator('a.list-main', { hasText: title });
 
   // By title.

@@ -18,6 +18,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import type { FirebaseServices } from '../lib/firebase';
+import { MAX_LYRICS_CHARS } from './lyricsLimits';
 import type {
   ArrangementSummary,
   NewArrangementInput,
@@ -33,6 +34,11 @@ export interface CatalogApi {
     songId: string,
     cb: (arrangements: ArrangementSummary[]) => void,
     onError?: (e: unknown) => void,
+  ): () => void;
+  /** Assina `songLyrics` (texto por música); ignora docs sem `text` string não vazio. */
+  subscribeLyrics(
+    cb: (lyrics: Map<string, string>) => void,
+    onError: (e: unknown) => void,
   ): () => void;
   findSong(titleNormalized: string, artistId: string): Promise<SongSummary | null>;
   getArrangement(
@@ -163,6 +169,19 @@ export function createCatalogApi({
           ),
         onError,
       ),
+    subscribeLyrics: (cb, onError) =>
+      onSnapshot(
+        collection(db, 'songLyrics'),
+        (snap) => {
+          const lyrics = new Map<string, string>();
+          for (const d of snap.docs) {
+            const text: unknown = d.data().text;
+            if (typeof text === 'string' && text !== '') lyrics.set(d.id, text);
+          }
+          cb(lyrics);
+        },
+        onError,
+      ),
     findSong: async (titleNormalized, artistId) => {
       const snap = await getDocs(
         query(
@@ -216,6 +235,13 @@ export function createCatalogApi({
         doc(songRef, 'arrangements', keySlug(input.key)),
         arrangementData(input, createdBy),
       );
+      if (input.lyrics.trim() !== '') {
+        batch.set(doc(db, 'songLyrics', input.songId), {
+          text: input.lyrics.slice(0, MAX_LYRICS_CHARS),
+          createdBy,
+          createdAt: serverTimestamp(),
+        });
+      }
       await batch.commit();
       return songRef.id;
     },
@@ -280,6 +306,7 @@ export async function saveUpload(
         key: plan.key,
         storagePath,
         chordCount: plan.chordCount,
+        lyrics: plan.lyrics,
       });
     } else if (plan.action === 'add-key') {
       await api.addArrangement(songId, {

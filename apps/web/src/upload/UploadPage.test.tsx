@@ -10,6 +10,7 @@ const baseResult = {
   chordCount: 12,
   suspects: [] as string[][],
   ignoredChordLines: 0,
+  lyrics: '',
   suggestion: {
     title: 'Sonda-me',
     artist: 'Aline Barros',
@@ -220,6 +221,16 @@ describe('UploadPage', () => {
         key: 'G',
         chordCount: 12,
       }),
+    );
+  });
+
+  it('saves a new song with the lyrics read from the PDF', async () => {
+    const { api } = setup({ result: { lyrics: 'Sonda-me, Senhor\nSonda-me, Senhor' } });
+    pick();
+    fireEvent.click(await enabledButton('Salvar cifra'));
+    expect(await screen.findByTestId('where')).toHaveTextContent('/musicas/new-id?tom=G');
+    expect(api.createSongWithArrangement).toHaveBeenCalledWith(
+      expect.objectContaining({ lyrics: 'Sonda-me, Senhor\nSonda-me, Senhor' }),
     );
   });
 
