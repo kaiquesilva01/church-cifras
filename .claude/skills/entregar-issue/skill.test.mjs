@@ -97,8 +97,28 @@ test('cada gatilho de §5.1 é o item numerado de mesmo número', () => {
   keys.forEach((k, i) => assert.ok(items[i].includes(k), `item ${i + 1} não traz "${k}"`));
 });
 
-test('a seção de gatilhos liga aguardando-voce ao PushNotification na mesma linha', () => {
-  assert.ok(hasLine(sec('## Gatilhos'), ['aguardando-voce', 'PushNotification']));
+test('a seção de gatilhos traz aguardando-voce e PushNotification como sinais de pausa', () => {
+  const g = sec('## Gatilhos');
+  assert.ok(g.includes('aguardando-voce'), 'seção de gatilhos sem aguardando-voce');
+  assert.ok(g.includes('PushNotification'), 'seção de gatilhos sem PushNotification');
+  assert.ok(g.includes('Três sinais'), 'falta a lista dos sinais de pausa');
+});
+
+test('a resposta da pessoa e os sinais de pausa são linhas separadas', () => {
+  const lines = sec('## Gatilhos').split('\n');
+  const sinais = lines.findIndex((l) => l.includes('Três sinais'));
+  assert.ok(sinais !== -1, 'falta a linha "Três sinais"');
+  assert.ok(
+    lines.slice(sinais + 1).some((l) => l.includes('A resposta vem no chat')),
+    'a resposta da pessoa deve vir em linha própria, depois dos sinais',
+  );
+  assert.ok(!lines[sinais].includes('A resposta vem'), 'bullets fundidos na mesma linha');
+});
+
+test('a worktree só é exigida a partir da etapa 3, com as etapas 1 e 2 sem escrita', () => {
+  const r = sec('## Regras que não se quebram');
+  assert.ok(r.includes('A partir da etapa 3'), 'falta o marco da etapa 3');
+  assert.ok(r.includes('só leem o repositório'), 'falta a regra de leitura nas etapas 1 e 2');
 });
 
 test('etiquetas aparecem na etapa que as usa', () => {
@@ -153,6 +173,11 @@ test('release: checklist do PR de release do AGENTS.md e corpo com risco e rollb
     'rollback',
     'Rules, índices ou variáveis',
     'ficou de fora',
+    'code-reviewer',
+    'pendência crítica',
+    'Paper',
+    'design system',
+    'mergeados na develop',
   ]) {
     assert.ok(r.includes(t), `release sem "${t}"`);
   }

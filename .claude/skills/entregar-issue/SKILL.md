@@ -24,7 +24,7 @@ As instruções do projeto (`AGENTS.md`) valem mais que as skills. Dentro deste 
 - **Grave sempre pelo CLI:** `node .claude/skills/entregar-issue/analise.mjs <n> <arquivo.md>`. Nunca `gh issue edit --body`: ele apaga o texto original da pessoa.
 - **Toda etapa termina atualizando a Análise Agêntica:** status, etapa, próximo passo e histórico.
 - **Modelo e effort em toda chamada ao `Agent`**, conforme § Modelos, mesmo quando igual ao padrão. Não herde o modelo da sessão.
-- **Toda chamada ao `Agent` leva o caminho absoluto da worktree da entrega** e a ordem de trabalhar só nela. Um plano escrito no checkout principal cai na branch errada.
+- **A partir da etapa 3 (worktree criada), toda chamada ao `Agent` leva o caminho absoluto da worktree da entrega** e a ordem de trabalhar só nela. Um plano escrito no checkout principal cai na branch errada. Nas etapas 1 e 2 os agentes só leem o repositório e devolvem texto, sem escrever arquivos.
 - **Produção só sai pelo merge do release.** Nunca `firebase deploy` nem `gh workflow run deploy.yml`: o hook bloqueia.
 - **Trabalhe com as travas, não ao redor delas.** Se o hook bloquear, a mensagem diz o que falta. Não contorne.
 - **`gh pr merge` é comando simples:** sem redirecionamento, sem `$(...)`, sem `--auto` ou `-a`, sem `--subject` nem `--body`. Para o SHA, rode `gh pr view <n> --json headRefOid -q .headRefOid` antes e cole o valor literal no merge.
@@ -115,7 +115,8 @@ Também param quando uma tarefa falha duas vezes em Sonnet high. Fora dos gatilh
 **Como parar:**
 - Só a entrega afetada para. As outras entregas e issues continuam.
 - Até 3 perguntas por vez. Cada uma traz as opções, o que cada uma implica e a recomendação dos agentes.
-- Três sinais: o status vira "🟡 Aguardando você · N perguntas (desde dd/mm hh:mm)"; a issue ganha `aguardando-voce`; um `PushNotification` curto, por exemplo "#85: 2 perguntas sobre escala".- A resposta vem no chat ou num comentário da issue. Grave em "Decisões" com "quem: você". Quando não sobrar pergunta: `gh issue edit <n> --remove-label aguardando-voce`.
+- Três sinais: o status vira "🟡 Aguardando você · N perguntas (desde dd/mm hh:mm)"; a issue ganha `aguardando-voce`; um `PushNotification` curto, por exemplo "#85: 2 perguntas sobre escala".
+- A resposta vem no chat ou num comentário da issue. Grave em "Decisões" com "quem: você". Quando não sobrar pergunta: `gh issue edit <n> --remove-label aguardando-voce`.
 
 ## Análise Agêntica (§5.5)
 
@@ -199,7 +200,10 @@ Depois que as entregas estão na develop:
    O corpo, em pt-BR, traz:
    - `Closes #<sub>` de cada sub-issue entregue. `Closes #<mãe>` só no release que leva a última entrega da mãe. `Closes #<incidente>` para cada `incidente` aberto que este release corrige (sem isso o hook bloqueia; § Produção e incidente).
    - o que muda para a pessoa; o que ela deve conferir (passos de teste manual); risco; rollback; mudanças em Rules, índices ou variáveis (ou "nenhuma"); o que ficou de fora;
-   - os checks rodados, e que o merge é feito pelo agente com `--merge` e as travas.
+   - os checks rodados, e que o merge é feito pelo agente com `--merge` e as travas;
+   - a conferência feita: `code-reviewer` revisou cada PR da entrega, sem pendência crítica nem importante aberta;
+   - em mudança de UI: Paper atualizado (ou "Paper pendente" com o motivo) e design system respeitado;
+   - a entrega concluída: todos os PRs dela estão mergeados na develop.
 2. Espere o CI no head: `gh pr checks <n> --watch`.
 3. Janela do culto: quinta ou domingo, das 16h30 às 23h59 (America/Sao_Paulo), o merge é bloqueado. Confira a hora com o comando de § Janela do culto. Se o hook recusar o merge mesmo assim, registre "Release aguardando a janela" na Análise e pare, sem nova tentativa.
 4. Leia o SHA em comando próprio: `gh pr view <n> --json headRefOid -q .headRefOid`.
