@@ -38,6 +38,15 @@ test('every hook script referenced by settings exists in the repo', () => {
   }
 });
 
+test('deploy skips pushes that only touch harness, docs or tests', () => {
+  const deploy = readFileSync(join(repoRoot, '.github', 'workflows', 'deploy.yml'), 'utf8');
+  const ignored = ['.claude/**', 'docs/**', '*.md', 'e2e/**', 'tests/**'];
+  assert.match(deploy, /paths-ignore:/);
+  for (const pattern of ignored) {
+    assert.ok(deploy.includes(`- '${pattern}'`), `${pattern} fora do paths-ignore`);
+  }
+});
+
 test('AGENTS.md documents the release hook, the sync hook and the merge commit rule', () => {
   assert.match(agents, /release-pr\.mjs/);
   assert.match(agents, /sync-main\.mjs/);
