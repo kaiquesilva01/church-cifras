@@ -236,6 +236,11 @@ test('incidente sem culpado: rerun único com --failed, só no head da main, e f
   }
 });
 
+test('incidente sem culpado: o rerun respeita a janela do culto', () => {
+  const p = sec('## Produção e incidente');
+  assert.ok(hasLine(p, ['gh run rerun', 'janela']), 'o rerun não cita a janela do culto na mesma linha');
+});
+
 test('merge na develop: a exceção chore/merge-main-into-develop usa --merge', () => {
   const m = sec('### Antes de entrar na develop');
   assert.ok(m.includes('chore/merge-main-into-develop'), 'falta a exceção chore/merge-main-into-develop');
