@@ -45,6 +45,29 @@ export function ciGreen(checks) {
   );
 }
 
+// Janela do culto: quinta e domingo, a partir das 16h30 em Brasília (sem horário de verão).
+const WORSHIP_DAYS = new Set(['Thu', 'Sun']);
+const WORSHIP_START_MINUTES = 16 * 60 + 30;
+const SAO_PAULO_CLOCK = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Sao_Paulo',
+  weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+export function isFreezeWindow(date) {
+  const parts = Object.fromEntries(SAO_PAULO_CLOCK.formatToParts(date).map((p) => [p.type, p.value]));
+  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+  return WORSHIP_DAYS.has(parts.weekday) && minutes >= WORSHIP_START_MINUTES;
+}
+
+// Números de issues que o corpo do PR fecha (`Closes #N`, `fixes #N`, `resolve #N`...), sem repetição.
+export function closingRefs(body) {
+  const nums = [...body.matchAll(/\b(?:close[sd]?|fix(?:es|ed)?|resolve[sd]?)\s+#(\d+)/gi)].map((m) => Number(m[1]));
+  return [...new Set(nums)];
+}
+
 export const PROTECTED_BRANCHES = ['main', 'develop'];
 
 const isProtected = (b) => PROTECTED_BRANCHES.includes(b);
@@ -308,25 +331,33 @@ function checkGit(tokens, state, stagedFiles) {
 }
 
 const MERGE_VALUE_FLAGS = [
-  '--subject', '-t', '--body', '-b', '--body-file', '-F', '--match-head-commit',
+  '--subject', '-t', '--body', '-b', '--body-file', '-F',
   '--author-email', '-A', '-R', '--repo',
 ];
 
-// Argumentos de `gh pr merge`: { positionals, repo } ignorando flags, seus valores e redirecionamentos.
+// Argumentos de `gh pr merge`: { positionals, repo, flags, matchHead } ignorando valores e redirecionamentos.
+// `flags` traz as formas longas e cada letra de agrupamentos curtos (`-ms` -> `-m`, `-s`), para que
+// nenhuma combinação esconda `--squash`/`--merge`/etc.
 function parseMergeArgs(args) {
   const positionals = [];
+  const flags = [];
   let repo = null;
+  let matchHead = null;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '-R' || a === '--repo') repo = args[++i] ?? repo;
     else if (a.startsWith('--repo=')) repo = a.slice(7);
     else if (/^-R./.test(a)) repo = a.slice(2);
+    else if (a === '--match-head-commit') matchHead = args[++i] ?? null;
+    else if (a.startsWith('--match-head-commit=')) matchHead = a.slice(20);
     else if (MERGE_VALUE_FLAGS.includes(a)) i++;
     else if (/^[\d*]*[<>]/.test(a)) {
       if (/^[\d*]*[<>]+$/.test(a)) i++; // `> arquivo`: o próximo token é o destino
-    } else if (!a.startsWith('-')) positionals.push(a);
+    } else if (a.startsWith('--')) flags.push(a);
+    else if (a.startsWith('-')) flags.push(a, ...[...a.slice(1)].map((c) => `-${c}`));
+    else positionals.push(a);
   }
-  return { positionals, repo };
+  return { positionals, repo, flags, matchHead };
 }
 
 // Merge na develop: travas, CI verde, etiquetas e teste no celular, nesta ordem; para no primeiro bloqueio.
@@ -356,7 +387,54 @@ function checkDevelopMerge(facts, target) {
   return null;
 }
 
-// Merge só para PRs com base develop (fail closed: fatos indisponíveis ou base desconhecida bloqueiam).
+// Release develop -> main, feito pelo agente só com todas as travas: head develop, merge commit
+// (`--merge`) sem squash/rebase/admin, SHA conferido, CI verde, fora da janela do culto e sem incidente aberto.
+const RELEASE_FORBIDDEN_FLAGS = ['--squash', '-s', '--rebase', '-r', '--auto', '--admin'];
+
+function checkReleaseMerge(facts, { flags, matchHead }, target, state) {
+  if (facts.head !== 'develop') {
+    return block(`O release (PR para main) só pode vir da develop (head atual: "${facts.head}").`);
+  }
+  const hasMerge = flags.includes('--merge') || flags.includes('-m');
+  const forbidden = RELEASE_FORBIDDEN_FLAGS.filter((f) => flags.includes(f));
+  if (!hasMerge || forbidden.length) {
+    const found = forbidden.length ? forbidden.join(', ') : 'sem --merge';
+    return block(
+      'O release exige `--merge` (merge commit) e não aceita --squash, --rebase, --auto ou --admin ' +
+        `(encontrado: ${found}): use \`gh pr merge ${target} --merge --match-head-commit ${facts.headSha}\`.`
+    );
+  }
+  if (matchHead !== facts.headSha) {
+    return block(
+      `Informe \`--match-head-commit ${facts.headSha}\` (SHA atual da develop no PR de release): ` +
+        'o merge só segue se o SHA conferir.'
+    );
+  }
+  if (!ciGreen(facts.checks)) {
+    const names = facts.checks.map((c) => c.name).join(', ') || 'nenhum check';
+    return block(`CI não está verde no release (${names}): espere o CI (\`gh pr checks ${target} --watch\`).`);
+  }
+  if (isFreezeWindow(state.now())) {
+    return block(
+      'Janela do culto (quinta e domingo, a partir das 16h30 em Brasília): o release espera a janela passar.'
+    );
+  }
+  const open = state.openIncidents();
+  if (open === null) {
+    return block('Não foi possível verificar incidentes abertos: o release fica bloqueado até a checagem voltar.');
+  }
+  const closes = new Set(closingRefs(facts.body ?? ''));
+  const unclosed = open.filter((n) => !closes.has(n));
+  if (unclosed.length) {
+    const list = unclosed.map((n) => `#${n}`).join(', ');
+    return block(
+      `Há incidente aberto (${list}): o próximo release precisa fechá-lo (\`Closes #${unclosed[0]}\`).`
+    );
+  }
+  return null;
+}
+
+// Merge só para PRs com base develop ou main (fail closed: fatos indisponíveis ou base desconhecida bloqueiam).
 function checkMerge(args, state, leadingRepo) {
   if (/\bGH_REPO\b/.test(state.command)) {
     return block('Não use GH_REPO com `gh pr merge`: defina o repositório com -R <dono/repo>.');
@@ -364,7 +442,8 @@ function checkMerge(args, state, leadingRepo) {
   if (++state.merges > 1) {
     return block('Faça um merge por comando: rode cada `gh pr merge` separadamente.');
   }
-  const { positionals, repo } = parseMergeArgs(args);
+  const parsed = parseMergeArgs(args);
+  const { positionals, repo, flags } = parsed;
   if (positionals.length > 1) {
     return block('`gh pr merge` com mais de um alvo: informe apenas um PR (`gh pr merge <n> --squash --delete-branch`).');
   }
@@ -376,12 +455,14 @@ function checkMerge(args, state, leadingRepo) {
     );
   }
   const facts = state.resolvePr(target, repo ?? leadingRepo);
-  if (facts?.base === 'develop') return checkDevelopMerge(facts, target);
-  if (facts?.base === 'main') {
+  if (flags.includes('--auto')) {
     return block(
-      'Merge de PR para main é decisão humana: só a pessoa responsável aprova e faz o merge do PR develop → main.'
+      '`--auto` não é permitido em nenhum merge (develop ou release). ' +
+        'Faça o merge direto: develop com `--squash --delete-branch`; release com `--merge --match-head-commit <sha>`.'
     );
   }
+  if (facts?.base === 'develop') return checkDevelopMerge(facts, target);
+  if (facts?.base === 'main') return checkReleaseMerge(facts, parsed, target, state);
   return block(
     'Não foi possível determinar a base do PR; merge bloqueado. ' +
       `Confira com \`gh pr view ${target} --json baseRefName\` e só faça merge de PRs com base develop.`

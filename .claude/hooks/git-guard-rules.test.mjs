@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateCommand, touches, ciGreen, GUARD_PATHS, DEVICE_TEST_PATHS } from './git-guard-rules.mjs';
+import {
+  evaluateCommand,
+  touches,
+  ciGreen,
+  closingRefs,
+  isFreezeWindow,
+  GUARD_PATHS,
+  DEVICE_TEST_PATHS,
+} from './git-guard-rules.mjs';
 
 const cases = [
   ['blocks commit on main', 'git commit -m "x"', 'main', [], false, 'Commit direto'],
@@ -139,10 +147,16 @@ const FACTS = {
   body: '',
 };
 
-const mergeWith = (command, resolvePr) =>
-  evaluateCommand({ command, branch: 'feat/a', stagedFiles: [], resolvePr });
+const mergeWith = (command, resolvePr, extra = {}) =>
+  evaluateCommand({ command, branch: 'feat/a', stagedFiles: [], resolvePr, ...extra });
 
-const merge = (command, facts = FACTS) => mergeWith(command, () => facts);
+const merge = (command, facts = FACTS, extra = {}) => mergeWith(command, () => facts, extra);
+
+// Release develop -> main: facts da release, relógio numa quarta (fora da janela) e sem incidentes.
+const RELEASE = { ...FACTS, base: 'main', head: 'develop', headSha: 'abc123', labels: [] };
+const WEDNESDAY = () => new Date('2026-11-25T15:00:00Z');
+const release = (command, facts = RELEASE, extra = {}) =>
+  merge(command, facts, { now: WEDNESDAY, openIncidents: () => [], ...extra });
 
 test('allows develop merge with green CI and both labels', () => {
   let received;
@@ -271,16 +285,131 @@ const target = (command) => {
   return { r, got };
 };
 
-test('merge with main base is a human decision', () => {
-  const r = merge('gh pr merge 2 --squash', { ...FACTS, base: 'main' });
+test('merge with main base needs --merge (release develop -> main)', () => {
+  const r = release('gh pr merge 2 --squash');
   assert.equal(r.allow, false);
-  assert.ok(r.reason.includes('humana'), r.reason);
+  assert.ok(r.reason.includes('--merge'), r.reason);
 });
 
-test('blocks merge with -R when base main', () => {
-  const r = merge('gh -R o/r pr merge 3', { ...FACTS, base: 'main' });
+test('blocks merge with -R when base main and no --merge', () => {
+  const r = release('gh -R o/r pr merge 3');
   assert.equal(r.allow, false);
-  assert.ok(r.reason.includes('humana'), r.reason);
+  assert.ok(r.reason.includes('--merge'), r.reason);
+});
+
+test('allows the release merge with --merge and the current head', () => {
+  const r = release('gh pr merge 99 --merge --match-head-commit abc123');
+  assert.equal(r.allow, true, r.reason);
+});
+
+test('the release merge goes through the same guards in any command form', () => {
+  const forms = [
+    'if ($?) { gh pr merge https://github.com/o/r/pull/99 --merge --match-head-commit abc123 }',
+    'gh -R o/r pr merge 99 -m --match-head-commit abc123',
+  ];
+  for (const c of forms) {
+    assert.equal(release(c).allow, true, c);
+    const inWindow = release(c, RELEASE, { now: () => new Date('2026-11-26T19:30:00Z') });
+    assert.equal(inWindow.allow, false, c);
+    assert.match(inWindow.reason, /janela do culto/i, c);
+  }
+});
+
+test('blocks release merge without --merge or with squash, rebase, auto or admin', () => {
+  for (const c of [
+    'gh pr merge 99 --match-head-commit abc123',
+    'gh pr merge 99 --squash --match-head-commit abc123',
+    'gh pr merge 99 -s --match-head-commit abc123',
+    'gh pr merge 99 --merge --rebase --match-head-commit abc123',
+    'gh pr merge 99 -m -r --match-head-commit abc123',
+    'gh pr merge 99 --merge --auto --match-head-commit abc123',
+    'gh pr merge 99 --merge --admin --match-head-commit abc123',
+  ]) {
+    const r = release(c);
+    assert.equal(r.allow, false, c);
+    assert.ok(r.reason.includes('--merge'), `${c}: ${r.reason}`);
+  }
+});
+
+test('blocks release merge without --match-head-commit or with another sha', () => {
+  for (const c of ['gh pr merge 99 --merge', 'gh pr merge 99 --merge --match-head-commit zzz']) {
+    const r = release(c);
+    assert.equal(r.allow, false, c);
+    assert.ok(r.reason.includes('--match-head-commit'), r.reason);
+  }
+});
+
+test('blocks release from a head other than develop', () => {
+  const r = release('gh pr merge 99 --merge --match-head-commit abc123', { ...RELEASE, head: 'feat/x' });
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('develop'), r.reason);
+});
+
+test('blocks release merge when CI is not green', () => {
+  const notGreen = [
+    [{ name: 'checks', status: 'IN_PROGRESS' }],
+    [],
+    [{ name: 'checks', status: 'COMPLETED', conclusion: 'FAILURE' }],
+    [{ __typename: 'StatusContext', state: 'PENDING' }],
+  ];
+  for (const checks of notGreen) {
+    const r = release('gh pr merge 99 --merge --match-head-commit abc123', { ...RELEASE, checks });
+    assert.equal(r.allow, false, JSON.stringify(checks));
+    assert.ok(r.reason.includes('CI'), r.reason);
+  }
+});
+
+test('blocks release merge in the worship window (Thu and Sun from 16h30 Brasília)', () => {
+  const cases = [
+    ['2026-11-26T19:29:00Z', true], // qui 16h29
+    ['2026-11-26T19:30:00Z', false], // qui 16h30
+    ['2026-11-30T02:59:00Z', false], // dom 23h59
+    ['2026-11-30T03:00:00Z', true], // seg 00h00
+    ['2026-11-25T23:00:00Z', true], // qua 20h00
+    ['2026-11-27T02:00:00Z', false], // qui 23h00 em Brasília (sexta em UTC)
+  ];
+  for (const [iso, allow] of cases) {
+    const r = release('gh pr merge 99 --merge --match-head-commit abc123', RELEASE, { now: () => new Date(iso) });
+    assert.equal(r.allow, allow, iso);
+    if (!allow) assert.match(r.reason, /janela do culto/i, iso);
+  }
+});
+
+test('isFreezeWindow uses Brasília time', () => {
+  assert.equal(isFreezeWindow(new Date('2026-11-26T19:30:00Z')), true);
+  assert.equal(isFreezeWindow(new Date('2026-11-26T19:29:00Z')), false);
+  assert.equal(isFreezeWindow(new Date('2026-11-25T19:30:00Z')), false);
+});
+
+test('blocks release while an incident is open unless the PR closes it', () => {
+  const cmd = 'gh pr merge 99 --merge --match-head-commit abc123';
+  const open = release(cmd, RELEASE, { openIncidents: () => [120] });
+  assert.equal(open.allow, false);
+  assert.ok(open.reason.includes('incidente'), open.reason);
+
+  const closed = release(cmd, { ...RELEASE, body: 'Closes #120' }, { openIncidents: () => [120] });
+  assert.equal(closed.allow, true, closed.reason);
+
+  const unknown = release(cmd, RELEASE, { openIncidents: () => null });
+  assert.equal(unknown.allow, false);
+  assert.ok(unknown.reason.includes('incidente'), unknown.reason);
+});
+
+test('blocks --auto on any base', () => {
+  for (const [c, facts] of [
+    ['gh pr merge 2 --squash --auto', FACTS],
+    ['gh pr merge 99 --merge --auto --match-head-commit abc123', RELEASE],
+  ]) {
+    const r = merge(c, facts, { now: WEDNESDAY, openIncidents: () => [] });
+    assert.equal(r.allow, false, c);
+    assert.ok(r.reason.includes('--auto'), r.reason);
+  }
+});
+
+test('closingRefs reads closing keywords, case-insensitive, without repeats', () => {
+  assert.deepEqual(closingRefs('Closes #95\nresolves #96, Parte de #85'), [95, 96]);
+  assert.deepEqual(closingRefs('CLOSES #1, closes #1 and Fixed #2'), [1, 2]);
+  assert.deepEqual(closingRefs(''), []);
 });
 
 test('blocks merge without explicit target', () => {
