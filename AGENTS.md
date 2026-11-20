@@ -114,3 +114,4 @@ Registrados em `.claude/settings.json` e testados por `npm run test:harness`:
 - `npm run test:rules` — testes das Security Rules no emulador.
 - `npm run test:harness` — testes do harness (`node --test ".claude/**/*.test.mjs"`).
 - `npm run test:scripts` — testes dos scripts locais (`node --test "scripts/**/*.test.mjs"`, p.ex. produção dos loops do pad).
+
