@@ -3,6 +3,15 @@ name: Deploy
 on:
   push:
     branches: [main]
+    # Push só de harness, docs ou testes não muda o que vai para produção.
+    paths-ignore:
+      - '.claude/**'
+      - 'docs/**'
+      - '*.md'
+      - '.github/pull_request_template.md'
+      - '.github/workflows/ci.yml'
+      - 'e2e/**'
+      - 'tests/**'
   workflow_dispatch:
 
 permissions:
