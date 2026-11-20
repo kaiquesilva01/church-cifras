@@ -12,6 +12,7 @@ const result = (over: Partial<Suggestion['suggestion']> = {}, chordCount = 12): 
   chordCount,
   suspects: [],
   ignoredChordLines: 0,
+  lyrics: '',
   suggestion: {
     title: 'Música Nova',
     artist: 'Cantor Novo',
@@ -73,6 +74,20 @@ describe('ImportPage', () => {
     expect(within(rowOf('c.pdf')).getByText('fora do padrão')).toBeVisible();
     expect(screen.getByText('3 arquivos · 1 prontos')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Importar 1 prontos' })).toBeEnabled();
+  });
+
+  it('imports a new song with the row lyrics', async () => {
+    const { api } = setup({
+      reads: { 'a.pdf': { ...result({ title: 'Música A' }), lyrics: 'Letra da música A' } },
+    });
+    addFiles([pdf('a.pdf')]);
+    const button = await screen.findByRole('button', { name: 'Importar 1 prontos' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(await screen.findByText('1 importados · 0 já existiam · 0 com erro')).toBeVisible();
+    expect(api.createSongWithArrangement).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Música A', lyrics: 'Letra da música A' }),
+    );
   });
 
   it('classifies from the catalog summaries without per-row lookups', async () => {

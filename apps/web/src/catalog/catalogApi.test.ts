@@ -6,6 +6,10 @@ function fakeApi(overrides: Partial<CatalogApi> = {}): CatalogApi {
   return {
     subscribeSongs: vi.fn(() => () => undefined),
     subscribeArrangements: vi.fn(() => () => undefined),
+    subscribeLyrics: vi.fn((cb: (l: Map<string, string>) => void) => {
+      cb(new Map());
+      return () => undefined;
+    }),
     findSong: vi.fn(() => Promise.resolve(null)),
     getArrangement: vi.fn(() => Promise.resolve(null)),
     newSongId: vi.fn(() => 'song1'),
@@ -35,6 +39,7 @@ describe('saveUpload', () => {
       action: 'new-song',
       title: 'Sonda-me',
       artistName: 'Aline',
+      lyrics: '',
     };
     await expect(saveUpload(api, plan)).resolves.toEqual({ songId: 'song1', key: 'G' });
     expect(api.uploadPdf).toHaveBeenCalledWith('song1', 'G', file);
@@ -45,7 +50,35 @@ describe('saveUpload', () => {
       key: 'G',
       storagePath: 'songs/song1/G-abc.pdf',
       chordCount: 12,
+      lyrics: '',
     });
+  });
+
+  it('saveUpload passes the plan lyrics for a new song', async () => {
+    const api = fakeApi();
+    await saveUpload(api, {
+      ...base,
+      action: 'new-song',
+      title: 'Sonda-me',
+      artistName: 'Aline',
+      lyrics: 'Sonda-me, Senhor',
+    });
+    expect(api.createSongWithArrangement).toHaveBeenCalledWith(
+      expect.objectContaining({ lyrics: 'Sonda-me, Senhor' }),
+    );
+  });
+
+  it('does not pass lyrics for add-key', async () => {
+    const api = fakeApi();
+    // Only the new-song branch carries lyrics; a stray field on another plan must be ignored.
+    const plan = { ...base, action: 'add-key', songId: 's9', lyrics: 'Sonda-me' } as UploadPlan;
+    await saveUpload(api, plan);
+    expect(api.addArrangement).toHaveBeenCalledWith('s9', {
+      key: 'G',
+      storagePath: 'songs/s9/G-abc.pdf',
+      chordCount: 12,
+    });
+    expect(api.createSongWithArrangement).not.toHaveBeenCalled();
   });
 
   it('saveUpload adds key to existing song', async () => {
@@ -95,7 +128,7 @@ describe('saveUpload', () => {
       });
       const plan: UploadPlan =
         action === 'new-song'
-          ? { ...base, action, title: 'T', artistName: 'A' }
+          ? { ...base, action, title: 'T', artistName: 'A', lyrics: '' }
           : { ...base, action, songId: 's9' };
       await expect(saveUpload(api, plan)).rejects.toBeInstanceOf(ArrangementExistsError);
       expect(api.deleteFile).toHaveBeenCalledTimes(1);

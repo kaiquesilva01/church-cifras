@@ -143,7 +143,34 @@ Os repertórios somem sozinhos 30 dias após o culto (campo `expiresAt`). Depois
 - A coleção `setlistUsage` **não** deve ter política de TTL (Firestore > TTL e índices): ela guarda o histórico de uso das músicas, que precisa durar.
 - A primeira visita de um admin a Estatísticas já conta os repertórios fechados que ainda existem; o job diário faz o mesmo para os demais.
 
-## 12. Build das funções falha com `Cannot read properties of null (reading 'edgesOut')`
+## 12. Preencher as letras das músicas já enviadas
+
+Músicas enviadas antes da busca por letra não têm `songLyrics/{songId}`. O script lê o PDF do arranjo feito à mão de cada uma e cria o documento só quando ele não existe; rodar de novo não grava nada.
+
+Rode **depois** do deploy (release já em `main`), a partir da **raiz do repositório**. Num Cloud Shell novo, a sequência completa é esta (troque `<url-do-repositório>`, `<id-do-projeto>` e `<bucket>`; o bucket é o mesmo de `VITE_FIREBASE_STORAGE_BUCKET`):
+
+```bash
+git clone <url-do-repositório> church-cifras && cd church-cifras
+git checkout main && git pull
+nvm install && nvm use          # Node do .nvmrc; o pdfjs-dist exige Node >= 22.13
+npm ci                          # na raiz
+gcloud config set project <id-do-projeto>
+npm run lyrics:backfill -- --bucket <bucket> --dry-run
+```
+
+Fora do Cloud Shell, faça antes `gcloud auth application-default login`. Se preferir não mudar o projeto do `gcloud`, exporte `GOOGLE_CLOUD_PROJECT=<id-do-projeto>`.
+
+O `--dry-run` mostra quantas letras seriam gravadas, quais músicas não têm PDF ou texto extraível e uma amostra das primeiras linhas de cada letra. Confira as amostras e, no cabeçalho da saída, se `projeto:` e `bucket:` são os de produção (e que não aparece nenhuma linha `..._EMULATOR_HOST`). Só então rode sem `--dry-run`:
+
+```bash
+npm run lyrics:backfill -- --bucket <bucket>
+```
+
+Com algumas centenas de PDFs, cada execução leva alguns minutos; o progresso sai em `processadas n/total` (a cada 25 músicas) no stderr.
+
+Saída com `falhas` diferente de zero encerra com código 1; as músicas com falha aparecem listadas e podem ser reexecutadas com segurança. Use `--samples <n>` para mudar o número de amostras (padrão 3).
+
+## 13. Build das funções falha com `Cannot read properties of null (reading 'edgesOut')`
 
 A Cloud Build instala `apps/functions/package.json` sozinho (npm 10, sem lockfile). No npm 10.9.x o par `firebase-admin` + `firebase-functions` quebra a resolução de dependências com esse erro, e **todas** as funções falham no deploy (inclusive as que não mudaram; o erro só aparece quando o código das funções muda, porque o Firebase pula funções sem alteração). Reproduzido localmente com `npx npm@10.9.9 install` numa pasta só com esse `package.json`; no npm 11 funciona.
 

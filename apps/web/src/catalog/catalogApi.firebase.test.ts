@@ -62,6 +62,7 @@ describe('createCatalogApi payloads', () => {
       key: 'C#',
       storagePath: 'songs/s1/Cs-abc.pdf',
       chordCount: 12,
+      lyrics: '',
     });
     expect(id).toBe('s1');
     expect(batchSet).toHaveBeenCalledTimes(2);
@@ -105,6 +106,57 @@ describe('createCatalogApi payloads', () => {
       createdAt: '<ts>',
     });
     expect(batchCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('createSongWithArrangement writes songLyrics in the same batch', async () => {
+    await createCatalogApi(services).createSongWithArrangement({
+      songId: 's1',
+      title: 'Sonda-me',
+      artistName: 'Aline Barros',
+      key: 'G',
+      storagePath: 'songs/s1/G-abc.pdf',
+      chordCount: 12,
+      lyrics: 'Sonda-me, Senhor',
+    });
+    expect(batchSet).toHaveBeenCalledTimes(3);
+    const [ref, data] = batchSet.mock.calls[2] as [{ path: string }, Record<string, unknown>];
+    expect(ref.path).toBe('songLyrics/s1');
+    expect(data).toEqual({
+      text: 'Sonda-me, Senhor',
+      createdBy: 'u1',
+      createdAt: '<ts>',
+    });
+    expect(batchCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not write songLyrics when lyrics is blank', async () => {
+    await createCatalogApi(services).createSongWithArrangement({
+      songId: 's1',
+      title: 'Sonda-me',
+      artistName: 'Aline Barros',
+      key: 'G',
+      storagePath: 'songs/s1/G-abc.pdf',
+      chordCount: 12,
+      lyrics: '   \n ',
+    });
+    expect(batchSet).toHaveBeenCalledTimes(2);
+    const paths = batchSet.mock.calls.map((call) => (call[0] as { path: string }).path);
+    expect(paths).not.toContain('songLyrics/s1');
+  });
+
+  it('cuts lyrics at 20000 characters', async () => {
+    await createCatalogApi(services).createSongWithArrangement({
+      songId: 's1',
+      title: 'Sonda-me',
+      artistName: 'Aline Barros',
+      key: 'G',
+      storagePath: 'songs/s1/G-abc.pdf',
+      chordCount: 12,
+      lyrics: 'a'.repeat(25_000),
+    });
+    const [ref, data] = batchSet.mock.calls[2] as [{ path: string }, { text: string }];
+    expect(ref.path).toBe('songLyrics/s1');
+    expect(data.text.length).toBe(20_000);
   });
 
   it('addArrangement writes one arrangement doc', async () => {
@@ -187,6 +239,30 @@ describe('createCatalogApi payloads', () => {
         collisions: 2,
       },
     ]);
+    expect(stop).toBe(unsubscribe);
+  });
+
+  it('subscribeLyrics maps songLyrics docs to a Map and skips invalid text', () => {
+    const unsubscribe = vi.fn();
+    vi.mocked(onSnapshot).mockImplementationOnce(((
+      _ref: { path: string },
+      next: (snap: unknown) => void,
+    ) => {
+      const docData = (id: string, data: Record<string, unknown>) => ({ id, data: () => data });
+      next({
+        docs: [
+          docData('s1', { text: 'Sonda-me, Senhor' }),
+          docData('s2', { text: '' }),
+          docData('s3', { text: 42 }),
+          docData('s4', { createdBy: 'u1' }),
+        ],
+      });
+      return unsubscribe;
+    }) as never);
+    const cb = vi.fn();
+    const stop = createCatalogApi(services).subscribeLyrics(cb, vi.fn());
+    expect(vi.mocked(onSnapshot).mock.calls[0]?.[0]).toMatchObject({ path: 'songLyrics' });
+    expect(cb).toHaveBeenCalledWith(new Map([['s1', 'Sonda-me, Senhor']]));
     expect(stop).toBe(unsubscribe);
   });
 

@@ -414,3 +414,86 @@ describe('firestore.rules', () => {
     await assertFails(setDoc(doc(db, 'secret/y'), { a: 1 }));
   });
 });
+
+describe('songLyrics rules', () => {
+  const lyricsData = (over: Record<string, unknown> = {}) => ({
+    text: 'Grande é o Senhor',
+    createdBy: 'm1',
+    createdAt: serverTimestamp(),
+    ...over,
+  });
+
+  const seedLyrics = (songId: string, data: Record<string, unknown>) =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `songLyrics/${songId}`), data);
+    });
+
+  const songAndLyrics = (db: Db, lyrics: Record<string, unknown> = lyricsData()) => {
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'songs/s9'), songData());
+    batch.set(doc(db, 'songLyrics/s9'), lyrics);
+    return batch.commit();
+  };
+
+  it('member creates songLyrics together with the song', async () => {
+    await assertSucceeds(songAndLyrics(memberDb()));
+  });
+
+  it('text of exactly 20000 characters is accepted', async () => {
+    await assertSucceeds(songAndLyrics(memberDb(), lyricsData({ text: 'x'.repeat(20000) })));
+  });
+
+  const seedSong = (songId: string) =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `songs/${songId}`), { title: 'Sonda-me' });
+    });
+
+  it('denies viewer creating songLyrics for an existing song', async () => {
+    await seedSong('s9');
+    const db = env.authenticatedContext('m1', { role: 'viewer' }).firestore();
+    await assertFails(setDoc(doc(db, 'songLyrics/s9'), lyricsData()));
+  });
+
+  it('member creates songLyrics for an already-existing song', async () => {
+    await seedSong('s9');
+    await assertSucceeds(setDoc(doc(memberDb(), 'songLyrics/s9'), lyricsData()));
+  });
+
+  it('denies songLyrics without the song in the same write', async () => {
+    const db = memberDb();
+    await assertFails(setDoc(doc(db, 'songLyrics/s9'), lyricsData()));
+  });
+
+  it('denies songLyrics with extra field, empty text, oversized text or wrong types', async () => {
+    const db = memberDb();
+    await assertFails(songAndLyrics(db, lyricsData({ extra: 1 })));
+    await assertFails(songAndLyrics(db, lyricsData({ text: '' })));
+    await assertFails(songAndLyrics(db, lyricsData({ text: 'x'.repeat(20001) })));
+    await assertFails(songAndLyrics(db, lyricsData({ text: 5 })));
+  });
+
+  it('denies songLyrics with createdBy of another user or client timestamp', async () => {
+    const db = memberDb();
+    await assertFails(songAndLyrics(db, lyricsData({ createdBy: 'other' })));
+    await assertFails(songAndLyrics(db, lyricsData({ createdAt: new Date() })));
+  });
+
+  it('denies songLyrics update and delete', async () => {
+    await seedLyrics('s1', { text: 'a', createdBy: 'm1', createdAt: new Date() });
+    const db = memberDb();
+    await assertFails(updateDoc(doc(db, 'songLyrics/s1'), { text: 'b' }));
+    await assertFails(deleteDoc(doc(db, 'songLyrics/s1')));
+  });
+
+  it('signed-in reads songLyrics', async () => {
+    await seedLyrics('s1', { text: 'a', createdBy: 'm1', createdAt: new Date() });
+    const db = env.authenticatedContext('u1').firestore();
+    await assertSucceeds(getDoc(doc(db, 'songLyrics/s1')));
+  });
+
+  it('anonymous cannot read songLyrics', async () => {
+    await seedLyrics('s1', { text: 'a', createdBy: 'm1', createdAt: new Date() });
+    const db = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'songLyrics/s1')));
+  });
+});

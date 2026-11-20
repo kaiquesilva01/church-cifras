@@ -5,12 +5,43 @@ import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import type { SongSummary } from '../catalog/types';
 import { SongsProvider } from '../catalog/SongsProvider';
+import { LyricsProvider } from '../catalog/LyricsProvider';
+import type { CatalogApi } from '../catalog/catalogApi';
 import { SetlistsProvider } from '../setlists/SetlistsProvider';
 import type { Setlist } from '../setlists/types';
-import { fakeCatalogApi } from '../test/fakeCatalogApi';
+import { fakeCatalogApi, makeSong, sampleSongs } from '../test/fakeCatalogApi';
 import { fakeSetlistApi, makeSetlist, type FakeSetlistApi } from '../test/fakeSetlistApi';
 import { testUser } from '../test/fakeGateway';
 import { HomePage } from './HomePage';
+
+/** Lyrics for `sampleSongs` (s1 Sonda-me, s2 Ressuscita-me, s3 Grande é o Senhor). */
+const LYRICS = {
+  s1: 'Sonda-me, Senhor, e conhece o meu coração',
+  s2: 'Ressuscita-me, Senhor, e levanta-me',
+  s3: 'Grande é o Senhor, rei das nações',
+};
+const hymn = makeSong({
+  id: 'h1',
+  title: 'Hino de louvor',
+  titleNormalized: 'hino de louvor',
+  artistId: 'harpa',
+  artistName: 'Harpa',
+});
+const songsWithHymn: SongSummary[] = [...sampleSongs, hymn];
+
+/** Catalog overrides whose lyrics are ready with `map`. */
+function lyricsReady(map: Record<string, string>): Partial<CatalogApi> {
+  return {
+    subscribeLyrics: (cb) => {
+      cb(new Map(Object.entries(map)));
+      return () => undefined;
+    },
+  };
+}
+/** Catalog overrides whose lyrics never arrive (the skeleton state). */
+const lyricsPending: Partial<CatalogApi> = {
+  subscribeLyrics: () => () => undefined,
+};
 
 function StateProbe() {
   const { state } = useLocation();
@@ -35,9 +66,11 @@ function renderHome(
     state?: unknown;
     setlists?: Setlist[];
     setlistApi?: FakeSetlistApi;
+    catalog?: Partial<CatalogApi>;
   } = {},
 ) {
   const setlistApi = options.setlistApi ?? fakeSetlistApi(options.setlists);
+  const catalogApi = fakeCatalogApi(options.songs, options.catalog);
   const auth: AuthState = {
     status: 'signed-in',
     user: testUser,
@@ -55,12 +88,14 @@ function renderHome(
             : { pathname: options.path ?? '/', state: options.state },
         ]}
       >
-        <SongsProvider api={fakeCatalogApi(options.songs)}>
-          <SetlistsProvider api={setlistApi}>
-            <HomePage setlistApi={setlistApi} />
-            <StateProbe />
-            <PathProbe />
-          </SetlistsProvider>
+        <SongsProvider api={catalogApi}>
+          <LyricsProvider api={catalogApi}>
+            <SetlistsProvider api={setlistApi}>
+              <HomePage setlistApi={setlistApi} />
+              <StateProbe />
+              <PathProbe />
+            </SetlistsProvider>
+          </LyricsProvider>
         </SongsProvider>
       </MemoryRouter>
     </AuthContext.Provider>,
@@ -110,7 +145,7 @@ describe('HomePage', () => {
 
   it('searches by artist', () => {
     renderHome();
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar música ou cantor…' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }), {
       target: { value: 'adhemar' },
     });
     expect(screen.getByText('Grande é o Senhor')).toBeInTheDocument();
@@ -172,10 +207,12 @@ describe('HomePage', () => {
       >
         <MemoryRouter>
           <SongsProvider api={api}>
-            <SetlistsProvider api={fakeSetlistApi()}>
-              <HomePage setlistApi={fakeSetlistApi()} />
-              <StateProbe />
-            </SetlistsProvider>
+            <LyricsProvider api={api}>
+              <SetlistsProvider api={fakeSetlistApi()}>
+                <HomePage setlistApi={fakeSetlistApi()} />
+                <StateProbe />
+              </SetlistsProvider>
+            </LyricsProvider>
           </SongsProvider>
         </MemoryRouter>
       </AuthContext.Provider>,
@@ -194,6 +231,138 @@ describe('HomePage', () => {
   it('shows empty catalog message', () => {
     renderHome({ songs: [] });
     expect(screen.getByText('Nenhuma cifra ainda.')).toBeInTheDocument();
+  });
+
+  describe('letra nas abas', () => {
+    it('Músicas tab shows a "Na letra" section for a lyric match', () => {
+      renderHome({ path: '/?q=nações', catalog: lyricsReady(LYRICS) });
+      expect(screen.getByRole('heading', { name: 'Na letra' })).toBeInTheDocument();
+      expect(screen.getByText('nações').tagName).toBe('MARK');
+      const card = screen.getByText('nações').closest('li')!;
+      expect(within(card).getByText('Grande é o Senhor')).toBeInTheDocument();
+    });
+
+    it('does not repeat in "Na letra" a song already listed by title', () => {
+      renderHome({ path: '/?q=sonda', catalog: lyricsReady(LYRICS) });
+      expect(screen.getByText('Sonda-me')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+    });
+
+    it('shows skeleton cards while lyrics load, with the title matches already visible', () => {
+      const { container } = renderHome({ path: '/?q=senhor', catalog: lyricsPending });
+      expect(screen.getByText('Grande é o Senhor')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Na letra' })).toBeInTheDocument();
+      expect(container.querySelectorAll('.lyric-skeleton-card')).toHaveLength(2);
+    });
+
+    it('does not show "Nada encontrado" while lyrics load; shows it when ready and nothing matched', () => {
+      const { unmount } = renderHome({ path: '/?q=zzz', catalog: lyricsPending });
+      expect(screen.queryByText('Nada encontrado para “zzz”.')).not.toBeInTheDocument();
+      unmount();
+      renderHome({ path: '/?q=zzz', catalog: lyricsReady({}) });
+      expect(screen.getByText('Nada encontrado para “zzz”.')).toBeInTheDocument();
+    });
+
+    it('shows only "Na letra" when no title matches but a lyric does', () => {
+      renderHome({ path: '/?q=nações', catalog: lyricsReady(LYRICS) });
+      expect(screen.getByRole('heading', { name: 'Na letra' })).toBeInTheDocument();
+      expect(screen.queryByText(/Nada encontrado/)).not.toBeInTheDocument();
+    });
+
+    it('Harpa tab shows a "Na letra" section for a hymn whose lyrics match', () => {
+      renderHome({
+        path: '/?aba=harpa&q=eternos',
+        songs: songsWithHymn,
+        catalog: lyricsReady({ h1: 'Hino de louvor, rei dos reis eternos' }),
+      });
+      expect(screen.getByRole('heading', { name: 'Na letra' })).toBeInTheDocument();
+      expect(screen.getByText('eternos').tagName).toBe('MARK');
+      expect(screen.getByText('Hino de louvor', { selector: '.song-title' })).toBeInTheDocument();
+    });
+
+    it('Harpa tab shows skeleton cards while lyrics load, with the title matches visible', () => {
+      const { container } = renderHome({
+        path: '/?aba=harpa&q=hino',
+        songs: songsWithHymn,
+        catalog: lyricsPending,
+      });
+      expect(screen.getByText('Hino de louvor')).toBeInTheDocument();
+      expect(container.querySelectorAll('.lyric-skeleton-card')).toHaveLength(2);
+      expect(screen.queryByText(/Nada encontrado/)).not.toBeInTheDocument();
+    });
+
+    it('Harpa tab does not repeat a hymn already listed by title', () => {
+      renderHome({
+        path: '/?aba=harpa&q=hino',
+        songs: songsWithHymn,
+        catalog: lyricsReady({ h1: 'Hino de louvor, hino antigo' }),
+      });
+      expect(screen.getByText('Hino de louvor')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+    });
+
+    it('Harpa tab shows "Nada encontrado" only when ready and nothing matched', () => {
+      const { unmount } = renderHome({
+        path: '/?aba=harpa&q=zzz',
+        songs: songsWithHymn,
+        catalog: lyricsPending,
+      });
+      expect(screen.queryByText(/Nada encontrado/)).not.toBeInTheDocument();
+      unmount();
+      renderHome({
+        path: '/?aba=harpa&q=zzz',
+        songs: songsWithHymn,
+        catalog: lyricsReady({}),
+      });
+      expect(screen.getByText('Nada encontrado para “zzz”.')).toBeInTheDocument();
+    });
+
+    it('Cantores tab does not search lyrics', () => {
+      renderHome({ path: '/?aba=cantores&q=nações', catalog: lyricsReady(LYRICS) });
+      expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+    });
+
+    it('Músicas tab does not search Harpa hymns by lyric', () => {
+      renderHome({
+        path: '/?q=reis',
+        songs: songsWithHymn,
+        catalog: lyricsReady({ h1: 'Hino de louvor, rei dos reis eternos' }),
+      });
+      expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+    });
+
+    it('Harpa tab does not search regular songs by lyric', () => {
+      renderHome({
+        path: '/?aba=harpa&q=nações',
+        songs: songsWithHymn,
+        catalog: lyricsReady(LYRICS),
+      });
+      expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+    });
+
+    it('lists the whole catalog and no "Na letra" when the search is empty', () => {
+      renderHome({ catalog: lyricsReady(LYRICS) });
+      expect(document.querySelectorAll('.song-title')).toHaveLength(3);
+      expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+    });
+
+    it('names the search field of each tab', () => {
+      const { unmount } = renderHome();
+      expect(
+        screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
+      ).toHaveAttribute('placeholder', 'Buscar música, cantor ou letra…');
+      unmount();
+      const harpa = renderHome({ path: '/?aba=harpa' });
+      expect(
+        screen.getByRole('searchbox', { name: 'Buscar na Harpa ou na letra…' }),
+      ).toHaveAttribute('placeholder', 'Buscar na Harpa ou na letra…');
+      harpa.unmount();
+      renderHome({ path: '/?aba=cantores' });
+      expect(screen.getByRole('searchbox', { name: 'Buscar cantor…' })).toHaveAttribute(
+        'placeholder',
+        'Buscar cantor…',
+      );
+    });
   });
 
   describe('Repertórios', () => {
