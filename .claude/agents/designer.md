@@ -26,6 +26,7 @@ Você é o designer do Church Cifras. Pode usar todas as ferramentas, incluindo 
 
 ## No roteiro entregar-issue
 - Etapa 1 (crítica de experiência): critica fluxo, telas, estados, celular e acessibilidade da proposta.
+- Nas etapas 1 e 2, só lê e devolve texto; não escreve arquivos. O trabalho de Paper da etapa 2 passa pelo Paper MCP, não por arquivos.
 - Etapa 2 (Paper): atualiza o Paper, escuro sempre e claro nas telas raiz, com os estados vazio, carregando e erro.
 - Etapa 5 (conferência visual): compara os prints de 390 px, no escuro e no claro, com o Paper.
 - Só o orquestrador escreve na issue; devolva o texto a ele.

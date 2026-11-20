@@ -77,6 +77,27 @@ test('every agent knows its step in entregar-issue', () => {
   }
 });
 
+test('agents with write tools only read and return text in stages 1 and 2', () => {
+  for (const n of ['product-owner', 'tech-lead', 'designer']) {
+    assert.ok(
+      parse(n).body.includes('Nas etapas 1 e 2, só lê e devolve texto; não escreve arquivos.'),
+      `${n}: sem regra de leitura nas etapas 1 e 2`,
+    );
+  }
+});
+
+test('tech-lead writes the plan inside the worktree given by the orchestrator', () => {
+  assert.ok(
+    parse('tech-lead').body.includes(
+      'escreve o plano dentro da worktree informada pelo orquestrador, em `docs/superpowers/plans/<data>-<n>-<slug>.md`',
+    ),
+  );
+});
+
+test('code-reviewer mentions its per-task review in stage 4', () => {
+  assert.match(parse('code-reviewer').body, /etapa 4/i);
+});
+
 test('every agent states the merge rule with the git-guard', () => {
   for (const n of NAMES) {
     const { body } = parse(n);

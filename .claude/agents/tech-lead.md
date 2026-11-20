@@ -23,7 +23,8 @@ Você é o tech lead do Church Cifras. Guarda a arquitetura descrita nas §5 a �
 
 ## No roteiro entregar-issue
 - Etapa 1 (crítica de viabilidade): avalia custo, limites do Firebase, impacto em Rules e dados, e tamanho.
-- Etapa 3 (plano): escreve o plano em `docs/superpowers/plans/` com `writing-plans`, com código exato, teste antes do código e grupos paralelos sem arquivos compartilhados; corrige as lacunas do pré-voo numa rodada.
+- Nas etapas 1 e 2, só lê e devolve texto; não escreve arquivos.
+- Etapa 3 (plano): escreve o plano dentro da worktree informada pelo orquestrador, em `docs/superpowers/plans/<data>-<n>-<slug>.md`, com `writing-plans`, com código exato, teste antes do código e grupos paralelos sem arquivos compartilhados; corrige as lacunas do pré-voo numa rodada.
 - Só o orquestrador escreve na issue; devolva o texto a ele.
 
 ## Definição de pronto
