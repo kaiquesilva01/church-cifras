@@ -355,8 +355,40 @@ function parseMergeArgs(args) {
   return { positionals, repo, matchHead };
 }
 
-// `--auto` (qualquer forma, exceto `--auto=false`) não existe neste fluxo, em nenhuma base.
-const autoOption = (args) => args.find((a) => a.split('=')[0] === '--auto' && a !== '--auto=false');
+// `--auto` (qualquer forma, exceto `--auto=false`) e o alias `-a`, sozinho ou em grupo curto
+// (`-sa`), não existem neste fluxo, em nenhuma base. `-R...` é o repositório, não grupo.
+const SHORT_AUTO = /^-(?!R)[A-Za-z]*a[A-Za-z]*(=|$)/;
+const autoOption = (args) =>
+  args.find((a) => (a.split('=')[0] === '--auto' ? a !== '--auto=false' : SHORT_AUTO.test(a)));
+
+// Comando simples: nenhum token do merge pode ter redirecionamento ou expansão, nem mesmo dentro de valor
+// de opção (senão `--subject >x` engole o token seguinte). Opções com valor precisam de um valor depois.
+const UNSAFE_TOKEN = /[<>$`*?{}~!]/;
+const MERGE_OPTIONS_WITH_VALUE = [
+  '--subject', '-t', '--body', '-b', '--body-file', '-F', '--match-head-commit', '-R', '--repo', '--author-email', '-A',
+];
+
+function checkSimpleMerge(args) {
+  const unsafe = args.find((a) => UNSAFE_TOKEN.test(a));
+  if (unsafe !== undefined) {
+    return block(
+      'Faça o merge com um comando simples, sem redirecionamento nem expansão: `gh pr merge <n> ...`. ' +
+        `Encontrado: ${unsafe}.`
+    );
+  }
+  for (let i = 0; i < args.length; i++) {
+    if (!MERGE_OPTIONS_WITH_VALUE.includes(args[i])) continue;
+    const next = args[i + 1];
+    if (next === undefined || next.startsWith('-')) {
+      return block(
+        `A opção \`${args[i]}\` precisa de um valor logo depois dela (sem outro \`-\` no meio). ` +
+          `Encontrado: ${args[i]}.`
+      );
+    }
+    i++;
+  }
+  return null;
+}
 
 // Merge na develop: travas, CI verde, etiquetas e teste no celular, nesta ordem; para no primeiro bloqueio.
 function checkDevelopMerge(facts, target) {
@@ -413,7 +445,8 @@ function scanReleaseOptions(args) {
 const releaseOptionsBlock = (target, sha, found) =>
   block(
     `Release só com \`gh pr merge ${target} --merge --match-head-commit ${sha}\` ` +
-      '(opções permitidas: --merge, --match-head-commit, --subject, --body, --body-file, -R). ' +
+      '(opções permitidas: `--merge`/`-m`, `--match-head-commit`, `--subject`/`-t`, `--body`/`-b`, ' +
+        '`--body-file`/`-F`, `-R`/`--repo`). ' +
       `Encontrado: ${found}.`
   );
 
@@ -462,6 +495,15 @@ function checkMerge(args, state, leadingRepo) {
   if (++state.merges > 1) {
     return block('Faça um merge por comando: rode cada `gh pr merge` separadamente.');
   }
+  const simple = checkSimpleMerge(args);
+  if (simple) return simple;
+  const auto = autoOption(args);
+  if (auto !== undefined) {
+    return block(
+      'Merge com `--auto` (ou o alias `-a`) não é permitido em nenhuma base: o merge é feito direto. ' +
+        `Encontrado: ${auto}. Develop: \`--squash --delete-branch\`; release: \`--merge --match-head-commit <sha>\`.`
+    );
+  }
   const parsed = parseMergeArgs(args);
   const { positionals, repo } = parsed;
   if (positionals.length > 1) {
@@ -475,13 +517,6 @@ function checkMerge(args, state, leadingRepo) {
     );
   }
   const facts = state.resolvePr(target, repo ?? leadingRepo);
-  const auto = autoOption(args);
-  if (auto !== undefined) {
-    return block(
-      `\`${auto}\` não é permitido em nenhum merge (develop ou release). ` +
-        'Faça o merge direto: develop com `--squash --delete-branch`; release com `--merge --match-head-commit <sha>`.'
-    );
-  }
   if (facts?.base === 'develop') return checkDevelopMerge(facts, target);
   if (facts?.base === 'main') return checkReleaseMerge(facts, args, parsed, target, state);
   return block(

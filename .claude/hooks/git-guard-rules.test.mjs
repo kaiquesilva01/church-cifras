@@ -342,7 +342,7 @@ test('release allowlist blocks every option outside it and names the offending t
   for (const [c, token] of cases) {
     const r = release(c);
     assert.equal(r.allow, false, c);
-    assert.ok(r.reason.includes(token), `${token} ausente em: ${r.reason}`);
+    assert.ok(r.reason.includes(`Encontrado: ${token}.`), `${token} ausente em: ${r.reason}`);
   }
 });
 
@@ -458,7 +458,7 @@ test('release blocks any =valor form, even =false, because only exact tokens are
   for (const flag of ['--merge=false', '--squash=false', '--auto=false', '--delete-branch=false']) {
     const r = release(`gh pr merge 99 --merge ${flag} --match-head-commit abc123`);
     assert.equal(r.allow, false, flag);
-    assert.ok(r.reason.includes(flag), `${flag}: ${r.reason}`);
+    assert.ok(r.reason.includes(`Encontrado: ${flag}.`), `${flag}: ${r.reason}`);
   }
 });
 
@@ -483,6 +483,46 @@ test('--delete-branch stays allowed on develop merges', () => {
   }
 });
 
+test('a redirection after a value option cannot hide the next flag on release', () => {
+  const admin = release('gh pr merge 99 --subject >x --body --admin --merge --match-head-commit abc123');
+  assert.equal(admin.allow, false);
+  assert.ok(admin.reason.includes('comando simples'), admin.reason);
+  assert.ok(admin.reason.includes('Encontrado: >x.'), admin.reason);
+
+  const del = release('gh pr merge 99 --subject >x --body -d --merge --match-head-commit abc123');
+  assert.equal(del.allow, false);
+  assert.ok(del.reason.includes('Encontrado: >x.'), del.reason);
+});
+
+test('release message lists the full allowlist', () => {
+  const r = release('gh pr merge 99 --merge --admin --match-head-commit abc123');
+  for (const opt of ['`--merge`/`-m`', '`--match-head-commit`', '`--subject`/`-t`', '`--body`/`-b`', '`--body-file`/`-F`', '`-R`/`--repo`']) {
+    assert.ok(r.reason.includes(opt), `${opt} ausente: ${r.reason}`);
+  }
+});
+
+test('merge must be a simple command on any base', () => {
+  const cases = [
+    ['gh pr merge 2 --squash -a', 'Encontrado: -a.'],
+    ['gh pr merge 2 -sa', 'Encontrado: -sa.'],
+    ['gh pr merge 2 --squash --subject', 'Encontrado: --subject.'],
+    ['gh pr merge 2 --squash --body --auto', 'Encontrado: --body.'],
+    ['gh pr merge 2 --squash > out.txt', 'Encontrado: >.'],
+    ['gh pr merge 2 --squash --body {x,--auto}', 'Encontrado: --body.'],
+  ];
+  for (const [c, snippet] of cases) {
+    const r = merge(c);
+    assert.equal(r.allow, false, c);
+    assert.ok(r.reason.includes(snippet), `${c}: ${r.reason}`);
+  }
+});
+
+test('simple merges stay allowed', () => {
+  assert.equal(merge('gh pr merge 2 --squash --delete-branch').allow, true);
+  assert.equal(release('gh pr merge 99 --merge --subject "release develop" --match-head-commit abc123').allow, true);
+  assert.equal(release('if ($?) { gh pr merge 99 --merge --match-head-commit abc123 }').allow, true);
+});
+
 test('closingRefs reads closing keywords, case-insensitive, without repeats', () => {
   assert.deepEqual(closingRefs('Closes #95\nresolves #96, Parte de #85'), [95, 96]);
   assert.deepEqual(closingRefs('CLOSES #1, closes #1 and Fixed #2'), [1, 2]);
@@ -501,7 +541,7 @@ test('blocks merge without explicit target', () => {
 
 test('skips flag values when finding the merge target', () => {
   let received;
-  mergeWith('gh pr merge --subject "x y" -b body --match-head-commit abc -R o/r 7 --auto', (t) => ((received = t), FACTS));
+  mergeWith('gh pr merge --subject "x y" -b body --match-head-commit abc -R o/r 7', (t) => ((received = t), FACTS));
   assert.equal(received, '7');
 });
 
@@ -537,10 +577,12 @@ test('url, branch and =-form targets', () => {
   assert.equal(target('gh pr merge --subject=foo 7').got[0], '7');
 });
 
-test('redirects are not the target', () => {
-  assert.equal(target('gh pr merge 3 --squash 2>&1').got[0], '3');
-  assert.equal(target('gh pr merge 3 >out.txt').got[0], '3');
-  assert.equal(target('gh pr merge 3 > out.txt').got[0], '3');
+test('redirects make the merge not simple, on any base', () => {
+  for (const c of ['gh pr merge 3 --squash 2>&1', 'gh pr merge 3 >out.txt', 'gh pr merge 3 > out.txt', 'gh pr merge 3 --squash *>&1']) {
+    const r = merge(c);
+    assert.equal(r.allow, false, c);
+    assert.ok(r.reason.includes('comando simples'), r.reason);
+  }
 });
 
 test('blocks more than one merge per command', () => {
@@ -599,10 +641,6 @@ test('allows read-only gh api calls', () => {
   ]) {
     assert.equal(merge(c, null).allow, true, c);
   }
-});
-
-test('star redirect is not the target', () => {
-  assert.equal(target('gh pr merge 3 --squash *>&1').got[0], '3');
 });
 
 test('glued -R repo', () => {
