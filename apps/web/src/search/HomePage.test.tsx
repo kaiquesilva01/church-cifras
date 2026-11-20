@@ -375,6 +375,17 @@ describe('HomePage', () => {
       expect(screen.getByText('Nenhum repertório ainda.')).toBeInTheDocument();
     });
 
+    it('keeps the search box and the sections segment together in the sticky block', () => {
+      for (const path of ['/', '/?aba=harpa', '/?aba=cantores']) {
+        const { container, unmount } = renderHome({ path });
+        const sticky = container.querySelector('.search-sticky');
+        expect(sticky).not.toBeNull();
+        expect(sticky).toContainElement(screen.getByRole('searchbox'));
+        expect(sticky).toContainElement(screen.getByRole('navigation', { name: 'Seções' }));
+        unmount();
+      }
+    });
+
     it('keeps the search box on the other tabs', () => {
       renderHome();
       expect(screen.getByRole('searchbox')).toBeInTheDocument();
