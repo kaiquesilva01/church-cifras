@@ -59,10 +59,13 @@ export function BuscaPage() {
     [matches, harpaMatches],
   );
   const lyricSearch = useLyricSearch(lyricCandidates, query, listedByTitle);
+  // The lyrics only load once the songs are ready, so without them "Na letra" must not show up
+  // (it would be an endless skeleton next to the songs error).
+  const songsReady = status === 'ready';
   const lyricsPending = showLyrics && lyricSearch.pending;
   const nothing =
     trimmed !== '' &&
-    status === 'ready' &&
+    songsReady &&
     (!showArtists || artists.length === 0) &&
     (!showSongs || matches.length === 0) &&
     (!showHarpa || harpaMatches.length === 0) &&
@@ -123,7 +126,7 @@ export function BuscaPage() {
           <SongList songs={harpaMatches} />
         </>
       )}
-      {trimmed !== '' && showLyrics && (
+      {trimmed !== '' && songsReady && showLyrics && (
         <LyricsResults hits={lyricSearch.hits} pending={lyricSearch.pending} />
       )}
     </section>

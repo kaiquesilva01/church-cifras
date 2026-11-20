@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { LyricsProvider } from '../catalog/LyricsProvider';
 import { SongsProvider } from '../catalog/SongsProvider';
 import type { CatalogApi } from '../catalog/catalogApi';
@@ -239,5 +239,23 @@ describe('BuscaPage', () => {
     );
     expect(screen.getByText('Ressuscita-me')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+  });
+
+  it('shows no endless skeleton when the songs fail to load', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { container } = renderBusca(
+      '/busca?q=senhor',
+      fakeCatalogApi(sampleSongs, {
+        subscribeSongs: (_cb, onError) => {
+          onError(new Error('offline'));
+          return () => undefined;
+        },
+        subscribeLyrics: () => () => undefined,
+      }),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível carregar as cifras.');
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Na letra' })).not.toBeInTheDocument();
+    spy.mockRestore();
   });
 });
