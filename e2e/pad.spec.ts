@@ -52,7 +52,7 @@ async function goHome(page: Page): Promise<void> {
 }
 /** Client-side navigation from the home page: no reload, so the provider keeps its state. */
 async function openFromSearch(page: Page, title: string): Promise<void> {
-  await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(title);
+  await page.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }).fill(title);
   await page.locator('a.list-main', { hasText: title }).click();
 }
 
