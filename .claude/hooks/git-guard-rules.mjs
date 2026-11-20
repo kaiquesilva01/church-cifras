@@ -20,8 +20,15 @@ export const GUARD_PATHS = ['.claude/', '.github/workflows/', 'firebase.json', '
 export const DEVICE_TEST_PATHS = ['apps/web/src/viewer/', 'apps/web/src/setlists/', 'apps/web/src/pad/'];
 
 // Arquivos de `files` que batem em algum prefixo (`/` no fim: startsWith; senão: igualdade).
+// Sem diferenciar maiúsculas: num checkout Windows `.Claude/x` é o mesmo arquivo de `.claude/x`.
 export function touches(files, prefixes) {
-  return files.filter((f) => prefixes.some((p) => (p.endsWith('/') ? f.startsWith(p) : f === p)));
+  return files.filter((f) => {
+    const lf = f.toLowerCase();
+    return prefixes.some((p) => {
+      const lp = p.toLowerCase();
+      return lp.endsWith('/') ? lf.startsWith(lp) : lf === lp;
+    });
+  });
 }
 
 const GREEN_CONCLUSIONS = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL']);

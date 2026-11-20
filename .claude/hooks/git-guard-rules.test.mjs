@@ -202,6 +202,20 @@ test('blocks develop merge of PRs that change the guards', () => {
   assert.equal(merge('gh pr merge 2', { ...FACTS, files: ['docs/AGENTS.md'] }).allow, true);
 });
 
+test('blocks guard paths regardless of case (Windows checkouts)', () => {
+  for (const f of ['.Claude/hooks/x.mjs', 'claude.md', 'Firebase.json']) {
+    const r = merge('gh pr merge 2', { ...FACTS, files: [f] });
+    assert.equal(r.allow, false, f);
+    assert.ok(r.reason.includes('merge é da pessoa'), r.reason);
+  }
+});
+
+test('device-test paths regardless of case need teste-celular-ok', () => {
+  const r = merge('gh pr merge 2', { ...FACTS, files: ['apps/web/src/Pad/x.tsx'] });
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('teste-celular-ok'), r.reason);
+});
+
 test('guards are checked before CI', () => {
   const r = merge('gh pr merge 2', { ...FACTS, files: ['AGENTS.md'], checks: [] });
   assert.ok(r.reason.includes('merge é da pessoa'), r.reason);
