@@ -609,11 +609,6 @@
   color: var(--color-muted);
 }
 
-/* With a snippet above them, the key pills need room below its text (.chips has only 4px). */
-.lyric-snippet + .chips {
-  margin-top: 10px;
-}
-
 /* The matched words: amber text (--color-accent-text is amber in both themes), no highlight box */
 .lyric-hit {
   background: none;
