@@ -9,7 +9,8 @@ const redesignCss =
   readFileSync(resolve(import.meta.dirname, 'redesign-cifra.css'), 'utf8') +
   readFileSync(resolve(import.meta.dirname, 'redesign-setlists.css'), 'utf8') +
   readFileSync(resolve(import.meta.dirname, 'redesign-forms.css'), 'utf8') +
-  readFileSync(resolve(import.meta.dirname, 'redesign-states.css'), 'utf8');
+  readFileSync(resolve(import.meta.dirname, 'redesign-states.css'), 'utf8') +
+  readFileSync(resolve(import.meta.dirname, 'redesign-stats.css'), 'utf8');
 const html = readFileSync(resolve(import.meta.dirname, '../../index.html'), 'utf8');
 
 function tokens(block: string): string[] {

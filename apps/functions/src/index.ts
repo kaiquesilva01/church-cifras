@@ -5,7 +5,11 @@ import { getStorage } from 'firebase-admin/storage';
 import { defineString } from 'firebase-functions/params';
 import * as functionsV1 from 'firebase-functions/v1';
 import { onCall } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { requireRole } from './auth/requireRole';
+import { countSettledSetlists } from './stats/countUsage';
+import { getStatsForAdmin } from './stats/getStats';
+import { createStatsDeps } from './stats/statsDeps';
 import { buildHealth } from './health';
 import { parseAdminEmails, ROLES } from './roles';
 import {
@@ -196,6 +200,19 @@ export const deleteSong = onCall({ region: REGION }, async (request) => {
   const data = (request.data ?? {}) as Record<string, unknown>;
   return deleteSongLogic(adminDeps, { songId: data.songId });
 });
+
+const statsDeps = createStatsDeps();
+
+export const getStats = onCall({ region: REGION }, (request) =>
+  getStatsForAdmin({ ...statsDeps, ...deps }, request.auth?.uid),
+);
+
+export const countSetlistUsage = onSchedule(
+  { region: REGION, schedule: 'every day 04:00', timeZone: 'America/Sao_Paulo' },
+  async () => {
+    await countSettledSetlists(statsDeps);
+  },
+);
 
 export const setUserRole = onCall({ region: REGION }, async (request) => {
   const data = (request.data ?? {}) as { uid?: unknown; role?: unknown };

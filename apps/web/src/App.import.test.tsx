@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import type { Role } from './auth/roles';
 import type { PeopleApi } from './people/peopleApi';
+import { fakeStatsApi } from './test/fakeStatsApi';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway, testUser } from './test/fakeGateway';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
@@ -22,6 +23,7 @@ function setup(role: Role) {
     <App
       gateway={gateway}
       peopleApi={peopleApi}
+      statsApi={fakeStatsApi()}
       catalogApi={fakeCatalogApi()}
       setlistApi={fakeSetlistApi()}
       initialPath="/importar"
