@@ -137,6 +137,28 @@ test('evaluates firebase deploy', () => {
   assert.match(r.stderr, /produção/);
 });
 
+test('firebase deploy outside a git repo is blocked (fail closed)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'git-guard-nonrepo-'));
+  try {
+    const r = spawnSync('node', [script], { input: payload('npx firebase deploy', dir), cwd: dir, encoding: 'utf8' });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /deploy bloqueado/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('firebase emulators outside a git repo is allowed', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'git-guard-nonrepo-'));
+  try {
+    const r = spawnSync('node', [script], { input: payload('npx firebase emulators:start', dir), cwd: dir, encoding: 'utf8' });
+    assert.equal(r.status, 0);
+    assert.match(r.stderr, /comando permitido/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('blocks gh pr merge when origin/develop is missing', () => {
   const dir = mkdtempSync(join(tmpdir(), 'git-guard-noremote-'));
   try {
@@ -174,7 +196,14 @@ test('loads the stub rules that return REGRAS-DA-DEVELOP', () => {
 
 // --- gh com respostas reais (fake gh no PATH) ---
 
-const DEFAULT_DIFF = 'apps/web/src/stats/StatsPage.tsx\n';
+// Diff unificado completo, como `gh pr diff` (sem --name-only): uma seção por arquivo.
+const diffOf = (path) =>
+  `diff --git a/${path} b/${path}\nindex 1111111..2222222 100644\n--- a/${path}\n+++ b/${path}\n@@ -1 +1 @@\n-a\n+b\n`;
+const renameDiff = (from, to) =>
+  `diff --git a/${from} b/${to}\nsimilarity index 100%\nrename from ${from}\nrename to ${to}\n`;
+const deleteDiff = (path) =>
+  `diff --git a/${path} b/${path}\ndeleted file mode 100644\nindex 1111111..0000000\n--- a/${path}\n+++ /dev/null\n@@ -1 +0,0 @@\n-a\n`;
+const DEFAULT_DIFF = diffOf('apps/web/src/stats/StatsPage.tsx');
 const OUTSIDE_WINDOW = '2026-11-20T15:00:00Z'; // sexta, 12h em Brasília: fora da janela do culto
 const WORSHIP_WINDOW = '2026-11-19T20:00:00Z'; // quinta, 17h em Brasília: dentro da janela
 
@@ -247,21 +276,53 @@ test('real gh JSON: a pending StatusContext blocks the merge', () => {
 
 test('real gh pr diff: a guarded file listed anywhere in the diff blocks the merge', () => {
   const names = [...Array.from({ length: 119 }, (_, i) => `docs/n${i}.md`), '.claude/hooks/x.mjs'];
-  const r = ghMerge({ pr: greenPr({ changedFiles: 120 }), diff: names.join('\n') + '\n' });
+  const r = ghMerge({ pr: greenPr({ changedFiles: 120 }), diff: names.map(diffOf).join('') });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /travas/);
   assert.match(r.stderr, /\.claude\/hooks\/x\.mjs/);
 });
 
 test('real gh pr diff: a list whose count matches changedFiles is used as is', () => {
-  const r = ghMerge({ pr: greenPr({ changedFiles: 2 }), diff: 'docs/a.md\ndocs/b.md\n' });
+  const r = ghMerge({ pr: greenPr({ changedFiles: 2 }), diff: diffOf('docs/a.md') + diffOf('docs/b.md') });
   assert.equal(r.status, 0, r.stderr);
 });
 
 test('real gh pr diff: incomplete list blocks with a specific message', () => {
-  const r = ghMerge({ pr: greenPr({ changedFiles: 2 }), diff: 'docs/a.md\n' });
+  const r = ghMerge({ pr: greenPr({ changedFiles: 2 }), diff: diffOf('docs/a.md') });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /A lista de arquivos do PR está incompleta \(1 de 2\)/);
+});
+
+test('real gh pr diff: a rename AGENTS.md -> docs/AGENTS.md is blocked as a guarded path', () => {
+  const r = ghMerge({ pr: greenPr({ changedFiles: 1 }), diff: renameDiff('AGENTS.md', 'docs/AGENTS.md') });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /merge é da pessoa/);
+});
+
+test('real gh pr diff: a deletion of a guarded file is blocked', () => {
+  const r = ghMerge({ pr: greenPr({ changedFiles: 1 }), diff: deleteDiff('AGENTS.md') });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /merge é da pessoa/);
+});
+
+test('real gh pr diff: a quoted (non-ASCII) guarded path is unquoted and blocked', () => {
+  const diff =
+    'diff --git "a/.claude/hooks/\\303\\247.mjs" "b/.claude/hooks/\\303\\247.mjs"\n' +
+    '--- "a/.claude/hooks/\\303\\247.mjs"\n+++ "b/.claude/hooks/\\303\\247.mjs"\n@@ -1 +1 @@\n-a\n+b\n';
+  const r = ghMerge({ pr: greenPr({ changedFiles: 1 }), diff });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /\.claude\/hooks\/ç\.mjs/);
+});
+
+test('real gh pr diff: a file name with spaces is counted once and allowed', () => {
+  const r = ghMerge({ pr: greenPr({ changedFiles: 1 }), diff: diffOf('docs/notas da semana.md') });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('real gh pr diff: a removed line that looks like a header is not a file', () => {
+  const diff = 'diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1 @@\n--- a/AGENTS.md\n+x\n';
+  const r = ghMerge({ pr: greenPr({ changedFiles: 1 }), diff });
+  assert.equal(r.status, 0, r.stderr);
 });
 
 test('real gh pr diff: failing diff blocks the merge', () => {
@@ -302,6 +363,17 @@ test('release blocked by an open incident that the PR does not close', () => {
   });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /incidente aberto \(#7\)/);
+});
+
+test('release blocked when the incident list reaches the 100-item limit', () => {
+  const issues = JSON.stringify(Array.from({ length: 100 }, (_, i) => ({ number: i + 1 })));
+  const r = ghRun('gh pr merge 2 --merge --match-head-commit abc', {
+    pr: releasePr(),
+    issues,
+    now: OUTSIDE_WINDOW,
+  });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /Não foi possível verificar incidentes/);
 });
 
 test('release allowed when the PR body closes the open incident', () => {
