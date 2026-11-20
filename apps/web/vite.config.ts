@@ -3,6 +3,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 import { preloadHints } from './build/preloadHints';
+import { appVersionPlugin } from './build/appVersion';
 import { createPwaOptions, cacheEmulatorStorage } from './build/pwaConfig';
 
 export default defineConfig(({ mode }) => {
@@ -11,6 +12,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       preloadHints(['bootstrap', 'firebase-core']),
+      appVersionPlugin(process.env.VITE_APP_VERSION || 'dev'),
       VitePWA(
         createPwaOptions(cacheEmulatorStorage(mode, env), env.VITE_EMULATOR_HOST || 'localhost'),
       ),

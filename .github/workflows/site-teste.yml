@@ -1,0 +1,117 @@
+name: Site de teste
+
+# Publica uma branch no site fixo de teste (louvor-hajaluz-teste), com a faixa "TESTE · #<issue>".
+# Só dispara a partir da main (a execução manual escolhe a branch); nunca toca o site de produção.
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch a publicar (ex.: feat/nome-da-feature)'
+        required: true
+        type: string
+      issue:
+        description: 'Número da issue (aparece na faixa)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-teste
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Entradas validadas por variável de ambiente: nunca interpoladas direto num run.
+      # bash [[ =~ ]] casa o valor inteiro (grep -E casaria uma linha qualquer do valor).
+      - name: Validar entradas
+        shell: bash
+        env:
+          BRANCH: ${{ inputs.branch }}
+          ISSUE: ${{ inputs.issue }}
+        run: |
+          if ! [[ "$BRANCH" =~ ^[a-z]+/[0-9]+-[a-z0-9-]+$ ]]; then
+            echo "::error::branch inválida: use tipo/numero-descricao (ex.: feat/95-faixa-teste)"
+            exit 1
+          fi
+          if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
+            echo "::error::issue inválida: use apenas o número"
+            exit 1
+          fi
+
+      # persist-credentials: false: o código da branch não recebe o GITHUB_TOKEN no .git.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+
+      - name: Registrar o SHA da branch
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_USE_EMULATORS: 'false'
+          VITE_APP_VERSION: ${{ steps.sha.outputs.sha }}
+          VITE_TEST_BANNER: ${{ format('TESTE · #{0}', inputs.issue) }}
+        run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-teste
+          path: apps/web/dist
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # O deploy usa a configuração da main (firebase.json com o site de teste), não a da branch.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-teste
+          path: apps/web/dist
+
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy no site de teste
+        env:
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: npx firebase deploy --only hosting:louvor-hajaluz-teste --project "$FIREBASE_PROJECT_ID" --non-interactive
