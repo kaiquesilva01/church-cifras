@@ -95,6 +95,39 @@ function listPendingSubjects(run) {
   return pendingSubjects(log.stdout, tree.stdout.trim());
 }
 
+// Uma única chamada: os PRs mergeados na develop trazem os corpos com `Closes #N`. Só entram os
+// PRs deste release (prNumbers). Se a consulta falhar, não há `Closes` (nunca lança).
+function resolveCloses(run, subjects) {
+  const numbers = new Set(prNumbers(subjects));
+  if (numbers.size === 0) return [];
+  const listed = run('gh', [
+    'pr',
+    'list',
+    '--base',
+    'develop',
+    '--state',
+    'merged',
+    '--json',
+    'number,body',
+    '--limit',
+    '200',
+  ]);
+  if (listed.status !== 0) return [];
+  let prs;
+  try {
+    prs = JSON.parse(listed.stdout);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(prs)) return [];
+  const closes = new Set();
+  for (const pr of prs) {
+    if (!numbers.has(pr?.number)) continue;
+    for (const issue of resolvedIssues(pr.body ?? '')) closes.add(issue);
+  }
+  return [...closes].sort((a, b) => a - b);
+}
+
 // run(cmd, args) -> { status, stdout, stderr }, injetado (nunca lança).
 export function checkRelease({ run, dryRun = false }) {
   const fetched = run('git', ['fetch', '--quiet', 'origin', 'main', 'develop']);
@@ -123,13 +156,6 @@ export function checkRelease({ run, dryRun = false }) {
   const subjects = listPendingSubjects(run);
   if (dryRun) return { action: 'dry-run', subjects };
 
-  const closes = new Set();
-  for (const number of prNumbers(subjects)) {
-    const view = run('gh', ['pr', 'view', String(number), '--json', 'body', '-q', '.body']);
-    if (view.status !== 0) continue;
-    for (const issue of resolvedIssues(view.stdout)) closes.add(issue);
-  }
-
   const created = run('gh', [
     'pr',
     'create',
@@ -140,7 +166,7 @@ export function checkRelease({ run, dryRun = false }) {
     '--title',
     RELEASE_TITLE,
     '--body',
-    buildReleaseBody(subjects, [...closes].sort((a, b) => a - b)),
+    buildReleaseBody(subjects, resolveCloses(run, subjects)),
   ]);
   if (created.status === 0) {
     const lines = created.stdout
