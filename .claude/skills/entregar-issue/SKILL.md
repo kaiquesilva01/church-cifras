@@ -190,7 +190,7 @@ A seção fica abaixo do texto original. Tudo depois do marcador é reescrito a 
 3. Etiquetas, só nestes casos: `revisado` com o relatório final do `code-reviewer` sem pendência crítica nem importante aberta; `qa-ok` com QA verde; `teste-celular-ok` (§ Teste no celular) só depois do "ok" explícito da pessoa. Agentes nunca põem essas etiquetas de outro modo.
 4. `gh pr ready <n>`: o PR sai do rascunho.
 5. Se a entrega é do site de teste, tire `no-site-teste`: `gh pr edit <n> --remove-label no-site-teste`.
-6. Merge: `gh pr merge <n> --squash --delete-branch`. Depois, `git worktree remove ../<n>-<slug>`.
+6. Merge: `gh pr merge <n> --squash --delete-branch`. Exceção: `chore/merge-main-into-develop` (trazer a `main` para a `develop`) usa `gh pr merge <n> --merge`, sem squash (AGENTS.md). Se o comando falhar, confira com `gh pr view <n> --json state -q .state`: `MERGED` quer dizer que o merge remoto aconteceu (o `--delete-branch` pode falhar ao limpar a branch que a worktree ainda usa). Então remova a worktree (`git worktree remove ../<n>-<slug>`) e a branch local.
 
 O hook recusa o merge sem CI verde, sem `revisado` e `qa-ok`, ou sem `teste-celular-ok` quando o PR mexe em viewer, setlists ou pad. Se o PR mexe nas travas (§ Gatilhos, item 7), não faça o merge: marque `aguardando-voce` e avise.
 
@@ -226,7 +226,7 @@ Depois que as entregas estão na develop:
   2. Pré-condição: `gh workflow view site-teste.yml` precisa achar o workflow no `main`. Se não achar, ou a execução falhar porque o site ou o domínio não estão configurados, registre "passo manual seu" (gatilho 4) com os passos do site de teste em `docs/deploy.md` (se a seção ainda não existir, os passos da §6 do spec), marque `aguardando-voce` e avise com `PushNotification`.
   3. Pegue a vez (`gh pr edit <n> --add-label no-site-teste`) e dispare **sempre a partir da `main`**: `gh workflow run site-teste.yml --ref main -f branch=<branch> -f issue=<n>`. Um job sem segredos faz o build da branch; outro só publica no Hosting do site de teste. Acompanhe com `gh run list --workflow site-teste.yml --limit 1` e `gh run watch <id>`.
   4. A seção ganha o roteiro, o status vira "📱 Pronto para testar", a issue ganha `aguardando-voce` e sai um `PushNotification`.
-  5. "ok" da pessoa: `gh pr edit <n> --add-label teste-celular-ok` e registre em "Decisões", na Análise, com a data e "quem: você". Problema descrito: tire `no-site-teste` (`--remove-label`), volte a entrega para correção (etapa 4) e refaça o fluxo a partir do passo 1, para novo deploy no site de teste.
+  5. "ok" da pessoa: registre em "Decisões", na Análise, com a data e "quem: você", e só depois `gh pr edit <n> --add-label teste-celular-ok`. Problema descrito: tire `no-site-teste` (`--remove-label`), volte a entrega para correção (etapa 4) e refaça o fluxo a partir do passo 1, para novo deploy no site de teste.
 - **O roteiro que a pessoa recebe começa com esta frase, sem mudança:**
   > O site de teste usa os dados de produção: não crie, altere nem apague dados reais além do que o roteiro pede.
 
@@ -236,7 +236,7 @@ Depois que as entregas estão na develop:
 ## Janela do culto (§5.7)
 
 - **Regra:** o merge do release é bloqueado nas **quintas e domingos, das 16h30 às 23h59** (America/Sao_Paulo), para o deploy terminar antes das 17h, quando começa o culto. O hook bloqueia o caminho normal; a regra vale mesmo onde o hook não enxerga (ex.: outro interpretador).
-- Hora de Brasília, sem depender do fuso da máquina. No bash: `TZ=America/Sao_Paulo date '+%a %H:%M'` (quinta é `Thu`, domingo é `Sun`). No PowerShell: `[System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId((Get-Date), 'E. South America Standard Time')` (quinta é `Thursday`, domingo é `Sunday`).
+- Hora de Brasília, sem depender do fuso da máquina. No bash: `TZ=America/Sao_Paulo date '+%u %H:%M'`: 4 é quinta, 7 é domingo (`%u` não depende do idioma do sistema). No PowerShell: `$t = [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId((Get-Date), 'E. South America Standard Time'); "$($t.DayOfWeek) $($t.ToString('HH:mm'))"`, que mostra o dia em inglês (`Thursday` é quinta, `Sunday` é domingo).
 - Se a pessoa precisar publicar nessa janela, ela mesma faz o merge.
 - A volta automática de incidente (§ Produção e incidente) vale em qualquer horário.
 
@@ -252,6 +252,8 @@ Depois que as entregas estão na develop:
 5. Atualize a seção "Produção" a cada passo.
 
 **Se a checagem falhar** (o workflow faz sozinho, só num push na `main`): publica de novo o último commit que passou na checagem (último Deploy verde na `main`; sem nenhum, o commit anterior da `main`), nos mesmos alvos; abre uma issue `incidente` com os links da execução; deixa o workflow vermelho, e o GitHub manda e-mail à pessoa. Um Deploy manual que falha abre o `incidente` sem volta. A volta não é rechecada: confirme à mão, abrindo `https://louvor-hajaluz.web.app` e vendo o botão de entrar.
+
+**Incidente sem culpado:** quando a execução falhou antes da checagem (instalação, Chromium, `firebase deploy`) ou foi cancelada, e o passo "Checar o site publicado" não falhou, a produção não foi tocada. Então você pode rodar `gh run rerun <id> --failed` **uma vez** para essa execução, e só se o `headSha` dela for o head atual de `origin/main`. Se a nova execução ficar verde e a checagem de produção passar (abrir `https://louvor-hajaluz.web.app` e ver "Entrar com Google"), feche o incidente com `gh issue close <n> --comment "<evidência: run id, sha, checagem>"` e registre na Análise. Caso contrário, marque `aguardando-voce` e avise a pessoa.
 
 **Incidente (etapa 0 ou falha acima):**
 1. Enquanto houver issue `incidente` aberta, o hook bloqueia o release na `main`. A exceção é o release que a fecha, com `Closes #<incidente>` no corpo.

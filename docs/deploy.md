@@ -99,7 +99,7 @@ Só é preciso repetir se a origem mudar. Os emuladores locais não precisam dis
 
 ## 9. Publicar
 
-Faça o PR `develop` -> `main` e aprove o merge. O workflow **Deploy** publica hosting, functions, regras do Firestore e regras do Storage.
+O release sai pelo fluxo do agente: o orquestrador abre o PR `develop` -> `main` e faz o merge com `gh pr merge <n> --merge --match-head-commit <sha>` (merge commit, nunca squash), sob as travas do git-guard (CI verde, fora da janela do culto, sem incidente aberto). Depois do merge, o workflow **Deploy** publica hosting, functions, regras do Firestore e regras do Storage, e a checagem confere a versão no ar e o carregamento da página. Se a checagem falha num push para a `main`, o workflow volta para o último Deploy verde e abre uma issue `incidente`, que bloqueia o próximo release até ser fechada (ver o roteiro em `.claude/skills/entregar-issue/SKILL.md`, § Produção e incidente). A mudança que instalou este fluxo (SDLC com agentes) é o último release feito à mão.
 
 ### Loops do pad
 

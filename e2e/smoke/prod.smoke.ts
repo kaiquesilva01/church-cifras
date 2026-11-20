@@ -16,9 +16,11 @@ test('o site está no ar e é a versão esperada', async ({ page }) => {
     await expect
       .poll(
         async () => {
-          await page.goto('/');
+          // Falha transitória do goto não encerra a espera: a próxima volta do poll tenta de novo.
+          await page.goto('/').catch(() => {});
           return page.evaluate(
-            () => document.querySelector('meta[name="app-version"]')?.getAttribute('content') ?? null,
+            () =>
+              document.querySelector('meta[name="app-version"]')?.getAttribute('content') ?? null,
           );
         },
         { timeout: 180_000, intervals: [10_000] },

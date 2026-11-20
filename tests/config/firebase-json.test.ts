@@ -7,11 +7,13 @@ const config = JSON.parse(readFileSync(resolve(root, 'firebase.json'), 'utf8'));
 
 const APP_SITE = 'louvor-hajaluz';
 const LEGACY_SITE = 'cifras-louvor-5dd50';
+const TEST_SITE = 'louvor-hajaluz-teste';
 type Site = {
   site: string;
   rewrites?: unknown[];
   redirects?: unknown[];
   public?: string;
+  ignore?: string[];
   headers: Array<{ source: string; headers: Array<{ key: string; value: string }> }>;
 };
 const sites: Site[] = config.hosting;
@@ -47,8 +49,16 @@ describe('firebase.json', () => {
     expect(config.functions.predeploy).toEqual(['npm run build -w @cifras/functions']);
   });
 
-  it('hosting has exactly the friendly app site and the legacy redirect site', () => {
-    expect(sites.map((s) => s.site).sort()).toEqual([APP_SITE, LEGACY_SITE].sort());
+  it('hosting has exactly the friendly app site, the legacy redirect site and the test site', () => {
+    expect(sites.map((s) => s.site).sort()).toEqual([APP_SITE, LEGACY_SITE, TEST_SITE].sort());
+  });
+
+  it('the test site mirrors the app site public, ignore, rewrites and headers', () => {
+    const test = sites.find((s) => s.site === TEST_SITE)!;
+    expect(test.public).toBe(app.public);
+    expect(test.ignore).toEqual(app.ignore);
+    expect(test.rewrites).toEqual(app.rewrites);
+    expect(test.headers).toEqual(app.headers);
   });
 
   it('hosting serves apps/web/dist as SPA on the friendly site', () => {

@@ -410,3 +410,30 @@ test('an unexpected error while evaluating a merge blocks it (fail closed)', () 
     rmSync(nogit, { recursive: true, force: true });
   }
 });
+
+test('real gh pr diff: a release (base main) does not need the diff, so a failing diff still allows it', () => {
+  const r = ghRun('gh pr merge 2 --merge --match-head-commit abc', {
+    pr: releasePr(),
+    diffPath: join(fakeBin, 'nao-existe.txt'),
+    issues: '[]',
+    now: OUTSIDE_WINDOW,
+  });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('merge reads origin/develop after a fetch, so a newer develop rule applies', () => {
+  // Outro clone publica regras novas (stub) na develop; o clone da tmp ainda tem as antigas.
+  const clone = mkdtempSync(join(tmpdir(), 'git-guard-clone-'));
+  try {
+    execFileSync('git', ['clone', '-q', remote, clone], { stdio: 'pipe' });
+    gitIn(clone, 'checkout', '-q', 'develop');
+    writeFileSync(join(clone, '.claude', 'hooks', 'git-guard-rules.mjs'), STUB_RULES);
+    gitIn(clone, 'commit', '-q', '-am', 'regras novas');
+    gitIn(clone, 'push', '-q', 'origin', 'develop');
+    const r = ghRun('gh pr merge 2 --merge --match-head-commit abc', { pr: releasePr(), issues: '[]', now: OUTSIDE_WINDOW });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /REGRAS-DA-DEVELOP/);
+  } finally {
+    rmSync(clone, { recursive: true, force: true });
+  }
+});

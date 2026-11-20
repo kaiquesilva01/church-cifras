@@ -37,7 +37,7 @@ O orquestrador abre o PR e faz o merge, com as travas. O hook de Stop `.claude/h
 ## Janela do culto
 
 - O merge do release é bloqueado nas **quintas e domingos, das 16h30 às 23h59** (America/Sao_Paulo), para o deploy terminar antes das 17h, quando começa o culto. O hook bloqueia o caminho normal; a regra vale mesmo onde o hook não enxerga (ex.: outro interpretador).
-- Hora de Brasília, sem depender do fuso da máquina. No bash: `TZ=America/Sao_Paulo date '+%a %H:%M'` (quinta é `Thu`, domingo é `Sun`). No PowerShell: `[System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId((Get-Date), 'E. South America Standard Time')` (quinta é `Thursday`, domingo é `Sunday`).
+- Hora de Brasília, sem depender do fuso da máquina. No bash: `TZ=America/Sao_Paulo date '+%u %H:%M'`: 4 é quinta, 7 é domingo (`%u` não depende do idioma do sistema). No PowerShell: `$t = [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId((Get-Date), 'E. South America Standard Time'); "$($t.DayOfWeek) $($t.ToString('HH:mm'))"`, que mostra o dia em inglês (`Thursday` é quinta, `Sunday` é domingo).
 - Se a pessoa precisar publicar dentro da janela, ela mesma faz o merge.
 - A volta automática de incidente vale em qualquer horário.
 
@@ -142,7 +142,7 @@ A tabela de modelos do spec `2026-11-20-sdlc-agentes-design.md` §5.3 substitui 
 Registrados em `.claude/settings.json` e testados por `npm run test:harness`:
 
 - `git-guard.mjs` (PreToolUse, Bash/PowerShell): impõe o fluxo Git acima. Bloqueia commit e push em `main`/`develop`; PR sem `--base`; merge na develop sem as travas; release fora das travas (só `--merge`/`-m`, `--match-head-commit`, título, corpo e `-R`; SHA conferido; CI verde; fora da janela; incidente aberto fechado pelo próprio release); `gh pr merge` com `--auto`/`-a` ou redirecionamento; `gh pr review --approve`; `gh api` que não seja leitura; PDF no commit.
-- Produção só sai pelo merge do release: o hook bloqueia `firebase deploy` e `gh workflow run deploy.yml` vindos do agente. `gh workflow run site-teste.yml` só com `--ref main`.
+- Produção só sai pelo merge do release: o hook bloqueia `firebase deploy` e `gh workflow run deploy.yml` vindos do agente. `gh workflow run site-teste.yml` só com `--ref main`. Re-rodar uma vez, com `gh run rerun <id> --failed`, um Deploy falho do head já liberado da `main` (mesmo commit) é permitido, nas condições de "Incidente sem culpado" no roteiro (§ Produção e incidente); não é nova mudança de produção.
 - `release-pr.mjs` (Stop): ao fim de cada turno, abre o PR `develop → main` se o conteúdo das duas difere e não há PR aberto. O corpo diz quem faz o merge e com quais travas. Simular: `RELEASE_PR_DRY_RUN=1`.
 - `sync-main.mjs` (SessionStart): num checkout que está na `main` e sem alterações, faz fast-forward para `origin/main`, para que sessões abertas ali carreguem o AGENTS.md e os hooks atuais. Em worktrees de outras branches não faz nada.
 - Deploy (`.github/workflows/deploy.yml`): roda em push na `main` que não seja só harness, docs ou testes (`paths-ignore`). A produção publica os sites listados explicitamente em `--only hosting:louvor-hajaluz,hosting:cifras-louvor-5dd50,functions,firestore,storage`. Todo site de produção novo entra nessa lista, inclusive no passo de volta. O site de teste `louvor-hajaluz-teste` nunca entra. Se a pessoa precisar do deploy sem push, ela usa _Run workflow_.

@@ -48,7 +48,7 @@ function runCli([issue, file]) {
     }
     throw err;
   }
-  const current = execFileSync('gh', ['issue', 'view', issue, '--json', 'body', '-q', '.body'], {
+  const current = execFileSync('gh', ['issue', 'view', issue, '--json', 'body', '-q', '.body // ""'], {
     encoding: 'utf8',
     windowsHide: true,
   });

@@ -229,6 +229,39 @@ test('produção: monitoramento por headSha, log do aviso de deploy ignorado e s
   }
 });
 
+test('incidente sem culpado: rerun único com --failed, só no head da main, e fechamento com evidência', () => {
+  const p = sec('## Produção e incidente');
+  for (const x of ['gh run rerun', '--failed', 'headSha', 'gh issue close', 'aguardando-voce']) {
+    assert.ok(p.includes(x), `incidente sem culpado sem "${x}"`);
+  }
+});
+
+test('merge na develop: a exceção chore/merge-main-into-develop usa --merge', () => {
+  const m = sec('### Antes de entrar na develop');
+  assert.ok(m.includes('chore/merge-main-into-develop'), 'falta a exceção chore/merge-main-into-develop');
+  assert.ok(hasLine(m, ['chore/merge-main-into-develop', '--merge']), 'a exceção não traz --merge');
+});
+
+test('merge na develop: se o comando falhar, confere o estado do PR antes de limpar a worktree', () => {
+  const m = sec('### Antes de entrar na develop');
+  assert.ok(m.includes('gh pr view <n> --json state -q .state'), 'falta a checagem do estado do PR');
+  assert.ok(m.includes('MERGED'), 'falta o sinal MERGED');
+});
+
+test('janela: hora com %u (independente do idioma), 4 quinta e 7 domingo', () => {
+  const j = sec('## Janela do culto');
+  assert.ok(j.includes("TZ=America/Sao_Paulo date '+%u %H:%M'"), 'janela sem o date com %u');
+  assert.ok(!j.includes("'+%a"), 'janela ainda usa %a (depende do idioma)');
+  assert.ok(j.includes('4 é quinta') && j.includes('7 é domingo'), 'falta a legenda 4 = quinta, 7 = domingo');
+});
+
+test('teste no celular: o "ok" é registrado na Análise antes da etiqueta teste-celular-ok', () => {
+  const t = sec('## Teste no celular');
+  const line = t.split('\n').find((l) => l.includes('"ok" da pessoa'));
+  assert.ok(line, 'falta o passo do "ok" da pessoa');
+  assert.ok(line.indexOf('Decisões') < line.indexOf('--add-label teste-celular-ok'), 'o ok deve ser registrado antes da etiqueta');
+});
+
 test('incidente: reversão em fix/<incidente>-reverte-, reabertura e Closes do incidente', () => {
   const p = sec('## Produção e incidente');
   for (const x of ['fix/<incidente>-reverte-', 'gh issue reopen', 'Closes #<incidente>']) {

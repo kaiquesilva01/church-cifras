@@ -102,6 +102,16 @@ const PR_FIELDS = 'baseRefName,headRefName,headRefOid,statusCheckRollup,labels,c
 // Devolve null se não der para ler ou importar; o chamador bloqueia.
 async function loadDevelopRules(cwd) {
   let dir = null;
+  // Busca best-effort: sem rede, segue com o origin/develop já conhecido; a falha do fetch não bloqueia sozinha.
+  try {
+    execFileSync('git', ['fetch', '--quiet', 'origin', 'develop'], {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 10000,
+    });
+  } catch {
+    // ignorado de propósito
+  }
   try {
     const source = execFileSync('git', ['show', `origin/develop:${RULES_PATH}`], {
       cwd,
@@ -154,11 +164,16 @@ try {
     try {
       const repoArgs = repo ? ['-R', repo] : [];
       const pr = JSON.parse(execFileSync('gh', ['pr', 'view', target, ...repoArgs, '--json', PR_FIELDS], ghOpts));
-      // Um só diff completo: renomeação conta uma vez e traz o caminho antigo (que pode ser guardado).
-      const { files, count } = filesFromDiff(execFileSync('gh', ['pr', 'diff', target, ...repoArgs], ghOpts));
-      if (count !== pr.changedFiles) {
-        incomplete = { listed: count, total: pr.changedFiles };
-        return null;
+      // Só o merge na develop usa a lista de arquivos (travas). Um release grande pode ter o diff recusado pelo
+      // GitHub: nesse caso o diff não é baixado. Na develop, um só diff completo: renomeação conta uma vez.
+      let files = [];
+      if (pr.baseRefName === 'develop') {
+        const diff = filesFromDiff(execFileSync('gh', ['pr', 'diff', target, ...repoArgs], ghOpts));
+        if (diff.count !== pr.changedFiles) {
+          incomplete = { listed: diff.count, total: pr.changedFiles };
+          return null;
+        }
+        files = diff.files;
       }
       if (!Array.isArray(pr.statusCheckRollup) || !Array.isArray(pr.labels)) return null;
       return {
