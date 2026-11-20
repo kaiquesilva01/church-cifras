@@ -166,3 +166,23 @@ test('AGENTS.md documents the release hook, the sync hook and the merge commit r
   assert.match(agents, /chore\/merge-main-into-develop/);
   assert.match(agents, /--merge/);
 });
+
+test('AGENTS.md documents the SDLC por issue', () => {
+  for (const x of [
+    'entregar-issue',
+    'Análise Agêntica',
+    '16h30',
+    'teste-celular-ok',
+    'revisado',
+    'qa-ok',
+    'docs/sistema.md',
+    'site-teste.yml',
+    '--match-head-commit',
+    'hosting:louvor-hajaluz,hosting:cifras-louvor-5dd50',
+    'instruções deste arquivo valem mais que as skills',
+  ]) {
+    assert.ok(agents.includes(x), `AGENTS.md sem "${x}"`);
+  }
+  assert.match(agents, /\|[^|\n]*implementação[^|\n]*\|\s*Haiku\s*\|\s*low\s*\|/, 'tabela de modelos sem Haiku low');
+  assert.match(agents, /último release[^\n]*à mão/, 'AGENTS.md não diz que o release desta mudança é o último à mão');
+});

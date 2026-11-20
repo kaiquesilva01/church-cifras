@@ -34,6 +34,14 @@ test('the PR template asks about the design system and Paper', () => {
   assert.ok(template.includes('Paper'));
 });
 
+test('the PR template links the issue, asks about the phone test and the review labels', () => {
+  const template = read('.github/pull_request_template.md');
+  assert.ok(template.includes('Resolve #'), 'template sem a linha Resolve #N / Parte de #N');
+  assert.ok(template.includes('Teste no celular'), 'template sem o item de teste no celular');
+  assert.ok(template.includes('Etiquetas revisado e qa-ok'), 'template sem as etiquetas revisado e qa-ok');
+  assert.ok(!template.includes('Revisado pelo code-reviewer'), 'template ainda pede "Revisado pelo code-reviewer"');
+});
+
 test('every color token of styles.css is documented in the design system', () => {
   const css = read('apps/web/src/ui/styles.css');
   const doc = read('docs/design-system.md');

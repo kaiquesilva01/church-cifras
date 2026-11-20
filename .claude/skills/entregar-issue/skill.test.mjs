@@ -183,6 +183,12 @@ test('release: checklist do PR de release do AGENTS.md e corpo com risco e rollb
   }
 });
 
+test('release: recalcula os Closes a partir dos PRs mergeados na develop antes do merge', () => {
+  const r = sec('### Release');
+  assert.ok(r.includes('gh pr list --base develop --state merged'), 'falta a busca dos PRs mergeados na develop');
+  assert.ok(r.includes('gh pr edit <n> --body-file'), 'falta gh pr edit --body-file para atualizar o corpo do release');
+});
+
 test('release: janela registrada na Análise, sem nova tentativa', () => {
   const r = sec('### Release');
   assert.ok(r.includes('Release aguardando a janela'), 'falta o registro da janela');

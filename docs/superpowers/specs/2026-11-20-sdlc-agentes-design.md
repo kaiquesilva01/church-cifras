@@ -244,7 +244,7 @@ Problema, quem ganha, como saberemos que deu certo.
   - conferir que o JS principal responde 200;
   - abrir a página inicial sem login e ver se carrega sem erro no console [decisão minha].
 - **Se a checagem falhar:**
-  - publicar de novo o commit anterior da `main` (o primeiro pai do merge), nos mesmos alvos;
+  - publicar de novo o último commit que passou na checagem (último Deploy verde na `main`), com o commit anterior da `main` como reserva, nos mesmos alvos [decisão minha, na execução];
   - abrir uma issue com a etiqueta `incidente`, com os links da execução;
   - deixar o workflow vermelho; o GitHub manda e-mail à pessoa.
 - A checagem roda dentro do `deploy.yml`, depois do deploy, e compara com o `github.sha` daquela execução. **Release sem deploy:** quando o diff só mexe nos caminhos do `paths-ignore` (harness, docs, testes), o workflow não roda. O orquestrador calcula isso pelo diff do release e registra "sem deploy (só harness/docs)", em vez de esperar uma execução que não vem [decisão minha].
@@ -352,7 +352,7 @@ Problema, quem ganha, como saberemos que deu certo.
 - O mecanismo da worktree por entrega (`EnterWorktree` ou `git worktree add`) e onde ela fica.
 - As chaves de configuração do modelo e do effort padrão da sessão no `settings.json`, verificadas na documentação do Claude Code.
 - O formato exato da seção dentro do esqueleto de §5.5, a política de corte do Histórico e o texto das mensagens de `PushNotification`.
-- Os detalhes da checagem (tempo limite, Playwright ou `curl`) e o mecanismo de volta: redeploy completo do commit anterior ou clone da versão do Hosting mais redeploy de Rules e Functions.
+- Os detalhes da checagem (tempo limite, Playwright ou `curl`) e o mecanismo de volta: redeploy completo do último commit que passou na checagem, com o anterior da `main` como reserva [decisão minha, na execução], ou clone da versão do Hosting mais redeploy de Rules e Functions.
 - A cor das etiquetas e a coleta de `Closes #N` no `release-pr.mjs`.
 - A estrutura interna do `docs/sistema.md`.
 - A divisão desta mudança em PRs.

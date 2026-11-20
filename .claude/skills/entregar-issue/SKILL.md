@@ -206,9 +206,10 @@ Depois que as entregas estão na develop:
    - a entrega concluída: todos os PRs dela estão mergeados na develop.
 2. Espere o CI no head: `gh pr checks <n> --watch`.
 3. Janela do culto: quinta ou domingo, das 16h30 às 23h59 (America/Sao_Paulo), o merge é bloqueado. Confira a hora com o comando de § Janela do culto. Se o hook recusar o merge mesmo assim, registre "Release aguardando a janela" na Análise e pare, sem nova tentativa.
-4. Leia o SHA em comando próprio: `gh pr view <n> --json headRefOid -q .headRefOid`.
-5. Merge: `gh pr merge <n> --merge --match-head-commit <sha>`, com o SHA literal. Nenhuma outra flag de merge ou de mensagem.
-6. Acompanhe a produção (§ Produção e incidente).
+4. **Recalcule os `Closes #N` logo antes do merge.** Leia os corpos dos PRs mergeados na develop: `gh pr list --base develop --state merged --json number,body --limit 200`, filtrados pelos números de PR que aparecem em `git log origin/main..origin/develop` (o `(#N)` do assunto). Fique só com as linhas `Resolve/Closes/Fixes #N` (nunca "Parte de #N"). Se o corpo do release não tiver algum deles, atualize-o com `gh pr edit <n> --body-file <arquivo>`.
+5. Leia o SHA em comando próprio: `gh pr view <n> --json headRefOid -q .headRefOid`.
+6. Merge: `gh pr merge <n> --merge --match-head-commit <sha>`, com o SHA literal. Nenhuma outra flag de merge ou de mensagem.
+7. Acompanhe a produção (§ Produção e incidente).
 
 - **Sem squash nem rebase na `main`.** Por isso o release é `--merge`. Com squash, a `main` ganha um commit que a `develop` não tem.
 - **Sem hotfix a partir da `main`.** Correção urgente também entra pela develop.
