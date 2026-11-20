@@ -660,9 +660,15 @@ function stripPrefixes(tokens) {
 // "/usr/bin/git" -> "git"; "C:\Git\git.EXE" -> "git"; "firebase.cmd" -> "firebase".
 const programName = (token) => token.split(/[\\/]/).pop().replace(/\.(exe|cmd)$/i, '');
 
-// Código inline de `bash -c "..."` / `pwsh -Command "..."`, se houver.
-function inlineScript(tokens) {
-  const i = tokens.findIndex((t) => /^-(c|command)$/i.test(t));
+// Código inline de `bash -c "..."`, `bash -lc "..."`, `sh -ec "..."` ou `pwsh -Command "..."`, se houver.
+// Shells POSIX aceitam `c` dentro de um grupo de flags curtas; pwsh só o `-Command` exato
+// (senão `-ExecutionPolicy` casaria pelo `c` e o valor seguinte seria tratado como script).
+const POSIX_SHELLS = new Set(['bash', 'sh', 'zsh']);
+function inlineScript(program, tokens) {
+  const isInlineFlag = POSIX_SHELLS.has(program)
+    ? (t) => /^-[a-zA-Z]*c[a-zA-Z]*$/.test(t)
+    : (t) => /^-command$/i.test(t);
+  const i = tokens.findIndex(isInlineFlag);
   return i !== -1 ? tokens[i + 1] : undefined;
 }
 
@@ -688,8 +694,10 @@ function workflowTarget(args) {
 function checkWorkflowRun(args) {
   const wf = workflowTarget(args);
   if (wf === undefined) return null;
-  if (DEPLOY_WORKFLOW.test(wf) || /^\d+$/.test(wf)) return DEPLOY_BLOCK;
-  if (SITE_TEST_WORKFLOW.test(wf)) {
+  // `.github/workflows/deploy.yml` e `./deploy.yaml` valem como o arquivo de nome `deploy.yml`.
+  const name = wf.split(/[\\/]/).pop();
+  if (DEPLOY_WORKFLOW.test(name) || /^\d+$/.test(wf)) return DEPLOY_BLOCK;
+  if (SITE_TEST_WORKFLOW.test(name)) {
     // `-rmain` (colado) também é a ref; `--ref=` e `-r main` são tratados por optionValue.
     const glued = args.find((a) => /^-r./.test(a))?.slice(2);
     const ref = optionValue(args, ['--ref', '-r']) ?? glued;
@@ -722,7 +730,7 @@ function evaluateSegments(command, state, stagedFiles) {
     else if (program === 'firebase') result = checkFirebase(tokens);
     else if (program === 'npx') result = checkNpx(tokens);
     else if (SHELLS.has(program)) {
-      const script = inlineScript(tokens);
+      const script = inlineScript(program, tokens);
       if (script) result = evaluateSegments(script, state, stagedFiles);
     }
     if (result) return result;

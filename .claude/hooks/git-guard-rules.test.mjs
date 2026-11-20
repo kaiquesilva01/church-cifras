@@ -101,6 +101,15 @@ const cases = [
   ['allows firebase --version', 'firebase --version', 'feat/a', [], true],
   ['blocks site-teste workflow with a feature --ref', 'gh workflow run site-teste.yml --ref feat/95-x', 'feat/a', [], false, '--ref main'],
   ['blocks site-teste workflow with a glued -r feature ref', 'gh workflow run site-teste.yml -rfeat/95-x', 'feat/a', [], false, '--ref main'],
+  // caminho do workflow e shells com flags combinadas
+  ['blocks workflow run by repo path to deploy.yml', 'gh workflow run .github/workflows/deploy.yml', 'feat/a', [], false, 'release'],
+  ['blocks workflow run by ./ path to deploy.yaml', 'gh workflow run ./.github/workflows/deploy.yaml', 'feat/a', [], false, 'release'],
+  ['blocks site-teste by path with a feature --ref', 'gh workflow run .github/workflows/site-teste.yml --ref feat/95-x', 'feat/a', [], false, '--ref main'],
+  ['blocks bash -lc firebase deploy', 'bash -lc "firebase deploy"', 'feat/a', [], false, 'release'],
+  ['blocks sh -ec git push to main', 'sh -ec "git push origin main"', 'feat/a', [], false, 'Push para'],
+  ['blocks bash -xc firebase deploy', 'bash -xc "npx firebase deploy"', 'feat/a', [], false, 'release'],
+  ['blocks pwsh -Command firebase deploy after other flags', 'pwsh -NoProfile -ExecutionPolicy Bypass -Command "firebase deploy"', 'feat/a', [], false, 'release'],
+  ['allows bash -o pipefail with a harmless -c script', 'bash -o pipefail -c "npm test"', 'feat/a', [], true],
 ];
 
 test('git-guard-rules.mjs is self-contained: no import statements', () => {
