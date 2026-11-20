@@ -44,14 +44,25 @@ test('busca por letra finds a freshly uploaded song by a line of its lyrics', as
   await expect(page.getByRole('heading', { name: 'Na letra', exact: true })).toHaveCount(0);
   await expect(card(title)).toHaveCount(0);
 
-  // Under 3 characters the lyrics are not searched.
+  // Under 3 characters the lyrics are not searched. "lu" really occurs in the lyrics ("Luz que
+  // nasce…") and not in this song's title or artist, so only the 3-character rule keeps it out.
   await page
     .getByRole('group', { name: 'Filtrar resultados' })
     .getByRole('button', { name: 'Tudo', exact: true })
     .click();
-  await buscaSearch.fill('ab');
-  await expect(buscaSearch).toHaveValue('ab');
+  // Tudo is back: the lyric match for the phrase is on screen again, so the next step starts from a
+  // visible card and the absence below can only come from the new query being applied.
+  await expect(card(title)).toBeVisible();
+  await buscaSearch.fill('lu');
+  await expect(page).toHaveURL(/[?&]q=lu(&|$)/);
+  await expect(card(title)).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Na letra', exact: true })).toHaveCount(0);
+
+  // At 3 characters the same word is searched: the song comes back under "Na letra".
+  await buscaSearch.fill('luz');
+  await expect(page.getByRole('heading', { name: 'Na letra', exact: true })).toBeVisible();
+  await expect(card(title)).toBeVisible();
+  await expect(card(title).locator('mark.lyric-hit', { hasText: /luz/i })).toBeVisible();
 
   // Home, Músicas tab: the same search shows the section and the card.
   await page.goto('/');
