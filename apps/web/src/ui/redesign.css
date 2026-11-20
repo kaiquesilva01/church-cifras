@@ -117,19 +117,17 @@
   box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
 }
 
-/* Busca: the field and the filters stay at the top while the results scroll under them. */
+/*
+ * Busca and Home: the field and the filters/tabs stay at the top while the results scroll under
+ * them. The extra bottom padding keeps the first card from being cut right against the block.
+ */
 .search-sticky {
   position: sticky;
   top: 0;
   z-index: 10;
   margin: 0 -16px;
-  padding: 8px 16px 0;
+  padding: 8px 16px;
   background: var(--color-bg);
-}
-
-/* Home: only the field is fixed, so the list needs more room below it before it scrolls under. */
-.search-sticky-roomy {
-  padding-bottom: 8px;
 }
 
 .filter-row {

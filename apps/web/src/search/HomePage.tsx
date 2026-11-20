@@ -126,30 +126,28 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
         title={tab.id === 'repertorios' ? 'Repertório' : tab.id === 'harpa' ? 'Harpa' : 'Músicas'}
       />
       {tab.id !== 'repertorios' && (
-        <div className="search-sticky search-sticky-roomy">
-          <SearchInput
-            aria-label={tab.placeholder}
-            placeholder={tab.placeholder}
-            value={query}
-            onChange={setQuery}
-          />
-        </div>
-      )}
-      {tab.id !== 'repertorios' && (
         <>
+          <div className="search-sticky">
+            <SearchInput
+              aria-label={tab.placeholder}
+              placeholder={tab.placeholder}
+              value={query}
+              onChange={setQuery}
+            />
+            <nav aria-label="Seções" className="tabs">
+              {TABS.filter((t) => t.id !== 'repertorios').map((t) => (
+                <Link
+                  key={t.id}
+                  to={TAB_PATHS[t.id]}
+                  aria-current={t.id === tab.id ? 'page' : undefined}
+                  className="tab"
+                >
+                  {t.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
           <NextCultoCard setlists={setlists} today={today} now={now} />
-          <nav aria-label="Seções" className="tabs">
-            {TABS.filter((t) => t.id !== 'repertorios').map((t) => (
-              <Link
-                key={t.id}
-                to={TAB_PATHS[t.id]}
-                aria-current={t.id === tab.id ? 'page' : undefined}
-                className="tab"
-              >
-                {t.label}
-              </Link>
-            ))}
-          </nav>
         </>
       )}
       {tab.id === 'repertorios' ? (
