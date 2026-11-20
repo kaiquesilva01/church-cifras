@@ -169,3 +169,9 @@ npm run lyrics:backfill -- --bucket <bucket>
 Com algumas centenas de PDFs, cada execução leva alguns minutos; o progresso sai em `processadas n/total` (a cada 25 músicas) no stderr.
 
 Saída com `falhas` diferente de zero encerra com código 1; as músicas com falha aparecem listadas e podem ser reexecutadas com segurança. Use `--samples <n>` para mudar o número de amostras (padrão 3).
+
+## 13. Build das funções falha com `Cannot read properties of null (reading 'edgesOut')`
+
+A Cloud Build instala `apps/functions/package.json` sozinho (npm 10, sem lockfile). No npm 10.9.x o par `firebase-admin` + `firebase-functions` quebra a resolução de dependências com esse erro, e **todas** as funções falham no deploy (inclusive as que não mudaram; o erro só aparece quando o código das funções muda, porque o Firebase pula funções sem alteração). Reproduzido localmente com `npx npm@10.9.9 install` numa pasta só com esse `package.json`; no npm 11 funciona.
+
+A correção é o arquivo `apps/functions/.npmrc` com `legacy-peer-deps=true`. Não o remova; o teste `tests/config/workspace-deps.test.ts` cobre a presença dele e que o deploy não o ignora. Se o erro voltar mesmo assim, a alternativa é versionar um `package-lock.json` gerado com o npm 11 dentro de `apps/functions` (a Cloud Build passa a usar `npm ci`), sem nenhum pacote `@cifras/*`.
