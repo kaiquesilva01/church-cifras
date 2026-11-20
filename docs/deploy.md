@@ -134,3 +134,21 @@ Os repertórios somem sozinhos 30 dias após o culto (campo `expiresAt`). Depois
 - a política de TTL da coleção `setlists` no campo `expiresAt` está ativa;
 - o índice ascendente de `setlists.expiresAt` está criado e ativo;
 - a conta de serviço do deploy consegue gerenciar índices (se o deploy falhar ao criar o índice, conceda o papel de administrador do Cloud Datastore/Firestore a ela).
+
+## Preencher as letras das músicas já enviadas
+
+Músicas enviadas antes da busca por letra não têm `songLyrics/{songId}`. O script lê o PDF do arranjo feito à mão de cada uma e cria o documento só quando ele não existe; rodar de novo não grava nada.
+
+Rode depois do deploy. Fora do Cloud Shell, faça antes `gcloud auth application-default login`. Use o `--bucket` igual ao `VITE_FIREBASE_STORAGE_BUCKET`:
+
+```bash
+npm run lyrics:backfill -- --bucket <bucket> --dry-run
+```
+
+O `--dry-run` mostra quantas letras seriam gravadas, quais músicas não têm PDF ou texto extraível e uma amostra das primeiras linhas de cada letra. Confira as amostras; depois rode sem `--dry-run`:
+
+```bash
+npm run lyrics:backfill -- --bucket <bucket>
+```
+
+Saída com `falhas` diferente de zero encerra com código 1; as músicas com falha aparecem listadas e podem ser reexecutadas. Use `--samples <n>` para mudar o número de amostras (padrão 3). Se o `gcloud` não tiver um projeto padrão, defina `GOOGLE_CLOUD_PROJECT` com o id do projeto.
