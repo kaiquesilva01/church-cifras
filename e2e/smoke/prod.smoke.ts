@@ -6,6 +6,9 @@ test('o site está no ar e é a versão esperada', async ({ page }) => {
   if (!process.env.SMOKE_URL) throw new Error('SMOKE_URL é obrigatória');
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  // Status de cada resposta da última carga de `/`: o JS principal precisa responder 200.
+  const statuses = new Map<string, number>();
+  page.on('response', (response) => statuses.set(response.url(), response.status()));
 
   const expected = process.env.EXPECTED_VERSION;
   if (expected) {
@@ -24,6 +27,12 @@ test('o site está no ar e é a versão esperada', async ({ page }) => {
   } else {
     await page.goto('/');
   }
+
+  const src = await page.locator('script[type="module"][src]').first().getAttribute('src');
+  expect(src, 'a página não carrega o script principal').toBeTruthy();
+  expect(statuses.get(new URL(src!, page.url()).toString()), 'JS principal sem resposta 200').toBe(
+    200,
+  );
 
   await expect(page.getByRole('button', { name: 'Entrar com Google' })).toBeVisible();
   expect(errors).toEqual([]);

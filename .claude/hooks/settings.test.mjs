@@ -56,10 +56,25 @@ test('deploy checks the new version and rolls back on failure', () => {
     'github.event.before',
     '--label incidente',
     'issues: write',
+    'actions: read',
+    '--status success',
     '--only hosting:louvor-hajaluz,hosting:cifras-louvor-5dd50,functions,firestore,storage',
+    'npm exec -w @cifras/e2e -- playwright install --with-deps chromium',
+    'gh label create incidente',
+    '(failure() || cancelled())',
+    'A checagem falhou; sem volta automática (execução manual)',
+    'gh run list --workflow deploy.yml --branch main --status success --limit 1',
   ]) {
     assert.ok(deploy.includes(x), `deploy.yml sem "${x}"`);
   }
+});
+
+test('deploy installs chromium before the deploy so a failed install cannot skip the check', () => {
+  const deploy = readFileSync(join(repoRoot, '.github', 'workflows', 'deploy.yml'), 'utf8');
+  assert.ok(
+    deploy.indexOf('playwright install') < deploy.indexOf('Deploy no Firebase'),
+    'o Chromium precisa ser instalado antes do deploy',
+  );
 });
 
 test('the project session opens on sonnet medium', () => {

@@ -241,7 +241,7 @@ Depois que as entregas estão na develop:
 
 ## Produção e incidente (§5.8)
 
-**Checagem depois do deploy:** o `index.html` traz o SHA do commit (`<meta name="app-version">`) e a checagem espera a versão bater; o JS principal responde 200; a página inicial, sem login, carrega sem erro no console.
+**Checagem depois do deploy:** o `index.html` traz o SHA do commit (`<meta name="app-version">`) e a checagem espera a versão bater; o JS principal responde 200; a página inicial, sem login, carrega sem erro de página.
 
 **Acompanhar o deploy:**
 1. Ache a execução do release: `gh run list --workflow deploy.yml --json databaseId,headSha,status,conclusion` e pegue a de `headSha` igual ao `mergeCommit` do PR (`gh pr view <n> --json mergeCommit -q .mergeCommit.oid`).
@@ -250,7 +250,7 @@ Depois que as entregas estão na develop:
 4. **Verde, mas com o aviso "Deploy ignorado: produção ainda não configurada":** não publicou. Confirme com `gh run view <id> --log`. Isso é incidente a reportar, não sucesso: registre "Produção: NÃO publicado" na Análise, avise a pessoa com `PushNotification` e não feche a entrega.
 5. Atualize a seção "Produção" a cada passo.
 
-**Se a checagem falhar** (o workflow faz sozinho): publica de novo o commit anterior da `main` (o primeiro pai do merge), nos mesmos alvos; abre uma issue `incidente` com os links da execução; deixa o workflow vermelho, e o GitHub manda e-mail à pessoa.
+**Se a checagem falhar** (o workflow faz sozinho): publica de novo o último commit que passou na checagem (último Deploy verde na `main`), nos mesmos alvos; abre uma issue `incidente` com os links da execução; deixa o workflow vermelho, e o GitHub manda e-mail à pessoa.
 
 **Incidente (etapa 0 ou falha acima):**
 1. Enquanto houver issue `incidente` aberta, o hook bloqueia o release na `main`. A exceção é o release que a fecha, com `Closes #<incidente>` no corpo.
