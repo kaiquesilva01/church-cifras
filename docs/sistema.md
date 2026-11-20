@@ -3,6 +3,7 @@
 Cada PR de entrega atualiza este arquivo; o `code-reviewer` cobra quando faltar.
 
 Resumo do que o app faz hoje, para os agentes de negócio lerem antes de refinar uma issue. Quando um spec e o código divergem, vale o código e a divergência vai em "Limites conhecidos e pendências". Detalhes: specs em `docs/superpowers/specs/`, [design-system.md](design-system.md), [deploy.md](deploy.md).
+Fontes: os specs, `design-system.md`, `deploy.md`, `firestore.rules`, `storage.rules`, `firebase.json`, `.github/workflows/deploy.yml` e `site-teste.yml`, `apps/functions/src/index.ts`, `apps/web/src/App.tsx` e `apps/web/src/setlists/dates.ts`.
 
 **Em uma frase:** site de cifras (PDFs com acordes) do ministério de louvor de uma igreja: busca, abre a cifra no celular, troca o tom sobrepondo acordes novos no PDF, monta repertórios de culto e toca um pad ambiente no tom da música. Todo acesso exige login Google; não há link público.
 
@@ -113,11 +114,12 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 - Não há coleção de cantores: a lista é derivada de `songs` no cliente (`artistId` = nome normalizado: minúsculas, sem acento nem pontuação, espaços colapsados).
 - `setlists.items[].id` é um UUID do item (não da música). As Rules não validam o conteúdo de cada item nem se a música existe; o cliente tolera itens inválidos.
 - `songs`, `arrangements` e `songLyrics` são imutáveis para o cliente; edição e exclusão passam por Functions.
-- TTL do Firestore em `setlists.expiresAt` (fim do dia da data + 30 dias, fuso `America/Sao_Paulo`), com índice ascendente mantido. `setlistUsage` não pode ter TTL.
+- TTL do Firestore em `setlists.expiresAt`, com índice ascendente mantido. `setlistUsage` não pode ter TTL.
+- `expiresAt` (fim do dia da data + 30 dias, fuso `America/Sao_Paulo`) é calculado pelo cliente (`apps/web/src/setlists/dates.ts`); `firestore.rules` só confere que é um timestamp. Nada no servidor impede um valor errado.
 
 ## Functions e jobs
 
-Todas em `apps/functions/src/index.ts`, região `southamerica-east1`. Chamadas `onCall` conferem o papel por `requireRole` (lê `users/{uid}`).
+Todas exportadas por `apps/functions/src/index.ts` (algumas definidas em submódulos, como `songs/keys.ts` e `stats/`), região `southamerica-east1`. Chamadas `onCall` conferem o papel por `requireRole` (lê `users/{uid}`).
 
 | Função | Gatilho | Papel | Faz |
 | --- | --- | --- | --- |
@@ -156,7 +158,7 @@ Regras de contagem de uso:
 | Caminho | Leitura | Escrita |
 | --- | --- | --- |
 | `songs/{songId}/{tom}-{fileId}.pdf` | logado | só criação, por membro/admin: `application/pdf`, até 10 MB, sem sobrescrever, metadado `uploadedBy` igual ao uid |
-| `pads/{versão}/{arquivo}.m4a` | logado | ninguém (só script administrativo com Admin SDK) |
+| `pads/{versão}/{arquivo}` (convenção: `.m4a`; a regra não restringe nome nem extensão) | logado | ninguém (só script administrativo com Admin SDK) |
 | qualquer outro | negado | negado |
 
 - PDFs são imutáveis (substituir grava arquivo novo em outro caminho e apaga o antigo), então o cache de 1 ano é seguro.
@@ -209,12 +211,12 @@ Cada item aponta para o spec e a seção de origem. Para reabrir um deles, o don
 
 Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 
-- Transposição que altere algo além dos acordes e do tom no título, ou que desloque um acorde da sílaba.
-- Trocar texto em negrito que não é acorde (ex.: `Intro:`) ou deixar acorde sem trocar sem avisar.
-- Abrir uma cifra lenta a ponto de atrapalhar o louvor (meta: menos de 1 s).
-- A lista do repertório mudar sozinha na tela de quem lê; perder um louvor por edição concorrente; abrir um tom diferente do item sem avisar; o repertório sumir antes do fim do dia do culto.
-- Estalo ao ligar, desligar, trocar tom ou mudar volume do pad; cortar o início do pad; o pad tocar sozinho ou atrasar a cifra.
-- Contar o mesmo repertório duas vezes nas estatísticas; um não-admin ler estatísticas ou `setlistUsage`.
+- Transposição que altere algo além dos acordes e do tom no título, ou que desloque um acorde da sílaba. [design principal](superpowers/specs/2026-11-13-church-cifras-design.md) §3
+- Trocar texto em negrito que não é acorde (ex.: `Intro:`) ou deixar acorde sem trocar sem avisar. [design principal](superpowers/specs/2026-11-13-church-cifras-design.md) §3
+- Abrir uma cifra lenta a ponto de atrapalhar o louvor (meta: menos de 1 s). [design principal](superpowers/specs/2026-11-13-church-cifras-design.md) §3
+- A lista do repertório mudar sozinha na tela de quem lê; perder um louvor por edição concorrente; abrir um tom diferente do item sem avisar; o repertório sumir antes do fim do dia do culto. [repertórios](superpowers/specs/2026-11-16-repertorios-design.md) §3
+- Estalo ao ligar, desligar, trocar tom ou mudar volume do pad; cortar o início do pad; o pad tocar sozinho ou atrasar a cifra. [pad](superpowers/specs/2026-11-17-pad-design.md) §3
+- Contar o mesmo repertório duas vezes nas estatísticas; um não-admin ler estatísticas ou `setlistUsage`. [estatísticas](superpowers/specs/2026-11-19-estatisticas-admin-design.md) "Anti-objetivos"
 
 ## Limites conhecidos e pendências
 
@@ -241,8 +243,9 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 
 ### Divergências entre spec e código (o código vale)
 
-- Cantor "Harpa" / aba Harpa: existe no app (`catalog/search.ts`, `HomePage`, `BuscaPage`) e na busca por letra, mas nenhum spec o descreve; o critério é o artista se chamar "Harpa".
-- Barra da cifra: o spec de compartilhar PDF fala em `⬇ PDF` + `↗` + `Mudar tom`; o redesign e o design system trazem WhatsApp, **Pad** e **Mudar tom**, sem botão de download.
+- Cantor "Harpa" / aba Harpa: existe no app (`catalog/search.ts`, `HomePage`, `BuscaPage`) e na busca por letra, e o spec da [busca por letra](superpowers/specs/2026-11-19-busca-por-letra-design.md) descreve o filtro e a aba Harpa; nenhum spec define o critério, que no código é o cantor se chamar "Harpa".
+- Barra da cifra: o spec de compartilhar PDF fala em `⬇ PDF` + `↗` + `Mudar tom`; o redesign (§2) lista ⬇ (ícone), WhatsApp, **Pad** e **Mudar tom**; só o design system ("Sem download") e o código não têm o botão de download.
+- Aba Pad: o redesign (§2) diz "Sem escolha manual de nota"; o design system e `PadPage.tsx` têm grade de 12 tons em que o toque liga o pad ou troca o tom.
 - Aba Mais: o spec do redesign (§2) deixa Importar em cinza "Em breve"; o código liga Importar (admin) a `/importar` e acrescenta Estatísticas (admin), que o design system ainda não lista. Só Pessoas (músicos) segue "Em breve".
 - Pad ao sair da cifra: o spec do pad (§3 item 5) diz que fora do repertório o pad sai com fade; a tabela do §5.2 do mesmo spec e o design system dizem que ele continua tocando e para pela aba Pad. Vale a segunda leitura.
 - Funções do spec principal: `onSongDeleted` foi substituída pela callable `deleteSong`; há ainda `getStats`, `countSetlistUsage` e `health`, que o spec principal não lista.
