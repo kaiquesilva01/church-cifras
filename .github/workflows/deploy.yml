@@ -130,15 +130,20 @@ jobs:
           GH_REPO: ${{ github.repository }}
           FALLBACK_SHA: ${{ github.event.before }}
         run: |
-          sha=$(gh run list --workflow deploy.yml --branch main --status success --limit 1 --json headSha -q '.[0].headSha')
-          if [ -z "$sha" ]; then
+          # Sem deploy verde, o jq imprime vazio (// empty); se o gh falhar, segue com o fallback.
+          sha=$(gh run list --workflow deploy.yml --branch main --status success --limit 1 --json headSha --jq '.[0].headSha // empty' || true)
+          zeros=0000000000000000000000000000000000000000
+          if [ -z "$sha" ] || [ "$sha" = "null" ] || [ "$sha" = "$zeros" ]; then
             sha="$FALLBACK_SHA"
+          fi
+          if [ -z "$sha" ] || [ "$sha" = "null" ] || [ "$sha" = "$zeros" ]; then
+            sha=""
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Preparar a volta (checkout do commit da volta)
         id: rb_checkout
-        if: failure() && steps.smoke.outcome == 'failure' && github.event_name == 'push' && steps.config.outputs.configured == 'true' && steps.rb_target.outcome == 'success'
+        if: failure() && steps.smoke.outcome == 'failure' && github.event_name == 'push' && steps.config.outputs.configured == 'true' && steps.rb_target.outcome == 'success' && steps.rb_target.outputs.sha != ''
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.rb_target.outputs.sha }}
@@ -193,6 +198,10 @@ jobs:
             body="$body
 
           A checagem falhou; sem volta automática (execução manual)."
+          elif [ "$SMOKE" = "failure" ] && [ -z "$ROLLBACK_SHA" ]; then
+            body="$body
+
+          A checagem falhou; sem commit verde para voltar: produção precisa de intervenção manual."
           elif [ "$SMOKE" = "failure" ] && [ "$ROLLBACK_DEPLOY" = "success" ]; then
             body="$body
 
@@ -206,5 +215,5 @@ jobs:
 
           A falha foi antes da checagem do site publicado."
           fi
-          gh label create incidente --color b60205 --description "Deploy ou checagem falhou em produção" --force
+          gh label create incidente --color b60205 --description "Deploy ou checagem falhou em produção" --force || true
           gh issue create --label incidente --title "Incidente: deploy de $SHA falhou" --body "$body"

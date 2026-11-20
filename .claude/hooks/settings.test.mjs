@@ -64,6 +64,9 @@ test('deploy checks the new version and rolls back on failure', () => {
     '(failure() || cancelled())',
     'A checagem falhou; sem volta automática (execução manual)',
     'gh run list --workflow deploy.yml --branch main --status success --limit 1',
+    '// empty',
+    'sem commit verde para voltar',
+    'gh label create incidente --color b60205 --description "Deploy ou checagem falhou em produção" --force || true',
   ]) {
     assert.ok(deploy.includes(x), `deploy.yml sem "${x}"`);
   }
