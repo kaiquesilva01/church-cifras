@@ -11,10 +11,11 @@ const BODY_LIMIT = 65536;
 // A linha `---` que precede o MARKER (com a quebra de linha do próprio texto, LF ou CRLF).
 const SEPARATOR = /(^|\r?\n)---\r?\n$/;
 
-// Texto original da issue: tudo antes do separador `---` que precede o MARKER.
+// Texto original da issue: tudo antes do separador `---` que precede o último MARKER
+// (o da ferramenta; um MARKER colado no texto original fica antes dele).
 // Sem MARKER, a issue inteira (sem espaços finais).
 export function originalText(body) {
-  const at = body.indexOf(MARKER);
+  const at = body.lastIndexOf(MARKER);
   if (at === -1) return body.trimEnd();
   return body.slice(0, at).replace(SEPARATOR, '').trimEnd();
 }
@@ -22,6 +23,9 @@ export function originalText(body) {
 // Monta o corpo: texto original intocado + separador + MARKER + seção nova.
 // Reexecutar substitui a seção anterior, nunca acumula.
 export function spliceAnalysis(body, section) {
+  if (section.includes(MARKER)) {
+    throw new Error('a Análise Agêntica não pode conter o marcador da ferramenta');
+  }
   const original = originalText(body);
   const head = original ? `${original}\n\n` : '';
   const out = `${head}---\n${MARKER}\n${section.trim()}\n`;
@@ -35,7 +39,15 @@ function runCli([issue, file]) {
   if (!issue || !file) {
     throw new Error('uso: node .claude/skills/entregar-issue/analise.mjs <issue> <arquivo.md>');
   }
-  const section = readFileSync(file, 'utf8');
+  let section;
+  try {
+    section = readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err?.code === 'ENOENT') {
+      throw new Error(`arquivo não encontrado: ${file}`, { cause: err });
+    }
+    throw err;
+  }
   const current = execFileSync('gh', ['issue', 'view', issue, '--json', 'body', '-q', '.body'], {
     encoding: 'utf8',
     windowsHide: true,
