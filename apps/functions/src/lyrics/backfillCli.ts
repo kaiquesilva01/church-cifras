@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { extractLyrics, findKeyIndicator, type Measure } from '@cifras/chords';
 import { readTextLines } from '@cifras/pdf';
 import { initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import {
   backfillLyrics,
@@ -14,6 +14,9 @@ import {
   type BackfillDeps,
   type BackfillReport,
 } from './backfill';
+import { describeTarget } from './backfillTarget';
+
+type Bucket = ReturnType<ReturnType<typeof getStorage>['bucket']>;
 
 // Mesma aproximação de largura usada pelo app ao ler o PDF (só para geometria).
 const measure: Measure = (text, _fontName, fontSize) => text.length * 0.55 * fontSize;
@@ -39,12 +42,34 @@ function parseCli(argv: string[]) {
   return { bucket: values.bucket, dryRun: values['dry-run'], samples };
 }
 
-function realDeps(bucketName: string): BackfillDeps {
+function connect(bucketName: string) {
   // O projeto vem do ADC; sem gcloud configurado (ex.: emulador) use GOOGLE_CLOUD_PROJECT.
   const projectId = process.env.GOOGLE_CLOUD_PROJECT ?? process.env.GCLOUD_PROJECT;
   initializeApp({ storageBucket: bucketName, projectId });
-  const db = getFirestore();
-  const bucket = getStorage().bucket();
+  return { db: getFirestore(), bucket: getStorage().bucket() };
+}
+
+// O id que o Firestore de fato vai usar (explícito ou detectado pelo ADC).
+async function resolveProjectId(db: Firestore): Promise<string | undefined> {
+  const read = () => {
+    try {
+      // `projectId` existe em runtime mas não está nos tipos publicados.
+      return (db as unknown as { projectId?: string }).projectId || undefined;
+    } catch {
+      return undefined; // cliente ainda não inicializou
+    }
+  };
+  const direct = read();
+  if (direct) return direct;
+  try {
+    await db.collection('songs').limit(1).get(); // força a detecção do projeto
+  } catch {
+    // sem credenciais ou sem acesso: o projeto segue não identificado
+  }
+  return read();
+}
+
+function realDeps(db: Firestore, bucket: Bucket): BackfillDeps {
   return {
     listSongIds: async () => (await db.collection('songs').get()).docs.map((d) => d.id),
     hasLyrics: async (songId) => (await db.doc(`songLyrics/${songId}`).get()).exists,
@@ -100,7 +125,20 @@ function printReport(report: BackfillReport, dryRun: boolean): void {
 
 async function main(): Promise<void> {
   const { bucket, dryRun, samples } = parseCli(process.argv.slice(2));
-  const report = await backfillLyrics(realDeps(bucket), { dryRun, samples });
+  const { db, bucket: storageBucket } = connect(bucket);
+  const target = describeTarget({
+    projectId: await resolveProjectId(db),
+    bucket,
+    dryRun,
+    env: process.env,
+  });
+  for (const line of target.lines) console.log(line);
+  console.log('');
+  if (!target.canProceed) {
+    process.exitCode = 1;
+    return;
+  }
+  const report = await backfillLyrics(realDeps(db, storageBucket), { dryRun, samples });
   printReport(report, dryRun);
   if (report.failed.length > 0) process.exitCode = 1;
 }

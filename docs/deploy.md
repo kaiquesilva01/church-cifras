@@ -145,7 +145,7 @@ Rode depois do deploy. Fora do Cloud Shell, faça antes `gcloud auth application
 npm run lyrics:backfill -- --bucket <bucket> --dry-run
 ```
 
-O `--dry-run` mostra quantas letras seriam gravadas, quais músicas não têm PDF ou texto extraível e uma amostra das primeiras linhas de cada letra. Confira as amostras; depois rode sem `--dry-run`:
+O `--dry-run` mostra quantas letras seriam gravadas, quais músicas não têm PDF ou texto extraível e uma amostra das primeiras linhas de cada letra. Confira as amostras e, no cabeçalho da saída, se `projeto:` e `bucket:` são os de produção (e que não aparece nenhuma linha `..._EMULATOR_HOST`); depois rode sem `--dry-run`:
 
 ```bash
 npm run lyrics:backfill -- --bucket <bucket>
