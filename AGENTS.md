@@ -12,11 +12,12 @@ Stack: React + Node + Firebase, em monorepo. Documento de design: [docs/superpow
 - Criar branch: `git checkout -b <tipo>/<nome> origin/develop`
 - Abrir PR: `gh pr create --base develop`
 - `--base` é obrigatório em `gh pr create`; o hook bloqueia PR sem base explícita.
-- Release: `gh pr create --base main --head develop`. **O agente DEVE abrir esse PR** quando a feature estiver concluída, testada, validada e revisada (ver "PR de release" abaixo).
+- Release: `gh pr create --base main --head develop`. **O agente DEVE abrir esse PR** quando a feature estiver concluída, testada, validada e revisada (ver "PR de release" abaixo). O hook de Stop `.claude/hooks/release-pr.mjs` abre esse PR sozinho quando o conteúdo de `develop` difere do de `main` (não pela contagem de commits) e não há PR de release aberto; o agente então completa o corpo.
 - Após `git checkout <branch>` (sem `-b`), rode commit/push em outro comando — o hook bloqueia na mesma linha. `git checkout -b` / `git switch -c` podem ser encadeados com commit/push.
 - Prefixos de branch: `feat/`, `fix/`, `chore/`, `docs/`, `test/`, `refactor/`.
 - PRs para `develop`: revisados pelo agente `code-reviewer`; após aprovação, **somente o orquestrador** (sessão principal) faz o merge (`gh pr merge <n> --squash --delete-branch`). Subagentes nunca fazem merge. Isso é regra de conduta: o hook não distingue orquestrador de subagente, só impõe a base (`develop` permitido, `main` bloqueado, base indeterminada bloqueada). Informe sempre o número do PR (`gh pr merge <n> ...`); sem alvo explícito, com mais de um alvo, com `GH_REPO` ou mais de um merge por comando o hook bloqueia. `gh api` é só leitura (GET/graphql query); mutações (`-X` ≠ GET, `-f`/`-F`/`--input`, graphql `mutation`) são bloqueadas — para PRs use `gh pr ...`.
 - PR para `main` (`develop → main`): o agente **DEVE abrir**, mas **NUNCA aprova nem faz merge**: só o humano aprova e faz o merge. O hook bloqueia `gh pr merge` de PR com base `main` (ou base indeterminada) e `gh pr review --approve`/`-a` em qualquer PR.
+- **Merge do release com merge commit** (_Create a merge commit_ / `gh pr merge <n> --merge`), nunca squash nem rebase: com squash a `main` fica com um commit que a `develop` não tem e cada release seguinte exigiu um `chore: merge main into develop` (8 vezes até 2026-11-20). Se acontecer (release com squash ou hotfix na main), traga a `main` para a `develop` por PR (`chore/merge-main-into-develop`) e faça o merge desse PR com `gh pr merge <n> --merge` (squash não resolve: a `main` continuaria fora do histórico da `develop`) antes do próximo release.
 
 ### PR de release (develop → main)
 
@@ -26,6 +27,8 @@ Abra só quando tudo isto for verdade, e diga no corpo do PR o que foi conferido
 - **Testada e validada**: `npm test`, `lint`, `typecheck`, `build` e `test:harness` verdes; E2E do CI verde; regras (`test:rules`) quando mexeu em Rules/Functions.
 - **Code review** feito em todos os PRs (sem pendências críticas) e, em UI, o Paper atualizado e o design system respeitado.
 - Corpo do PR em pt-BR: o que muda para o usuário, o que **a pessoa deve conferir** antes de aprovar (passos de teste manual, risco, rollback, mudanças em Rules/índices/variáveis) e o que ficou de fora.
+- O corpo diz para fazer o merge com **Create a merge commit** (o hook já escreve isso).
+- Push na `main` só com harness, docs ou testes (`.claude/`, `docs/`, `*.md`, `e2e/`, `tests/`, `ci.yml`) não dispara o deploy (`paths-ignore` em `deploy.yml`); use _Run workflow_ do Deploy se precisar.
 - Depois de abrir: **pare**. Não aprove, não faça merge, não ative auto-merge e não peça a outro agente que o faça; avise a pessoa com o link e aguarde.
 
 ## Modelos e esforço
@@ -64,6 +67,7 @@ Um plano por fase da §11 do spec.
 - Lint, typecheck e testes verdes.
 - Revisão do `code-reviewer` sem pendências críticas.
 - PR para `develop` com o template preenchido.
+- Mudou texto ou rótulo de UI? Procure o texto antigo nos testes (`git grep "<texto antigo>" -- apps e2e`) e atualize os specs E2E no mesmo PR.
 
 ## Nunca commitar
 
@@ -90,6 +94,14 @@ Um plano por fase da §11 do spec.
 - Conventional Commits em inglês.
 - Identificadores de código em inglês; texto de UI e documentação em pt-BR.
 - TypeScript `strict` a partir da Fase 1.
+
+## Hooks do harness
+
+Registrados em `.claude/settings.json` e testados por `npm run test:harness`:
+
+- `git-guard.mjs` (PreToolUse): impõe o fluxo Git acima (commits, pushes, PRs, merges, PDFs).
+- `release-pr.mjs` (Stop): ao fim de cada turno, abre o PR `develop → main` se o conteúdo das duas difere e não há PR aberto. Simular: `RELEASE_PR_DRY_RUN=1`.
+- `sync-main.mjs` (SessionStart): num checkout que está na `main` e sem alterações, faz fast-forward para `origin/main`, para que sessões abertas ali carreguem o AGENTS.md e os hooks atuais. Em worktrees de outras branches não faz nada.
 
 ## Comandos
 
