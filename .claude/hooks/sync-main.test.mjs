@@ -204,6 +204,33 @@ test('script: behind main on startup -> fast-forwards and reports it', () => {
   assert.equal(git(b, 'rev-parse', 'HEAD'), git(b, 'rev-parse', 'origin/main'));
 });
 
+// Mesmo script, caminho que difere só na forma: no Windows, letra do drive com outra caixa e
+// "/" no lugar de "\"; nos demais, um segmento redundante ("./").
+const scriptPathVariant = () => {
+  if (process.platform === 'win32') {
+    const [d] = script;
+    const flipped = d === d.toLowerCase() ? d.toUpperCase() : d.toLowerCase();
+    return (flipped + script.slice(1)).replaceAll('\\', '/');
+  }
+  return join(dirname(script), '.', 'sync-main.mjs');
+};
+
+test('script: runs when launched through a path that differs only in form', () => {
+  const variant = scriptPathVariant();
+  assert.notEqual(variant, script);
+  const c = join(tmp, 'c');
+  git(tmp, 'clone', '--quiet', join(tmp, 'origin.git'), c);
+  git(c, 'reset', '--quiet', '--hard', 'HEAD~1');
+  const r = spawnSync('node', [variant], {
+    input: JSON.stringify({ cwd: c, source: 'startup' }),
+    cwd: tmp,
+    encoding: 'utf8',
+  });
+  assert.equal(r.status, 0);
+  assert.match(JSON.parse(r.stdout).systemMessage, /atualizado/);
+  assert.equal(git(c, 'rev-parse', 'HEAD'), git(c, 'rev-parse', 'origin/main'));
+});
+
 test('script: checkout on a feature branch is left alone', () => {
   const b = join(tmp, 'b');
   git(b, 'checkout', '-b', 'feat/x');

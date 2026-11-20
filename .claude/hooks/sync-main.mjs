@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -96,9 +96,13 @@ function runScriptMode() {
   }
 }
 
+// Executado como script (hook)? Compara caminhos reais; no Windows sem diferenciar maiúsculas.
+const samePath = (a, b) =>
+  process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
 const isMain = (() => {
   try {
-    return fileURLToPath(import.meta.url) === resolve(process.argv[1] ?? '');
+    const self = realpathSync(fileURLToPath(import.meta.url));
+    return samePath(self, realpathSync(resolve(process.argv[1] ?? '')));
   } catch {
     return false;
   }

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -125,6 +125,8 @@ export function checkRelease({ run, dryRun = false }) {
       .filter(Boolean);
     return { action: 'created', url: lines.at(-1) ?? '' };
   }
+  // Outra sessão (um worktree por sessão) abriu o PR entre o `gh pr list` e o `gh pr create`.
+  if (/already exists/i.test(created.stderr)) return { action: 'none' };
   return { action: 'error', message: created.stderr.trim() || 'gh pr create falhou' };
 }
 
@@ -170,9 +172,13 @@ function runScriptMode() {
   if (message) process.stdout.write(JSON.stringify({ systemMessage: message }));
 }
 
+// Executado como script (hook)? Compara caminhos reais; no Windows sem diferenciar maiúsculas.
+const samePath = (a, b) =>
+  process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
 const isMain = (() => {
   try {
-    return fileURLToPath(import.meta.url) === resolve(process.argv[1] ?? '');
+    const self = realpathSync(fileURLToPath(import.meta.url));
+    return samePath(self, realpathSync(resolve(process.argv[1] ?? '')));
   } catch {
     return false;
   }

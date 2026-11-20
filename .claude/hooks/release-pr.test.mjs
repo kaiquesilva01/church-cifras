@@ -138,6 +138,21 @@ test('checkRelease: pr create fails -> error with stderr text', () => {
   });
 });
 
+test('checkRelease: pr create loses a race ("already exists") -> none', () => {
+  const { run } = fakeRun([
+    FETCH,
+    DIFFERS,
+    NO_OPEN_PR,
+    MAIN_TREE,
+    LOG,
+    [
+      'gh pr create',
+      fail('a pull request for branch "develop" into branch "main" Already Exists\n'),
+    ],
+  ]);
+  assert.deepEqual(checkRelease({ run }), { action: 'none' });
+});
+
 test('pendingSubjects: stops at the commit whose tree equals main tree', () => {
   const log = 'T1\tfeat: a\nT2\tfeat: b\nT0\tfeat: antiga\n';
   assert.deepEqual(pendingSubjects(log, 'T2'), ['feat: a']);

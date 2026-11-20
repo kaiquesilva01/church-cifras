@@ -51,4 +51,6 @@ test('AGENTS.md documents the release hook, the sync hook and the merge commit r
   assert.match(agents, /release-pr\.mjs/);
   assert.match(agents, /sync-main\.mjs/);
   assert.match(agents, /Create a merge commit/);
+  assert.match(agents, /chore\/merge-main-into-develop/);
+  assert.match(agents, /--merge/);
 });
