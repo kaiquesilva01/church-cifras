@@ -13,7 +13,8 @@ Stack: React + Node + Firebase, em monorepo. Documento de design: [docs/superpow
 - Prefixos de branch: `feat/`, `fix/`, `chore/`, `docs/`, `test/`, `refactor/`.
 - Após `git checkout <branch>` (sem `-b`), rode commit/push em outro comando — o hook bloqueia na mesma linha. `git checkout -b` / `git switch -c` podem ser encadeados com commit/push.
 - Primeiro push: `git push -u origin <branch>` e PR rascunho para a develop: `gh pr create --base develop --draft --title "<título>" --body-file <arquivo>`. `--base` é obrigatório; o hook bloqueia PR sem base explícita. O corpo segue `.github/pull_request_template.md`, com `Resolve #N` e, em sub-issue, `Parte de #<mãe>`. O CI roda a cada push.
-- Antes de entrar na develop: atualizar a branch com `origin/develop` (merge, sem force push e sem rebase); CI verde no head; etiquetas `revisado` e `qa-ok`; `teste-celular-ok` quando a entrega exige. Depois, `gh pr merge <n> --squash --delete-branch`.
+- Antes de entrar na develop: atualizar a branch com `origin/develop` (merge, sem force push e sem rebase); CI verde no head; etiquetas `revisado` e `qa-ok`; `teste-celular-ok` quando a entrega exige. Depois, `gh pr merge <n> --squash --delete-branch`, exceto `chore/merge-main-into-develop`, que usa `--merge` (ver abaixo).
+- Quem põe as etiquetas de revisão é o orquestrador, e só nestes casos: `revisado` quando o relatório final do `code-reviewer` não tem pendência crítica nem importante aberta; `qa-ok` quando o QA está verde; `teste-celular-ok` só depois do "ok" explícito da pessoa, registrado na Análise Agêntica com a data. Agentes nunca põem essas etiquetas de outro modo.
 - Travas do merge na develop, lidas da `origin/develop` (um PR não afrouxa o próprio hook): CI verde, `revisado`, `qa-ok`, `teste-celular-ok` para viewer, setlists e pad, e nenhuma alteração nas travas (`.claude/`, `.github/workflows/`, `firebase.json`, `cors.json`, `AGENTS.md`, `CLAUDE.md`). Sem uma delas, o merge é bloqueado.
 - PR que altera as travas não é mergeado pelo agente: o merge na develop é da pessoa. O agente marca `aguardando-voce` e avisa.
 - Subagentes nunca fazem merge. O merge na develop e o release são do orquestrador (a sessão principal).
@@ -35,7 +36,7 @@ O orquestrador abre o PR e faz o merge, com as travas. O hook de Stop `.claude/h
 
 ## Janela do culto
 
-- O merge do release é bloqueado nas **quintas e domingos, das 16h30 às 23h59** (America/Sao_Paulo), para o deploy terminar antes das 17h, quando começa o culto. O hook faz isso e o agente não tem como contornar.
+- O merge do release é bloqueado nas **quintas e domingos, das 16h30 às 23h59** (America/Sao_Paulo), para o deploy terminar antes das 17h, quando começa o culto. O hook bloqueia o caminho normal; a regra vale mesmo onde o hook não enxerga (ex.: outro interpretador).
 - Hora de Brasília, sem depender do fuso da máquina. No bash: `TZ=America/Sao_Paulo date '+%a %H:%M'` (quinta é `Thu`, domingo é `Sun`). No PowerShell: `[System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId((Get-Date), 'E. South America Standard Time')` (quinta é `Thursday`, domingo é `Sunday`).
 - Se a pessoa precisar publicar dentro da janela, ela mesma faz o merge.
 - A volta automática de incidente vale em qualquer horário.
@@ -73,13 +74,15 @@ O orquestrador abre o PR e faz o merge, com as travas. O hook de Stop `.claude/h
 | --- | --- |
 | `product-owner` | Guarda o spec e os critérios de aceite |
 | `designer` | Fidelidade aos mockups, tokens e estados de tela |
-| `tech-lead` | Planos por fase, interfaces e divisão de tarefas |
+| `tech-lead` | Planos por entrega, interfaces e divisão de tarefas |
 | `frontend-dev` | React/TS em `apps/web` |
 | `backend-dev` | Functions, Security Rules, `packages/chords`, Docker/emuladores |
 | `qa` | E2E Playwright, PDFs sintéticos, anti-objetivos |
 | `code-reviewer` | Revisa cada PR, não edita código |
 
 ## Modelos e esforço
+
+A tabela de modelos do spec `2026-11-20-sdlc-agentes-design.md` §5.3 substitui a seção de modelos do spec de 2026-11-13.
 
 | Papel / etapa | Modelo | Effort |
 | --- | --- | --- |
@@ -143,7 +146,7 @@ Registrados em `.claude/settings.json` e testados por `npm run test:harness`:
 - `release-pr.mjs` (Stop): ao fim de cada turno, abre o PR `develop → main` se o conteúdo das duas difere e não há PR aberto. O corpo diz quem faz o merge e com quais travas. Simular: `RELEASE_PR_DRY_RUN=1`.
 - `sync-main.mjs` (SessionStart): num checkout que está na `main` e sem alterações, faz fast-forward para `origin/main`, para que sessões abertas ali carreguem o AGENTS.md e os hooks atuais. Em worktrees de outras branches não faz nada.
 - Deploy (`.github/workflows/deploy.yml`): roda em push na `main` que não seja só harness, docs ou testes (`paths-ignore`). A produção publica os sites listados explicitamente em `--only hosting:louvor-hajaluz,hosting:cifras-louvor-5dd50,functions,firestore,storage`. Todo site de produção novo entra nessa lista, inclusive no passo de volta. O site de teste `louvor-hajaluz-teste` nunca entra. Se a pessoa precisar do deploy sem push, ela usa _Run workflow_.
-- Checagem depois do deploy: confere a versão do `index.html` (SHA do commit), o JS principal e a página inicial. Se falha, publica de novo o último commit que passou na checagem (último Deploy verde na `main`) e abre a issue `incidente`, que bloqueia o próximo release até um release que a feche.
+- Checagem depois do deploy: confere a versão do `index.html` (SHA do commit), o JS principal e a página inicial. Se o deploy ou a checagem falham, abre a issue `incidente`, que bloqueia o próximo release até um release que a feche. A volta automática só roda quando a checagem falha num push na `main`: publica de novo o último Deploy verde na `main` (se não houver nenhum, o commit anterior da `main`). Um Deploy manual (_Run workflow_) que falha abre o `incidente`, mas não volta. A volta não é rechecada: o orquestrador confirma à mão, abrindo `https://louvor-hajaluz.web.app` e vendo o botão de entrar.
 
 ## Comandos
 
