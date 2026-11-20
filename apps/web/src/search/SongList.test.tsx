@@ -58,4 +58,53 @@ describe('SongList', () => {
     expect(rows[0]).toHaveTextContent('TomD');
     expect(rows[1]).toHaveTextContent('Tom–');
   });
+
+  it('renders the lyrics snippet with the matched words highlighted', () => {
+    render(
+      <MemoryRouter>
+        <SongList
+          songs={[song]}
+          snippets={
+            new Map([
+              [
+                's1',
+                [
+                  { text: 'Santo', match: true },
+                  { text: 'é o Senhor', match: false },
+                ],
+              ],
+            ])
+          }
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Santo').tagName).toBe('MARK');
+    expect(screen.getByText('Santo').closest('.lyric-snippet')).toHaveTextContent(
+      'Santo é o Senhor',
+    );
+  });
+
+  it('places the snippet right after the main link and before the key chips', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <SongList
+          songs={[song]}
+          snippets={new Map([['s1', [{ text: 'Santo é o Senhor', match: false }]]])}
+        />
+      </MemoryRouter>,
+    );
+    const li = container.querySelector('li')!;
+    const children = Array.from(li.children);
+    const main = screen.getByRole('link', { name: 'Bondade de Deus Isaías Saad' });
+    expect(children.map((c) => c.className)).toEqual([
+      main.className,
+      'lyric-snippet',
+      'chips chips-compact',
+    ]);
+  });
+
+  it('shows no snippet when the song has none', () => {
+    const { container } = renderList();
+    expect(container.querySelector('.lyric-snippet')).toBeNull();
+  });
 });

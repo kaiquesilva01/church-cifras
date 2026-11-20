@@ -42,6 +42,8 @@ export interface NewSongInput extends NewArrangementInput {
   songId: string;
   title: string;
   artistName: string;
+  /** Letra lida do PDF; vazia não grava `songLyrics`. */
+  lyrics: string;
 }
 
 export type UploadPlan = {
@@ -49,7 +51,7 @@ export type UploadPlan = {
   key: KeyName;
   chordCount: number;
 } & (
-  | { action: 'new-song'; title: string; artistName: string }
+  | { action: 'new-song'; title: string; artistName: string; lyrics: string }
   | { action: 'add-key'; songId: string }
   | { action: 'replace-generated'; songId: string }
 );

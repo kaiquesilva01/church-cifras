@@ -1,5 +1,6 @@
 import {
   buildTransposePlan,
+  extractLyrics,
   findChords,
   findKeyIndicator,
   parseKey,
@@ -14,6 +15,8 @@ export interface PdfSuggestion {
   suspects: string[][];
   ignoredChordLines: number;
   suggestion: MetadataSuggestion;
+  /** Letra sem as linhas de acorde; vazia quando o PDF não tem texto. */
+  lyrics: string;
 }
 
 // Approximate monospace-ish width; only used for geometry, never for output.
@@ -43,5 +46,6 @@ export async function readPdfSuggestion(
     suspects: plan.suspectSegments.map((segment) => segment.unknown),
     ignoredChordLines: plan.ignoredChordLines,
     suggestion,
+    lyrics: extractLyrics(lines, { indicator, measure }),
   };
 }

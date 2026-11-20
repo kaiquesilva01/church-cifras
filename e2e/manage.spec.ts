@@ -68,6 +68,6 @@ test('admin deletes a whole song after confirming with Apagar música', async ({
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('status').filter({ hasText: 'Música apagada.' })).toBeVisible();
-  await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(song.title);
+  await page.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }).fill(song.title);
   await expect(page.getByText(`Nada encontrado para “${song.title}”.`)).toBeVisible();
 });

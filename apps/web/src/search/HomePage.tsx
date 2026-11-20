@@ -10,6 +10,7 @@ import {
   splitHarpa,
 } from '../catalog/search';
 import { useSongsContext } from '../catalog/SongsProvider';
+import type { SongSummary } from '../catalog/types';
 import { NextCultoCard } from '../setlists/NextCultoCard';
 import { todayLocal } from '../setlists/dates';
 import type { SetlistApi } from '../setlists/setlistApi';
@@ -20,14 +21,18 @@ import { ScreenHeader } from '../ui/ScreenHeader';
 import { SearchInput } from '../ui/SearchInput';
 import { dayEyebrow } from '../ui/screenDate';
 import { ArtistList } from './ArtistList';
+import { LyricsResults, useLyricSearch } from './LyricsResults';
 import { SongList } from './SongList';
 
 const TABS = [
-  { id: 'musicas', label: 'Músicas', placeholder: 'Buscar música ou cantor…' },
+  { id: 'musicas', label: 'Músicas', placeholder: 'Buscar música, cantor ou letra…' },
   { id: 'cantores', label: 'Cantores', placeholder: 'Buscar cantor…' },
-  { id: 'harpa', label: 'Harpa', placeholder: 'Buscar na Harpa…' },
+  { id: 'harpa', label: 'Harpa', placeholder: 'Buscar na Harpa ou na letra…' },
   { id: 'repertorios', label: 'Repertórios', placeholder: '' },
 ] as const;
+
+/** Stable empty candidate list: the tabs without lyric search (Cantores, Repertórios). */
+const NO_SONGS: SongSummary[] = [];
 
 const TAB_PATHS = {
   musicas: '/',
@@ -75,6 +80,15 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
     [tab.id, harpa, regular, query],
   );
   const visibleArtists = useMemo(() => filterArtists(artists, query), [artists, query]);
+  // "Na letra" searches the lyrics of the tab's own songs, except the ones already listed by title.
+  const lyricTab = tab.id === 'musicas' || tab.id === 'harpa';
+  const lyricCandidates = useMemo(
+    () => (tab.id === 'musicas' ? regular : tab.id === 'harpa' ? harpa : NO_SONGS),
+    [tab.id, regular, harpa],
+  );
+  const listedIds = useMemo(() => new Set(visibleSongs.map((song) => song.id)), [visibleSongs]);
+  const lyric = useLyricSearch(lyricCandidates, query, listedIds);
+  const lyricPending = lyricTab && lyric.pending;
 
   const setQuery = (value: string) => {
     const next: Record<string, string> = {};
@@ -169,11 +183,16 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
               Não foi possível carregar as cifras.
             </p>
           )}
-          {status === 'ready' && items.length === 0 && <p className="status">{emptyText}</p>}
+          {status === 'ready' && items.length === 0 && !lyricPending && lyric.hits.length === 0 && (
+            <p className="status">{emptyText}</p>
+          )}
           {tab.id === 'cantores' ? (
             <ArtistList artists={visibleArtists} />
           ) : (
             <SongList songs={visibleSongs} />
+          )}
+          {status === 'ready' && lyricTab && (
+            <LyricsResults hits={lyric.hits} pending={lyric.pending} />
           )}
         </div>
       )}

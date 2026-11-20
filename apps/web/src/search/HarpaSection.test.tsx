@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import type { SongSummary } from '../catalog/types';
+import { LyricsProvider } from '../catalog/LyricsProvider';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { SetlistsProvider } from '../setlists/SetlistsProvider';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
@@ -66,13 +67,16 @@ const auth: AuthState = {
 
 function renderWith(path: string, page: 'home' | 'busca' = 'home') {
   const setlistApi = fakeSetlistApi();
+  const catalogApi = fakeCatalogApi(songs);
   return render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[path]}>
-        <SongsProvider api={fakeCatalogApi(songs)}>
-          <SetlistsProvider api={setlistApi}>
-            {page === 'home' ? <HomePage setlistApi={setlistApi} /> : <BuscaPage />}
-          </SetlistsProvider>
+        <SongsProvider api={catalogApi}>
+          <LyricsProvider api={catalogApi}>
+            <SetlistsProvider api={setlistApi}>
+              {page === 'home' ? <HomePage setlistApi={setlistApi} /> : <BuscaPage />}
+            </SetlistsProvider>
+          </LyricsProvider>
         </SongsProvider>
       </MemoryRouter>
     </AuthContext.Provider>,

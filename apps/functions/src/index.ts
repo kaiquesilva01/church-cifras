@@ -155,6 +155,9 @@ const adminDeps: AdminDeps = {
       return target;
     });
   },
+  deleteLyricsDoc: async (songId) => {
+    await getFirestore().doc(`songLyrics/${songId}`).delete();
+  },
   deleteSongDoc: async (songId) => {
     await getFirestore().doc(`songs/${songId}`).delete();
   },

@@ -71,7 +71,7 @@ test('admin imports two synthetic PDFs in batch, ignoring a non-PDF, and downloa
     .getByRole('navigation', { name: 'Principal' })
     .getByRole('link', { name: 'Músicas' })
     .click();
-  await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(artist);
+  await page.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }).fill(artist);
   for (const { title } of files) {
     await expect(page.locator('a.list-main', { hasText: title })).toBeVisible();
   }

@@ -54,6 +54,7 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
   const keyRef = useRef<HTMLSelectElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [chordCount, setChordCount] = useState(0);
+  const [lyrics, setLyrics] = useState('');
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [key, setKey] = useState('');
@@ -130,6 +131,7 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
         const parsed = suggestion.key ? parseKey(suggestion.key) : null;
         setFile(picked);
         setChordCount(result.chordCount);
+        setLyrics(result.lyrics);
         setTitle(suggestion.title.slice(0, MAX_TEXT));
         setArtist(suggestion.artist.slice(0, MAX_TEXT));
         setKey(parsed?.name ?? '');
@@ -174,7 +176,7 @@ export function UploadPage({ api, readPdf }: { api: CatalogApi; readPdf: ReadPdf
     const base = { file, key, chordCount };
     const plan: UploadPlan =
       lookup.decision === 'new-song'
-        ? { ...base, action: 'new-song', title: titleTrim, artistName: artistTrim }
+        ? { ...base, action: 'new-song', title: titleTrim, artistName: artistTrim, lyrics }
         : { ...base, action: lookup.decision, songId: lookup.songId! };
     setSave('saving');
     try {

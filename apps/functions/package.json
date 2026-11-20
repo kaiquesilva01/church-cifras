@@ -10,7 +10,8 @@
     "build": "tsup",
     "build:watch": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lyrics:backfill": "tsup --config tsup.backfill.config.ts && node lib/backfillCli.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

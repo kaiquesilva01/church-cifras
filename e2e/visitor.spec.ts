@@ -10,7 +10,7 @@ test('visitor can read and share but cannot create, change keys or manage', asyn
   await signInAs(page, newAccount('visitante'), 'Visitante');
 
   // Home: the song is there, but no way to create one and no admin navigation.
-  await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(song.title);
+  await page.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }).fill(song.title);
   await expect(page.locator('a.list-main', { hasText: song.title })).toBeVisible();
   await expect(page.getByRole('link', { name: /Nova cifra/ })).toHaveCount(0);
   await page
@@ -23,7 +23,7 @@ test('visitor can read and share but cannot create, change keys or manage', asyn
     .getByRole('navigation', { name: 'Principal' })
     .getByRole('link', { name: 'Músicas' })
     .click();
-  await page.getByRole('searchbox', { name: 'Buscar música ou cantor…' }).fill(song.title);
+  await page.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }).fill(song.title);
   await shot(page, testInfo, 'visitor-1-home');
 
   // Viewer: PDF and share only.
@@ -37,6 +37,8 @@ test('visitor can read and share but cannot create, change keys or manage', asyn
   for (const path of ['/nova', '/pessoas', '/importar']) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole('searchbox', { name: 'Buscar música ou cantor…' })).toBeVisible();
+    await expect(
+      page.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
+    ).toBeVisible();
   }
 });
