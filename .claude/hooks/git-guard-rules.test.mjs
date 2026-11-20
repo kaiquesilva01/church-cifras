@@ -285,16 +285,16 @@ const target = (command) => {
   return { r, got };
 };
 
-test('merge with main base needs --merge (release develop -> main)', () => {
+test('merge with main base names the option outside the release allowlist', () => {
   const r = release('gh pr merge 2 --squash');
   assert.equal(r.allow, false);
-  assert.ok(r.reason.includes('--merge'), r.reason);
+  assert.ok(r.reason.includes('--squash'), r.reason);
 });
 
 test('blocks merge with -R when base main and no --merge', () => {
   const r = release('gh -R o/r pr merge 3');
   assert.equal(r.allow, false);
-  assert.ok(r.reason.includes('--merge'), r.reason);
+  assert.ok(r.reason.includes('sem --merge'), r.reason);
 });
 
 test('allows the release merge with --merge and the current head', () => {
@@ -315,19 +315,48 @@ test('the release merge goes through the same guards in any command form', () =>
   }
 });
 
-test('blocks release merge without --merge or with squash, rebase, auto or admin', () => {
-  for (const c of [
-    'gh pr merge 99 --match-head-commit abc123',
-    'gh pr merge 99 --squash --match-head-commit abc123',
-    'gh pr merge 99 -s --match-head-commit abc123',
-    'gh pr merge 99 --merge --rebase --match-head-commit abc123',
-    'gh pr merge 99 -m -r --match-head-commit abc123',
-    'gh pr merge 99 --merge --auto --match-head-commit abc123',
-    'gh pr merge 99 --merge --admin --match-head-commit abc123',
-  ]) {
+test('blocks release merge without --merge', () => {
+  const r = release('gh pr merge 99 --match-head-commit abc123');
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('sem --merge'), r.reason);
+});
+
+test('release allowlist blocks every option outside it and names the offending token', () => {
+  const cases = [
+    ['gh pr merge 99 -dm=false --merge --match-head-commit abc123', '-dm=false'],
+    ['gh pr merge 99 --merge -sm=false --match-head-commit abc123', '-sm=false'],
+    ['gh pr merge 99 --merge -rm=false --match-head-commit abc123', '-rm=false'],
+    ['gh pr merge 99 -md --match-head-commit abc123', '-md'],
+    ['gh pr merge 99 --merge=true --match-head-commit abc123', '--merge=true'],
+    ['gh pr merge 99 -m=true --match-head-commit abc123', '-m=true'],
+    ['gh pr merge 99 --merge --admin --match-head-commit abc123', '--admin'],
+    ['gh pr merge 99 --merge -d --match-head-commit abc123', '-d'],
+    ['gh pr merge 99 --merge --delete-branch --match-head-commit abc123', '--delete-branch'],
+    ['gh pr merge 99 --merge --auto --match-head-commit abc123', '--auto'],
+    ['gh pr merge 99 --merge --squash --match-head-commit abc123', '--squash'],
+    ['gh pr merge 99 --merge -s --match-head-commit abc123', '-s'],
+    ['gh pr merge 99 --merge --rebase --match-head-commit abc123', '--rebase'],
+    ['gh pr merge 99 -m -r --match-head-commit abc123', '-r'],
+    ['gh pr merge 99 --merge -x --match-head-commit abc123', '-x'],
+  ];
+  for (const [c, token] of cases) {
     const r = release(c);
     assert.equal(r.allow, false, c);
-    assert.ok(r.reason.includes('--merge'), `${c}: ${r.reason}`);
+    assert.ok(r.reason.includes(token), `${token} ausente em: ${r.reason}`);
+  }
+});
+
+test('release allowlist allows only --merge, --match-head-commit and the listed value options', () => {
+  for (const c of [
+    'gh pr merge 99 --merge --match-head-commit abc123',
+    'gh pr merge 99 -m --match-head-commit=abc123',
+    'gh pr merge 99 --merge --subject "release" --body=x --match-head-commit abc123',
+    'gh -R o/r pr merge 99 --merge --match-head-commit abc123',
+    'gh pr merge 99 --merge -R o/r --match-head-commit abc123',
+    'gh pr merge 99 --merge --body-file=notes.md --repo=o/r --match-head-commit abc123',
+  ]) {
+    const r = release(c);
+    assert.equal(r.allow, true, `${c}: ${r.reason}`);
   }
 });
 
@@ -410,7 +439,7 @@ test('blocks --auto, --admin, --squash and --rebase written as --flag=true on re
   for (const flag of ['--auto=true', '--admin=true', '--squash=true', '--rebase=true']) {
     const r = release(`gh pr merge 99 --merge ${flag} --match-head-commit abc123`);
     assert.equal(r.allow, false, flag);
-    assert.ok(r.reason.includes('--merge'), `${flag}: ${r.reason}`);
+    assert.ok(r.reason.includes(flag), `${flag}: ${r.reason}`);
   }
 });
 
@@ -425,22 +454,27 @@ test('allows --match-head-commit=<sha> on release', () => {
   assert.equal(release('gh pr merge 99 --merge --match-head-commit=zzz').allow, false);
 });
 
-test('--flag=false counts as absent and --merge=true as --merge', () => {
-  const noMerge = release('gh pr merge 99 --merge=false --match-head-commit abc123');
-  assert.equal(noMerge.allow, false);
-  assert.ok(noMerge.reason.includes('--merge'), noMerge.reason);
-  assert.equal(release('gh pr merge 99 --merge=true --match-head-commit abc123').allow, true);
-  assert.equal(release('gh pr merge 99 --merge --squash=false --match-head-commit abc123').allow, true);
-  assert.equal(release('gh pr merge 99 --merge --auto=false --match-head-commit abc123').allow, true);
+test('release blocks any =valor form, even =false, because only exact tokens are allowed', () => {
+  for (const flag of ['--merge=false', '--squash=false', '--auto=false', '--delete-branch=false']) {
+    const r = release(`gh pr merge 99 --merge ${flag} --match-head-commit abc123`);
+    assert.equal(r.allow, false, flag);
+    assert.ok(r.reason.includes(flag), `${flag}: ${r.reason}`);
+  }
 });
 
-test('blocks --delete-branch on the release (it would delete develop)', () => {
-  for (const flag of ['--delete-branch', '-d', '--delete-branch=true', '-d=true', '-md']) {
-    const r = release(`gh pr merge 99 ${flag} --match-head-commit abc123`);
+test('blocks --delete-branch and -d on the release (it would delete develop)', () => {
+  for (const flag of ['--delete-branch', '-d', '--delete-branch=true', '-d=true']) {
+    const r = release(`gh pr merge 99 --merge ${flag} --match-head-commit abc123`);
     assert.equal(r.allow, false, flag);
-    assert.ok(r.reason.includes('--merge'), `${flag}: ${r.reason}`);
+    assert.ok(r.reason.includes(flag), `${flag}: ${r.reason}`);
   }
-  assert.equal(release('gh pr merge 99 --merge --delete-branch=false --match-head-commit abc123').allow, true);
+});
+
+test('--auto=false stays allowed on develop, --auto=true does not', () => {
+  assert.equal(merge('gh pr merge 2 --squash --auto=false').allow, true);
+  const r = merge('gh pr merge 2 --squash --auto=true', FACTS, { now: WEDNESDAY, openIncidents: () => [] });
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('--auto=true'), r.reason);
 });
 
 test('--delete-branch stays allowed on develop merges', () => {

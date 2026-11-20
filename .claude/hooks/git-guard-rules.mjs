@@ -335,12 +335,9 @@ const MERGE_VALUE_FLAGS = [
   '--author-email', '-A', '-R', '--repo',
 ];
 
-// Argumentos de `gh pr merge`: { positionals, repo, flags, matchHead } ignorando valores e redirecionamentos.
-// `flags` traz as formas longas e cada letra de agrupamentos curtos (`-ms` -> `-m`, `-s`), para que
-// nenhuma combinação esconda `--squash`/`--merge`/etc.
+// Argumentos de `gh pr merge`: { positionals, repo, matchHead } ignorando valores e redirecionamentos.
 function parseMergeArgs(args) {
   const positionals = [];
-  const flags = [];
   let repo = null;
   let matchHead = null;
   for (let i = 0; i < args.length; i++) {
@@ -353,17 +350,13 @@ function parseMergeArgs(args) {
     else if (MERGE_VALUE_FLAGS.includes(a)) i++;
     else if (/^[\d*]*[<>]/.test(a)) {
       if (/^[\d*]*[<>]+$/.test(a)) i++; // `> arquivo`: o próximo token é o destino
-    } else if (a.startsWith('-')) {
-      // `--flag=valor`: vale pelo nome; `=false` é o mesmo que ausente, qualquer outro valor conta como presente.
-      const eq = a.indexOf('=');
-      const name = eq === -1 ? a : a.slice(0, eq);
-      if (eq !== -1 && a.slice(eq + 1) === 'false') continue;
-      if (name.startsWith('--')) flags.push(name);
-      else flags.push(name, ...[...name.slice(1)].map((c) => `-${c}`));
-    } else positionals.push(a);
+    } else if (!a.startsWith('-')) positionals.push(a);
   }
-  return { positionals, repo, flags, matchHead };
+  return { positionals, repo, matchHead };
 }
+
+// `--auto` (qualquer forma, exceto `--auto=false`) não existe neste fluxo, em nenhuma base.
+const autoOption = (args) => args.find((a) => a.split('=')[0] === '--auto' && a !== '--auto=false');
 
 // Merge na develop: travas, CI verde, etiquetas e teste no celular, nesta ordem; para no primeiro bloqueio.
 function checkDevelopMerge(facts, target) {
@@ -392,24 +385,45 @@ function checkDevelopMerge(facts, target) {
   return null;
 }
 
-// Release develop -> main, feito pelo agente só com todas as travas: head develop, merge commit
-// (`--merge`) sem squash/rebase/admin, SHA conferido, CI verde, fora da janela do culto e sem incidente aberto.
-// `--delete-branch` apagaria a própria develop depois do merge: no release ele é proibido.
-const RELEASE_FORBIDDEN_FLAGS = ['--squash', '-s', '--rebase', '-r', '--auto', '--admin', '--delete-branch', '-d'];
+// Release develop -> main, feito pelo agente só com todas as travas: head develop, opções na allowlist
+// (só `--merge`, `--match-head-commit` e as de valor listadas), SHA conferido, CI verde, fora da janela
+// do culto e sem incidente aberto. Qualquer outro token que comece com `-` bloqueia: não se tenta
+// interpretar as formas do pflag (`-dm=false`, `-md`, `--merge=true`...).
+const RELEASE_BOOL_OPTIONS = ['--merge', '-m'];
+const RELEASE_VALUE_OPTIONS = ['--subject', '-t', '--body', '-b', '--body-file', '-F', '-R', '--repo', '--match-head-commit'];
+const RELEASE_LONG_VALUE_OPTION = /^--(subject|body|body-file|repo|match-head-commit)=/;
 
-function checkReleaseMerge(facts, { flags, matchHead }, target, state) {
+// Varre as opções do release: { offending: primeiro token fora da allowlist ou null, merge: se --merge/-m veio }.
+// Posicionais (alvo) e redirecionamentos passam; valores das opções de valor são pulados.
+function scanReleaseOptions(args) {
+  let merge = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (!a.startsWith('-')) {
+      if (/^[\d*]*[<>]+$/.test(a)) i++; // `> arquivo`
+      continue;
+    }
+    if (RELEASE_BOOL_OPTIONS.includes(a)) merge = true;
+    else if (RELEASE_VALUE_OPTIONS.includes(a)) i++;
+    else if (!RELEASE_LONG_VALUE_OPTION.test(a)) return { offending: a, merge };
+  }
+  return { offending: null, merge };
+}
+
+const releaseOptionsBlock = (target, sha, found) =>
+  block(
+    `Release só com \`gh pr merge ${target} --merge --match-head-commit ${sha}\` ` +
+      '(opções permitidas: --merge, --match-head-commit, --subject, --body, --body-file, -R). ' +
+      `Encontrado: ${found}.`
+  );
+
+function checkReleaseMerge(facts, args, { matchHead }, target, state) {
   if (facts.head !== 'develop') {
     return block(`O release (PR para main) só pode vir da develop (head atual: "${facts.head}").`);
   }
-  const hasMerge = flags.includes('--merge') || flags.includes('-m');
-  const forbidden = RELEASE_FORBIDDEN_FLAGS.filter((f) => flags.includes(f));
-  if (!hasMerge || forbidden.length) {
-    const found = forbidden.length ? forbidden.join(', ') : 'sem --merge';
-    return block(
-      'O release exige `--merge` (merge commit) e não aceita --squash, --rebase, --auto, --admin ou --delete-branch ' +
-        `(encontrado: ${found}): use \`gh pr merge ${target} --merge --match-head-commit ${facts.headSha}\`.`
-    );
-  }
+  const { offending, merge } = scanReleaseOptions(args);
+  if (offending !== null) return releaseOptionsBlock(target, facts.headSha, offending);
+  if (!merge) return releaseOptionsBlock(target, facts.headSha, 'sem --merge');
   if (matchHead !== facts.headSha) {
     return block(
       `Informe \`--match-head-commit ${facts.headSha}\` (SHA atual da develop no PR de release): ` +
@@ -449,7 +463,7 @@ function checkMerge(args, state, leadingRepo) {
     return block('Faça um merge por comando: rode cada `gh pr merge` separadamente.');
   }
   const parsed = parseMergeArgs(args);
-  const { positionals, repo, flags } = parsed;
+  const { positionals, repo } = parsed;
   if (positionals.length > 1) {
     return block('`gh pr merge` com mais de um alvo: informe apenas um PR (`gh pr merge <n> --squash --delete-branch`).');
   }
@@ -461,14 +475,15 @@ function checkMerge(args, state, leadingRepo) {
     );
   }
   const facts = state.resolvePr(target, repo ?? leadingRepo);
-  if (flags.includes('--auto')) {
+  const auto = autoOption(args);
+  if (auto !== undefined) {
     return block(
-      '`--auto` não é permitido em nenhum merge (develop ou release). ' +
+      `\`${auto}\` não é permitido em nenhum merge (develop ou release). ` +
         'Faça o merge direto: develop com `--squash --delete-branch`; release com `--merge --match-head-commit <sha>`.'
     );
   }
   if (facts?.base === 'develop') return checkDevelopMerge(facts, target);
-  if (facts?.base === 'main') return checkReleaseMerge(facts, parsed, target, state);
+  if (facts?.base === 'main') return checkReleaseMerge(facts, args, parsed, target, state);
   return block(
     'Não foi possível determinar a base do PR; merge bloqueado. ' +
       `Confira com \`gh pr view ${target} --json baseRefName\` e só faça merge de PRs com base develop.`
