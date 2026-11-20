@@ -44,7 +44,7 @@ export function SongList({
   snippets,
 }: {
   songs: SongSummary[];
-  /** Lyrics snippet per song id, shown right under the title row (above the key chips) when there is one. */
+  /** Lyrics snippet per song id, shown right under the title row; a song with one has no key chips. */
   snippets?: ReadonlyMap<string, SnippetPart[]>;
 }) {
   return (
@@ -66,13 +66,15 @@ export function SongList({
               <span className="song-chevron">{CHEVRON}</span>
             </Link>
             {snippet && <LyricSnippet parts={snippet} />}
-            <KeyChips
-              songId={song.id}
-              title={song.title}
-              keys={song.keys}
-              selected={key ?? undefined}
-              compact
-            />
+            {!snippet && (
+              <KeyChips
+                songId={song.id}
+                title={song.title}
+                keys={song.keys}
+                selected={key ?? undefined}
+                compact
+              />
+            )}
           </li>
         );
       })}

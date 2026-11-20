@@ -117,6 +117,16 @@
   box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
 }
 
+/* Busca: the field and the filters stay at the top while the results scroll under them. */
+.search-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 -16px;
+  padding: 8px 16px 0;
+  background: var(--color-bg);
+}
+
 .filter-row {
   display: flex;
   gap: 8px;
@@ -607,11 +617,6 @@
   font-size: 0.8125rem;
   line-height: 19px;
   color: var(--color-muted);
-}
-
-/* With a snippet above them, the key pills need room below its text (.chips has only 4px). */
-.lyric-snippet + .chips {
-  margin-top: 10px;
 }
 
 /* The matched words: amber text (--color-accent-text is amber in both themes), no highlight box */
