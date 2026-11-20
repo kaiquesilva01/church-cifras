@@ -1,11 +1,42 @@
 // Regras puras do guard de Git: decide se um comando de shell pode rodar
 // sob o fluxo de branches do projeto. Sem dependências, sem I/O.
 //
-// evaluateCommand({ command, branch, stagedFiles, resolvePrBase }) devolve
-// (resolvePrBase(alvo, repo) -> base do PR ou null; injetado pelo entrypoint, só chamado em `gh pr merge`):
+// evaluateCommand({ command, branch, stagedFiles, resolvePr, now, openIncidents }) devolve
 //   { allow: false, reason }     comando bloqueado;
 //   { allow: true, reminder }    permitido, com lembrete (ex.: `gh pr create` -> rodar testes);
 //   { allow: true }              permitido.
+// resolvePr(alvo, repo) -> PrFacts | null: injetado pelo entrypoint, só chamado em `gh pr merge`.
+
+/**
+ * @typedef {{ name: string; status?: string; conclusion?: string; state?: string }} CheckRun
+ * @typedef {{ base: string; head: string; headSha: string; checks: CheckRun[]; labels: string[]; files: string[]; body: string }} PrFacts
+ */
+
+// Travas: PRs que tocam estes caminhos só são mergeados pela pessoa responsável.
+// Entradas terminadas em `/` são prefixos de pasta; as demais são arquivos da raiz.
+export const GUARD_PATHS = ['.claude/', '.github/workflows/', 'firebase.json', 'cors.json', 'AGENTS.md', 'CLAUDE.md'];
+
+// Caminhos que exigem teste no celular (etiqueta `teste-celular-ok`).
+export const DEVICE_TEST_PATHS = ['apps/web/src/viewer/', 'apps/web/src/setlists/', 'apps/web/src/pad/'];
+
+// Arquivos de `files` que batem em algum prefixo (`/` no fim: startsWith; senão: igualdade).
+export function touches(files, prefixes) {
+  return files.filter((f) => prefixes.some((p) => (p.endsWith('/') ? f.startsWith(p) : f === p)));
+}
+
+const GREEN_CONCLUSIONS = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL']);
+
+// Verde: ao menos um check e todos verdes. StatusContext tem `state`; CheckRun tem `status`/`conclusion`.
+export function ciGreen(checks) {
+  return (
+    checks.length > 0 &&
+    checks.every((c) =>
+      c.state !== undefined
+        ? c.state === 'SUCCESS'
+        : c.status === 'COMPLETED' && GREEN_CONCLUSIONS.has(c.conclusion)
+    )
+  );
+}
 
 export const PROTECTED_BRANCHES = ['main', 'develop'];
 
@@ -291,7 +322,34 @@ function parseMergeArgs(args) {
   return { positionals, repo };
 }
 
-// Merge só para PRs com base develop (fail closed: base desconhecida bloqueia).
+// Merge na develop: travas, CI verde, etiquetas e teste no celular, nesta ordem; para no primeiro bloqueio.
+function checkDevelopMerge(facts, target) {
+  const ref = /^\d+$/.test(target) ? `#${target}` : target;
+  const guarded = touches(facts.files, GUARD_PATHS);
+  if (guarded.length) {
+    return block(
+      `O PR ${ref} altera as travas ou o processo (${guarded.join(', ')}): o merge é da pessoa responsável.`
+    );
+  }
+  if (!ciGreen(facts.checks)) {
+    const names = facts.checks.map((c) => c.name).join(', ') || 'nenhum check';
+    return block(`CI não está verde no PR ${ref} (${names}): espere o CI (\`gh pr checks ${target} --watch\`).`);
+  }
+  const missing = ['revisado', 'qa-ok'].filter((l) => !facts.labels.includes(l));
+  if (missing.length) {
+    return block(
+      `Faltam as etiquetas ${missing.join(', ')} no PR ${ref}: o merge na develop exige revisão (\`revisado\`) e QA (\`qa-ok\`).`
+    );
+  }
+  if (touches(facts.files, DEVICE_TEST_PATHS).length && !facts.labels.includes('teste-celular-ok')) {
+    return block(
+      `O PR ${ref} mexe em cifra, repertório ou pad: precisa do teste no celular (\`teste-celular-ok\`).`
+    );
+  }
+  return null;
+}
+
+// Merge só para PRs com base develop (fail closed: fatos indisponíveis ou base desconhecida bloqueiam).
 function checkMerge(args, state, leadingRepo) {
   if (/\bGH_REPO\b/.test(state.command)) {
     return block('Não use GH_REPO com `gh pr merge`: defina o repositório com -R <dono/repo>.');
@@ -310,9 +368,9 @@ function checkMerge(args, state, leadingRepo) {
         '`gh pr merge <n> --squash --delete-branch`.'
     );
   }
-  const base = state.resolvePrBase(target, repo ?? leadingRepo);
-  if (base === 'develop') return null;
-  if (base === 'main') {
+  const facts = state.resolvePr(target, repo ?? leadingRepo);
+  if (facts?.base === 'develop') return checkDevelopMerge(facts, target);
+  if (facts?.base === 'main') {
     return block(
       'Merge de PR para main é decisão humana: só a pessoa responsável aprova e faz o merge do PR develop → main.'
     );
@@ -484,8 +542,15 @@ const PR_REMINDER =
   '[git-guard] Lembrete: rode os testes (node --test ".claude/**/*.test.mjs" e os do monorepo) ' +
   'e confirme que passam antes de abrir o PR.';
 
-export function evaluateCommand({ command, branch, stagedFiles = [], resolvePrBase = () => null }) {
-  const state = { branch, prCreate: false, resolvePrBase, command, merges: 0 };
+export function evaluateCommand({
+  command,
+  branch,
+  stagedFiles = [],
+  resolvePr = () => null,
+  now = () => new Date(),
+  openIncidents = () => null,
+}) {
+  const state = { branch, prCreate: false, resolvePr, now, openIncidents, command, merges: 0 };
   const blocked = checkApi(command) ?? evaluateSegments(command, state, stagedFiles);
   if (blocked) return blocked;
   return state.prCreate ? { allow: true, reminder: PR_REMINDER } : { allow: true };

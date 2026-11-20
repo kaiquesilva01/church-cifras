@@ -17,22 +17,33 @@ try {
     .filter(Boolean);
 
   // Chamado só quando há `gh pr merge`; qualquer falha -> null (o guard bloqueia).
-  const resolvePrBase = (target, repo) => {
+  const PR_FIELDS = 'baseRefName,headRefName,headRefOid,statusCheckRollup,labels,files,body';
+  const resolvePr = (target, repo) => {
     try {
-      const args = ['pr', 'view', ...(target ? [target] : []), ...(repo ? ['-R', repo] : []), '--json', 'baseRefName', '-q', '.baseRefName'];
-      const out = execFileSync('gh', args, {
-        cwd,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 15000,
-      }).trim();
-      return out || null;
+      const args = ['pr', 'view', target, ...(repo ? ['-R', repo] : []), '--json', PR_FIELDS];
+      const pr = JSON.parse(
+        execFileSync('gh', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 15000 }),
+      );
+      return {
+        base: pr.baseRefName,
+        head: pr.headRefName,
+        headSha: pr.headRefOid,
+        checks: (pr.statusCheckRollup ?? []).map((c) => ({
+          name: c.name ?? c.context,
+          status: c.status,
+          conclusion: c.conclusion,
+          state: c.state,
+        })),
+        labels: (pr.labels ?? []).map((l) => l.name),
+        files: (pr.files ?? []).map((f) => f.path),
+        body: pr.body ?? '',
+      };
     } catch {
       return null;
     }
   };
 
-  const result = evaluateCommand({ command, branch, stagedFiles, resolvePrBase });
+  const result = evaluateCommand({ command, branch, stagedFiles, resolvePr });
   if (!result.allow) {
     process.stderr.write('[git-guard] ' + result.reason);
     process.exit(2);

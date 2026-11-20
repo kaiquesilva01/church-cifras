@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateCommand } from './git-guard-rules.mjs';
+import { evaluateCommand, touches, ciGreen, GUARD_PATHS, DEVICE_TEST_PATHS } from './git-guard-rules.mjs';
 
 const cases = [
   ['blocks commit on main', 'git commit -m "x"', 'main', [], false, 'Commit direto'],
@@ -129,30 +129,142 @@ test('allows opening the release PR develop -> main (the human approves and merg
   assert.equal(r.allow, true);
 });
 
-const merge = (command, resolvePrBase) =>
-  evaluateCommand({ command, branch: 'feat/a', stagedFiles: [], resolvePrBase });
+const FACTS = {
+  base: 'develop',
+  head: 'feat/95-x',
+  headSha: 'abc',
+  checks: [{ name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+  labels: ['revisado', 'qa-ok'],
+  files: ['apps/web/src/stats/StatsPage.tsx'],
+  body: '',
+};
 
-test('allows merge when base is develop', () => {
+const mergeWith = (command, resolvePr) =>
+  evaluateCommand({ command, branch: 'feat/a', stagedFiles: [], resolvePr });
+
+const merge = (command, facts = FACTS) => mergeWith(command, () => facts);
+
+test('allows develop merge with green CI and both labels', () => {
   let received;
-  const r = merge('gh pr merge 2 --squash --delete-branch', (t) => ((received = t), 'develop'));
-  assert.equal(r.allow, true);
+  const r = mergeWith('gh pr merge 2 --squash --delete-branch', (t) => ((received = t), FACTS));
+  assert.equal(r.allow, true, r.reason);
   assert.equal(received, '2');
 });
 
-test('blocks merge when base is main', () => {
-  const r = merge('gh pr merge 2 --squash', () => 'main');
-  assert.equal(r.allow, false);
-  assert.ok(r.reason.includes('humana'), r.reason);
+test('blocks develop merge when CI is not green', () => {
+  const notGreen = [
+    [{ name: 'checks', status: 'IN_PROGRESS' }],
+    [],
+    [{ name: 'checks', status: 'COMPLETED', conclusion: 'CANCELLED' }],
+    [{ name: 'checks', status: 'COMPLETED', conclusion: 'FAILURE' }],
+    [{ __typename: 'StatusContext', state: 'PENDING' }],
+  ];
+  for (const checks of notGreen) {
+    const r = merge('gh pr merge 2 --squash', { ...FACTS, checks });
+    assert.equal(r.allow, false, JSON.stringify(checks));
+    assert.ok(r.reason.includes('CI'), r.reason);
+  }
 });
 
-test('blocks merge when base unknown', () => {
-  const r = merge('gh pr merge 2 --squash', () => null);
+test('blocks develop merge without revisado or qa-ok', () => {
+  const noQa = merge('gh pr merge 2', { ...FACTS, labels: ['revisado'] });
+  assert.equal(noQa.allow, false);
+  assert.match(noQa.reason, /Faltam as etiquetas[^:]*qa-ok/, noQa.reason);
+
+  const noRev = merge('gh pr merge 2', { ...FACTS, labels: ['qa-ok'] });
+  assert.equal(noRev.allow, false);
+  assert.match(noRev.reason, /Faltam as etiquetas[^:]*revisado/, noRev.reason);
+});
+
+test('requires teste-celular-ok when the PR touches viewer, setlists or pad', () => {
+  const pad = { ...FACTS, files: ['apps/web/src/pad/PadPage.tsx'] };
+  const blocked = merge('gh pr merge 2', pad);
+  assert.equal(blocked.allow, false);
+  assert.ok(blocked.reason.includes('teste-celular-ok'), blocked.reason);
+
+  const withLabel = { ...pad, labels: ['revisado', 'qa-ok', 'teste-celular-ok'] };
+  assert.equal(merge('gh pr merge 2', withLabel).allow, true);
+
+  for (const f of ['apps/web/src/viewer/V.tsx', 'apps/web/src/setlists/S.tsx']) {
+    assert.equal(merge('gh pr merge 2', { ...FACTS, files: [f] }).allow, false, f);
+    assert.equal(merge('gh pr merge 2', { ...FACTS, files: [f], labels: ['revisado', 'qa-ok', 'teste-celular-ok'] }).allow, true, f);
+  }
+
+  assert.equal(merge('gh pr merge 2', { ...FACTS, files: ['apps/web/src/viewer-old/x.ts'] }).allow, true);
+});
+
+test('blocks develop merge of PRs that change the guards', () => {
+  for (const f of ['.claude/hooks/x.mjs', '.github/workflows/ci.yml', 'firebase.json', 'cors.json', 'AGENTS.md', 'CLAUDE.md']) {
+    const r = merge('gh pr merge 2', { ...FACTS, files: [f] });
+    assert.equal(r.allow, false, f);
+    assert.ok(r.reason.includes('merge é da pessoa'), r.reason);
+  }
+  assert.equal(merge('gh pr merge 2', { ...FACTS, files: ['docs/AGENTS.md'] }).allow, true);
+});
+
+test('guards are checked before CI', () => {
+  const r = merge('gh pr merge 2', { ...FACTS, files: ['AGENTS.md'], checks: [] });
+  assert.ok(r.reason.includes('merge é da pessoa'), r.reason);
+});
+
+test('blocks develop merge when facts are unavailable', () => {
+  const r = merge('gh pr merge 2', null);
   assert.equal(r.allow, false);
   assert.ok(r.reason.includes('gh pr view'), r.reason);
 });
 
+test('blocks merge into a base other than develop or main', () => {
+  const r = merge('gh pr merge 2', { ...FACTS, base: 'feat/x' });
+  assert.equal(r.allow, false);
+});
+
+test('touches matches folder prefixes and exact files', () => {
+  assert.deepEqual(touches(['.claude/hooks/x.mjs'], GUARD_PATHS), ['.claude/hooks/x.mjs']);
+  assert.deepEqual(touches(['firebase.json'], GUARD_PATHS), ['firebase.json']);
+  assert.deepEqual(touches(['docs/AGENTS.md'], GUARD_PATHS), []);
+  assert.deepEqual(touches(['firebase.json.bak'], GUARD_PATHS), []);
+  assert.deepEqual(touches(['apps/web/src/pad/PadPage.tsx'], DEVICE_TEST_PATHS), ['apps/web/src/pad/PadPage.tsx']);
+  assert.deepEqual(touches(['apps/web/src/viewer-old/x.ts'], DEVICE_TEST_PATHS), []);
+});
+
+test('ciGreen needs at least one check and all of them green', () => {
+  assert.equal(ciGreen([]), false);
+  assert.equal(
+    ciGreen([
+      { name: 'a', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { name: 'b', status: 'COMPLETED', conclusion: 'SKIPPED' },
+      { name: 'c', status: 'COMPLETED', conclusion: 'NEUTRAL' },
+    ]),
+    true,
+  );
+  assert.equal(ciGreen([{ name: 'a', status: 'IN_PROGRESS' }]), false);
+  assert.equal(ciGreen([{ name: 'a', status: 'COMPLETED', conclusion: 'CANCELLED' }]), false);
+  assert.equal(ciGreen([{ name: 'a', status: 'COMPLETED', conclusion: 'FAILURE' }]), false);
+  assert.equal(ciGreen([{ __typename: 'StatusContext', state: 'SUCCESS' }]), true);
+  assert.equal(ciGreen([{ __typename: 'StatusContext', state: 'PENDING' }]), false);
+  assert.equal(
+    ciGreen([
+      { name: 'a', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { name: 'b', status: 'COMPLETED', conclusion: 'FAILURE' },
+    ]),
+    false,
+  );
+});
+
+const target = (command) => {
+  let got = 'unset';
+  const r = mergeWith(command, (t, repo) => ((got = [t, repo]), FACTS));
+  return { r, got };
+};
+
+test('merge with main base is a human decision', () => {
+  const r = merge('gh pr merge 2 --squash', { ...FACTS, base: 'main' });
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('humana'), r.reason);
+});
+
 test('blocks merge with -R when base main', () => {
-  const r = merge('gh -R o/r pr merge 3', () => 'main');
+  const r = merge('gh -R o/r pr merge 3', { ...FACTS, base: 'main' });
   assert.equal(r.allow, false);
   assert.ok(r.reason.includes('humana'), r.reason);
 });
@@ -160,7 +272,7 @@ test('blocks merge with -R when base main', () => {
 test('blocks merge without explicit target', () => {
   for (const c of ['gh pr merge --squash', 'git checkout develop; gh pr merge --squash', 'git switch develop && gh pr merge --merge', 'cd ../wt && gh pr merge --squash']) {
     let called = false;
-    const r = merge(c, () => ((called = true), 'develop'));
+    const r = mergeWith(c, () => ((called = true), FACTS));
     assert.equal(r.allow, false, c);
     assert.ok(r.reason.includes('informe o número do PR'), r.reason);
     assert.equal(called, false);
@@ -169,15 +281,9 @@ test('blocks merge without explicit target', () => {
 
 test('skips flag values when finding the merge target', () => {
   let received;
-  merge('gh pr merge --subject "x y" -b body --match-head-commit abc -R o/r 7 --auto', (t) => ((received = t), 'develop'));
+  mergeWith('gh pr merge --subject "x y" -b body --match-head-commit abc -R o/r 7 --auto', (t) => ((received = t), FACTS));
   assert.equal(received, '7');
 });
-
-const target = (command) => {
-  let got = 'unset';
-  const r = merge(command, (t, repo) => ((got = [t, repo]), 'develop'));
-  return { r, got };
-};
 
 test('author-email flag value is not the target', () => {
   assert.deepEqual(target('gh pr merge -A x 7').got, ['7', null]);
@@ -218,7 +324,7 @@ test('redirects are not the target', () => {
 });
 
 test('blocks more than one merge per command', () => {
-  const r = merge('gh pr merge 1 && gh pr merge 2', () => 'develop');
+  const r = merge('gh pr merge 1 && gh pr merge 2');
   assert.equal(r.allow, false);
   assert.ok(r.reason.includes('um merge por comando'), r.reason);
 });
@@ -256,7 +362,7 @@ test('blocks mutating gh api calls', () => {
     'gh api -iXPUT repos/o/r/pulls/3/merge',
     'gh api -if base=main repos/o/r/pulls/3',
   ]) {
-    const r = merge(c, () => 'develop');
+    const r = merge(c);
     assert.equal(r.allow, false, c);
     assert.ok(r.reason.includes(API_REASON), r.reason);
   }
@@ -271,7 +377,7 @@ test('allows read-only gh api calls', () => {
     `gh api graphql -f query='query { viewer { login } }'`,
     'gh api repos/o/r/pulls/3 --jq .title | cat',
   ]) {
-    assert.equal(merge(c, () => null).allow, true, c);
+    assert.equal(merge(c, null).allow, true, c);
   }
 });
 
