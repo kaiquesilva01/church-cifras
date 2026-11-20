@@ -80,6 +80,29 @@ test('deploy installs chromium before the deploy so a failed install cannot skip
   );
 });
 
+test('test site is deployed only from main, with the build job holding no secrets', () => {
+  const firebase = JSON.parse(readFileSync(join(repoRoot, 'firebase.json'), 'utf8'));
+  const site = firebase.hosting.find((s) => s.site === 'louvor-hajaluz-teste');
+  assert.ok(site, 'firebase.json sem o site louvor-hajaluz-teste');
+  assert.equal(site.public, 'apps/web/dist');
+
+  const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'site-teste.yml'), 'utf8');
+  for (const x of [
+    'workflow_dispatch',
+    "github.ref == 'refs/heads/main'",
+    'hosting:louvor-hajaluz-teste',
+    'VITE_TEST_BANNER',
+  ]) {
+    assert.ok(workflow.includes(x), `site-teste.yml sem "${x}"`);
+  }
+  const buildJob = workflow.slice(workflow.indexOf('build:'), workflow.indexOf('deploy:'));
+  assert.ok(buildJob.length > 0, 'site-teste.yml sem os jobs build e deploy');
+  assert.ok(!buildJob.includes('secrets.'), 'o job build não pode referenciar secrets');
+
+  const cors = JSON.parse(readFileSync(join(repoRoot, 'cors.json'), 'utf8'));
+  assert.ok(cors[0].origin.includes('https://louvor-hajaluz-teste.web.app'));
+});
+
 test('the project session opens on sonnet medium', () => {
   assert.equal(settings.model, 'sonnet');
   assert.equal(settings.effortLevel, 'medium');

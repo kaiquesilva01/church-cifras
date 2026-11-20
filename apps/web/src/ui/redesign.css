@@ -3,6 +3,20 @@
  * (see main.tsx) so it can refine the base rules. Colors come only from the theme tokens.
  */
 
+/* Faixa do site de teste: fica no topo ao rolar e ocupa espaço no fluxo (não cobre os controles). */
+.test-banner {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding: calc(env(safe-area-inset-top) + 4px) 12px 4px;
+  background: var(--color-warn-soft);
+  color: var(--color-warn);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .page.has-nav {
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
