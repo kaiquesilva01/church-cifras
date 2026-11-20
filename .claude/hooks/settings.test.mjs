@@ -47,6 +47,12 @@ test('deploy skips pushes that only touch harness, docs or tests', () => {
   }
 });
 
+test('the project session opens on sonnet medium', () => {
+  assert.equal(settings.model, 'sonnet');
+  assert.equal(settings.effortLevel, 'medium');
+  assert.equal(settings.modelSettings['claude-sonnet-5-5'].effortLevel, 'medium');
+});
+
 test('AGENTS.md documents the release hook, the sync hook and the merge commit rule', () => {
   assert.match(agents, /release-pr\.mjs/);
   assert.match(agents, /sync-main\.mjs/);
