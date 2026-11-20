@@ -99,7 +99,7 @@ Só é preciso repetir se a origem mudar. Os emuladores locais não precisam dis
 
 ## 9. Publicar
 
-Faça o PR `develop` -> `main` e aprove o merge. O workflow **Deploy** publica hosting, functions, regras do Firestore e regras do Storage.
+O release sai pelo fluxo do agente: o orquestrador abre o PR `develop` -> `main` e faz o merge com `gh pr merge <n> --merge --match-head-commit <sha>` (merge commit, nunca squash), sob as travas do git-guard (CI verde, fora da janela do culto, sem incidente aberto). Depois do merge, o workflow **Deploy** publica hosting, functions, regras do Firestore e regras do Storage, e a checagem confere a versão no ar e o carregamento da página. Se a checagem falha num push para a `main`, o workflow volta para o último Deploy verde e abre uma issue `incidente`, que bloqueia o próximo release até ser fechada (ver o roteiro em `.claude/skills/entregar-issue/SKILL.md`, § Produção e incidente). A mudança que instalou este fluxo (SDLC com agentes) é o último release feito à mão.
 
 ### Loops do pad
 
@@ -170,7 +170,18 @@ Com algumas centenas de PDFs, cada execução leva alguns minutos; o progresso s
 
 Saída com `falhas` diferente de zero encerra com código 1; as músicas com falha aparecem listadas e podem ser reexecutadas com segurança. Use `--samples <n>` para mudar o número de amostras (padrão 3).
 
-## 13. Build das funções falha com `Cannot read properties of null (reading 'edgesOut')`
+## 13. Site de teste
+
+O site **`louvor-hajaluz-teste`** (`https://louvor-hajaluz-teste.web.app`) é um terceiro site de Hosting no mesmo projeto, para testar uma branch antes da produção. Ele mostra a faixa "TESTE · #N" no topo, para não ser confundido com o app de verdade. Só o workflow **Site de teste** publica nele, sempre disparado a partir da `main` (Actions > Site de teste > Run workflow, com a branch e o número da issue). O deploy de produção não lista esse site, então nunca o recebe.
+
+Passos únicos (feitos uma vez pela pessoa responsável):
+
+1. Crie o site: `firebase hosting:sites:create louvor-hajaluz-teste`.
+2. Em Authentication > Settings > **Authorized domains**, adicione `louvor-hajaluz-teste.web.app`, para o login funcionar no site de teste.
+3. Aplique o `cors.json` atualizado no bucket do Storage (`gsutil cors set cors.json gs://<bucket>`, como na seção 8), para os PDFs carregarem no site de teste.
+4. Se a chave de API do navegador tiver restrição de referenciador HTTP (Google Cloud > APIs e serviços > Credenciais), acrescente `https://louvor-hajaluz-teste.web.app/*` às referências permitidas.
+
+## 14. Build das funções falha com `Cannot read properties of null (reading 'edgesOut')`
 
 A Cloud Build instala `apps/functions/package.json` sozinho (npm 10, sem lockfile). No npm 10.9.x o par `firebase-admin` + `firebase-functions` quebra a resolução de dependências com esse erro, e **todas** as funções falham no deploy (inclusive as que não mudaram; o erro só aparece quando o código das funções muda, porque o Firebase pula funções sem alteração). Reproduzido localmente com `npx npm@10.9.9 install` numa pasta só com esse `package.json`; no npm 11 funciona.
 

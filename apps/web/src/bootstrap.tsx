@@ -9,6 +9,7 @@ import { createPeopleApi } from './people/peopleApi';
 import { createSetlistApi } from './setlists/setlistApi';
 import { createStatsApi } from './stats/statsApi';
 import { UpdatePrompt } from './pwa/UpdatePrompt';
+import { TestBanner } from './ui/TestBanner';
 
 // Everything that needs Firebase lives behind this module, so the first script only carries React
 // and the loading screen; the Firebase chunk downloads in parallel right after it.
@@ -23,6 +24,7 @@ export function renderApp(root: Root): void {
     const setlistApi = createSetlistApi(services);
     root.render(
       <StrictMode>
+        <TestBanner label={import.meta.env.VITE_TEST_BANNER} />
         <App
           gateway={gateway}
           peopleApi={peopleApi}

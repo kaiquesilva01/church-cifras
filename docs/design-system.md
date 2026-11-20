@@ -104,6 +104,7 @@ componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.tes
 | **Alertas** | caixa suave vermelha (alerta de página); aviso de sucesso `.notice`; erro de campo só texto | `redesign-states.css` |
 | **Diálogos** | cartão 22 px com ações em pílula. **Destrutivo** = Cancelar neutro à esquerda + botão de confirmar vermelho sólido à direita (`--color-error`, texto `--color-on-primary`), ambos 46 px; foco inicial no Cancelar; Escape cancela; sem digitar nada para confirmar | `.dialog`, `ConfirmDialog`, `.confirm-actions` |
 | **Aviso de atualização** | pílula no topo, centralizada, botão âmbar "Atualizar" | `UpdatePrompt` |
+| **Faixa de teste** | faixa no topo, só no site de teste (`louvor-hajaluz-teste`): texto "TESTE · #N" (13 px, negrito, centralizado) sobre `--color-warn-soft`, com `--color-warn`; no topo da página, rola com o conteúdo; nunca cobre controles (sem `sticky` nem `fixed`), com `env(safe-area-inset-top)`. Não aparece em produção (sem `VITE_TEST_BANNER`) | `TestBanner`, `.test-banner` |
 
 Estados obrigatórios por tela: **carregando, vazio, erro** (e "somente leitura" para visitante). Ver a tela
 "Estados e avisos" no Paper.

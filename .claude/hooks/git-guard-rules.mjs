@@ -1,11 +1,72 @@
 // Regras puras do guard de Git: decide se um comando de shell pode rodar
 // sob o fluxo de branches do projeto. Sem dependências, sem I/O.
 //
-// evaluateCommand({ command, branch, stagedFiles, resolvePrBase }) devolve
-// (resolvePrBase(alvo, repo) -> base do PR ou null; injetado pelo entrypoint, só chamado em `gh pr merge`):
+// evaluateCommand({ command, branch, stagedFiles, resolvePr, now, openIncidents }) devolve
 //   { allow: false, reason }     comando bloqueado;
 //   { allow: true, reminder }    permitido, com lembrete (ex.: `gh pr create` -> rodar testes);
 //   { allow: true }              permitido.
+// resolvePr(alvo, repo) -> PrFacts | null: injetado pelo entrypoint, só chamado em `gh pr merge`.
+
+/**
+ * @typedef {{ name: string; status?: string; conclusion?: string; state?: string }} CheckRun
+ * @typedef {{ base: string; head: string; headSha: string; checks: CheckRun[]; labels: string[]; files: string[]; body: string }} PrFacts
+ */
+
+// Travas: PRs que tocam estes caminhos só são mergeados pela pessoa responsável.
+// Entradas terminadas em `/` são prefixos de pasta; as demais são arquivos da raiz.
+export const GUARD_PATHS = ['.claude/', '.github/workflows/', 'firebase.json', 'cors.json', 'AGENTS.md', 'CLAUDE.md'];
+
+// Caminhos que exigem teste no celular (etiqueta `teste-celular-ok`).
+export const DEVICE_TEST_PATHS = ['apps/web/src/viewer/', 'apps/web/src/setlists/', 'apps/web/src/pad/'];
+
+// Arquivos de `files` que batem em algum prefixo (`/` no fim: startsWith; senão: igualdade).
+// Sem diferenciar maiúsculas: num checkout Windows `.Claude/x` é o mesmo arquivo de `.claude/x`.
+export function touches(files, prefixes) {
+  return files.filter((f) => {
+    const lf = f.toLowerCase();
+    return prefixes.some((p) => {
+      const lp = p.toLowerCase();
+      return lp.endsWith('/') ? lf.startsWith(lp) : lf === lp;
+    });
+  });
+}
+
+const GREEN_CONCLUSIONS = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL']);
+
+// Verde: ao menos um check e todos verdes. StatusContext tem `state`; CheckRun tem `status`/`conclusion`.
+export function ciGreen(checks) {
+  return (
+    checks.length > 0 &&
+    checks.every((c) =>
+      c.state !== undefined
+        ? c.state === 'SUCCESS'
+        : c.status === 'COMPLETED' && GREEN_CONCLUSIONS.has(c.conclusion)
+    )
+  );
+}
+
+// Janela do culto: quinta e domingo, a partir das 16h30 em Brasília (sem horário de verão).
+const WORSHIP_DAYS = new Set(['Thu', 'Sun']);
+const WORSHIP_START_MINUTES = 16 * 60 + 30;
+const SAO_PAULO_CLOCK = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Sao_Paulo',
+  weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+export function isFreezeWindow(date) {
+  const parts = Object.fromEntries(SAO_PAULO_CLOCK.formatToParts(date).map((p) => [p.type, p.value]));
+  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+  return WORSHIP_DAYS.has(parts.weekday) && minutes >= WORSHIP_START_MINUTES;
+}
+
+// Números de issues que o corpo do PR fecha (`Closes #N`, `fixes #N`, `resolve #N`...), sem repetição.
+export function closingRefs(body) {
+  const nums = [...body.matchAll(/\b(?:close[sd]?|fix(?:es|ed)?|resolve[sd]?)\s+#(\d+)/gi)].map((m) => Number(m[1]));
+  return [...new Set(nums)];
+}
 
 export const PROTECTED_BRANCHES = ['main', 'develop'];
 
@@ -270,28 +331,163 @@ function checkGit(tokens, state, stagedFiles) {
 }
 
 const MERGE_VALUE_FLAGS = [
-  '--subject', '-t', '--body', '-b', '--body-file', '-F', '--match-head-commit',
+  '--subject', '-t', '--body', '-b', '--body-file', '-F',
   '--author-email', '-A', '-R', '--repo',
 ];
 
-// Argumentos de `gh pr merge`: { positionals, repo } ignorando flags, seus valores e redirecionamentos.
+// Argumentos de `gh pr merge`: { positionals, repo, matchHead } ignorando valores e redirecionamentos.
 function parseMergeArgs(args) {
   const positionals = [];
   let repo = null;
+  let matchHead = null;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '-R' || a === '--repo') repo = args[++i] ?? repo;
     else if (a.startsWith('--repo=')) repo = a.slice(7);
     else if (/^-R./.test(a)) repo = a.slice(2);
+    else if (a === '--match-head-commit') matchHead = args[++i] ?? null;
+    else if (a.startsWith('--match-head-commit=')) matchHead = a.slice(20);
     else if (MERGE_VALUE_FLAGS.includes(a)) i++;
     else if (/^[\d*]*[<>]/.test(a)) {
       if (/^[\d*]*[<>]+$/.test(a)) i++; // `> arquivo`: o próximo token é o destino
     } else if (!a.startsWith('-')) positionals.push(a);
   }
-  return { positionals, repo };
+  return { positionals, repo, matchHead };
 }
 
-// Merge só para PRs com base develop (fail closed: base desconhecida bloqueia).
+// `--auto` (qualquer forma, exceto `--auto=false`) e o alias `-a`, sozinho ou em grupo curto
+// (`-sa`), não existem neste fluxo, em nenhuma base. `-R...` é o repositório, não grupo.
+const SHORT_AUTO = /^-(?!R)[A-Za-z]*a[A-Za-z]*(=|$)/;
+const autoOption = (args) =>
+  args.find((a) => (a.split('=')[0] === '--auto' ? a !== '--auto=false' : SHORT_AUTO.test(a)));
+
+// Comando simples: nenhum token do merge pode ter redirecionamento ou expansão, nem mesmo dentro de valor
+// de opção (senão `--subject >x` engole o token seguinte). Opções com valor precisam de um valor depois.
+const UNSAFE_TOKEN = /[<>$`*?{}~!]/;
+const MERGE_OPTIONS_WITH_VALUE = [
+  '--subject', '-t', '--body', '-b', '--body-file', '-F', '--match-head-commit', '-R', '--repo', '--author-email', '-A',
+];
+
+function checkSimpleMerge(args) {
+  const unsafe = args.find((a) => UNSAFE_TOKEN.test(a));
+  if (unsafe !== undefined) {
+    return block(
+      'Faça o merge com um comando simples, sem redirecionamento nem expansão: `gh pr merge <n> ...`. ' +
+        `Encontrado: ${unsafe}.`
+    );
+  }
+  for (let i = 0; i < args.length; i++) {
+    if (!MERGE_OPTIONS_WITH_VALUE.includes(args[i])) continue;
+    const next = args[i + 1];
+    if (next === undefined || next.startsWith('-')) {
+      return block(
+        `A opção \`${args[i]}\` precisa de um valor logo depois dela (sem outro \`-\` no meio). ` +
+          `Encontrado: ${args[i]}.`
+      );
+    }
+    i++;
+  }
+  return null;
+}
+
+// Merge na develop: travas, CI verde, etiquetas e teste no celular, nesta ordem; para no primeiro bloqueio.
+function checkDevelopMerge(facts, target) {
+  const ref = /^\d+$/.test(target) ? `#${target}` : target;
+  const guarded = touches(facts.files, GUARD_PATHS);
+  if (guarded.length) {
+    return block(
+      `O PR ${ref} altera as travas ou o processo (${guarded.join(', ')}): o merge é da pessoa responsável.`
+    );
+  }
+  if (!ciGreen(facts.checks)) {
+    const names = facts.checks.map((c) => c.name).join(', ') || 'nenhum check';
+    return block(`CI não está verde no PR ${ref} (${names}): espere o CI (\`gh pr checks ${target} --watch\`).`);
+  }
+  const missing = ['revisado', 'qa-ok'].filter((l) => !facts.labels.includes(l));
+  if (missing.length) {
+    return block(
+      `Faltam as etiquetas ${missing.join(', ')} no PR ${ref}: o merge na develop exige revisão (\`revisado\`) e QA (\`qa-ok\`).`
+    );
+  }
+  if (touches(facts.files, DEVICE_TEST_PATHS).length && !facts.labels.includes('teste-celular-ok')) {
+    return block(
+      `O PR ${ref} mexe em cifra, repertório ou pad: precisa do teste no celular (\`teste-celular-ok\`).`
+    );
+  }
+  return null;
+}
+
+// Release develop -> main, feito pelo agente só com todas as travas: head develop, opções na allowlist
+// (só `--merge`, `--match-head-commit` e as de valor listadas), SHA conferido, CI verde, fora da janela
+// do culto e sem incidente aberto. Qualquer outro token que comece com `-` bloqueia: não se tenta
+// interpretar as formas do pflag (`-dm=false`, `-md`, `--merge=true`...).
+const RELEASE_BOOL_OPTIONS = ['--merge', '-m'];
+const RELEASE_VALUE_OPTIONS = ['--subject', '-t', '--body', '-b', '--body-file', '-F', '-R', '--repo', '--match-head-commit'];
+const RELEASE_LONG_VALUE_OPTION = /^--(subject|body|body-file|repo|match-head-commit)=/;
+
+// Varre as opções do release: { offending: primeiro token fora da allowlist ou null, merge: se --merge/-m veio }.
+// Posicionais (alvo) e redirecionamentos passam; valores das opções de valor são pulados.
+function scanReleaseOptions(args) {
+  let merge = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (!a.startsWith('-')) {
+      if (/^[\d*]*[<>]+$/.test(a)) i++; // `> arquivo`
+      continue;
+    }
+    if (RELEASE_BOOL_OPTIONS.includes(a)) merge = true;
+    else if (RELEASE_VALUE_OPTIONS.includes(a)) i++;
+    else if (!RELEASE_LONG_VALUE_OPTION.test(a)) return { offending: a, merge };
+  }
+  return { offending: null, merge };
+}
+
+const releaseOptionsBlock = (target, sha, found) =>
+  block(
+    `Release só com \`gh pr merge ${target} --merge --match-head-commit ${sha}\` ` +
+      '(opções permitidas: `--merge`/`-m`, `--match-head-commit`, `--subject`/`-t`, `--body`/`-b`, ' +
+        '`--body-file`/`-F`, `-R`/`--repo`). ' +
+      `Encontrado: ${found}.`
+  );
+
+function checkReleaseMerge(facts, args, { matchHead }, target, state) {
+  if (facts.head !== 'develop') {
+    return block(`O release (PR para main) só pode vir da develop (head atual: "${facts.head}").`);
+  }
+  const { offending, merge } = scanReleaseOptions(args);
+  if (offending !== null) return releaseOptionsBlock(target, facts.headSha, offending);
+  if (!merge) return releaseOptionsBlock(target, facts.headSha, 'sem --merge');
+  if (matchHead !== facts.headSha) {
+    return block(
+      `Informe \`--match-head-commit ${facts.headSha}\` (SHA atual da develop no PR de release): ` +
+        'o merge só segue se o SHA conferir.'
+    );
+  }
+  if (!ciGreen(facts.checks)) {
+    const names = facts.checks.map((c) => c.name).join(', ') || 'nenhum check';
+    return block(`CI não está verde no release (${names}): espere o CI (\`gh pr checks ${target} --watch\`).`);
+  }
+  if (isFreezeWindow(state.now())) {
+    return block(
+      'Janela do culto (quinta e domingo, a partir das 16h30 em Brasília): o release espera a janela passar.'
+    );
+  }
+  const open = state.openIncidents();
+  if (open === null) {
+    return block('Não foi possível verificar incidentes abertos: o release fica bloqueado até a checagem voltar.');
+  }
+  const closes = new Set(closingRefs(facts.body ?? ''));
+  const unclosed = open.filter((n) => !closes.has(n));
+  if (unclosed.length) {
+    const list = unclosed.map((n) => `#${n}`).join(', ');
+    return block(
+      `Há incidente aberto (${list}): o próximo release precisa fechá-lo (\`Closes #${unclosed[0]}\`).`
+    );
+  }
+  return null;
+}
+
+// Merge só para PRs com base develop ou main (fail closed: fatos indisponíveis ou base desconhecida bloqueiam).
 function checkMerge(args, state, leadingRepo) {
   if (/\bGH_REPO\b/.test(state.command)) {
     return block('Não use GH_REPO com `gh pr merge`: defina o repositório com -R <dono/repo>.');
@@ -299,7 +495,17 @@ function checkMerge(args, state, leadingRepo) {
   if (++state.merges > 1) {
     return block('Faça um merge por comando: rode cada `gh pr merge` separadamente.');
   }
-  const { positionals, repo } = parseMergeArgs(args);
+  const simple = checkSimpleMerge(args);
+  if (simple) return simple;
+  const auto = autoOption(args);
+  if (auto !== undefined) {
+    return block(
+      'Merge com `--auto` (ou o alias `-a`) não é permitido em nenhuma base: o merge é feito direto. ' +
+        `Encontrado: ${auto}. Develop: \`--squash --delete-branch\`; release: \`--merge --match-head-commit <sha>\`.`
+    );
+  }
+  const parsed = parseMergeArgs(args);
+  const { positionals, repo } = parsed;
   if (positionals.length > 1) {
     return block('`gh pr merge` com mais de um alvo: informe apenas um PR (`gh pr merge <n> --squash --delete-branch`).');
   }
@@ -310,13 +516,9 @@ function checkMerge(args, state, leadingRepo) {
         '`gh pr merge <n> --squash --delete-branch`.'
     );
   }
-  const base = state.resolvePrBase(target, repo ?? leadingRepo);
-  if (base === 'develop') return null;
-  if (base === 'main') {
-    return block(
-      'Merge de PR para main é decisão humana: só a pessoa responsável aprova e faz o merge do PR develop → main.'
-    );
-  }
+  const facts = state.resolvePr(target, repo ?? leadingRepo);
+  if (facts?.base === 'develop') return checkDevelopMerge(facts, target);
+  if (facts?.base === 'main') return checkReleaseMerge(facts, args, parsed, target, state);
   return block(
     'Não foi possível determinar a base do PR; merge bloqueado. ' +
       `Confira com \`gh pr view ${target} --json baseRefName\` e só faça merge de PRs com base develop.`
@@ -415,6 +617,7 @@ function checkGh(tokens, state) {
       ? block('`gh api` só é permitido para leitura (GET); para PRs use `gh pr ...`.')
       : null;
   }
+  if (area === 'workflow' && action === 'run') return checkWorkflowRun(args);
   if (area !== 'pr') return null;
   if (action === 'merge') return checkMerge(args, state, leadingRepo);
   if (action === 'review' && args.some((a) => a === '--approve' || /^-[A-Za-z]*a[A-Za-z]*$/.test(a))) {
@@ -454,13 +657,66 @@ function stripPrefixes(tokens) {
   return out;
 }
 
-// "/usr/bin/git" -> "git"; "C:\Git\git.EXE" -> "git".
-const programName = (token) => token.split(/[\\/]/).pop().replace(/\.exe$/i, '');
+// "/usr/bin/git" -> "git"; "C:\Git\git.EXE" -> "git"; "firebase.cmd" -> "firebase".
+const programName = (token) => token.split(/[\\/]/).pop().replace(/\.(exe|cmd)$/i, '');
 
-// Código inline de `bash -c "..."` / `pwsh -Command "..."`, se houver.
-function inlineScript(tokens) {
-  const i = tokens.findIndex((t) => /^-(c|command)$/i.test(t));
+// Código inline de `bash -c "..."`, `bash -lc "..."`, `sh -ec "..."`, `pwsh -Command "..."` ou `pwsh -c "..."`.
+// Shells POSIX aceitam `c` dentro de um grupo de flags curtas; pwsh só `-c` ou `-Command` exatos
+// (senão `-ExecutionPolicy` casaria pelo `c` e o valor seguinte seria tratado como script).
+const POSIX_SHELLS = new Set(['bash', 'sh', 'zsh']);
+function inlineScript(program, tokens) {
+  const isInlineFlag = POSIX_SHELLS.has(program)
+    ? (t) => /^-[a-zA-Z]*c[a-zA-Z]*$/.test(t)
+    : (t) => /^-c(ommand)?$/i.test(t);
+  const i = tokens.findIndex(isInlineFlag);
   return i !== -1 ? tokens[i + 1] : undefined;
+}
+
+// Produção só sai pelo merge do release; o site de teste, pelo workflow `site-teste.yml` com `--ref main`.
+const DEPLOY_BLOCK = block(
+  'O agente não publica produção: ela sai pelo merge do release, e o site de teste pelo workflow ' +
+    '`site-teste.yml` (disparado com `--ref main`).'
+);
+
+const DEPLOY_WORKFLOW = /^deploy(\.ya?ml)?$/i;
+const SITE_TEST_WORKFLOW = /^site-teste(\.ya?ml)?$/i;
+const WORKFLOW_VALUE_FLAGS = ['-f', '--field', '-F', '--raw-field', '-r', '--ref', '-R', '--repo'];
+
+// Primeiro posicional de `gh workflow run` (o nome, o arquivo ou o id), pulando os valores das flags.
+function workflowTarget(args) {
+  for (let i = 0; i < args.length; i++) {
+    if (WORKFLOW_VALUE_FLAGS.includes(args[i])) i++;
+    else if (!args[i].startsWith('-')) return args[i];
+  }
+  return undefined;
+}
+
+function checkWorkflowRun(args) {
+  const wf = workflowTarget(args);
+  if (wf === undefined) return null;
+  // `.github/workflows/deploy.yml` e `./deploy.yaml` valem como o arquivo de nome `deploy.yml`.
+  const name = wf.split(/[\\/]/).pop();
+  if (DEPLOY_WORKFLOW.test(name) || /^\d+$/.test(wf)) return DEPLOY_BLOCK;
+  if (SITE_TEST_WORKFLOW.test(name)) {
+    // `-rmain` (colado) também é a ref; `--ref=` e `-r main` são tratados por optionValue.
+    const glued = args.find((a) => /^-r./.test(a))?.slice(2);
+    const ref = optionValue(args, ['--ref', '-r']) ?? glued;
+    if (ref !== undefined && ref !== 'main') {
+      return block(`O workflow \`site-teste.yml\` só roda com \`--ref main\`: Encontrado: --ref ${ref}.`);
+    }
+  }
+  return null;
+}
+
+// `firebase` (ou `firebase.cmd`): deploy é token exato `deploy` ou um alvo `...:deploy` depois do comando.
+const isFirebaseDeploy = (t) => t === 'deploy' || t.endsWith(':deploy');
+const checkFirebase = (tokens) => (tokens.slice(1).some(isFirebaseDeploy) ? DEPLOY_BLOCK : null);
+
+// `npx firebase ...`, `npx firebase-tools@15 ...`: a partir do primeiro token do pacote firebase.
+const FIREBASE_PACKAGE = /^firebase(-tools)?(@.*)?$/i;
+function checkNpx(tokens) {
+  const i = tokens.findIndex((t, idx) => idx > 0 && FIREBASE_PACKAGE.test(t));
+  return i === -1 ? null : checkFirebase(tokens.slice(i));
 }
 
 function evaluateSegments(command, state, stagedFiles) {
@@ -471,8 +727,10 @@ function evaluateSegments(command, state, stagedFiles) {
     let result = null;
     if (program === 'git') result = checkGit(tokens, state, stagedFiles);
     else if (program === 'gh') result = checkGh(tokens, state);
+    else if (program === 'firebase') result = checkFirebase(tokens);
+    else if (program === 'npx') result = checkNpx(tokens);
     else if (SHELLS.has(program)) {
-      const script = inlineScript(tokens);
+      const script = inlineScript(program, tokens);
       if (script) result = evaluateSegments(script, state, stagedFiles);
     }
     if (result) return result;
@@ -484,8 +742,15 @@ const PR_REMINDER =
   '[git-guard] Lembrete: rode os testes (node --test ".claude/**/*.test.mjs" e os do monorepo) ' +
   'e confirme que passam antes de abrir o PR.';
 
-export function evaluateCommand({ command, branch, stagedFiles = [], resolvePrBase = () => null }) {
-  const state = { branch, prCreate: false, resolvePrBase, command, merges: 0 };
+export function evaluateCommand({
+  command,
+  branch,
+  stagedFiles = [],
+  resolvePr = () => null,
+  now = () => new Date(),
+  openIncidents = () => null,
+}) {
+  const state = { branch, prCreate: false, resolvePr, now, openIncidents, command, merges: 0 };
   const blocked = checkApi(command) ?? evaluateSegments(command, state, stagedFiles);
   if (blocked) return blocked;
   return state.prCreate ? { allow: true, reminder: PR_REMINDER } : { allow: true };

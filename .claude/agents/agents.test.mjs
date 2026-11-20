@@ -41,11 +41,73 @@ test('every agent has name matching file and a description', () => {
   }
 });
 
-test('implementers run on haiku medium', () => {
-  for (const n of ['frontend-dev', 'backend-dev', 'qa']) {
+const SDLC_TABLE = {
+  'product-owner': { model: 'sonnet', effort: 'medium' },
+  designer: { model: 'sonnet', effort: 'medium' },
+  'tech-lead': { model: 'haiku', effort: 'high' },
+  'frontend-dev': { model: 'haiku', effort: 'low' },
+  'backend-dev': { model: 'haiku', effort: 'low' },
+  qa: { model: 'haiku', effort: 'low' },
+  'code-reviewer': { model: 'sonnet', effort: 'high' },
+};
+
+test('every agent runs on the model and effort of the SDLC table', () => {
+  for (const [n, want] of Object.entries(SDLC_TABLE)) {
     const { fm } = parse(n);
-    assert.equal(fm.model, 'haiku');
-    assert.equal(fm.effort, 'medium');
+    assert.equal(fm.model, want.model, `${n}: model`);
+    assert.equal(fm.effort, want.effort, `${n}: effort`);
+  }
+});
+
+test('no agent runs on opus', () => {
+  for (const n of NAMES) {
+    assert.notEqual(parse(n).fm.model, 'opus', `${n}: opus`);
+  }
+});
+
+test('every agent leaves the issue to the orchestrator', () => {
+  for (const n of NAMES) {
+    assert.ok(parse(n).body.includes('orquestrador escreve na issue'), `${n}: sem regra da issue`);
+  }
+});
+
+test('every agent knows its step in entregar-issue', () => {
+  for (const n of NAMES) {
+    assert.ok(parse(n).body.includes('entregar-issue'), `${n}: sem entregar-issue`);
+  }
+});
+
+test('agents with write tools only read and return text in stages 1 and 2', () => {
+  for (const n of ['product-owner', 'tech-lead', 'designer']) {
+    assert.ok(
+      parse(n).body.includes('Nas etapas 1 e 2, só lê e devolve texto; não escreve arquivos.'),
+      `${n}: sem regra de leitura nas etapas 1 e 2`,
+    );
+  }
+});
+
+test('tech-lead writes the plan inside the worktree given by the orchestrator', () => {
+  assert.ok(
+    parse('tech-lead').body.includes(
+      'escreve o plano dentro da worktree informada pelo orquestrador, em `docs/superpowers/plans/<data>-<n>-<slug>.md`',
+    ),
+  );
+});
+
+test('code-reviewer mentions its per-task review in stage 4', () => {
+  assert.match(parse('code-reviewer').body, /etapa 4/i);
+});
+
+test('every agent states the merge rule with the git-guard', () => {
+  for (const n of NAMES) {
+    const { body } = parse(n);
+    assert.ok(
+      body.includes(
+        'subagentes nunca fazem merge; o orquestrador faz o merge com as travas do git-guard, e mudanças nas travas ficam com a pessoa',
+      ),
+      `${n}: regra de merge antiga ou ausente`,
+    );
+    assert.ok(!body.includes('merge é do orquestrador para develop'), `${n}: linha antiga de merge`);
   }
 });
 

@@ -3,7 +3,7 @@ name: frontend-dev
 description: Desenvolvedor frontend React + TypeScript em apps/web; use para implementar telas e componentes seguindo o designer, com TDD.
 tools: Read, Grep, Glob, Bash, Write, Edit, Skill
 model: haiku
-effort: medium
+effort: low
 ---
 
 Leia `AGENTS.md` antes de qualquer ação.
@@ -22,7 +22,12 @@ Você é o desenvolvedor frontend do Church Cifras: React + TypeScript em `apps/
 
 - Siga TDD (skill `superpowers:test-driven-development`): teste falhando antes do código.
 - Nunca despache subagentes; faça o trabalho você mesmo.
-- Nunca commitar em `main` nem em `develop`; subagentes nunca fazem merge de PR (merge é do orquestrador para develop e do humano para main).
+- Nunca commitar em `main` nem em `develop`; subagentes nunca fazem merge; o orquestrador faz o merge com as travas do git-guard, e mudanças nas travas ficam com a pessoa.
+
+## No roteiro entregar-issue
+- Pré-voo (etapa 3): lê as suas tarefas do plano e aponta lacunas, sem implementar.
+- Implementação (etapa 4): executa as tarefas com `test-driven-development`, com testes verdes ao fim de cada uma.
+- Só o orquestrador escreve na issue; devolva o texto a ele.
 
 ## Definição de pronto
 
