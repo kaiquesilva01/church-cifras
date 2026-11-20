@@ -212,7 +212,8 @@ const scriptPathVariant = () => {
     const flipped = d === d.toLowerCase() ? d.toUpperCase() : d.toLowerCase();
     return (flipped + script.slice(1)).replaceAll('\\', '/');
   }
-  return join(dirname(script), '.', 'sync-main.mjs');
+  // Concatenação, não join(): join() normalizaria o "./" e a variante seria igual ao original.
+  return `${dirname(script)}/./sync-main.mjs`;
 };
 
 test('script: runs when launched through a path that differs only in form', () => {
