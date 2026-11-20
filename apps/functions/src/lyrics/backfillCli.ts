@@ -15,6 +15,7 @@ import {
   type BackfillReport,
 } from './backfill';
 import { describeTarget } from './backfillTarget';
+import { pickHandmadePath } from './handmadePath';
 
 type Bucket = ReturnType<ReturnType<typeof getStorage>['bucket']>;
 
@@ -78,8 +79,7 @@ function realDeps(db: Firestore, bucket: Bucket): BackfillDeps {
         .collection(`songs/${songId}/arrangements`)
         .where('source', '==', 'handmade')
         .get();
-      const path = snap.docs.map((d) => d.data().storagePath).find((p) => typeof p === 'string');
-      return path ?? null;
+      return pickHandmadePath(snap.docs.map((d) => d.data().storagePath));
     },
     readPdf: async (storagePath) => {
       const [data] = await bucket.file(storagePath).download();
@@ -138,7 +138,11 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const report = await backfillLyrics(realDeps(db, storageBucket), { dryRun, samples });
+  const report = await backfillLyrics(realDeps(db, storageBucket), {
+    dryRun,
+    samples,
+    onProgress: (done, total) => console.error(`processadas ${done}/${total}`),
+  });
   printReport(report, dryRun);
   if (report.failed.length > 0) process.exitCode = 1;
 }

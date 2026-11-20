@@ -143,3 +143,72 @@ describe('backfillLyrics', () => {
     expect(report.written).toBe(0);
   });
 });
+
+describe('backfillLyrics: samples and progress', () => {
+  it('does not record a sample when writeLyrics reports the doc already existed', async () => {
+    const { deps } = setup({
+      s1: { storagePath: 'a.pdf', pdf: pdfOf(1), lyrics: 'Luz', created: false },
+      s2: { storagePath: 'b.pdf', pdf: pdfOf(2), lyrics: 'Canto' },
+    });
+    const report = await backfillLyrics(deps, { dryRun: false });
+    expect(report.existing).toBe(1);
+    expect(report.written).toBe(1);
+    expect(report.samples).toEqual([{ songId: 's2', text: 'Canto' }]);
+  });
+
+  it('still records samples in dry-run (the doc would be created)', async () => {
+    const { deps } = setup({
+      s1: { storagePath: 'a.pdf', pdf: pdfOf(1), lyrics: 'Luz', created: false },
+    });
+    const report = await backfillLyrics(deps, { dryRun: true });
+    expect(report.samples).toEqual([{ songId: 's1', text: 'Luz' }]);
+  });
+
+  it('reports progress every 25 songs and at the end', async () => {
+    const songs: Record<string, FakeSong> = {};
+    for (let i = 1; i <= 60; i++) songs[`s${i}`] = { hasLyrics: true };
+    const { deps } = setup(songs);
+    const calls: Array<[number, number]> = [];
+    await backfillLyrics(deps, {
+      dryRun: true,
+      onProgress: (done, total) => calls.push([done, total]),
+    });
+    expect(calls).toEqual([
+      [25, 60],
+      [50, 60],
+      [60, 60],
+    ]);
+  });
+
+  it('reports progress once at the end when the total is a multiple of 25, and for an empty list', async () => {
+    const songs: Record<string, FakeSong> = {};
+    for (let i = 1; i <= 25; i++) songs[`s${i}`] = { hasLyrics: true };
+    const calls: Array<[number, number]> = [];
+    await backfillLyrics(setup(songs).deps, {
+      dryRun: true,
+      onProgress: (done, total) => calls.push([done, total]),
+    });
+    expect(calls).toEqual([[25, 25]]);
+
+    const empty: Array<[number, number]> = [];
+    await backfillLyrics(setup({}).deps, {
+      dryRun: true,
+      onProgress: (done, total) => empty.push([done, total]),
+    });
+    expect(empty).toEqual([[0, 0]]);
+  });
+
+  it('counts failed songs as processed and works without onProgress', async () => {
+    const { deps } = setup({
+      s1: { storagePath: 'a.pdf', pdf: pdfOf(1), readError: 'boom' },
+    });
+    const calls: Array<[number, number]> = [];
+    const withCb = await backfillLyrics(deps, {
+      dryRun: true,
+      onProgress: (done, total) => calls.push([done, total]),
+    });
+    const without = await backfillLyrics(deps, { dryRun: true });
+    expect(calls).toEqual([[1, 1]]);
+    expect(withCb).toEqual(without);
+  });
+});

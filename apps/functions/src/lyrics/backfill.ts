@@ -4,6 +4,8 @@
 
 export const MAX_LYRICS_LENGTH = 20_000;
 export const DEFAULT_SAMPLES = 3;
+/** De quantas em quantas músicas `onProgress` é chamado (além da chamada final). */
+export const PROGRESS_EVERY = 25;
 
 export interface BackfillDeps {
   listSongIds(): Promise<string[]>;
@@ -25,7 +27,12 @@ export interface BackfillReport {
 
 export async function backfillLyrics(
   deps: BackfillDeps,
-  options: { dryRun: boolean; samples?: number },
+  options: {
+    dryRun: boolean;
+    samples?: number;
+    /** Chamado a cada `PROGRESS_EVERY` músicas processadas e ao final. */
+    onProgress?: (done: number, total: number) => void;
+  },
 ): Promise<BackfillReport> {
   const sampleLimit = options.samples ?? DEFAULT_SAMPLES;
   const report: BackfillReport = {
@@ -38,7 +45,9 @@ export async function backfillLyrics(
   };
 
   // Sequencial de propósito: uma música por vez, sem estourar cotas do Firestore/Storage.
-  for (const songId of await deps.listSongIds()) {
+  const songIds = await deps.listSongIds();
+  let done = 0;
+  for (const songId of songIds) {
     try {
       if (await deps.hasLyrics(songId)) {
         report.existing++;
@@ -57,15 +66,24 @@ export async function backfillLyrics(
         continue;
       }
       const created = options.dryRun ? true : await deps.writeLyrics(songId, text);
-      if (created) report.written++;
-      else report.existing++;
-      if (report.samples.length < sampleLimit) report.samples.push({ songId, text });
+      if (created) {
+        report.written++;
+        if (report.samples.length < sampleLimit) report.samples.push({ songId, text });
+      } else {
+        report.existing++;
+      }
     } catch (error) {
       report.failed.push({
         songId,
         error: error instanceof Error ? error.message : String(error),
       });
+    } finally {
+      done++;
+      if (done % PROGRESS_EVERY === 0 && done !== songIds.length) {
+        options.onProgress?.(done, songIds.length);
+      }
     }
   }
+  options.onProgress?.(done, songIds.length);
   return report;
 }
