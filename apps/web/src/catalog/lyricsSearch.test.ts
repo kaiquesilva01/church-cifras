@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import * as chords from '@cifras/chords';
+import { describe, expect, it, vi } from 'vitest';
 import { searchLyrics } from './lyricsSearch';
 import type { SongSummary } from './types';
+
+vi.mock('@cifras/chords', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@cifras/chords')>();
+  return { ...actual, normalizeText: vi.fn(actual.normalizeText) };
+});
 
 const song = (id: string, title: string): SongSummary => ({
   id,
@@ -153,5 +159,95 @@ describe('searchLyrics', () => {
       { text: 'Deus amor', match: true },
       { text: 'eterno', match: false },
     ]);
+  });
+});
+
+describe('searchLyrics: single-word queries highlight every occurrence', () => {
+  it('marks every repeated word in the snippet window, merged into one run', () => {
+    const songs = [song('s1', 'Santo')];
+    const lyrics = new Map([['s1', 'Santo, santo, santo é o Senhor']]);
+
+    expect(searchLyrics(songs, lyrics, 'santo')[0]?.snippet).toEqual([
+      { text: 'Santo, santo, santo', match: true },
+      { text: 'é o Senhor', match: false },
+    ]);
+  });
+
+  it('keeps separate runs for occurrences that are not adjacent', () => {
+    const songs = [song('s1', 'Santo')];
+    const lyrics = new Map([['s1', 'Ó santo é o Senhor, santo']]);
+
+    expect(searchLyrics(songs, lyrics, 'santo')[0]?.snippet).toEqual([
+      { text: 'Ó', match: false },
+      { text: 'santo', match: true },
+      { text: 'é o Senhor,', match: false },
+      { text: 'santo', match: true },
+    ]);
+  });
+
+  it('matches accent-insensitively on every occurrence and still highlights partial words', () => {
+    const songs = [song('s1', 'Glória')];
+    const lyrics = new Map([['s1', 'Glória, glorioso, GLÓRIA ao Rei']]);
+
+    expect(searchLyrics(songs, lyrics, 'glori')[0]?.snippet).toEqual([
+      { text: 'Glória, glorioso, GLÓRIA', match: true },
+      { text: 'ao Rei', match: false },
+    ]);
+  });
+
+  it('does not highlight occurrences outside the snippet window', () => {
+    const songs = [song('s1', 'Santo')];
+    const lyrics = new Map([['s1', `santo ${ipsum(40).join(' ')} santo`]]);
+
+    const snippet = searchLyrics(songs, lyrics, 'santo')[0]?.snippet ?? [];
+    expect(snippet[0]).toEqual({ text: 'santo', match: true });
+    expect(snippet.filter((part) => part.match)).toHaveLength(1);
+    expect(snippet[snippet.length - 1]).toEqual({ text: '…', match: false });
+  });
+});
+
+describe('searchLyrics: per-snapshot cache', () => {
+  const normalizeText = vi.mocked(chords.normalizeText);
+
+  it('does not normalize the lyrics again for the same snapshot', () => {
+    const songs = [song('s1', 'Alfa'), song('s2', 'Beta')];
+    const lyrics = new Map([
+      ['s1', 'Deus é amor'],
+      ['s2', 'Senhor, Deus de glória'],
+    ]);
+
+    const first = searchLyrics(songs, lyrics, 'deus');
+    normalizeText.mockClear();
+    const again = searchLyrics(songs, lyrics, 'deus');
+    const other = searchLyrics(songs, lyrics, 'glória');
+
+    expect(again).toEqual(first);
+    expect(other.map((h) => h.song.id)).toEqual(['s2']);
+    // Só a própria busca é normalizada (uma vez por chamada), nunca as letras ou as palavras do trecho.
+    expect(normalizeText).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-processes a song whose text changed in a new snapshot', () => {
+    const songs = [song('s1', 'Alfa')];
+    const before = new Map([['s1', 'Deus é amor']]);
+    const after = new Map([['s1', 'Senhor Jesus']]);
+
+    expect(searchLyrics(songs, before, 'deus')).toHaveLength(1);
+    expect(searchLyrics(songs, after, 'deus')).toEqual([]);
+    expect(searchLyrics(songs, after, 'jesus')[0]?.snippet).toEqual([
+      { text: 'Senhor', match: false },
+      { text: 'Jesus', match: true },
+    ]);
+    expect(searchLyrics(songs, before, 'deus')).toHaveLength(1);
+  });
+
+  it('never serves stale results when the same Map is mutated in place', () => {
+    const songs = [song('s1', 'Alfa')];
+    const lyrics = new Map([['s1', 'Deus é amor']]);
+
+    expect(searchLyrics(songs, lyrics, 'deus')).toHaveLength(1);
+    lyrics.set('s1', 'Senhor Jesus');
+    expect(searchLyrics(songs, lyrics, 'deus')).toEqual([]);
+    expect(searchLyrics(songs, lyrics, 'jesus')).toHaveLength(1);
   });
 });

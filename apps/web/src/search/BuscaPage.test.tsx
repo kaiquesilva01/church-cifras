@@ -138,8 +138,8 @@ describe('BuscaPage', () => {
   it('shows a "Na letra" section with the snippet and the highlighted words', () => {
     renderBusca('/busca?q=santo');
     expect(screen.getByRole('heading', { name: 'Na letra' })).toBeInTheDocument();
-    // The snippet highlights the located occurrence (the first one), as searchLyrics returns it.
-    expect(screen.getByText('Santo,').tagName).toBe('MARK');
+    // A single word is highlighted on every occurrence in the snippet (one merged run).
+    expect(screen.getByText('Santo, santo, santo').tagName).toBe('MARK');
     expect(screen.getByText('1 música')).toBeInTheDocument();
   });
 

@@ -32,6 +32,38 @@ interface Location {
   phrase: boolean;
 }
 
+interface Processed {
+  /** O texto de que `normalized` e `tokens` foram calculados (para detectar mudança). */
+  text: string;
+  normalized: string;
+  tokens: Token[] | undefined;
+}
+
+/**
+ * Letras já normalizadas/tokenizadas por snapshot (o Map que o provider entrega). Cada busca a
+ * cada tecla reaproveita o trabalho; um snapshot novo começa vazio e o antigo é coletado junto
+ * com o Map. Uma entrada só vale se o texto da música ainda é o mesmo.
+ */
+const processedBySnapshot = new WeakMap<ReadonlyMap<string, string>, Map<string, Processed>>();
+
+function processedFor(
+  lyrics: ReadonlyMap<string, string>,
+  songId: string,
+  text: string,
+): Processed {
+  let cache = processedBySnapshot.get(lyrics);
+  if (!cache) {
+    cache = new Map();
+    processedBySnapshot.set(lyrics, cache);
+  }
+  let entry = cache.get(songId);
+  if (entry?.text !== text) {
+    entry = { text, normalized: normalizeText(text), tokens: undefined };
+    cache.set(songId, entry);
+  }
+  return entry;
+}
+
 /** Casa como `matchesAll`: todas as palavras da busca precisam aparecer no texto. */
 export function searchLyrics(
   songs: SongSummary[],
@@ -48,10 +80,11 @@ export function searchLyrics(
     if (exclude.has(song.id)) continue;
     const text = lyrics.get(song.id);
     if (text === undefined) continue;
-    const normalized = normalizeText(text);
-    if (!words.every((w) => normalized.includes(w))) continue;
+    const processed = processedFor(lyrics, song.id, text);
+    if (!words.every((w) => processed.normalized.includes(w))) continue;
 
-    const tokens = tokenize(text);
+    processed.tokens ??= tokenize(text);
+    const tokens = processed.tokens;
     const location = locate(tokens, words);
     hits.push({
       song,
@@ -114,8 +147,9 @@ function buildSnippet(tokens: Token[], words: string[], location: Location): Sni
     }
   }
 
+  // Uma palavra só: toda ocorrência no trecho é destacada. Frase: só a sequência localizada.
   const isMatch = (i: number, token: Token) =>
-    location.phrase
+    location.phrase && words.length > 1
       ? i >= location.start && i <= location.end
       : words.some((w) => token.norm.includes(w));
 
