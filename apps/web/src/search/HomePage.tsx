@@ -126,12 +126,14 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
         title={tab.id === 'repertorios' ? 'Repertório' : tab.id === 'harpa' ? 'Harpa' : 'Músicas'}
       />
       {tab.id !== 'repertorios' && (
-        <SearchInput
-          aria-label={tab.placeholder}
-          placeholder={tab.placeholder}
-          value={query}
-          onChange={setQuery}
-        />
+        <div className="search-sticky search-sticky-roomy">
+          <SearchInput
+            aria-label={tab.placeholder}
+            placeholder={tab.placeholder}
+            value={query}
+            onChange={setQuery}
+          />
+        </div>
       )}
       {tab.id !== 'repertorios' && (
         <>

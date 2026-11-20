@@ -127,6 +127,11 @@
   background: var(--color-bg);
 }
 
+/* Home: only the field is fixed, so the list needs more room below it before it scrolls under. */
+.search-sticky-roomy {
+  padding-bottom: 8px;
+}
+
 .filter-row {
   display: flex;
   gap: 8px;
