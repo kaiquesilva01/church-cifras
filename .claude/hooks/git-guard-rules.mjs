@@ -617,6 +617,7 @@ function checkGh(tokens, state) {
       ? block('`gh api` só é permitido para leitura (GET); para PRs use `gh pr ...`.')
       : null;
   }
+  if (area === 'workflow' && action === 'run') return checkWorkflowRun(args);
   if (area !== 'pr') return null;
   if (action === 'merge') return checkMerge(args, state, leadingRepo);
   if (action === 'review' && args.some((a) => a === '--approve' || /^-[A-Za-z]*a[A-Za-z]*$/.test(a))) {
@@ -656,13 +657,58 @@ function stripPrefixes(tokens) {
   return out;
 }
 
-// "/usr/bin/git" -> "git"; "C:\Git\git.EXE" -> "git".
-const programName = (token) => token.split(/[\\/]/).pop().replace(/\.exe$/i, '');
+// "/usr/bin/git" -> "git"; "C:\Git\git.EXE" -> "git"; "firebase.cmd" -> "firebase".
+const programName = (token) => token.split(/[\\/]/).pop().replace(/\.(exe|cmd)$/i, '');
 
 // Código inline de `bash -c "..."` / `pwsh -Command "..."`, se houver.
 function inlineScript(tokens) {
   const i = tokens.findIndex((t) => /^-(c|command)$/i.test(t));
   return i !== -1 ? tokens[i + 1] : undefined;
+}
+
+// Produção só sai pelo merge do release; o site de teste, pelo workflow `site-teste.yml` com `--ref main`.
+const DEPLOY_BLOCK = block(
+  'O agente não publica produção: ela sai pelo merge do release, e o site de teste pelo workflow ' +
+    '`site-teste.yml` (disparado com `--ref main`).'
+);
+
+const DEPLOY_WORKFLOW = /^deploy(\.ya?ml)?$/i;
+const SITE_TEST_WORKFLOW = /^site-teste(\.ya?ml)?$/i;
+const WORKFLOW_VALUE_FLAGS = ['-f', '--field', '-F', '--raw-field', '-r', '--ref', '-R', '--repo'];
+
+// Primeiro posicional de `gh workflow run` (o nome, o arquivo ou o id), pulando os valores das flags.
+function workflowTarget(args) {
+  for (let i = 0; i < args.length; i++) {
+    if (WORKFLOW_VALUE_FLAGS.includes(args[i])) i++;
+    else if (!args[i].startsWith('-')) return args[i];
+  }
+  return undefined;
+}
+
+function checkWorkflowRun(args) {
+  const wf = workflowTarget(args);
+  if (wf === undefined) return null;
+  if (DEPLOY_WORKFLOW.test(wf) || /^\d+$/.test(wf)) return DEPLOY_BLOCK;
+  if (SITE_TEST_WORKFLOW.test(wf)) {
+    // `-rmain` (colado) também é a ref; `--ref=` e `-r main` são tratados por optionValue.
+    const glued = args.find((a) => /^-r./.test(a))?.slice(2);
+    const ref = optionValue(args, ['--ref', '-r']) ?? glued;
+    if (ref !== undefined && ref !== 'main') {
+      return block(`O workflow \`site-teste.yml\` só roda com \`--ref main\`: Encontrado: --ref ${ref}.`);
+    }
+  }
+  return null;
+}
+
+// `firebase` (ou `firebase.cmd`): deploy é token exato `deploy` ou um alvo `...:deploy` depois do comando.
+const isFirebaseDeploy = (t) => t === 'deploy' || t.endsWith(':deploy');
+const checkFirebase = (tokens) => (tokens.slice(1).some(isFirebaseDeploy) ? DEPLOY_BLOCK : null);
+
+// `npx firebase ...`, `npx firebase-tools@15 ...`: a partir do primeiro token do pacote firebase.
+const FIREBASE_PACKAGE = /^firebase(-tools)?(@.*)?$/i;
+function checkNpx(tokens) {
+  const i = tokens.findIndex((t, idx) => idx > 0 && FIREBASE_PACKAGE.test(t));
+  return i === -1 ? null : checkFirebase(tokens.slice(i));
 }
 
 function evaluateSegments(command, state, stagedFiles) {
@@ -673,6 +719,8 @@ function evaluateSegments(command, state, stagedFiles) {
     let result = null;
     if (program === 'git') result = checkGit(tokens, state, stagedFiles);
     else if (program === 'gh') result = checkGh(tokens, state);
+    else if (program === 'firebase') result = checkFirebase(tokens);
+    else if (program === 'npx') result = checkNpx(tokens);
     else if (SHELLS.has(program)) {
       const script = inlineScript(tokens);
       if (script) result = evaluateSegments(script, state, stagedFiles);

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   evaluateCommand,
   touches,
@@ -86,7 +87,26 @@ const cases = [
   ['allows git rebase origin/develop', 'git rebase origin/develop', 'feat/a', [], true],
   ['allows pr create main from develop explicit head', 'gh pr create --base main --head develop', 'feat/a', [], true],
   ['allows commit message mentioning main and develop', 'git commit -m "merge main into develop"', 'feat/a', [], true],
+  // deploy de produção só pelo release; site de teste só com --ref main
+  ['blocks gh workflow run deploy.yml', 'gh workflow run deploy.yml', 'feat/a', [], false, 'release'],
+  ['blocks gh workflow run Deploy', 'gh workflow run Deploy', 'feat/a', [], false, 'release'],
+  ['blocks gh workflow run by numeric id', 'gh workflow run 123456', 'feat/a', [], false, 'release'],
+  ['blocks npx firebase deploy', 'npx firebase deploy --only hosting', 'feat/a', [], false, 'release'],
+  ['blocks firebase.cmd deploy', 'firebase.cmd deploy', 'feat/a', [], false, 'release'],
+  ['blocks npx firebase-tools@version hosting:channel:deploy', 'npx firebase-tools@15 hosting:channel:deploy x', 'feat/a', [], false, 'release'],
+  ['blocks firebase deploy after npm ci', 'npm ci; npx firebase deploy', 'feat/a', [], false, 'release'],
+  ['allows site-teste workflow without --ref', 'gh workflow run site-teste.yml -f branch=feat/95-x -f issue=95', 'feat/a', [], true],
+  ['allows site-teste workflow with --ref main', 'gh workflow run site-teste.yml --ref main -f branch=feat/95-x -f issue=95', 'feat/a', [], true],
+  ['allows firebase emulators:start', 'npx firebase emulators:start', 'feat/a', [], true],
+  ['allows firebase --version', 'firebase --version', 'feat/a', [], true],
+  ['blocks site-teste workflow with a feature --ref', 'gh workflow run site-teste.yml --ref feat/95-x', 'feat/a', [], false, '--ref main'],
+  ['blocks site-teste workflow with a glued -r feature ref', 'gh workflow run site-teste.yml -rfeat/95-x', 'feat/a', [], false, '--ref main'],
 ];
+
+test('git-guard-rules.mjs is self-contained: no import statements', () => {
+  const src = readFileSync(new URL('./git-guard-rules.mjs', import.meta.url), 'utf8');
+  assert.deepEqual(src.split(/\r?\n/).filter((line) => line.startsWith('import ')), []);
+});
 
 for (const [name, command, branch, stagedFiles, allow, snippet] of cases) {
   test(name, () => {
