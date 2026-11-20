@@ -406,6 +406,49 @@ test('blocks --auto on any base', () => {
   }
 });
 
+test('blocks --auto, --admin, --squash and --rebase written as --flag=true on release', () => {
+  for (const flag of ['--auto=true', '--admin=true', '--squash=true', '--rebase=true']) {
+    const r = release(`gh pr merge 99 --merge ${flag} --match-head-commit abc123`);
+    assert.equal(r.allow, false, flag);
+    assert.ok(r.reason.includes('--merge'), `${flag}: ${r.reason}`);
+  }
+});
+
+test('blocks --auto=true on develop too', () => {
+  const r = merge('gh pr merge 2 --squash --auto=true', FACTS, { now: WEDNESDAY, openIncidents: () => [] });
+  assert.equal(r.allow, false);
+  assert.ok(r.reason.includes('--auto'), r.reason);
+});
+
+test('allows --match-head-commit=<sha> on release', () => {
+  assert.equal(release('gh pr merge 99 --merge --match-head-commit=abc123').allow, true);
+  assert.equal(release('gh pr merge 99 --merge --match-head-commit=zzz').allow, false);
+});
+
+test('--flag=false counts as absent and --merge=true as --merge', () => {
+  const noMerge = release('gh pr merge 99 --merge=false --match-head-commit abc123');
+  assert.equal(noMerge.allow, false);
+  assert.ok(noMerge.reason.includes('--merge'), noMerge.reason);
+  assert.equal(release('gh pr merge 99 --merge=true --match-head-commit abc123').allow, true);
+  assert.equal(release('gh pr merge 99 --merge --squash=false --match-head-commit abc123').allow, true);
+  assert.equal(release('gh pr merge 99 --merge --auto=false --match-head-commit abc123').allow, true);
+});
+
+test('blocks --delete-branch on the release (it would delete develop)', () => {
+  for (const flag of ['--delete-branch', '-d', '--delete-branch=true', '-d=true', '-md']) {
+    const r = release(`gh pr merge 99 ${flag} --match-head-commit abc123`);
+    assert.equal(r.allow, false, flag);
+    assert.ok(r.reason.includes('--merge'), `${flag}: ${r.reason}`);
+  }
+  assert.equal(release('gh pr merge 99 --merge --delete-branch=false --match-head-commit abc123').allow, true);
+});
+
+test('--delete-branch stays allowed on develop merges', () => {
+  for (const c of ['gh pr merge 2 --squash --delete-branch', 'gh pr merge 2 --squash -d', 'gh pr merge 2 --squash --delete-branch=true']) {
+    assert.equal(merge(c).allow, true, c);
+  }
+});
+
 test('closingRefs reads closing keywords, case-insensitive, without repeats', () => {
   assert.deepEqual(closingRefs('Closes #95\nresolves #96, Parte de #85'), [95, 96]);
   assert.deepEqual(closingRefs('CLOSES #1, closes #1 and Fixed #2'), [1, 2]);

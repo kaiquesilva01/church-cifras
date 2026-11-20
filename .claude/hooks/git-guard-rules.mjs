@@ -353,9 +353,14 @@ function parseMergeArgs(args) {
     else if (MERGE_VALUE_FLAGS.includes(a)) i++;
     else if (/^[\d*]*[<>]/.test(a)) {
       if (/^[\d*]*[<>]+$/.test(a)) i++; // `> arquivo`: o próximo token é o destino
-    } else if (a.startsWith('--')) flags.push(a);
-    else if (a.startsWith('-')) flags.push(a, ...[...a.slice(1)].map((c) => `-${c}`));
-    else positionals.push(a);
+    } else if (a.startsWith('-')) {
+      // `--flag=valor`: vale pelo nome; `=false` é o mesmo que ausente, qualquer outro valor conta como presente.
+      const eq = a.indexOf('=');
+      const name = eq === -1 ? a : a.slice(0, eq);
+      if (eq !== -1 && a.slice(eq + 1) === 'false') continue;
+      if (name.startsWith('--')) flags.push(name);
+      else flags.push(name, ...[...name.slice(1)].map((c) => `-${c}`));
+    } else positionals.push(a);
   }
   return { positionals, repo, flags, matchHead };
 }
@@ -389,7 +394,8 @@ function checkDevelopMerge(facts, target) {
 
 // Release develop -> main, feito pelo agente só com todas as travas: head develop, merge commit
 // (`--merge`) sem squash/rebase/admin, SHA conferido, CI verde, fora da janela do culto e sem incidente aberto.
-const RELEASE_FORBIDDEN_FLAGS = ['--squash', '-s', '--rebase', '-r', '--auto', '--admin'];
+// `--delete-branch` apagaria a própria develop depois do merge: no release ele é proibido.
+const RELEASE_FORBIDDEN_FLAGS = ['--squash', '-s', '--rebase', '-r', '--auto', '--admin', '--delete-branch', '-d'];
 
 function checkReleaseMerge(facts, { flags, matchHead }, target, state) {
   if (facts.head !== 'develop') {
@@ -400,7 +406,7 @@ function checkReleaseMerge(facts, { flags, matchHead }, target, state) {
   if (!hasMerge || forbidden.length) {
     const found = forbidden.length ? forbidden.join(', ') : 'sem --merge';
     return block(
-      'O release exige `--merge` (merge commit) e não aceita --squash, --rebase, --auto ou --admin ' +
+      'O release exige `--merge` (merge commit) e não aceita --squash, --rebase, --auto, --admin ou --delete-branch ' +
         `(encontrado: ${found}): use \`gh pr merge ${target} --merge --match-head-commit ${facts.headSha}\`.`
     );
   }
