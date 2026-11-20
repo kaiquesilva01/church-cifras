@@ -75,24 +75,26 @@ export function BuscaPage() {
   return (
     <section>
       <ScreenHeader eyebrow="Encontrar" title="Busca" />
-      <SearchInput
-        aria-label="Buscar música, cantor ou letra…"
-        placeholder="Buscar música, cantor ou letra…"
-        value={query}
-        onChange={(value) => update({ q: value })}
-      />
-      <div className="filter-row" role="group" aria-label="Filtrar resultados">
-        {FILTERS.map((name) => (
-          <button
-            key={name}
-            type="button"
-            className="filter-chip"
-            aria-pressed={filter === name}
-            onClick={() => update({ tipo: TIPO[name] })}
-          >
-            {name}
-          </button>
-        ))}
+      <div className="search-sticky">
+        <SearchInput
+          aria-label="Buscar música, cantor ou letra…"
+          placeholder="Buscar música, cantor ou letra…"
+          value={query}
+          onChange={(value) => update({ q: value })}
+        />
+        <div className="filter-row" role="group" aria-label="Filtrar resultados">
+          {FILTERS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className="filter-chip"
+              aria-pressed={filter === name}
+              onClick={() => update({ tipo: TIPO[name] })}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
       </div>
       {status === 'loading' && (
         <p role="status" className="status">
