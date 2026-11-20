@@ -24,6 +24,21 @@ export function pendingSubjects(logOutput, mainTree) {
   return subjects;
 }
 
+// Números de PR no fim de cada assunto (`feat: x (#97)`), sem repetição.
+export function prNumbers(subjects) {
+  const nums = subjects.map((s) => /\(#(\d+)\)$/.exec(s.trim())).filter(Boolean).map((m) => Number(m[1]));
+  return [...new Set(nums)];
+}
+
+// Issues que o corpo do PR fecha (mesmas palavras-chave de closingRefs em git-guard-rules.mjs).
+// "Parte de #N" não conta.
+export function resolvedIssues(body) {
+  const nums = [...body.matchAll(/\b(?:close[sd]?|fix(?:es|ed)?|resolve[sd]?)\s+#(\d+)/gi)].map((m) =>
+    Number(m[1]),
+  );
+  return [...new Set(nums)].sort((a, b) => a - b);
+}
+
 function subjectLines(subjects) {
   if (subjects.length === 0) {
     return ['- (não consegui listar os commits; confira a aba Commits do PR)'];
@@ -39,9 +54,9 @@ const INTRO =
   'o conteúdo de `develop` difere do de `main` e não havia PR de release aberto.';
 
 const REVIEW_NOTE =
-  'O agente completa este corpo (AGENTS.md › "PR de release"): o que muda para o usuário, ' +
-  'o que conferir antes de aprovar (testes manuais, riscos, rollback, mudanças em ' +
-  'Rules/índices/variáveis) e o que ficou de fora.';
+  'O agente faz o merge (`gh pr merge <n> --merge --match-head-commit <sha>`) depois de: ' +
+  'CI verde, revisão e QA de cada entrega, fora da janela do culto (quinta e domingo a partir ' +
+  'das 16h30) e sem incidente aberto. Mudanças nas travas já passaram pelo merge da pessoa na develop.';
 
 const CHECKLIST = [
   '- [ ] CI verde (checks e e2e)',
@@ -56,11 +71,13 @@ const MERGE_NOTE =
 
 const FOOTER = '🤖 Generated with [Claude Code](https://claude.com/claude-code)';
 
-export function buildReleaseBody(subjects) {
+export function buildReleaseBody(subjects, closes = []) {
+  const fecha = closes.map((n) => `Closes #${n}`);
   return [
     INTRO,
     `## Entra neste release\n\n${subjectLines(subjects).join('\n')}`,
-    `## Antes de aprovar\n\n${REVIEW_NOTE}\n\n${CHECKLIST.join('\n')}`,
+    ...(fecha.length > 0 ? [`## Fecha\n\n${fecha.join('\n')}`] : []),
+    `## Travas\n\n${REVIEW_NOTE}\n\n${CHECKLIST.join('\n')}`,
     `## Como fazer o merge\n\n${MERGE_NOTE}`,
     FOOTER,
   ].join('\n\n');
@@ -106,6 +123,13 @@ export function checkRelease({ run, dryRun = false }) {
   const subjects = listPendingSubjects(run);
   if (dryRun) return { action: 'dry-run', subjects };
 
+  const closes = new Set();
+  for (const number of prNumbers(subjects)) {
+    const view = run('gh', ['pr', 'view', String(number), '--json', 'body', '-q', '.body']);
+    if (view.status !== 0) continue;
+    for (const issue of resolvedIssues(view.stdout)) closes.add(issue);
+  }
+
   const created = run('gh', [
     'pr',
     'create',
@@ -116,7 +140,7 @@ export function checkRelease({ run, dryRun = false }) {
     '--title',
     RELEASE_TITLE,
     '--body',
-    buildReleaseBody(subjects),
+    buildReleaseBody(subjects, [...closes].sort((a, b) => a - b)),
   ]);
   if (created.status === 0) {
     const lines = created.stdout

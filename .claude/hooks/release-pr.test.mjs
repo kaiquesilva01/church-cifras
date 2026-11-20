@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import {
   RELEASE_TITLE,
   pendingSubjects,
+  prNumbers,
+  resolvedIssues,
   buildReleaseBody,
   checkRelease,
 } from './release-pr.mjs';
@@ -96,6 +98,57 @@ test('checkRelease: differing content and no open PR -> creates the release PR',
   assert.doesNotMatch(arg('--body'), /^- fix: antigo$/m);
 });
 
+test('checkRelease: adds Closes for issues resolved by the PRs of the release', () => {
+  const { run, calls } = fakeRun([
+    FETCH,
+    DIFFERS,
+    NO_OPEN_PR,
+    MAIN_TREE,
+    ['git log', ok('T1\tfeat: x (#97)\nT0\tfix: antigo\n')],
+    ['gh pr view 97', ok('Resolve #95\nParte de #85')],
+    ['gh pr create', ok('https://github.com/o/r/pull/82\n')],
+  ]);
+  assert.deepEqual(checkRelease({ run }), {
+    action: 'created',
+    url: 'https://github.com/o/r/pull/82',
+  });
+  const create = calls.find((c) => c.cmd === 'gh' && c.args.includes('create'));
+  const body = create.args[create.args.indexOf('--body') + 1];
+  assert.match(body, /^Closes #95$/m);
+  assert.doesNotMatch(body, /Closes #85/);
+});
+
+test('checkRelease: failed pr view is skipped and the PR is still created', () => {
+  const { run, calls } = fakeRun([
+    FETCH,
+    DIFFERS,
+    NO_OPEN_PR,
+    MAIN_TREE,
+    ['git log', ok('T1\tfeat: x (#97)\n')],
+    ['gh pr view 97', fail('not found')],
+    ['gh pr create', ok('https://github.com/o/r/pull/83\n')],
+  ]);
+  assert.equal(checkRelease({ run }).action, 'created');
+  const create = calls.find((c) => c.cmd === 'gh' && c.args.includes('create'));
+  const body = create.args[create.args.indexOf('--body') + 1];
+  assert.doesNotMatch(body, /Closes #/);
+});
+
+test('checkRelease: dryRun never calls gh pr view', () => {
+  const { run, calls } = fakeRun([
+    FETCH,
+    DIFFERS,
+    NO_OPEN_PR,
+    MAIN_TREE,
+    ['git log', ok('T1\tfeat: x (#97)\n')],
+  ]);
+  checkRelease({ run, dryRun: true });
+  assert.equal(
+    calls.some((c) => c.cmd === 'gh' && c.args.includes('view')),
+    false,
+  );
+});
+
 test('checkRelease: dryRun -> returns subjects and never calls pr create', () => {
   const { run, calls } = fakeRun([FETCH, DIFFERS, NO_OPEN_PR, MAIN_TREE, LOG]);
   assert.deepEqual(checkRelease({ run, dryRun: true }), {
@@ -172,6 +225,42 @@ test('pendingSubjects: empty log -> empty list', () => {
   assert.deepEqual(pendingSubjects('', 'T0'), []);
 });
 
+test('prNumbers: reads the (#N) at the end of each subject', () => {
+  assert.deepEqual(prNumbers(['feat(web): x (#97)', 'chore: y']), [97]);
+});
+
+test('prNumbers: ignores repeated numbers and numbers not at the end', () => {
+  assert.deepEqual(prNumbers(['a (#97)', 'b (#97)', 'c (#12) extra']), [97]);
+});
+
+test('resolvedIssues: counts closing keywords and ignores "Parte de"', () => {
+  assert.deepEqual(resolvedIssues('Resolve #95\nParte de #85'), [95]);
+});
+
+test('resolvedIssues: case-insensitive, no repeats, sorted', () => {
+  assert.deepEqual(resolvedIssues('closes #96\nFixed #95\nresolves #96'), [95, 96]);
+});
+
+test('buildReleaseBody: lists Closes for each delivered issue', () => {
+  const body = buildReleaseBody(['a'], [95, 96]);
+  assert.match(body, /^## Fecha$/m);
+  assert.match(body, /^Closes #95$/m);
+  assert.match(body, /^Closes #96$/m);
+});
+
+test('buildReleaseBody: no Fecha section when there are no issues', () => {
+  const body = buildReleaseBody(['a']);
+  assert.doesNotMatch(body, /## Fecha/);
+  assert.doesNotMatch(body, /Closes #/);
+});
+
+test('buildReleaseBody: describes the merge guards and no human approval', () => {
+  const body = buildReleaseBody(['a'], [95]);
+  assert.match(body, /--match-head-commit/);
+  assert.match(body, /janela do culto/);
+  assert.doesNotMatch(body, /Antes de aprovar/);
+});
+
 test('buildReleaseBody: lists each subject as a bullet', () => {
   const body = buildReleaseBody(['feat: a', 'fix: b']);
   assert.match(body, /^- feat: a$/m);
@@ -200,7 +289,7 @@ test('buildReleaseBody: empty list -> fallback line', () => {
 test('buildReleaseBody: keeps the pt-BR structure', () => {
   const body = buildReleaseBody(['feat: a']);
   assert.match(body, /^## Entra neste release$/m);
-  assert.match(body, /^## Antes de aprovar$/m);
+  assert.match(body, /^## Travas$/m);
   assert.match(body, /^- \[ \] CI verde \(checks e e2e\)$/m);
   assert.match(body, /^## Como fazer o merge$/m);
 });
