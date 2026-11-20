@@ -8,6 +8,11 @@ describe('TestBanner', () => {
     expect(screen.getByRole('status')).toHaveTextContent('TESTE · #95');
   });
 
+  it('usa a classe test-banner (o CSS fica no redesign.css)', () => {
+    render(<TestBanner label="TESTE · #95" />);
+    expect(screen.getByRole('status')).toHaveClass('test-banner');
+  });
+
   it('não renderiza nada com rótulo vazio', () => {
     render(<TestBanner label="" />);
     expect(screen.queryByRole('status')).toBeNull();

@@ -103,6 +103,56 @@ test('test site is deployed only from main, with the build job holding no secret
   assert.ok(cors[0].origin.includes('https://louvor-hajaluz-teste.web.app'));
 });
 
+// Texto de um bloco `run:` de um workflow (linhas mais indentadas que a chave `run:`).
+const runBlocks = (yaml) => {
+  const lines = yaml.split('\n');
+  const blocks = [];
+  lines.forEach((line, i) => {
+    const m = line.match(/^(\s*)(- )?run:/);
+    if (!m) return;
+    const indent = m[1].length + (m[2] ? 2 : 0);
+    const body = [line];
+    for (let j = i + 1; j < lines.length; j++) {
+      const next = lines[j];
+      if (next.trim() !== '' && next.search(/\S/) <= indent) break;
+      body.push(next);
+    }
+    blocks.push(body.join('\n'));
+  });
+  return blocks;
+};
+
+test('every firebase deploy in deploy.yml names its --only targets, none of them the test site', () => {
+  const deploy = readFileSync(join(repoRoot, '.github', 'workflows', 'deploy.yml'), 'utf8');
+  const lines = deploy.split('\n').filter((l) => l.includes('firebase deploy'));
+  assert.ok(lines.length >= 1, 'deploy.yml sem firebase deploy');
+  for (const line of lines) {
+    const only = line.match(/--only\s+(\S+)/);
+    assert.ok(only, `firebase deploy sem --only: ${line.trim()}`);
+    assert.ok(!only[1].includes('louvor-hajaluz-teste'), 'produção não pode publicar o site de teste');
+  }
+});
+
+test('site-teste.yml guards both jobs with the main ref and reads inputs only through env', () => {
+  const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'site-teste.yml'), 'utf8');
+  const guard = "if: github.ref == 'refs/heads/main'";
+  const buildJob = workflow.slice(workflow.search(/^ {2}build:/m), workflow.search(/^ {2}deploy:/m));
+  const deployJob = workflow.slice(workflow.search(/^ {2}deploy:/m));
+  assert.ok(buildJob.includes(guard), 'o job build precisa da guarda da main');
+  assert.ok(deployJob.includes(guard), 'o job deploy precisa da guarda da main');
+  assert.ok(workflow.split(guard).length - 1 >= 2, 'guarda da main em pelo menos 2 jobs');
+  for (const block of runBlocks(workflow)) {
+    assert.ok(!block.includes('inputs.'), `run não pode interpolar inputs: ${block.split('\n')[0]}`);
+  }
+});
+
+test('site-teste build checkout does not persist the token', () => {
+  const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'site-teste.yml'), 'utf8');
+  const buildJob = workflow.slice(workflow.search(/^ {2}build:/m), workflow.search(/^ {2}deploy:/m));
+  const checkout = buildJob.slice(buildJob.indexOf('actions/checkout@v4'));
+  assert.match(checkout.slice(0, checkout.indexOf('\n      - ', 1)), /persist-credentials: false/);
+});
+
 test('the project session opens on sonnet medium', () => {
   assert.equal(settings.model, 'sonnet');
   assert.equal(settings.effortLevel, 'medium');
