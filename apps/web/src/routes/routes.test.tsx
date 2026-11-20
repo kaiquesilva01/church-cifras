@@ -131,7 +131,9 @@ describe('routes', () => {
 
   it('RequireRole sends non-admins from /estatisticas to home and lets admins in', () => {
     setup('/estatisticas', 'member');
-    expect(screen.getByRole('searchbox', { name: 'Buscar música ou cantor…' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Estatísticas' })).not.toBeInTheDocument();
     cleanup();
     setup('/estatisticas', 'admin');
