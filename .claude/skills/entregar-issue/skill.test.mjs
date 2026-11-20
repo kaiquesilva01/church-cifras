@@ -24,16 +24,38 @@ function split(text) {
   return { fm, body: m[2] };
 }
 
+// Trecho que começa no título dado e vai até o próximo título de mesmo nível ou acima.
+function section(body, heading) {
+  const lines = body.split('\n');
+  const start = lines.findIndex((l) => l.startsWith(heading));
+  assert.ok(start !== -1, `seção "${heading}" ausente`);
+  const level = heading.match(/^#+/)[0].length;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    const m = lines[i].match(/^(#{1,6}) /);
+    if (m && m[1].length <= level) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(start, end).join('\n');
+}
+
 // Linhas de tabela markdown viram células, sem as bordas vazias.
-function rows(body) {
-  return body
+function rows(text) {
+  return text
     .split('\n')
     .filter((l) => l.startsWith('|'))
     .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
 }
 
+// Verdadeiro se alguma linha do trecho contém todos os termos.
+const hasLine = (text, terms) =>
+  text.split('\n').some((l) => terms.every((t) => l.includes(t)));
+
 const text = load();
 const { fm, body } = split(text);
+const sec = (heading) => section(body, heading);
 
 test('frontmatter: name e description com os gatilhos', () => {
   assert.equal(fm.name, 'entregar-issue');
@@ -47,17 +69,22 @@ test('tem menos de 300 linhas', () => {
   assert.ok(text.split('\n').length < 300, 'SKILL.md passa de 300 linhas');
 });
 
-test('usa o MARKER de analise.mjs e chama o CLI para gravar a issue', () => {
+test('usa o MARKER de analise.mjs, chama o CLI e nunca regrava o corpo com gh issue edit --body', () => {
   assert.ok(body.includes(MARKER), 'MARKER de analise.mjs ausente');
   assert.ok(
     body.includes('node .claude/skills/entregar-issue/analise.mjs <n> <arquivo.md>'),
     'chamada do CLI analise.mjs ausente',
   );
   assert.ok(body.includes('Só o orquestrador escreve na issue'), 'frase de autoria ausente');
+  assert.ok(
+    hasLine(sec('## Regras que não se quebram'), ['gh issue edit --body', 'Nunca']),
+    'falta a proibição de gh issue edit --body',
+  );
 });
 
-test('lista os 7 gatilhos de parada de §5.1', () => {
-  for (const g of [
+test('cada gatilho de §5.1 é o item numerado de mesmo número', () => {
+  const items = sec('## Gatilhos').split('\n').filter((l) => /^\d\. /.test(l));
+  const keys = [
     'dado novo sobre pessoas',
     'papel',
     'custo',
@@ -65,45 +92,128 @@ test('lista os 7 gatilhos de parada de §5.1', () => {
     'não-objetivo',
     'sem volta',
     'travas',
-  ]) {
-    assert.ok(body.includes(g), `gatilho "${g}" ausente`);
+  ];
+  assert.equal(items.length, 7, 'a lista de gatilhos precisa ter 7 itens numerados');
+  keys.forEach((k, i) => assert.ok(items[i].includes(k), `item ${i + 1} não traz "${k}"`));
+});
+
+test('a seção de gatilhos liga aguardando-voce ao PushNotification na mesma linha', () => {
+  assert.ok(hasLine(sec('## Gatilhos'), ['aguardando-voce', 'PushNotification']));
+});
+
+test('etiquetas aparecem na etapa que as usa', () => {
+  const casos = [
+    ['## Etapa 0', ['em-andamento']],
+    ['### Antes de entrar na develop', ['revisado', 'qa-ok', 'teste-celular-ok']],
+    ['## Teste no celular', ['no-site-teste']],
+    ['## Gatilhos', ['aguardando-voce']],
+    ['## Produção e incidente', ['incidente']],
+  ];
+  for (const [heading, labels] of casos) {
+    for (const l of labels) assert.ok(sec(heading).includes(l), `"${l}" ausente em ${heading}`);
   }
 });
 
-test('cita as 7 etiquetas do fluxo', () => {
-  for (const l of [
-    'revisado',
-    'qa-ok',
-    'teste-celular-ok',
-    'no-site-teste',
-    'aguardando-voce',
-    'em-andamento',
-    'incidente',
-  ]) {
-    assert.ok(body.includes(l), `etiqueta "${l}" ausente`);
+test('comandos de Git ficam na seção que os executa', () => {
+  const casos = [
+    ['### Antes de entrar na develop', ['gh pr merge <n> --squash --delete-branch', 'gh pr checks <n> --watch']],
+    ['### Release', ['gh pr merge <n> --merge --match-head-commit <sha>', 'gh pr view <n> --json headRefOid -q .headRefOid']],
+    ['### 1. Negócio e experiência', ['docs/sistema.md']],
+  ];
+  for (const [heading, terms] of casos) {
+    for (const t of terms) assert.ok(sec(heading).includes(t), `"${t}" ausente em ${heading}`);
   }
 });
 
-test('traz os comandos e termos de Git, janela, celular e produção', () => {
+test('release: merge commit com SHA e nenhuma outra forma de merge', () => {
+  const r = sec('### Release');
+  assert.ok(r.includes('--merge --match-head-commit'), 'falta --merge --match-head-commit');
+  for (const f of ['--squash', '--rebase', '--auto']) {
+    assert.ok(!r.includes(f), `o release cita ${f}`);
+  }
+});
+
+test('release: Closes da sub-issue, da mãe (só na última entrega) e do incidente', () => {
+  const r = sec('### Release');
+  assert.ok(r.includes('Closes #<incidente>'), 'falta Closes #<incidente>');
+  assert.ok(r.includes('Closes #<mãe>') && r.includes('última entrega'), 'falta a regra da issue-mãe');
+  assert.ok(r.includes('Closes #<sub>'), 'falta Closes #<sub> da sub-issue');
+});
+
+test('release: checklist do PR de release do AGENTS.md e corpo com risco e rollback', () => {
+  const r = sec('### Release');
   for (const t of [
-    '16h30',
-    '--match-head-commit',
-    'site-teste.yml',
-    '--ref main',
-    'PushNotification',
-    'docs/sistema.md',
-    'gh pr merge <n> --squash --delete-branch',
-    'gh pr checks <n> --watch',
-    'gh pr merge <n> --merge --match-head-commit <sha>',
-    'gh run watch',
-    'gh workflow run site-teste.yml --ref main -f branch=<branch> -f issue=<n>',
+    'npm test',
+    'npm run lint',
+    'npm run typecheck',
+    'npm run build',
+    'npm run test:harness',
+    'npm run test:rules',
+    'risco',
+    'rollback',
+    'Rules, índices ou variáveis',
+    'ficou de fora',
   ]) {
-    assert.ok(body.includes(t), `termo "${t}" ausente`);
+    assert.ok(r.includes(t), `release sem "${t}"`);
   }
 });
 
-test('tabela de modelos tem uma linha por papel de §5.3 com modelo e effort', () => {
-  const table = rows(body);
+test('release: janela registrada na Análise, sem nova tentativa', () => {
+  const r = sec('### Release');
+  assert.ok(r.includes('Release aguardando a janela'), 'falta o registro da janela');
+  assert.ok(r.includes('sem nova tentativa'), 'falta a proibição de tentar de novo');
+});
+
+test('janela do culto: limite de 16h30 a 23h59 e comandos para ler a hora', () => {
+  const j = sec('## Janela do culto');
+  for (const t of ['16h30', '23h59', 'TZ=America/Sao_Paulo date', 'ConvertTimeBySystemTimeZoneId']) {
+    assert.ok(j.includes(t), `janela sem "${t}"`);
+  }
+});
+
+test('teste no celular: site fixo, fila, pré-condição e aviso de dados de produção', () => {
+  const t = sec('## Teste no celular');
+  for (const x of [
+    'https://louvor-hajaluz-teste.web.app',
+    'gh workflow run site-teste.yml --ref main -f branch=<branch> -f issue=<n>',
+    'gh workflow view site-teste.yml',
+    'passo manual seu',
+    'O site de teste usa os dados de produção: não crie, altere nem apague dados reais além do que o roteiro pede.',
+  ]) {
+    assert.ok(t.includes(x), `teste no celular sem "${x}"`);
+  }
+});
+
+test('produção: monitoramento por headSha, log do aviso de deploy ignorado e sem deploy', () => {
+  const p = sec('## Produção e incidente');
+  for (const x of [
+    'headSha',
+    'mergeCommit',
+    'gh run watch',
+    'gh run view <id> --log',
+    'Deploy ignorado: produção ainda não configurada',
+    'sem deploy (só harness/docs)',
+  ]) {
+    assert.ok(p.includes(x), `produção sem "${x}"`);
+  }
+});
+
+test('incidente: reversão em fix/<incidente>-reverte-, reabertura e Closes do incidente', () => {
+  const p = sec('## Produção e incidente');
+  for (const x of ['fix/<incidente>-reverte-', 'gh issue reopen', 'Closes #<incidente>']) {
+    assert.ok(p.includes(x), `incidente sem "${x}"`);
+  }
+});
+
+test('regras: worktree com caminho absoluto em toda chamada ao Agent', () => {
+  assert.ok(
+    sec('## Regras que não se quebram').includes('caminho absoluto da worktree'),
+    'falta a regra do caminho absoluto da worktree',
+  );
+});
+
+test('tabela de modelos: uma linha por papel de §5.3 com modelo e effort', () => {
+  const table = rows(sec('## Modelos e esforço (§5.3)'));
   const expected = [
     ['Orquestrador', 'Sonnet', 'medium'],
     ['product-owner', 'Sonnet', 'medium'],
@@ -129,9 +239,14 @@ test('tabela de modelos tem uma linha por papel de §5.3 com modelo e effort', (
   }
 });
 
+test('parâmetros do Agent: mapeamento e overrides do code-reviewer', () => {
+  const m = sec('## Modelos e esforço (§5.3)');
+  assert.ok(m.includes('model: "haiku" | "sonnet" | "opus"'), 'falta o mapeamento de model');
+  assert.ok(m.includes('effort: "low" | "medium" | "high"'), 'falta o mapeamento de effort');
+  assert.ok(hasLine(m, ['code-reviewer', 'model: "haiku"', 'effort: "high"']), 'falta a conferência do code-reviewer');
+  assert.ok(hasLine(m, ['code-reviewer', 'model: "sonnet"', 'effort: "high"']), 'falta a revisão final do code-reviewer');
+});
+
 test('Opus aparece só ligado a incidente', () => {
-  assert.ok(
-    body.split('\n').some((l) => l.includes('Opus') && l.includes('incidente')),
-    'Opus precisa estar atrelado a incidente de produção',
-  );
+  assert.ok(hasLine(sec('## Modelos e esforço (§5.3)'), ['Opus', 'incidente']));
 });
