@@ -109,6 +109,7 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 | `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt` | nenhuma; só Admin SDK (negado por padrão) |
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
 | `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
+| `avisosEnviados/{setlistId}_novo` | `setlistId`, `tipo` (`novo`), `createdAt`, `expiresAt` (TTL de 60 dias; marca do aviso de repertório novo) | nenhuma; só Functions |
 | `artists/*` | não existe de fato | negada |
 
 - `slug` do tom = tom com `#` trocado por `s` (id do documento). Um tom existe uma vez por música; quem gerar o mesmo tom depois recebe "já existe" e o sistema abre o existente.
@@ -118,6 +119,7 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 - `songs`, `arrangements` e `songLyrics` são imutáveis para o cliente; edição e exclusão passam por Functions.
 - `pushDevices`, `avisosEnviados` e `config/*` são fechados ao cliente (deny-all); só Functions leem e gravam.
 - TTL do Firestore em `setlists.expiresAt`, com índice ascendente mantido. `setlistUsage` não pode ter TTL.
+- TTL do Firestore em `avisosEnviados.expiresAt` (60 dias), sem índice de campo.
 - `expiresAt` (fim do dia da data + 30 dias, fuso `America/Sao_Paulo`) é calculado pelo cliente (`apps/web/src/setlists/dates.ts`); `firestore.rules` só confere que é um timestamp. Nada no servidor impede um valor errado.
 - Contrato do cliente para `rehearsalAt` (#100): limpar o ensaio é `deleteField()` num `updateDoc` (ou omitir o campo num `setDoc` completo); `rehearsalAt: null` é negado. Trocar `date` revalida o `rehearsalAt` gravado contra a nova janela: se ele cair fora, a gravação é negada. Por isso o cliente manda um `rehearsalAt` novo ou `deleteField()` na mesma gravação. O cliente monta o instante em UTC-3 (`America/Sao_Paulo`, sem horário de verão), não no fuso do aparelho.
 
@@ -140,9 +142,18 @@ Todas exportadas por `apps/functions/src/index.ts` (algumas definidas em submód
 | `registerDevice` | callable | membro, admin | Grava o aparelho para os avisos (`pushDevices/{sha256(token)}`); o mesmo token mantém um registro |
 | `unregisterDevice` | callable | qualquer logado | Apaga o aparelho do próprio chamador (logout); idempotente |
 | `sendTestPush` | callable | membro, admin | Envia "Aviso de teste" só aos aparelhos do chamador; ignora o interruptor; responde `{ sent, failed, pruned }` (só contagens; `pruned` são aparelhos apagados por token morto) |
+| `onSetlistWritten` | Firestore (`setlists/{setlistId}`) | automático | Avisa "Novo repertório" aos aparelhos de membros e admins quando o repertório chega a 4 louvores; uma vez por repertório (marca em `avisosEnviados`); não avisa quem gravou; só aparelhos da mesma origem; respeita `config/push` |
 | `health` | callable | qualquer chamada | Verificação de saúde |
 
-Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. Ainda não há gatilho: os avisos chegam nas entregas #101 e #102.
+Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. O gatilho do repertório novo é `onSetlistWritten` (regra abaixo); os lembretes chegam na #102.
+
+Regra do aviso de repertório novo:
+
+- Sai quando `items.length` passa de 3 ou menos para 4 ou mais, ou quando o repertório nasce com 4 ou mais (por exemplo, ao duplicar).
+- Repertório com menos de 4 louvores nunca avisa.
+- A marca `avisosEnviados/{setlistId}_novo` é criada antes do envio; esvaziar e encher o repertório de novo não avisa outra vez.
+- Falha de envio só entra no log; não reenvia.
+- Com `config/push.enabled === false`, a marca é criada e o aviso não sai; religar o interruptor não manda o aviso depois.
 
 Regras de contagem de uso:
 
@@ -253,6 +264,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - O Paper não mostra o chip Harpa nas telas 03b e 03c da busca por letra (spec da busca por letra).
 - Avisos (push, #85): o backend dos aparelhos está na #98, sem tela nem envio automático. Antes da #99: passos manuais 1 e 2 da #85 (número do projeto e chave VAPID). Antes da #101: passos 4 e 5.
 - Passos manuais únicos de `deploy.md`: TTL e índice de `setlists` (§10), job do Cloud Scheduler e `setlistUsage` sem TTL (§11), autorizar o domínio e o CORS do site de teste (§13).
+- Antes do deploy da #101, os passos manuais de `deploy.md` §3 (Pub/Sub e Eventarc) e §15 (papel Eventarc Admin); depois, conferir o TTL de `avisosEnviados` (§15).
 
 ### Divergências entre spec e código (o código vale)
 
