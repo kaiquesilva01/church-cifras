@@ -70,6 +70,7 @@ export const onUserCreated = functionsV1
   });
 
 export { onArrangementWritten } from './songs/keys';
+export { onSetlistWritten } from './push/setlistTrigger';
 
 const replaceDeps: ReplaceDeps = {
   replaceIfGenerated: (songId, slug, data) => {
