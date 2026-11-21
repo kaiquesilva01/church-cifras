@@ -6,6 +6,8 @@ export interface SetlistItem {
   key: KeyName;
 }
 
+export type SetlistOrigin = 'producao' | 'teste';
+
 export interface Setlist {
   id: string;
   /** YYYY-MM-DD */
@@ -15,6 +17,10 @@ export interface Setlist {
   expiresAt: Date;
   /** `null` enquanto o timestamp do servidor está pendente. */
   createdAt: Date | null;
+  /** Hora do ensaio como instante absoluto (dia e hora saem em UTC-3). Ausente sem ensaio ou em repertório antigo. */
+  rehearsalAt?: Date;
+  /** Site que criou o repertório. Ausente em repertório antigo. */
+  origin?: SetlistOrigin;
 }
 
 export type SetlistOp =

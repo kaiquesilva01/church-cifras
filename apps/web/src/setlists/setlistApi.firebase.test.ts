@@ -52,7 +52,7 @@ import { MAX_ITEMS } from './types';
 const services = { auth: { currentUser: { uid: 'u1' } }, db: {} } as unknown as FirebaseServices;
 const api = () => createSetlistApi(services);
 
-const stored = (items: unknown[]) => ({
+const stored = (items: unknown[], extra: Record<string, unknown> = {}) => ({
   exists: () => true,
   id: 'l1',
   data: () => ({
@@ -61,6 +61,7 @@ const stored = (items: unknown[]) => ({
     items,
     expiresAt: Timestamp.fromDate(new Date('2026-12-20T00:00:00Z')),
     createdAt: Timestamp.fromDate(new Date('2026-11-16T00:00:00Z')),
+    ...extra,
   }),
 });
 
@@ -245,6 +246,50 @@ describe('createSetlistApi', () => {
       api().applyOp('l1', { type: 'add', item: { id: 'x', songId: 's1', key: 'G' } }),
     ).rejects.toBeInstanceOf(SetlistFullError);
     expect(txUpdate).not.toHaveBeenCalled();
+  });
+
+  it('lê rehearsalAt e origin, e ignora o que falta ou é inválido', () => {
+    const at = new Date('2026-11-22T21:30:00Z');
+    const base = {
+      id: 'l1',
+      date: '2026-11-20',
+      label: 'Culto',
+      items: [],
+      expiresAt: new Date('2026-12-20T00:00:00Z'),
+      createdAt: new Date('2026-11-16T00:00:00Z'),
+    };
+    // Entrega um snapshot com `extra` no data e devolve o `setlist` que chegou ao callback.
+    const read = (extra: Record<string, unknown>) => {
+      const cb = vi.fn();
+      vi.mocked(onSnapshot).mockImplementationOnce(((
+        _ref: unknown,
+        _opts: unknown,
+        next: (s: unknown) => void,
+      ) => {
+        next({ ...stored([], extra), metadata: { fromCache: false } });
+        return () => undefined;
+      }) as never);
+      api().subscribeSetlist('l1', cb, vi.fn());
+      return (cb.mock.calls[0]![0] as { setlist: unknown }).setlist;
+    };
+
+    // A: campos novos válidos
+    expect(read({ rehearsalAt: Timestamp.fromDate(at), origin: 'teste' })).toEqual({
+      ...base,
+      rehearsalAt: at,
+      origin: 'teste',
+    });
+
+    // B: repertório antigo, sem os campos novos
+    const old = read({});
+    expect(old).toEqual(base);
+    expect(old).not.toHaveProperty('rehearsalAt');
+    expect(old).not.toHaveProperty('origin');
+
+    // C: origem desconhecida é ignorada
+    const unknown = read({ origin: 'outro' });
+    expect(unknown).toEqual(base);
+    expect(unknown).not.toHaveProperty('origin');
   });
 
   it('deleteSetlist deletes the doc', async () => {

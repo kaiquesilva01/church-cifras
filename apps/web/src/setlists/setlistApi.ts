@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import type { FirebaseServices } from '../lib/firebase';
 import { expiresAtFor } from './dates';
+import { parseOrigin } from './origin';
 import { applySetlistOp } from './ops';
 import type { SetlistSnapshot } from './sync';
 import type { Setlist, SetlistItem, SetlistOp } from './types';
@@ -59,7 +60,7 @@ const toDate = (value: unknown): Date | null =>
   value instanceof Timestamp ? value.toDate() : null;
 
 function toSetlist(id: string, data: Record<string, unknown>): Setlist {
-  return {
+  const setlist: Setlist = {
     id,
     date: String(data.date ?? ''),
     label: String(data.label ?? ''),
@@ -67,6 +68,12 @@ function toSetlist(id: string, data: Record<string, unknown>): Setlist {
     expiresAt: toDate(data.expiresAt) ?? new Date(0),
     createdAt: toDate(data.createdAt),
   };
+  // Campos de #100: repertório antigo não os tem; origem fora da lista é ignorada.
+  const rehearsalAt = toDate(data.rehearsalAt);
+  if (rehearsalAt) setlist.rehearsalAt = rehearsalAt;
+  const origin = parseOrigin(data.origin);
+  if (origin) setlist.origin = origin;
+  return setlist;
 }
 
 export function createSetlistApi({ auth, db }: FirebaseServices): SetlistApi {
