@@ -166,6 +166,43 @@ describe('SetlistFormDialog', () => {
       expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ rehearsalAt: null }));
     });
 
+    it('anuncia o erro da janela com role alert', () => {
+      setup();
+      fireEvent.change(hourInput(), { target: { value: '18:30' } });
+      fireEvent.change(dayInput(), { target: { value: '2026-11-11' } });
+      expect(screen.getByRole('alert')).toHaveTextContent(RULE_WINDOW);
+    });
+
+    it('anuncia o erro da regra de par com role alert', () => {
+      setup();
+      fireEvent.change(hourInput(), { target: { value: '18:30' } });
+      fireEvent.change(dayInput(), { target: { value: '' } });
+      expect(screen.getByRole('alert')).toHaveTextContent(RULE_PARTIAL);
+    });
+
+    it('✕ devolve o foco ao campo Dia', () => {
+      setup();
+      fireEvent.change(hourInput(), { target: { value: '18:30' } });
+      fireEvent.click(clearButton() as HTMLElement);
+      expect(document.activeElement).toBe(dayInput());
+    });
+
+    it('hora fora do formato HH:MM mantém Salvar desabilitado', () => {
+      setup();
+      // jsdom mantém "18:30:15" num type="time" (o navegador também aceita segundos) e isValidHour recusa.
+      fireEvent.change(hourInput(), { target: { value: '18:30:15' } });
+      expect(hourInput()).toHaveValue('18:30:15');
+      expect(save()).toBeDisabled();
+    });
+
+    it('com data do culto inválida não mostra a regra de par', () => {
+      setup();
+      fireEvent.change(dateInput(), { target: { value: '' } });
+      fireEvent.change(hourInput(), { target: { value: '18:30' } });
+      expect(screen.queryByText(RULE_PARTIAL)).not.toBeInTheDocument();
+      expect(save()).toBeDisabled();
+    });
+
     it('edição preenche dia e hora a partir de rehearsalAt', () => {
       setup({
         mode: 'edit',

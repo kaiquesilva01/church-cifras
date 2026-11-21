@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Dialog } from '../viewer/Dialog';
 import { defaultCultoDate, defaultLabel, isTooOld, todayLocal } from './dates';
 import {
@@ -61,6 +61,7 @@ export function SetlistFormDialog({
   const [rehearsalHour, setRehearsalHour] = useState(() =>
     initial?.rehearsalAt ? rehearsalParts(initial.rehearsalAt).hour : '',
   );
+  const dayInputRef = useRef<HTMLInputElement>(null);
 
   const dateValid = isValidDate(date);
   const tooOld = dateValid && isTooOld(date, today);
@@ -70,8 +71,9 @@ export function SetlistFormDialog({
   const hasHour = rehearsalHour !== '';
   const range = dateValid ? rehearsalWindow(date) : null;
   let rehearsalError: string | null = null;
-  if (hasDay !== hasHour) rehearsalError = PARTIAL_MSG;
-  else if (hasDay && dateValid && !isRehearsalDayInWindow(rehearsalDay, date))
+  // Sem culto válido não há janela nem par a cobrar: o erro da data já basta.
+  if (dateValid && hasDay !== hasHour) rehearsalError = PARTIAL_MSG;
+  else if (dateValid && hasDay && !isRehearsalDayInWindow(rehearsalDay, date))
     rehearsalError = WINDOW_MSG;
   const canSave =
     dateValid &&
@@ -96,6 +98,8 @@ export function SetlistFormDialog({
   const clearRehearsal = (): void => {
     setRehearsalDay('');
     setRehearsalHour('');
+    // O ✕ some ao limpar; o foco volta ao campo Dia, como o × do campo de busca.
+    dayInputRef.current?.focus();
   };
 
   const describedBy = rehearsalError
@@ -132,7 +136,7 @@ export function SetlistFormDialog({
             onChange={(e) => changeDate(e.target.value)}
           />
           {tooOld && (
-            <p id="setlist-date-err" className="field-error">
+            <p id="setlist-date-err" role="alert" className="field-error">
               Essa data é antiga demais: o repertório já expiraria.
             </p>
           )}
@@ -157,6 +161,7 @@ export function SetlistFormDialog({
             <div className="rehearsal-day">
               <label htmlFor="setlist-rehearsal-day">Dia</label>
               <input
+                ref={dayInputRef}
                 id="setlist-rehearsal-day"
                 type="date"
                 className="input"
@@ -196,7 +201,7 @@ export function SetlistFormDialog({
             Quem ativou os avisos é lembrado 30 min antes e na hora.
           </p>
           {rehearsalError && (
-            <p id="setlist-rehearsal-err" className="field-error">
+            <p id="setlist-rehearsal-err" role="alert" className="field-error">
               {rehearsalError}
             </p>
           )}
