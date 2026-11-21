@@ -18,6 +18,7 @@ vi.mock('firebase/firestore', () => {
     addDoc: vi.fn(() => Promise.resolve({ id: 'new1' })),
     collection: vi.fn((_db: unknown, name: string) => ({ path: name })),
     deleteDoc: vi.fn(() => Promise.resolve()),
+    deleteField: vi.fn(() => '<del>'),
     doc: vi.fn((_db: unknown, ...segments: string[]) => ({
       id: segments[segments.length - 1],
       path: segments.join('/'),
@@ -37,6 +38,7 @@ import {
   Timestamp,
   addDoc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   query,
   runTransaction,
@@ -159,11 +161,36 @@ describe('createSetlistApi', () => {
       label: 'Culto',
       items: [{ id: 'a', songId: 's1', key: 'G' }],
       expiresAt: Timestamp.fromDate(expiresAtFor('2026-11-20')),
+      origin: 'producao',
       createdBy: 'u1',
       createdAt: '<ts>',
       updatedBy: 'u1',
       updatedAt: '<ts>',
     });
+  });
+
+  it('createSetlist grava rehearsalAt como Timestamp e origin teste no site de teste', async () => {
+    const at = new Date('2026-11-22T21:30:00Z');
+    await createSetlistApi(services, { hostname: 'louvor-hajaluz-teste.web.app' }).createSetlist({
+      date: '2026-11-22',
+      label: 'Domingo',
+      items: [],
+      rehearsalAt: at,
+    });
+    const data = vi.mocked(addDoc).mock.calls.at(-1)![1] as Record<string, unknown>;
+    expect(data.rehearsalAt).toEqual(Timestamp.fromDate(at));
+    expect(data.origin).toBe('teste');
+  });
+
+  it('createSetlist omite rehearsalAt quando não há hora (null ou ausente)', async () => {
+    await api().createSetlist({
+      date: '2026-11-22',
+      label: 'Domingo',
+      items: [],
+      rehearsalAt: null,
+    });
+    const data = vi.mocked(addDoc).mock.calls.at(-1)![1] as Record<string, unknown>;
+    expect(data).not.toHaveProperty('rehearsalAt');
   });
 
   it('createSetlist requires an authenticated user', async () => {
@@ -174,7 +201,7 @@ describe('createSetlistApi', () => {
   });
 
   it('updateSetlistMeta rewrites meta without createdBy/createdAt', async () => {
-    await api().updateSetlistMeta('l1', { date: '2026-12-01', label: 'Ceia' });
+    await api().updateSetlistMeta('l1', { date: '2026-12-01', label: 'Ceia', rehearsalAt: null });
     const [ref, data] = vi.mocked(updateDoc).mock.calls[0] as unknown as [
       { path: string },
       Record<string, unknown>,
@@ -183,12 +210,22 @@ describe('createSetlistApi', () => {
     expect(data).toEqual({
       date: '2026-12-01',
       label: 'Ceia',
+      rehearsalAt: '<del>',
       expiresAt: Timestamp.fromDate(expiresAtFor('2026-12-01')),
       updatedBy: 'u1',
       updatedAt: '<ts>',
     });
+    expect(deleteField).toHaveBeenCalled();
     expect(data).not.toHaveProperty('createdBy');
     expect(data).not.toHaveProperty('createdAt');
+  });
+
+  it('updateSetlistMeta grava rehearsalAt como Timestamp e nunca grava origin', async () => {
+    const at = new Date('2026-12-01T21:30:00Z');
+    await api().updateSetlistMeta('l1', { date: '2026-12-01', label: 'Ceia', rehearsalAt: at });
+    const data = vi.mocked(updateDoc).mock.calls.at(-1)![1] as unknown as Record<string, unknown>;
+    expect(data.rehearsalAt).toEqual(Timestamp.fromDate(at));
+    expect(data).not.toHaveProperty('origin');
   });
 
   it('applyOp reads inside the transaction and applies to the latest state', async () => {

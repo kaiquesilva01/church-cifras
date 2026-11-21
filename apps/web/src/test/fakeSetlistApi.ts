@@ -50,14 +50,19 @@ export function fakeSetlistApi(
       cb({ setlist: setlists.find((s) => s.id === id) ?? null, fromCache: false });
       return () => set.delete(cb);
     },
-    createSetlist: vi.fn(({ date, label, items }) => {
+    createSetlist: vi.fn(({ date, label, items, rehearsalAt }) => {
       const id = `new-${nextId++}`;
-      setlists = [...setlists, makeSetlist({ id, date, label, items })];
+      setlists = [
+        ...setlists,
+        makeSetlist({ id, date, label, items, ...(rehearsalAt ? { rehearsalAt } : {}) }),
+      ];
       emitList();
       return Promise.resolve(id);
     }),
-    updateSetlistMeta: vi.fn((id, { date, label }) => {
-      setlists = setlists.map((s) => (s.id === id ? { ...s, date, label } : s));
+    updateSetlistMeta: vi.fn((id, { date, label, rehearsalAt }) => {
+      setlists = setlists.map((s) =>
+        s.id === id ? { ...s, date, label, rehearsalAt: rehearsalAt ?? undefined } : s,
+      );
       emitList();
       emitDoc(id);
       return Promise.resolve();
