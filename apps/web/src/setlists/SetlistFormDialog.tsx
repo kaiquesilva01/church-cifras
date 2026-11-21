@@ -61,6 +61,11 @@ export function SetlistFormDialog({
   const [rehearsalHour, setRehearsalHour] = useState(() =>
     initial?.rehearsalAt ? rehearsalParts(initial.rehearsalAt).hour : '',
   );
+  // O Dia acompanha a data do culto: era igual a ela ou foi preenchido automaticamente.
+  // Fica de pé mesmo com a data momentaneamente vazia (digitação no type="date").
+  const [dayFollows, setDayFollows] = useState(() =>
+    initial?.rehearsalAt ? rehearsalParts(initial.rehearsalAt).day === initial.date : false,
+  );
   const dayInputRef = useRef<HTMLInputElement>(null);
 
   const dateValid = isValidDate(date);
@@ -70,11 +75,17 @@ export function SetlistFormDialog({
   const hasDay = rehearsalDay !== '';
   const hasHour = rehearsalHour !== '';
   const range = dateValid ? rehearsalWindow(date) : null;
+  // Par incompleto avisa por status (leitor de tela não interrompe ao escolher só o dia);
+  // janela fora do intervalo é erro de verdade e segue como alert.
+  const partialRehearsal = dateValid && hasDay !== hasHour;
   let rehearsalError: string | null = null;
   // Sem culto válido não há janela nem par a cobrar: o erro da data já basta.
-  if (dateValid && hasDay !== hasHour) rehearsalError = PARTIAL_MSG;
+  if (partialRehearsal) rehearsalError = PARTIAL_MSG;
   else if (dateValid && hasDay && !isRehearsalDayInWindow(rehearsalDay, date))
     rehearsalError = WINDOW_MSG;
+  const errorLive = partialRehearsal
+    ? ({ role: 'status', 'aria-live': 'polite' } as const)
+    : ({ role: 'alert' } as const);
   const canSave =
     dateValid &&
     !tooOld &&
@@ -83,21 +94,30 @@ export function SetlistFormDialog({
     (!hasHour || isValidHour(rehearsalHour));
 
   const changeDate = (value: string): void => {
-    // O dia do ensaio acompanha a data do culto só quando era o mesmo dia.
-    if (hasDay && rehearsalDay === date) setRehearsalDay(value);
+    // Data vazia (digitação) não move o Dia: ele só se move para datas válidas.
+    if (dayFollows && isValidDate(value)) setRehearsalDay(value);
     setDate(value);
     if (!labelEdited && isValidDate(value)) setLabel(defaultLabel(value));
   };
 
+  const changeDay = (value: string): void => {
+    setDayFollows(value !== '' && value === date);
+    setRehearsalDay(value);
+  };
+
   const changeHour = (value: string): void => {
     // Escolher a hora sem dia põe o dia da data do culto.
-    if (value !== '' && !hasDay && dateValid) setRehearsalDay(date);
+    if (value !== '' && !hasDay && dateValid) {
+      setRehearsalDay(date);
+      setDayFollows(true);
+    }
     setRehearsalHour(value);
   };
 
   const clearRehearsal = (): void => {
     setRehearsalDay('');
     setRehearsalHour('');
+    setDayFollows(false);
     // O ✕ some ao limpar; o foco volta ao campo Dia, como o × do campo de busca.
     dayInputRef.current?.focus();
   };
@@ -170,7 +190,7 @@ export function SetlistFormDialog({
                 max={range?.last}
                 aria-invalid={rehearsalError ? true : undefined}
                 aria-describedby={describedBy}
-                onChange={(e) => setRehearsalDay(e.target.value)}
+                onChange={(e) => changeDay(e.target.value)}
               />
             </div>
             <div className="rehearsal-hour">
@@ -201,7 +221,7 @@ export function SetlistFormDialog({
             Quem ativou os avisos é lembrado 30 min antes e na hora.
           </p>
           {rehearsalError && (
-            <p id="setlist-rehearsal-err" role="alert" className="field-error">
+            <p id="setlist-rehearsal-err" className="field-error" {...errorLive}>
               {rehearsalError}
             </p>
           )}

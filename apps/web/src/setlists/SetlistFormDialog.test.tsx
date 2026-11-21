@@ -173,11 +173,47 @@ describe('SetlistFormDialog', () => {
       expect(screen.getByRole('alert')).toHaveTextContent(RULE_WINDOW);
     });
 
-    it('anuncia o erro da regra de par com role alert', () => {
+    it('anuncia a regra de par com role status e aria-live polite, sem alert', () => {
       setup();
       fireEvent.change(hourInput(), { target: { value: '18:30' } });
       fireEvent.change(dayInput(), { target: { value: '' } });
-      expect(screen.getByRole('alert')).toHaveTextContent(RULE_PARTIAL);
+      const msg = screen.getByRole('status');
+      expect(msg).toHaveTextContent(RULE_PARTIAL);
+      expect(msg).toHaveAttribute('aria-live', 'polite');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('escolher só o dia já mostra a regra de par como status, não como alert', () => {
+      setup();
+      fireEvent.change(dayInput(), { target: { value: '2026-11-18' } });
+      expect(screen.getByRole('status')).toHaveTextContent(RULE_PARTIAL);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('o erro da janela continua com role alert', () => {
+      setup();
+      fireEvent.change(hourInput(), { target: { value: '18:30' } });
+      fireEvent.change(dayInput(), { target: { value: '2026-11-11' } });
+      expect(screen.getByRole('alert')).toHaveTextContent(RULE_WINDOW);
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('dia que acompanha a data continua acompanhando quando a data fica vazia e volta válida', () => {
+      setup();
+      fireEvent.change(hourInput(), { target: { value: '18:30' } });
+      fireEvent.change(dateInput(), { target: { value: '' } });
+      fireEvent.change(dateInput(), { target: { value: '2026-11-22' } });
+      expect(dayInput()).toHaveValue('2026-11-22');
+      expect(save()).toBeEnabled();
+    });
+
+    it('dia escolhido à mão não acompanha a data mesmo depois de ela ficar vazia', () => {
+      setup();
+      fireEvent.change(hourInput(), { target: { value: '18:30' } });
+      fireEvent.change(dayInput(), { target: { value: '2026-11-15' } });
+      fireEvent.change(dateInput(), { target: { value: '' } });
+      fireEvent.change(dateInput(), { target: { value: '2026-11-22' } });
+      expect(dayInput()).toHaveValue('2026-11-15');
     });
 
     it('✕ devolve o foco ao campo Dia', () => {
