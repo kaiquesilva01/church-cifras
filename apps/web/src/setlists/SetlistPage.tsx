@@ -13,7 +13,8 @@ import { KeyPicker } from './KeyPicker';
 import { BackChevronIcon } from './icons';
 import { buildShareMessage, resolveShareLines } from './shareMessage';
 import { shareText } from './shareText';
-import { SetlistFormDialog } from './SetlistFormDialog';
+import { RehearsalLine } from './RehearsalLine';
+import { SetlistFormDialog, type SetlistFormValue } from './SetlistFormDialog';
 import { SetlistItemRow } from './SetlistItemRow';
 import { SortableItems } from './SortableItems';
 import type { SetlistApi } from './setlistApi';
@@ -57,6 +58,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [shareNote, setShareNote] = useState<'copied' | 'error' | null>(null);
+  const [now] = useState(() => new Date());
 
   useEffect(() => {
     if (shareNote !== 'copied') return;
@@ -113,6 +115,9 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
 
   const editable = canEdit(role) && !active.removed;
   const items = shown.items;
+  // Edição parte do estado mais novo: um ensaio gravado em outro aparelho (ainda não aceito
+  // no banner) não pode ser apagado ao salvar só o rótulo.
+  const newest = active.latest ?? shown;
 
   const run = async (op: SetlistOp): Promise<void> => {
     setMessage(null);
@@ -131,7 +136,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
     setDialogError(null);
   };
 
-  const saveMeta = async (value: { date: string; label: string }): Promise<void> => {
+  const saveMeta = async (value: SetlistFormValue): Promise<void> => {
     setBusy(true);
     setDialogError(null);
     try {
@@ -208,7 +213,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
               <div role="menu" className="setlist-menu-list">
                 {(
                   [
-                    ['edit', 'Editar data e rótulo'],
+                    ['edit', 'Editar data, rótulo e ensaio'],
                     ['duplicate', 'Duplicar'],
                     ['delete', 'Apagar'],
                   ] as const
@@ -235,6 +240,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
         {weekdayOf(shown.date)} · {shortDate(shown.date)}
       </p>
       <h1 className="page-title">{shown.label}</h1>
+      <RehearsalLine rehearsalAt={shown.rehearsalAt} now={now} clock />
       {!editable && <p className="setlist-count">{songCount(shown)}</p>}
       <PadMini setlistId={shown.id} />
       {active.removed && (
@@ -313,7 +319,11 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
       {(dialog === 'edit' || dialog === 'duplicate') && (
         <SetlistFormDialog
           mode={dialog}
-          initial={dialog === 'edit' ? { date: shown.date, label: shown.label } : undefined}
+          initial={
+            dialog === 'edit'
+              ? { date: newest.date, label: newest.label, rehearsalAt: newest.rehearsalAt }
+              : undefined
+          }
           busy={busy}
           error={dialogError}
           onSave={(value) => void saveMeta(value)}

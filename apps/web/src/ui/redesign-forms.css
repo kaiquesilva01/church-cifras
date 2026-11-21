@@ -141,3 +141,55 @@
   font-size: 0.75rem;
   font-weight: 700;
 }
+
+/* Hora do ensaio (diálogo do repertório): Dia e Hora lado a lado; o ✕ é o .search-clear de redesign.css, só sai do posicionamento absoluto. */
+.rehearsal-group {
+  min-width: 0;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+.rehearsal-group legend {
+  padding: 0;
+  margin: 0 0 6px;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.rehearsal-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.rehearsal-day {
+  flex: 3 1 0;
+  min-width: 0;
+}
+.rehearsal-hour {
+  flex: 2 1 0;
+  min-width: 0;
+}
+.rehearsal-day > label,
+.rehearsal-hour > label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.rehearsal-row .input {
+  width: 100%;
+  min-width: 0;
+}
+.rehearsal-row .rehearsal-clear {
+  position: static;
+  top: auto;
+  right: auto;
+  transform: none;
+  flex: none;
+}
+.field-help {
+  margin: 6px 0 0;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}

@@ -79,6 +79,18 @@ describe('sameContent', () => {
     expect(sameContent(a, { ...a, items: [] })).toBe(false);
   });
 
+  it('detects a rehearsal change, including clearing it', () => {
+    const withHour = { ...a, rehearsalAt: new Date('2026-11-22T21:30:00Z') };
+    expect(sameContent(a, withHour)).toBe(false);
+    expect(sameContent(withHour, { ...a, rehearsalAt: new Date('2026-11-22T22:00:00Z') })).toBe(
+      false,
+    );
+    expect(sameContent(withHour, { ...a, rehearsalAt: new Date('2026-11-22T21:30:00Z') })).toBe(
+      true,
+    );
+    expect(sameContent(withHour, a)).toBe(false);
+  });
+
   it('handles null', () => {
     expect(sameContent(null, null)).toBe(true);
     expect(sameContent(null, a)).toBe(false);

@@ -203,7 +203,7 @@ export async function seedSetlist(
   date: string,
   label: string,
   items: Array<{ songId: string; key: string }>,
-  opts: { expiresAt?: Date; id?: string } = {},
+  opts: { expiresAt?: Date; id?: string; rehearsalAt?: Date } = {},
 ): Promise<string> {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
   const expiresAt = opts.expiresAt ?? new Date(Date.UTC(y, m - 1, d + 1, 3) + 30 * DAY_MS);
@@ -225,6 +225,7 @@ export async function seedSetlist(
       },
     },
     expiresAt: ts(expiresAt),
+    ...(opts.rehearsalAt ? { rehearsalAt: ts(opts.rehearsalAt) } : {}),
     createdBy: str('e2e'),
     createdAt: ts(now),
     updatedBy: str('e2e'),
