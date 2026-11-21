@@ -160,10 +160,10 @@ describe('PadProvider', () => {
       act(() => result.current.toggle('Am', song));
       await flush();
       expect(result.current.status).toBe('loading');
-      expect(engine.start).toHaveBeenCalledWith('A');
+      expect(engine.start).toHaveBeenCalledWith('C');
       await act(async () => d.resolve());
       expect(result.current.status).toBe('playing');
-      expect(result.current.note).toBe('A');
+      expect(result.current.note).toBe('C');
       expect(result.current.owner).toEqual(song);
       act(() => result.current.toggle('Am', song));
       expect(engine.stop).toHaveBeenCalled();
@@ -234,9 +234,9 @@ describe('PadProvider', () => {
       expect(result.current.note).toBe('D');
     });
 
-    it('does nothing for the same tonic, null or when off', async () => {
+    it('does nothing for the same note (relative major included), null or when off', async () => {
       const { result, engine } = await playing('D');
-      act(() => result.current.follow('Dm'));
+      act(() => result.current.follow('Bm'));
       act(() => result.current.follow(null));
       expect(engine.crossfadeTo).not.toHaveBeenCalled();
       const off = setup();
@@ -343,7 +343,7 @@ describe('PadProvider', () => {
       engine.start.mockImplementationOnce(() => d.promise);
       act(() => result.current.toggle('C', song));
       await flush();
-      act(() => result.current.follow('Cm'));
+      act(() => result.current.follow('Am'));
       await act(async () => d.resolve());
       expect(engine.crossfadeTo).not.toHaveBeenCalled();
     });

@@ -38,8 +38,13 @@ describe('padNoteFor', () => {
     ['Bb', 'A#'],
     [' bb', 'A#'],
     ['B', 'B'],
-    ['Am', 'A'],
-    ['F#m', 'F#'],
+    ['Am', 'C'],
+    ['Em', 'G'],
+    ['F#m', 'A'],
+    ['Bm', 'D'],
+    ['Dm', 'F'],
+    ['C#m', 'E'],
+    ['Gm', 'A#'],
   ])('maps %s to %s', (key, note) => {
     expect(padNoteFor(key)).toBe(note);
   });
