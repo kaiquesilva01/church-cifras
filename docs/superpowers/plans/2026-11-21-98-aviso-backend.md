@@ -6,7 +6,7 @@
 
 **Architecture:** Três partes independentes em arquivos disjuntos. (1) Docs: reabre o não-objetivo em `docs/sistema.md` e no spec de repertórios §3. (2) Rules: `setlists` aceita dois campos opcionais; `pushDevices`, `avisosEnviados` e `config/*` seguem fechados ao cliente pelo deny-all. (3) Functions: módulo `apps/functions/src/push/` com lógica pura, injetada por `PushDeps` (mesmo padrão de `stats/`), testada com um fake em memória; um adaptador fino com `firebase-admin` e as três callables em `index.ts`.
 
-**Tech Stack:** TypeScript 6.0.3 em `strict` + `noUncheckedIndexedAccess`; firebase-admin 14.5.1 (`firebase-admin/messaging`, `sendEachForMulticast`); firebase-functions 7.4.0 (`onCall`, `HttpsError` de `firebase-functions/v2/https`); vitest 5.1.0; `@firebase/rules-unit-testing` 6.0.0 com o emulador do Firestore; tsup 9.0.0 para o build.
+**Tech Stack:** TypeScript 6.0.3 em `strict` + `noUncheckedIndexedAccess`; firebase-admin 14.5.1 (`firebase-admin/messaging`, `sendEach`); firebase-functions 7.4.0 (`onCall`, `HttpsError` de `firebase-functions/v2/https`); vitest 5.1.0; `@firebase/rules-unit-testing` 6.0.0 com o emulador do Firestore; tsup 9.0.0 para o build.
 
 **Spec:** Não há spec próprio do push. Esta entrega implementa as decisões da [Análise Agêntica da #85](https://github.com/kaiquesilva01/church-cifras/issues/85) (decisões de 21/11) e o critério de aceite da #98, e reabre o não-objetivo de [repertórios §3](../specs/2026-11-16-repertorios-design.md). Os critérios de aceite estão no corpo da issue #98.
 
@@ -15,9 +15,10 @@
 - Região das callables: `southamerica-east1`, em `onCall({ region: REGION })`, como no resto de `index.ts`.
 - Papel sempre lido de `users/{uid}` por `requireRole` (não do token).
 - Token de aparelho é credencial: nunca em log, resposta ou mensagem de erro. Logs só com contagens e `shortHash` (8 primeiros caracteres do SHA-256).
+- Token de aparelho: string, sem espaços nas pontas, de 1 a 4096 caracteres; conferido em `registerDevice` e em `unregisterDevice`.
 - Origem válida: exatamente `producao` ou `teste`. Aparelho sem origem gravada conta como `producao`.
 - Link absoluto por origem: produção `https://louvor-hajaluz.web.app`, teste `https://louvor-hajaluz-teste.web.app`.
-- Lote de envio: no máximo 500 tokens por `sendEachForMulticast`.
+- Envio: `sendEach` com uma mensagem por token; no máximo 500 mensagens por chamada.
 - Poda de token só com `messaging/registration-token-not-registered` ou `messaging/invalid-registration-token`. Outros erros contam como falha e mantêm o aparelho.
 - `config/push` com `enabled === false` bloqueia só quando `respectSwitch` é verdadeiro. Sem o doc, o envio liga.
 - Rules: nenhum `allow` novo para `pushDevices`, `avisosEnviados` e `config/*`; o deny-all cobre.
@@ -26,15 +27,22 @@
 - `docs/sistema.md` com no máximo 350 linhas (teste `.claude/agents/sistema.test.mjs`).
 - Conventional Commits em inglês; prosa de docs e UI em pt-BR. O `.prettierignore` exclui `docs/` e `*.md`; formatar só o código alterado (`*.ts`, `*.mjs`, `*.json`) com `npx prettier --write <arquivos>`.
 
+## Decisões do orquestrador (pré-voo do backend-dev)
+
+1. **Limpar a hora do ensaio (contrato com a #100).** Em `updateDoc`, omitir o campo **não** o apaga: o cliente usa `deleteField()`. Em `setDoc` completo (sobrescrita), omitir o campo o remove. `rehearsalAt: null` é recusado. Coberto pelos testes da Tarefa 2.
+2. **Validação do token** em `registerDevice` e `unregisterDevice`: string, sem espaços nas pontas, não vazia, no máximo 4096 caracteres; senão `invalid-argument`. Coberto pelos testes da Tarefa 5.
+3. **Troca de dono zera `createdAt`.** Quando o token passa a outro `uid`, `createdAt` recebe o instante da troca (é a primeira gravação do novo dono). Coberto pelo teste da Tarefa 5.
+4. **Envio com `sendEach`, não `sendEachForMulticast`.** No firebase-admin 14.5.1, `MulticastMessage.tokens` está `@deprecated`. Cada token vira uma mensagem; `sendEach` aceita até 500 mensagens por chamada. A poda e os códigos de erro (`responses[i].error.code`) não mudam.
+
 ## Review Focus
 
 Entradas e condições que a spec implica e que a pessoa usaria, mais prováveis primeiro. Cada uma tem o teste que a prova, na tarefa dona do código.
 
-1. Rebaixado a `viewer` (ou removido) com aparelho registrado: o próximo envio ignora o aparelho e o apaga; o logout dele apaga o próprio registro. Teste: Tarefa 4 `sends to member and admin only, and deletes devices of users who are no longer member or admin`; Tarefa 5 `unregister deletes own device`.
-2. Mesmo aparelho usado por outra pessoa (troca de conta no celular): o registro passa ao novo `uid` e não duplica. Teste: Tarefa 5 `token previously owned by another uid moves to the new uid`.
-3. Mais de 500 aparelhos ativos: todos recebem, em lotes de 500, sem perder o excedente. Teste: Tarefa 4 `splits tokens into batches of 500`.
-4. Token expirado no meio de um lote: só ele sai; erro temporário não apaga aparelho bom. Teste: Tarefa 4 `prunes only not-registered and invalid-token, keeps device on other errors`.
-5. Repertório antigo (sem `rehearsalAt` nem `origin`) segue editável; ensaio no limite da janela passa e um segundo depois falha. Teste: Tarefa 2 `allows update of a legacy setlist` e os casos de limite em `rehearsalAt`.
+1. Rebaixado a `viewer` (ou removido) com aparelho registrado: o próximo envio ignora o aparelho e o apaga; o logout dele apaga o próprio registro. Teste: Tarefa 4 `deletes devices of users who are no longer member or admin, and does not send to them`; Tarefa 5 `deletes the caller own device, any role`.
+2. Mesmo aparelho usado por outra pessoa (troca de conta no celular): o registro passa ao novo `uid`, não duplica e ganha `createdAt` novo. Teste: Tarefa 5 `token previously owned by another uid moves to the new uid` e `token moved to another uid gets a new createdAt`.
+3. Mais de 500 aparelhos ativos: todos recebem, em lotes de 500 mensagens por `sendEach`, sem perder o excedente. Teste: Tarefa 4 `splits devices into batches of 500 messages`.
+4. Token expirado no meio de um lote: só ele sai; erro temporário não apaga aparelho bom. Teste: Tarefa 4 `prunes only not-registered and invalid-token errors, keeps the device on other errors`.
+5. Repertório antigo (sem `rehearsalAt` nem `origin`) segue editável; ensaio no limite da janela passa e um segundo depois falha; limpar a hora do ensaio é aceito. Teste: Tarefa 2 `allows update of a legacy setlist without the new fields`, os casos de limite de `rehearsalAt` e `allows clearing rehearsalAt with deleteField() in an update`.
 
 ## Grupos de execução
 
@@ -112,7 +120,7 @@ New:
 ```
 E, logo depois da tabela (antes de "Regras de contagem de uso:"), acrescente:
 ```
-Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia por lotes de 500, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. Ainda não há gatilho: os avisos chegam nas entregas #101 e #102.
+Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. Ainda não há gatilho: os avisos chegam nas entregas #101 e #102.
 ```
 
 3e. Não-objetivos decididos: troque a linha
@@ -140,7 +148,7 @@ Notificação push estava nesta lista como "Notificação push, escala de músic
 - Avisos (push, #85): o backend dos aparelhos está na #98, sem tela nem envio automático. Antes da #99: passos manuais 1 e 2 da #85 (número do projeto e chave VAPID). Antes da #101: passos 4 e 5.
 ```
 
-- [ ] **Step 4: Formatar e conferir o tamanho**
+- [ ] **Step 4: Conferir o tamanho e o diff**
 
 Markdown não passa pelo Prettier (`.prettierignore` exclui `docs/` e `*.md`); não rode `prettier` nesses arquivos. Confira o diff com `git diff docs/` e veja se as tabelas ficaram com colunas consistentes.
 Run: `wc -l docs/sistema.md`
@@ -163,7 +171,7 @@ git commit -m "docs(sistema): reabre push para os avisos (#85) e registra as Fun
 ### Task 2: Rules aceitam `rehearsalAt` e `origin`; push segue fechado ao cliente
 
 **Files:**
-- Modify: `tests/rules/setlists.rules.test.ts` (acrescentar um bloco ao final)
+- Modify: `tests/rules/setlists.rules.test.ts` (acrescentar um bloco ao final e incluir `deleteField` no import de `firebase/firestore`)
 - Create: `tests/rules/push.rules.test.ts`
 - Modify: `firestore.rules` (`validSetlist` e uma função nova `validRehearsal`)
 
@@ -171,7 +179,7 @@ git commit -m "docs(sistema): reabre push para os avisos (#85) e registra as Fun
 - Consumes: nada.
 - Produces: `setlists/{id}` aceita, opcionalmente, `rehearsalAt` (timestamp) e `origin` (`'producao' | 'teste'`). Os valores são os que o cliente grava na #100 e as Functions leem na #101/#102.
 
-Contrato para a #100: o cliente **omite** o campo para limpar a hora do ensaio. `rehearsalAt: null` é recusado.
+Contrato para a #100 (ver Decisão 1): para limpar a hora do ensaio, o cliente usa `deleteField()` em `updateDoc`, ou omite o campo em um `setDoc` completo. `rehearsalAt: null` é recusado.
 
 Janela: culto em `date` (dia civil de Brasília, UTC-3 sem horário de verão). Aceito: `rehearsalAt >= 00:00 de (date - 7 dias)` e `rehearsalAt < 00:00 de (date + 1 dia)`. Em UTC: `base + 3h - 168h` (inclusivo) e `base + 27h` (exclusivo), com `base = timestamp.date(Y, M, D)`.
 
@@ -179,7 +187,9 @@ Janela: culto em `date` (dia civil de Brasília, UTC-3 sem horário de verão). 
 
 - [ ] **Step 1: Escrever os testes positivos e negativos de `setlists`**
 
-Acrescente ao final de `tests/rules/setlists.rules.test.ts`:
+Em `tests/rules/setlists.rules.test.ts`, acrescente `deleteField` ao import de `firebase/firestore`.
+
+Acrescente ao final do arquivo:
 
 ```ts
 describe('setlists rules: rehearsalAt e origin', () => {
@@ -230,6 +240,30 @@ describe('setlists rules: rehearsalAt e origin', () => {
   it('denies update with rehearsalAt outside the window of the new date', async () => {
     await assertFails(
       updateDoc(existing(memberDb()), updateData({ rehearsalAt: at('2026-11-22T02:59:59Z') })),
+    );
+  });
+
+  it('allows clearing rehearsalAt with deleteField() in an update', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'setlists/comEnsaio'),
+        setlistData({ rehearsalAt: at('2026-11-19T22:30:00Z'), createdAt: at('2026-11-16T00:00:00Z') }),
+      );
+    });
+    await assertSucceeds(
+      updateDoc(doc(memberDb(), 'setlists/comEnsaio'), updateData({ rehearsalAt: deleteField() })),
+    );
+  });
+
+  it('allows clearing rehearsalAt by omitting it in a full overwrite', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'setlists/comEnsaio'),
+        setlistData({ rehearsalAt: at('2026-11-19T22:30:00Z'), createdAt: at('2026-11-16T00:00:00Z') }),
+      );
+    });
+    await assertSucceeds(
+      setDoc(doc(memberDb(), 'setlists/comEnsaio'), setlistData({ createdAt: at('2026-11-16T00:00:00Z') })),
     );
   });
 });
@@ -310,7 +344,7 @@ describe.each(WHO)('colecoes de push fechadas para %s', (who) => {
 
 Run (Windows sem Java): `docker compose run --rm --no-deps emulators npm run test:rules`
 Run (host com Node 22 e Java 21): `npm run test:rules`
-Expected: os casos positivos de `rehearsalAt` e `origin` (`allows member with ...`, `allows update adding ...`) FALHAM, porque `hasOnly` ainda recusa os campos. Os casos negativos e os de `push.rules.test.ts` PASSAM (já são negados). Se os positivos passarem, pare: a regra já aceita os campos e o teste não prova nada.
+Expected: os casos positivos de `rehearsalAt` e `origin` (`allows member with ...`, `allows update adding ...`) FALHAM, porque `hasOnly` ainda recusa os campos. Os casos negativos, os dois de limpar (`allows clearing ...`, que não validam o campo removido) e os de `push.rules.test.ts` PASSAM já antes da mudança. Os de limpar são guarda de regressão do contrato da #100. Se os positivos de `allows member with ...` passarem, pare: a regra já aceita os campos e o teste não prova nada.
 
 - [ ] **Step 4: Alterar `firestore.rules`**
 
@@ -367,7 +401,7 @@ New:
 - [ ] **Step 5: Rodar as Rules até ficarem verdes**
 
 Run: `docker compose run --rm --no-deps emulators npm run test:rules` (ou `npm run test:rules`)
-Expected: todos os testes de `setlists`, `setlistUsage`, `storage` e `firestore` passam, incluindo os casos de limite (`2026-11-15T03:00:00Z` aceito, `02:59:59Z` recusado, `2026-11-23T02:59:59Z` aceito, `03:00:00Z` recusado) e `push.rules.test.ts` inteiro.
+Expected: todos os testes de `setlists`, `setlistUsage`, `storage` e `firestore` passam, incluindo os casos de limite (`2026-11-15T03:00:00Z` aceito, `02:59:59Z` recusado, `2026-11-23T02:59:59Z` aceito, `03:00:00Z` recusado), os de limpar e `push.rules.test.ts` inteiro.
 
 - [ ] **Step 6: Commit**
 
@@ -391,7 +425,7 @@ git commit -m "feat(rules): aceita rehearsalAt e origin no repertório e mantém
 - Produces (usados pelas Tarefas 4 a 6):
   - `token.ts`: `ORIGINS`, `type Origin`, `SITE_BASE: Record<Origin, string>`, `parseOrigin(value: unknown): Origin | null`, `deviceOrigin(value: unknown): Origin` (ausente ou desconhecida = `'producao'`), `deviceId(token: string): string` (SHA-256 hex), `shortHash(token: string): string` (8 caracteres).
   - `types.ts`: `PushMessage`, `SendResult`, `DeviceRecord`, `PushDeps` (ver bloco abaixo).
-  - `fakeDeps.ts`: `fakeDeps(opts?)` e `device(token, uid, origin?)` para os testes.
+  - `fakeDeps.ts`: `fakeDeps(opts?)`, `device(token, uid, origin?)` e `sentTokens(calls)` para os testes.
 
 `PushDeps` (em `types.ts`):
 ```ts
@@ -401,7 +435,8 @@ export type PushDeps = RoleDeps & {
   deleteDevices(ids: string[]): Promise<void>;
   listDevices(): Promise<DeviceRecord[]>;
   getUserRoles(uids: string[]): Promise<Map<string, Role>>;
-  sendBatch(tokens: string[], message: PushMessage): Promise<SendResult[]>; // até 500, um resultado por token, na mesma ordem
+  // até 500 mensagens por chamada (sendEach); um resultado por mensagem, na mesma ordem
+  sendBatch(messages: Array<{ token: string; message: PushMessage }>): Promise<SendResult[]>;
   readPushConfig(): Promise<{ enabled?: unknown } | null>;
   now(): Date;
 };
@@ -465,14 +500,14 @@ Crie `apps/functions/src/push/types.ts` com o bloco `PushDeps` da seção Interf
 import type { RoleDeps } from '../auth/requireRole';
 import type { Role } from '../roles';
 
-/** Mensagem com link absoluto (o domínio depende da origem do grupo de aparelhos). */
+/** Mensagem com link absoluto (o domínio depende da origem do aparelho). */
 export type PushMessage = { title: string; body: string; link: string; tag: string };
 
 export type SendResult = { ok: true } | { ok: false; code: string };
 
 export type DeviceRecord = { id: string; uid: string; token: string; origin: unknown };
 ```
-(Acrescente o `export type PushDeps = RoleDeps & { ... }` completo com os comentários de `writeDevice` e `sendBatch` da seção Interfaces.)
+(Acrescente o `export type PushDeps = RoleDeps & { ... }` completo, com os comentários de `writeDevice` e `sendBatch` da seção Interfaces.)
 
 - [ ] **Step 4: Implementar `token.ts`**
 
@@ -531,6 +566,8 @@ export type FakeOptions = {
   failures?: Record<string, string>;
 };
 
+export type SentCall = Array<{ token: string; message: PushMessage }>;
+
 export const FAKE_NOW = new Date('2026-11-21T12:00:00Z');
 
 /** Aparelho pronto para `devices`, com o id derivado do token. */
@@ -541,13 +578,16 @@ export const device = (token: string, uid: string, origin?: string): DeviceRecor
   origin,
 });
 
+/** Tokens na ordem em que foram enviados, somando todas as chamadas. */
+export const sentTokens = (calls: SentCall[]) => calls.flat().map((m) => m.token);
+
 export function fakeDeps(opts: FakeOptions = {}) {
   const devices = new Map<string, Record<string, unknown>>(
     (opts.devices ?? []).map((d) => [d.id, { uid: d.uid, token: d.token, origin: d.origin }]),
   );
   const roles = new Map<string, Role>(Object.entries(opts.roles ?? {}));
   const clock = { now: FAKE_NOW };
-  const batches: Array<{ tokens: string[]; message: PushMessage }> = [];
+  const calls: SentCall[] = [];
 
   const deps: PushDeps = {
     getUserRole: async (uid) => roles.get(uid),
@@ -570,9 +610,9 @@ export function fakeDeps(opts: FakeOptions = {}) {
       })),
     getUserRoles: async (uids) =>
       new Map(uids.filter((uid) => roles.has(uid)).map((uid) => [uid, roles.get(uid) as Role])),
-    sendBatch: async (tokens, message) => {
-      batches.push({ tokens, message });
-      return tokens.map((token): SendResult => {
+    sendBatch: async (messages) => {
+      calls.push(messages);
+      return messages.map(({ token }): SendResult => {
         const code = opts.failures?.[token];
         return code ? { ok: false, code } : { ok: true };
       });
@@ -581,7 +621,7 @@ export function fakeDeps(opts: FakeOptions = {}) {
     now: () => clock.now,
   };
 
-  return { deps, devices, batches, clock };
+  return { deps, devices, calls, clock };
 }
 ```
 
@@ -606,7 +646,7 @@ git commit -m "feat(functions): tipos, id de aparelho e fake de teste do módulo
 - Create: `apps/functions/src/push/send.ts`
 
 **Interfaces:**
-- Consumes: `PushDeps`, `PushMessage`, `DeviceRecord` de `types.ts`; `ORIGINS`, `SITE_BASE`, `deviceOrigin`, `shortHash`, `type Origin` de `token.ts`; `device`, `fakeDeps`, `FAKE_NOW` de `fakeDeps.ts` (nos testes).
+- Consumes: `PushDeps`, `PushMessage`, `DeviceRecord` de `types.ts`; `SITE_BASE`, `deviceOrigin`, `shortHash`, `type Origin` de `token.ts`; `device`, `fakeDeps`, `sentTokens` de `fakeDeps.ts` (nos testes).
 - Produces:
   ```ts
   export const BATCH_SIZE = 500;
@@ -623,7 +663,7 @@ git commit -m "feat(functions): tipos, id de aparelho e fake de teste do módulo
   export async function sendToDevices(deps: PushDeps, input: SendInput): Promise<SendOutcome>;
   ```
 
-Regras de implementação, na ordem: valida `link` (começa com `/` e não com `//`, senão `Error('push link must be a site path')`); se `respectSwitch` e `config.enabled === false`, devolve `blocked: true` sem enviar nem apagar; lista os aparelhos e filtra por `excludeUid`, `onlyUid` e `origin` (`deviceOrigin`); busca os papéis de todos os `uid` distintos; aparelho cujo papel não é `member` nem `admin` entra em `stale` e é apagado; os demais são agrupados por origem (na ordem de `ORIGINS`), enviados em lotes de `BATCH_SIZE` com `link = SITE_BASE[origin] + input.link`; resultado `ok` soma em `sent`; código de poda vai para `toPrune` (com `device.id`); outro erro soma em `failed`; ao fim, apaga `toPrune` e loga só contagens e `shortHash`.
+Regras de implementação, na ordem: valida `link` (começa com `/` e não com `//`, senão `Error('push link must be a site path')`); se `respectSwitch` e `config.enabled === false`, devolve `blocked: true` sem enviar nem apagar; lista os aparelhos e filtra por `excludeUid`, `onlyUid` e `origin` (`deviceOrigin`); busca os papéis de todos os `uid` distintos; aparelho cujo papel não é `member` nem `admin` entra em `stale` e é apagado; os demais viram mensagens `{ token, message: { title, body, tag, link: SITE_BASE[deviceOrigin(d.origin)] + input.link } }`, na ordem da listagem, enviadas em lotes de `BATCH_SIZE` (até 500 mensagens por chamada de `sendBatch`); resultado `ok` soma em `sent`; código de poda vai para `toPrune` (com `device.id`); outro erro soma em `failed`; ao fim, apaga `toPrune` e loga só contagens e `shortHash`.
 
 - [ ] **Step 1: Escrever os testes**
 
@@ -632,7 +672,7 @@ Crie `apps/functions/src/push/send.test.ts`:
 ```ts
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { deviceId } from './token';
-import { device, fakeDeps } from './fakeDeps';
+import { device, fakeDeps, sentTokens } from './fakeDeps';
 import { sendToDevices, type SendInput } from './send';
 
 const BASE: SendInput = {
@@ -648,8 +688,8 @@ afterEach(() => {
 });
 
 describe('sendToDevices: quem recebe', () => {
-  it('sends to member and admin devices, one multicast per origin, with the link of each origin', async () => {
-    const { deps, batches } = fakeDeps({
+  it('sends one message per device, with the link of each device origin', async () => {
+    const { deps, calls } = fakeDeps({
       roles: { m1: 'member', a1: 'admin' },
       devices: [device('t1', 'm1', 'producao'), device('t2', 'a1', 'teste')],
     });
@@ -657,28 +697,30 @@ describe('sendToDevices: quem recebe', () => {
     const out = await sendToDevices(deps, BASE);
 
     expect(out).toEqual({ sent: 2, failed: 0, pruned: 0, unauthorizedRemoved: 0, blocked: false });
-    expect(batches).toEqual([
-      {
-        tokens: ['t1'],
-        message: { title: 'Novo repertório', body: 'Domingo', tag: 'rep-r1', link: 'https://louvor-hajaluz.web.app/repertorios/r1' },
-      },
-      {
-        tokens: ['t2'],
-        message: { title: 'Novo repertório', body: 'Domingo', tag: 'rep-r1', link: 'https://louvor-hajaluz-teste.web.app/repertorios/r1' },
-      },
+    expect(calls).toEqual([
+      [
+        {
+          token: 't1',
+          message: { title: 'Novo repertório', body: 'Domingo', tag: 'rep-r1', link: 'https://louvor-hajaluz.web.app/repertorios/r1' },
+        },
+        {
+          token: 't2',
+          message: { title: 'Novo repertório', body: 'Domingo', tag: 'rep-r1', link: 'https://louvor-hajaluz-teste.web.app/repertorios/r1' },
+        },
+      ],
     ]);
   });
 
   it('treats a device without origin as producao', async () => {
-    const { deps, batches } = fakeDeps({ roles: { m1: 'member' }, devices: [device('t1', 'm1')] });
+    const { deps, calls } = fakeDeps({ roles: { m1: 'member' }, devices: [device('t1', 'm1')] });
 
     await sendToDevices(deps, BASE);
 
-    expect(batches[0]?.message.link).toBe('https://louvor-hajaluz.web.app/repertorios/r1');
+    expect(calls.flat()[0]?.message.link).toBe('https://louvor-hajaluz.web.app/repertorios/r1');
   });
 
   it('origin filter sends only to devices of that origin', async () => {
-    const { deps, batches } = fakeDeps({
+    const { deps, calls } = fakeDeps({
       roles: { m1: 'member' },
       devices: [device('t1', 'm1', 'producao'), device('t2', 'm1', 'teste')],
     });
@@ -686,22 +728,22 @@ describe('sendToDevices: quem recebe', () => {
     const out = await sendToDevices(deps, { ...BASE, origin: 'teste' });
 
     expect(out.sent).toBe(1);
-    expect(batches.flatMap((b) => b.tokens)).toEqual(['t2']);
+    expect(sentTokens(calls)).toEqual(['t2']);
   });
 
   it('excludeUid leaves out the devices of that user', async () => {
-    const { deps, batches } = fakeDeps({
+    const { deps, calls } = fakeDeps({
       roles: { m1: 'member', a1: 'admin' },
       devices: [device('t1', 'm1', 'producao'), device('t2', 'a1', 'producao')],
     });
 
     await sendToDevices(deps, { ...BASE, excludeUid: 'm1' });
 
-    expect(batches.flatMap((b) => b.tokens)).toEqual(['t2']);
+    expect(sentTokens(calls)).toEqual(['t2']);
   });
 
   it('deletes devices of users who are no longer member or admin, and does not send to them', async () => {
-    const { deps, devices, batches } = fakeDeps({
+    const { deps, devices, calls } = fakeDeps({
       roles: { m1: 'member', v1: 'viewer' },
       devices: [device('t1', 'm1', 'producao'), device('t2', 'v1', 'producao')],
     });
@@ -709,19 +751,19 @@ describe('sendToDevices: quem recebe', () => {
     const out = await sendToDevices(deps, BASE);
 
     expect(out).toMatchObject({ sent: 1, unauthorizedRemoved: 1 });
-    expect(batches.flatMap((b) => b.tokens)).toEqual(['t1']);
+    expect(sentTokens(calls)).toEqual(['t1']);
     expect([...devices.keys()]).toEqual([deviceId('t1')]);
   });
 });
 
 describe('sendToDevices: lotes e poda', () => {
-  it('splits tokens into batches of 500', async () => {
+  it('splits devices into batches of 500 messages', async () => {
     const many = Array.from({ length: 1001 }, (_, i) => device(`t${i}`, 'm1', 'producao'));
-    const { deps, batches } = fakeDeps({ roles: { m1: 'member' }, devices: many });
+    const { deps, calls } = fakeDeps({ roles: { m1: 'member' }, devices: many });
 
     const out = await sendToDevices(deps, BASE);
 
-    expect(batches.map((b) => b.tokens.length)).toEqual([500, 500, 1]);
+    expect(calls.map((c) => c.length)).toEqual([500, 500, 1]);
     expect(out.sent).toBe(1001);
   });
 
@@ -745,7 +787,7 @@ describe('sendToDevices: lotes e poda', () => {
 
 describe('sendToDevices: interruptor', () => {
   it('blocks everything when config/push is disabled and respectSwitch is true', async () => {
-    const { deps, batches, devices } = fakeDeps({
+    const { deps, calls, devices } = fakeDeps({
       roles: { m1: 'member' },
       devices: [device('t1', 'm1')],
       config: { enabled: false },
@@ -754,7 +796,7 @@ describe('sendToDevices: interruptor', () => {
     const out = await sendToDevices(deps, BASE);
 
     expect(out).toEqual({ sent: 0, failed: 0, pruned: 0, unauthorizedRemoved: 0, blocked: true });
-    expect(batches).toEqual([]);
+    expect(calls).toEqual([]);
     expect(devices.size).toBe(1);
   });
 
@@ -808,7 +850,7 @@ Expected: FAIL com `Cannot find module './send'`.
 Crie `apps/functions/src/push/send.ts`, seguindo as regras de implementação da seção Interfaces (exports e assinaturas exatos). Pontos que não são óbvios:
 - `matches(d, input)` é uma função auxiliar do próprio arquivo: `excludeUid`, depois `onlyUid`, depois `origin` com `deviceOrigin`.
 - Papel do aparelho: `const role = roles.get(d.uid)`; é remetente se `role === 'member' || role === 'admin'`.
-- Como o `tsconfig` tem `noUncheckedIndexedAccess`, use `const device = batch[i]; if (!device) return;` dentro do `forEach`.
+- Como o `tsconfig` tem `noUncheckedIndexedAccess`, ao ler o resultado pelo índice use `const device = batch[i]; if (!device) return;` dentro do `forEach`.
 - Log: `console.info('push: send', { sent, failed, pruned, unauthorizedRemoved })` e, para cada poda, `console.info(\`push: pruned ${shortHash(device.token)} (${result.code})\`)`. Nada de token.
 
 - [ ] **Step 4: Rodar e ver passar**
@@ -832,7 +874,7 @@ git commit -m "feat(functions): auxiliar sendToDevices com lotes, poda e interru
 - Create: `apps/functions/src/push/devices.ts`
 
 **Interfaces:**
-- Consumes: `PushDeps` de `types.ts`; `deviceId`, `parseOrigin` de `token.ts`; `sendToDevices` de `send.ts`; `requireRole` de `../auth/requireRole`; `HttpsError` de `firebase-functions/v2/https`; `device`, `fakeDeps` de `fakeDeps.ts` (nos testes).
+- Consumes: `PushDeps` de `types.ts`; `deviceId`, `parseOrigin` de `token.ts`; `sendToDevices` de `send.ts`; `requireRole` de `../auth/requireRole`; `HttpsError` de `firebase-functions/v2/https`; `device`, `fakeDeps`, `sentTokens` de `fakeDeps.ts` (nos testes).
 - Produces:
   ```ts
   export async function registerDevice(deps: PushDeps, uid: string | undefined, data: { token?: unknown; origin?: unknown }): Promise<{ ok: true }>;
@@ -840,7 +882,26 @@ git commit -m "feat(functions): auxiliar sendToDevices com lotes, poda e interru
   export async function sendTestPush(deps: PushDeps, uid: string | undefined): Promise<{ sent: number; failed: number }>;
   ```
 
-Regras: `registerDevice` chama `requireRole(deps, uid, ['member', 'admin'])`, valida token (string não vazia, senão `invalid-argument` "Invalid token.") e origem (`parseOrigin`, senão `invalid-argument` "Invalid origin."), calcula `deviceId(token)`, lê o dono com `getDeviceOwner`, e grava com `writeDevice(id, { uid, token, origin, lastSeenAt: now, ...(owner === null ? { createdAt: now } : {}) })`. Depois do `requireRole`, use `uid as string` (o `requireRole` já garante). `unregisterDevice` exige `uid` (senão `unauthenticated`, "Login required."), **sem** checar papel, e apaga só se o dono for o `uid`. `sendTestPush` chama `requireRole(deps, uid, ['member', 'admin'])` e `sendToDevices` com `title: 'Aviso de teste'`, `body: 'Está tudo certo. Você vai receber os avisos do Church Cifras neste aparelho.'`, `link: '/'`, `tag: 'aviso-teste'`, `onlyUid: uid`, `respectSwitch: false`, devolvendo só `{ sent, failed }`.
+Regras:
+- `parseToken(value: unknown): string` (interna de `devices.ts`, usada pelos dois callables) lança `HttpsError('invalid-argument', 'Invalid token.')` se o valor não for string, se for vazio, se passar de 4096 caracteres, ou se `value !== value.trim()`:
+  ```ts
+  const MAX_TOKEN_LENGTH = 4096;
+
+  function parseToken(value: unknown): string {
+    if (
+      typeof value !== 'string' ||
+      value.length === 0 ||
+      value.length > MAX_TOKEN_LENGTH ||
+      value !== value.trim()
+    ) {
+      throw new HttpsError('invalid-argument', 'Invalid token.');
+    }
+    return value;
+  }
+  ```
+- `registerDevice`: chama `requireRole(deps, uid, ['member', 'admin'])`; depois `parseToken` e `parseOrigin` (senão `invalid-argument` "Invalid origin."); calcula `deviceId(token)`; lê o dono com `getDeviceOwner`; grava com `writeDevice(id, { uid, token, origin, lastSeenAt: now, ...(owner === uid ? {} : { createdAt: now }) })`. Assim, o mesmo dono mantém `createdAt`, e dono novo ou primeira gravação recebe `createdAt` novo (Decisão 3). Depois do `requireRole`, use `uid as string` (o `requireRole` já garante).
+- `unregisterDevice`: exige `uid` (senão `unauthenticated`, "Login required."), **sem** checar papel; depois `parseToken`; apaga só se o dono for o `uid`; idempotente.
+- `sendTestPush`: `requireRole(deps, uid, ['member', 'admin'])` e `sendToDevices` com `title: 'Aviso de teste'`, `body: 'Está tudo certo. Você vai receber os avisos do Church Cifras neste aparelho.'`, `link: '/'`, `tag: 'aviso-teste'`, `onlyUid: uid`, `respectSwitch: false`; devolve só `{ sent, failed }`.
 
 - [ ] **Step 1: Escrever os testes**
 
@@ -848,7 +909,7 @@ Crie `apps/functions/src/push/devices.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { device, fakeDeps } from './fakeDeps';
+import { device, fakeDeps, sentTokens } from './fakeDeps';
 import { registerDevice, sendTestPush, unregisterDevice } from './devices';
 import { deviceId } from './token';
 
@@ -863,10 +924,20 @@ describe('registerDevice', () => {
     ['origin Producao', { token: 't', origin: 'Producao' }],
     ['origin ausente', { token: 't' }],
     ['token vazio', { token: '', origin: 'producao' }],
-    ['token não é texto', { token: 1, origin: 'producao' }],
+    ['token só com espaços', { token: '   ', origin: 'producao' }],
+    ['token com espaço nas pontas', { token: ' tok ', origin: 'producao' }],
+    ['token acima de 4096 caracteres', { token: 'a'.repeat(4097), origin: 'producao' }],
+    ['token ausente', { origin: 'producao' }],
+    ['token undefined', { token: undefined, origin: 'producao' }],
+    ['token número', { token: 1, origin: 'producao' }],
   ])('rejects %s with invalid-argument', async (_name, data) => {
     const { deps } = fakeDeps({ roles: { m1: 'member' } });
     await expect(registerDevice(deps, 'm1', data)).rejects.toMatchObject({ code: 'invalid-argument' });
+  });
+
+  it('accepts a token of exactly 4096 characters', async () => {
+    const { deps } = fakeDeps({ roles: { m1: 'member' } });
+    await expect(registerDevice(deps, 'm1', { token: 'a'.repeat(4096), origin: 'producao' })).resolves.toEqual({ ok: true });
   });
 
   it('stores the device under sha256(token) with uid, token, origin, createdAt and lastSeenAt', async () => {
@@ -901,9 +972,35 @@ describe('registerDevice', () => {
     expect(devices.size).toBe(1);
     expect(devices.get(deviceId('tok-A'))?.uid).toBe('a1');
   });
+
+  it('token moved to another uid gets a new createdAt (first write of the new owner)', async () => {
+    const { deps, devices, clock } = fakeDeps({ roles: { m1: 'member', a1: 'admin' } });
+    await registerDevice(deps, 'm1', { token: 'tok-A', origin: 'producao' });
+
+    clock.now = new Date('2026-11-21T13:00:00Z');
+    await registerDevice(deps, 'a1', { token: 'tok-A', origin: 'producao' });
+
+    expect(devices.get(deviceId('tok-A'))).toMatchObject({
+      uid: 'a1',
+      createdAt: new Date('2026-11-21T13:00:00Z'),
+      lastSeenAt: new Date('2026-11-21T13:00:00Z'),
+    });
+  });
 });
 
 describe('unregisterDevice', () => {
+  it.each([
+    ['token ausente', {}],
+    ['token undefined', { token: undefined }],
+    ['token número', { token: 1 }],
+    ['token vazio', { token: '' }],
+    ['token com espaço nas pontas', { token: ' tok-V' }],
+    ['token acima de 4096 caracteres', { token: 'a'.repeat(4097) }],
+  ])('rejects %s with invalid-argument', async (_name, data) => {
+    const { deps } = fakeDeps();
+    await expect(unregisterDevice(deps, 'm1', data)).rejects.toMatchObject({ code: 'invalid-argument' });
+  });
+
   it('deletes the caller own device, any role', async () => {
     const { deps, devices } = fakeDeps({ roles: { v1: 'viewer' }, devices: [device('tok-V', 'v1', 'producao')] });
 
@@ -941,7 +1038,7 @@ describe('sendTestPush', () => {
   });
 
   it('sends only to the caller devices, ignores the disabled switch, returns counts', async () => {
-    const { deps, batches } = fakeDeps({
+    const { deps, calls } = fakeDeps({
       roles: { m1: 'member', m2: 'member' },
       devices: [device('t1', 'm1', 'producao'), device('t2', 'm1', 'teste'), device('t3', 'm2', 'producao')],
       config: { enabled: false },
@@ -950,8 +1047,8 @@ describe('sendTestPush', () => {
     const result = await sendTestPush(deps, 'm1');
 
     expect(result).toEqual({ sent: 2, failed: 0 });
-    expect(batches.flatMap((b) => b.tokens).sort()).toEqual(['t1', 't2']);
-    expect(batches.map((b) => b.message.title)).toEqual(['Aviso de teste', 'Aviso de teste']);
+    expect(sentTokens(calls).sort()).toEqual(['t1', 't2']);
+    expect(calls.flat().map((m) => m.message.title)).toEqual(['Aviso de teste', 'Aviso de teste']);
   });
 
   it('returns only counts, never tokens', async () => {
@@ -971,7 +1068,7 @@ Expected: FAIL com `Cannot find module './devices'`.
 
 - [ ] **Step 3: Implementar `devices.ts`**
 
-Crie `apps/functions/src/push/devices.ts` com as três funções exatas da seção Interfaces e as regras acima. Mensagens de erro: `'Invalid token.'`, `'Invalid origin.'`, `'Login required.'`. Não há `now` nas funções: use `deps.now()`.
+Crie `apps/functions/src/push/devices.ts` com as três funções exatas da seção Interfaces, o `parseToken` da seção Regras e as regras acima. Mensagens de erro: `'Invalid token.'`, `'Invalid origin.'`, `'Login required.'`. Não há `now` nas funções: use `deps.now()`.
 
 - [ ] **Step 4: Rodar e ver passar**
 
@@ -994,7 +1091,7 @@ git commit -m "feat(functions): registerDevice, unregisterDevice e sendTestPush 
 - Modify: `apps/functions/src/index.ts` (imports e três exports, no fim do arquivo)
 
 **Interfaces:**
-- Consumes: `PushDeps` de `types.ts`; `ROLES`, `type Role` de `../roles`; `registerDevice`, `unregisterDevice`, `sendTestPush` de `devices.ts`; `deps` (já existente em `index.ts`, do tipo `UserDeps`).
+- Consumes: `PushDeps`, `DeviceRecord`, `SendResult` de `types.ts`; `ROLES`, `type Role` de `../roles`; `registerDevice`, `unregisterDevice`, `sendTestPush` de `devices.ts`; `deps` (já existente em `index.ts`, do tipo `UserDeps`).
 - Produces: `createPushDeps(): PushDeps`; callables `registerDevice`, `unregisterDevice`, `sendTestPush` exportadas por `index.ts`.
 
 Sem teste unitário: o adaptador só fala com o Firestore e o FCM, e o fake já cobre a lógica. A prova é typecheck, build e o teste no aparelho da #99. Se `webpush.notification` recusar `tag` no tipo instalado, confira `WebpushNotification` em `node_modules/firebase-admin/lib/messaging/messaging-api.d.ts`, sem mudar a lógica.
@@ -1007,7 +1104,7 @@ Crie `apps/functions/src/push/adminDeps.ts`:
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { ROLES, type Role } from '../roles';
-import type { DeviceRecord, PushDeps, PushMessage, SendResult } from './types';
+import type { DeviceRecord, PushDeps, SendResult } from './types';
 
 // Limite de referências por getAll (igual a statsDeps) e de operações por batch do Firestore.
 const GET_ALL_BLOCK = 300;
@@ -1054,15 +1151,18 @@ export function createPushDeps(): PushDeps {
       }
       return roles;
     },
-    sendBatch: async (tokens, message: PushMessage): Promise<SendResult[]> => {
-      const response = await getMessaging().sendEachForMulticast({
-        tokens,
-        notification: { title: message.title, body: message.body },
-        webpush: {
-          notification: { tag: message.tag },
-          fcmOptions: { link: message.link },
-        },
-      });
+    // sendEach: uma mensagem por token (sendEachForMulticast está deprecado para tokens no 14.5.1).
+    sendBatch: async (messages): Promise<SendResult[]> => {
+      const response = await getMessaging().sendEach(
+        messages.map(({ token, message }) => ({
+          token,
+          notification: { title: message.title, body: message.body },
+          webpush: {
+            notification: { tag: message.tag },
+            fcmOptions: { link: message.link },
+          },
+        })),
+      );
       return response.responses.map((r): SendResult =>
         r.success ? { ok: true } : { ok: false, code: r.error?.code ?? 'unknown' },
       );
@@ -1162,7 +1262,7 @@ Expected: verde (inclusive `docs/sistema.md has at most 350 lines`).
 
 Run (Windows sem Java): `docker compose run --rm --no-deps emulators npm run test:rules`
 Run (host com Java 21): `npm run test:rules`
-Expected: verde, com os casos positivos e negativos de `setlists` e o bloco de `push.rules.test.ts`.
+Expected: verde, com os casos positivos e negativos de `setlists` (incluindo os de limpar) e o bloco de `push.rules.test.ts`.
 
 - [ ] **Step 5: Escopo do diff**
 
@@ -1176,14 +1276,14 @@ Expected: só estes arquivos, e nenhum de `apps/web`, `.claude/`, `.github/`, `f
 
 Conferir um a um com a evidência acima:
 1. [I] docs: spec §3 e `sistema.md` mostram o push reaberto com link para a #85; escala e comentários seguem fora.
-2. [U] `registerDevice` (Tarefa 5, 4 testes de registro).
+2. [U] `registerDevice` (Tarefa 5: registro, troca de dono, validação do token).
 3. [U] `origin` aceita só `producao`/`teste` (Tarefa 5 e Tarefa 3).
-4. [U] `unregisterDevice` (Tarefa 5).
+4. [U] `unregisterDevice` (Tarefa 5: validação do token e dono).
 5. [U] `sendTestPush` com interruptor desligado (Tarefa 5).
-6. [U] auxiliar: lotes de 500, poda, papel, interruptor (Tarefa 4).
+6. [U] auxiliar: lotes de 500 mensagens, poda, papel, interruptor (Tarefa 4).
 7. [U] logs e respostas sem token (Tarefa 4 e Tarefa 5).
 8. [R] cliente sem acesso a `pushDevices`, `avisosEnviados`, `config/push` (Tarefa 2).
-9. [R] `setlists` com `rehearsalAt` e `origin` opcionais (Tarefa 2).
+9. [R] `setlists` com `rehearsalAt` e `origin` opcionais, e limpar a hora do ensaio aceito (Tarefa 2).
 
 ---
 
@@ -1192,7 +1292,5 @@ Conferir um a um com a evidência acima:
 1. **`int()` nas Rules.** A janela de `rehearsalAt` depende de converter `date` (string) em inteiros. Se o emulador não tiver `int()`, a Tarefa 2 para e volta ao tech-lead. Não há substituto escolhido aqui.
 2. **`sendTestPush` atinge as duas origens.** O aviso de teste vai a todos os aparelhos do chamador, produção e teste, cada um com o link da própria origem. A alternativa é um parâmetro `origin` no callable. Mantive o padrão sem parâmetro.
 3. **Frase da harness.** `.claude/agents/sistema.test.mjs` exige o texto literal "Notificação push, escala de músicos/líder, comentários" em `sistema.md`. O plano mantém a frase na nota histórica. Texto limpo exige mudar esse teste, que fica em `.claude/` (trava, merge da pessoa).
-4. **Contrato com a #100.** O cliente remove a hora do ensaio omitindo o campo; `rehearsalAt: null` é recusado pelas Rules.
-5. **Validação do token.** Só texto não vazio. A spec não fixa tamanho máximo; não acrescentei limite.
-6. **Adaptador sem teste unitário.** `createPushDeps` é provado por typecheck, build e pelo teste de aparelho da #99, como `statsDeps`.
-7. **`fakeDeps.ts` em `src/`.** É um helper de teste fora do `index.ts`; não entra no bundle. Se preferir outro lugar (`testing/`), muda só o import.
+4. **Adaptador sem teste unitário.** `createPushDeps` é provado por typecheck, build e pelo teste de aparelho da #99, como `statsDeps`.
+5. **`fakeDeps.ts` em `src/`.** É um helper de teste fora do `index.ts`; não entra no bundle. Se preferir outro lugar (`testing/`), muda só o import.
