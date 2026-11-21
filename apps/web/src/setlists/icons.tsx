@@ -37,3 +37,13 @@ export function BackChevronIcon() {
     </svg>
   );
 }
+
+/** Relógio da linha do ensaio: 14 px, herda a cor do texto. */
+export function ClockIcon() {
+  return (
+    <svg {...SVG_PROPS} width={14} height={14} strokeWidth={2.2}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}

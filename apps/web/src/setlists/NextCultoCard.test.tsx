@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { makeSetlist } from '../test/fakeSetlistApi';
 import { NextCultoCard } from './NextCultoCard';
+import { rehearsalInstant } from './rehearsal';
 
 const now = new Date('2026-11-16T15:00:00Z');
 const today = '2026-11-16';
@@ -42,5 +43,24 @@ describe('NextCultoCard', () => {
     expect(second).toHaveTextContent('1 louvor');
     expect(second).not.toHaveTextContent('1 louvores');
     expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
+
+  it('mostra o ensaio em segunda linha muted, fora do link', () => {
+    renderCard([
+      makeSetlist({
+        id: 'a',
+        date: '2026-11-22',
+        label: 'Domingo',
+        rehearsalAt: rehearsalInstant('2026-11-22', '18:30'),
+      }),
+    ]);
+    const line = screen.getByText('Ensaio dom · 22/11 às 18h30');
+    expect(line.closest('.rehearsal-line')).toHaveClass('is-muted');
+    expect(screen.getByRole('link', { name: /Domingo · 22\/11/ })).not.toHaveTextContent('Ensaio');
+  });
+
+  it('não mostra nada sem hora', () => {
+    renderCard();
+    expect(document.querySelector('.rehearsal-line')).toBeNull();
   });
 });

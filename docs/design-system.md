@@ -76,7 +76,7 @@ Novo token: crie nos **dois** blocos, na mesma mudança, e na tabela acima e no 
 importados em `main.tsx` **nesta ordem**: `redesign.css` (cabeçalhos, barra inferior, Mais, Busca, Pad, listas),
 `redesign-cifra.css` (barra de ações e painel Mudar tom), `redesign-setlists.css` (repertórios),
 `redesign-forms.css` (login, formulários, diálogos), `redesign-states.css` (alertas, avisos, aviso de
-atualização). Área nova → arquivo novo (ou seção dele), importado depois dos existentes, **escopado** pelo
+atualização), `redesign-stats.css` (estatísticas), `redesign-install.css` (convite de instalação). Área nova → arquivo novo (ou seção dele), importado depois dos existentes, **escopado** pelo
 componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.test.ts` lê todos eles.
 
 ## 5. Componentes e padrões
@@ -101,9 +101,12 @@ componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.tes
 | **Botões** | secundário: pílula `--color-elevated`; **ação**: pílula âmbar (`.btn-primary`, peso 800); neutro: `--color-primary` (login, chip ativo, avatar) | `styles.css`, `redesign-forms.css` |
 | **Campo de busca** | pílula 46 px; × à direita (alvo 44 px, disco 22 px `--color-elevated`, ícone `--color-muted`) só enquanto há texto; limpa pelo mesmo `onChange` e devolve o foco ao campo; o × nativo do `type=search` é escondido | `SearchInput`, `.search-field` |
 | **Campos** | 46 px, raio 12, rótulo 13 px muted, selo "· lido do PDF" verde | `.input`, `.field` |
+| **Dia + Hora do ensaio** | `fieldset` com legenda "Hora do ensaio (opcional)" (13 px muted, sem borda); Dia (`type="date"`) e Hora (`type="time"`) lado a lado (proporção 3:2) em `.rehearsal-row`, cada um com rótulo 13 px muted. O × (`.search-clear` + `.rehearsal-clear`: alvo 44 px, disco 22 px `--color-elevated`, ícone `--color-muted`) só aparece enquanto há dia ou hora e limpa os dois. Ajuda embaixo em `.field-help` (13 px muted): "Quem ativou os avisos é lembrado 30 min antes e na hora."; erro de campo só texto | `SetlistFormDialog`, `redesign-forms.css` |
+| **Linha do ensaio** | Na tela do repertório: relógio 14 px em `--color-accent-text` (`aria-hidden`) + "Ensaio dom · 22/11 às 18h30" em `--color-text`, peso 600 (sempre dia da semana abreviado e data, nunca "hoje" nem "amanhã"; abreviações `dom seg ter qua qui sex sáb`); depois da hora passar, linha e relógio em `--color-muted`. No cartão "Próximo culto", a segunda linha é sempre `--color-muted`, peso 400, sem relógio. Sem hora, nada. A hora se edita no menu ⋯ da tela do repertório, em "Editar data, rótulo e ensaio". | `RehearsalLine`, `redesign-setlists.css` |
 | **Alertas** | caixa suave vermelha (alerta de página); aviso de sucesso `.notice`; erro de campo só texto | `redesign-states.css` |
 | **Diálogos** | cartão 22 px com ações em pílula. **Destrutivo** = Cancelar neutro à esquerda + botão de confirmar vermelho sólido à direita (`--color-error`, texto `--color-on-primary`), ambos 46 px; foco inicial no Cancelar; Escape cancela; sem digitar nada para confirmar | `.dialog`, `ConfirmDialog`, `.confirm-actions` |
 | **Aviso de atualização** | pílula no topo, centralizada, botão âmbar "Atualizar" | `UpdatePrompt` |
+| **Convite de instalação** | cartão fixo no topo da aba Músicas, só logado, abaixo da barra de status. Logo `icons/icon.svg` 48 px, título "Cifras como app" (15 px, 800), apoio "Abra direto da tela inicial" (13 px, muted). Android/Chromium: botão âmbar "Adicionar" (pílula 36 px, alvo 44 px) abre o diálogo de instalação. iPhone/iPad com Safari: sem botão; apoio "Toque em Compartilhar e depois em Adicionar à Tela de Início". "×" (aria-label "Agora não"; disco 28 px, alvo 44 px) dispensa por 30 dias. Some no app instalado e em outros navegadores sem o evento | `InstallCard`, `pwa/useInstallPrompt.ts`, `ui/redesign-install.css` |
 | **Faixa de teste** | faixa no topo, só no site de teste (`louvor-hajaluz-teste`): texto "TESTE · #N" (13 px, negrito, centralizado) sobre `--color-warn-soft`, com `--color-warn`; no topo da página, rola com o conteúdo; nunca cobre controles (sem `sticky` nem `fixed`), com `env(safe-area-inset-top)`. Não aparece em produção (sem `VITE_TEST_BANNER`) | `TestBanner`, `.test-banner` |
 
 Estados obrigatórios por tela: **carregando, vazio, erro** (e "somente leitura" para visitante). Ver a tela
@@ -132,8 +135,10 @@ Linha 1 (originais): `01 Músicas`, `02 Repertório`, `03 Busca`, `04 Pad (tocan
 `08 Cantores`, `09 Cantor`, `10 Cifra (PDF)`, `10b Cifra (PDF em tela cheia)`, `11 Mudar tom (painel)`, `12 Repertório (editar)`,
 `13 Repertório (visitante)`, `14 Adicionar louvor`, `15 Tom do item`, `16 Repertório · menu e diálogos`,
 `17 Cifra no repertório`, `18 Cifra · menu admin`, `19 Admin · editar e apagar`, `20 Login`, `21 Nova cifra`,
-`22 Nova cifra · escolher / erro`, `23 Importar em lote`, `24 Pessoas`, `25 Estados e avisos`.
-**Tema claro:** `L1 Músicas`, `L2 Repertório`, `L3 Cifra`, `L4 Mudar tom`, `L5 Pad tocando (bolinha verde na aba)`, `L6 Mais (admin)`
+`22 Nova cifra · escolher / erro`, `23 Importar em lote`, `24 Pessoas`, `25 Estados e avisos`,
+`28 · Músicas · convite para instalar`, `29 · Músicas · convite para instalar (iPhone)`.
+**Tema claro:** `L1 Músicas`, `L2 Repertório`, `L3 Cifra`, `L4 Mudar tom`, `L5 Pad tocando (bolinha verde na aba)`, `L6 Mais (admin)`,
+`L7 · Músicas · convite para instalar (claro)`, `L8 · Músicas · convite para instalar (iPhone, claro)`
 (tokens `--color-light-*`; o Paper não troca variáveis por artboard, então o claro são artboards próprios).
 Numeração nova continua a sequência; telas claras seguem `L<n>`.
 

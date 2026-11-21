@@ -4,6 +4,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   onSnapshot,
   query,
@@ -14,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import type { FirebaseServices } from '../lib/firebase';
 import { expiresAtFor } from './dates';
+import { originForHostname, parseOrigin } from './origin';
 import { applySetlistOp } from './ops';
 import type { SetlistSnapshot } from './sync';
 import type { Setlist, SetlistItem, SetlistOp } from './types';
@@ -25,8 +27,16 @@ export interface SetlistApi {
     cb: (snap: SetlistSnapshot) => void,
     onError: (e: unknown) => void,
   ): () => void;
-  createSetlist(input: { date: string; label: string; items: SetlistItem[] }): Promise<string>;
-  updateSetlistMeta(id: string, input: { date: string; label: string }): Promise<void>;
+  createSetlist(input: {
+    date: string;
+    label: string;
+    items: SetlistItem[];
+    rehearsalAt?: Date | null;
+  }): Promise<string>;
+  updateSetlistMeta(
+    id: string,
+    input: { date: string; label: string; rehearsalAt: Date | null },
+  ): Promise<void>;
   applyOp(id: string, op: SetlistOp): Promise<{ setlist: Setlist; changed: boolean }>;
   deleteSetlist(id: string): Promise<void>;
 }
@@ -59,7 +69,7 @@ const toDate = (value: unknown): Date | null =>
   value instanceof Timestamp ? value.toDate() : null;
 
 function toSetlist(id: string, data: Record<string, unknown>): Setlist {
-  return {
+  const setlist: Setlist = {
     id,
     date: String(data.date ?? ''),
     label: String(data.label ?? ''),
@@ -67,9 +77,18 @@ function toSetlist(id: string, data: Record<string, unknown>): Setlist {
     expiresAt: toDate(data.expiresAt) ?? new Date(0),
     createdAt: toDate(data.createdAt),
   };
+  // Campos de #100: repertório antigo não os tem; origem fora da lista é ignorada.
+  const rehearsalAt = toDate(data.rehearsalAt);
+  if (rehearsalAt) setlist.rehearsalAt = rehearsalAt;
+  const origin = parseOrigin(data.origin);
+  if (origin) setlist.origin = origin;
+  return setlist;
 }
 
-export function createSetlistApi({ auth, db }: FirebaseServices): SetlistApi {
+export function createSetlistApi(
+  { auth, db }: FirebaseServices,
+  { hostname = window.location.hostname }: { hostname?: string } = {},
+): SetlistApi {
   const uid = (): string => {
     const id = auth.currentUser?.uid;
     if (!id) throw new Error('Usuário não autenticado');
@@ -94,13 +113,15 @@ export function createSetlistApi({ auth, db }: FirebaseServices): SetlistApi {
           }),
         onError,
       ),
-    createSetlist: async ({ date, label, items }) => {
+    createSetlist: async ({ date, label, items, rehearsalAt }) => {
       const by = uid();
       const ref = await addDoc(collection(db, 'setlists'), {
         date,
         label,
         items,
+        ...(rehearsalAt ? { rehearsalAt: Timestamp.fromDate(rehearsalAt) } : {}),
         expiresAt: Timestamp.fromDate(expiresAtFor(date)),
+        origin: originForHostname(hostname),
         createdBy: by,
         createdAt: serverTimestamp(),
         updatedBy: by,
@@ -108,10 +129,12 @@ export function createSetlistApi({ auth, db }: FirebaseServices): SetlistApi {
       });
       return ref.id;
     },
-    updateSetlistMeta: async (id, { date, label }) => {
+    updateSetlistMeta: async (id, { date, label, rehearsalAt }) => {
       await updateDoc(doc(db, 'setlists', id), {
         date,
         label,
+        // sempre enviado: trocar a data revalida o ensaio gravado; limpar é `deleteField()`, nunca `null`
+        rehearsalAt: rehearsalAt ? Timestamp.fromDate(rehearsalAt) : deleteField(),
         expiresAt: Timestamp.fromDate(expiresAtFor(date)),
         updatedBy: uid(),
         updatedAt: serverTimestamp(),

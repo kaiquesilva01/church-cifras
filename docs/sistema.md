@@ -16,13 +16,13 @@ Rotas em `apps/web/src/App.tsx`. Tudo fora de `/login` exige login (`RequireAuth
 | Rota | Tela | Quem acessa | O que faz |
 | --- | --- | --- | --- |
 | `/login` | Login | qualquer um | Entrar com Google. Abrir um link sem estar logado leva ao login e, depois, volta ao destino |
-| `/` | Início | logado | Cartão "Próximo culto"; abas Músicas, Harpa, Cantores e Repertórios; campo de busca; "＋ Nova cifra" só para membro/admin |
+| `/` | Início | logado | Cartão "Próximo culto"; abas Músicas, Harpa, Cantores e Repertórios; campo de busca; "＋ Nova cifra" só para membro/admin; convite "Cifras como app" na aba Músicas (ver PWA) |
 | `/busca` | Busca | logado | Busca com filtros Tudo, Músicas, Cantores, Harpa; seção "Na letra" |
 | `/pad` | Pad | logado | Status, grade de 12 tons, volume, parar |
 | `/mais` | Mais | logado | Perfil e papel; Admin (só admin); Importar (só admin); Estatísticas (só admin); Pessoas "Em breve"; Sair |
 | `/cantores/:artistId` | Cantor | logado | Músicas do cantor, com filtro próprio |
 | `/musicas/:songId` | Visualizador | logado | Cifra em PDF, atalhos dos tons salvos, barra de ações, Mudar tom |
-| `/repertorios/:id` | Repertório | logado (edita membro/admin) | Lista de louvores com tom; editar, reordenar, compartilhar |
+| `/repertorios/:id` | Repertório | logado (edita membro/admin) | Lista de louvores com tom; editar data, rótulo e ensaio, reordenar, compartilhar |
 | `/nova` | Nova cifra | membro, admin | Upload de PDF com formulário |
 | `/pessoas` | Pessoas | admin | Lista de quem já logou, com seletor de papel |
 | `/estatisticas` | Estatísticas | admin | PDFs, armazenamento, cifras mais usadas |
@@ -51,9 +51,11 @@ Barra inferior (Músicas, Repertório, Busca, Pad, Mais) só nas 5 telas raiz; a
 ### Repertórios
 
 - Um repertório = data do culto + rótulo (1–60 caracteres) + até 40 itens ordenados (`songId` + tom). Pode haver mais de um no mesmo dia; a mesma música pode repetir (a UI avisa).
+- Hora do ensaio (opcional): dia de 7 dias antes do culto até o próprio dia do culto, inclusive, e hora em Brasília; grava `rehearsalAt`. Limpar apaga o campo. Duplicar não copia a hora.
 - Padrão de criação: próximo dia que seja quinta ou domingo; rótulo padrão é o dia da semana. Duplicar copia os itens com ids novos.
-- Aba Repertórios: "Próximos" (data crescente) e "Recentes" (decrescente, só não expirados). Cartão "Próximo culto" no topo do Início (data mais próxima, hoje incluído).
-- Editar (membro/admin): arrastar pela alça `≡` ou botões ▲ ▼, trocar o tom (entre os salvos da música), remover, adicionar pela folha de busca (entra no fim, no tom feito à mão; músicas sem PDF desabilitadas; "já está" nas repetidas). Visitante vê só título e tom, "Somente leitura".
+- Aba Repertórios: "Próximos" (data crescente) e "Recentes" (decrescente, só não expirados). Cartão "Próximo culto" no topo do Início (data mais próxima, hoje incluído). O cartão mostra o ensaio em segunda linha muted; sem hora, nada. A linha do ensaio sempre traz dia da semana e data (`Ensaio sáb · 21/11 às 18h30`), nunca "hoje" nem "amanhã".
+- Repertório novo grava `origin`: `teste` só quando o host é `louvor-hajaluz-teste.web.app` (o `teste` de `SITE_BASE`); `producao` no resto, inclusive localhost. Criar (nova ou duplicar) grava pelo host atual; editar não muda.
+- Editar (membro/admin), pelo menu ⋯ "Editar data, rótulo e ensaio": arrastar pela alça `≡` ou botões ▲ ▼, trocar o tom (entre os salvos da música), remover, adicionar pela folha de busca (entra no fim, no tom feito à mão; músicas sem PDF desabilitadas; "já está" nas repetidas). Visitante vê só título e tom, "Somente leitura".
 - Item de música apagada aparece como "Música removida" e é pulado na navegação. Tom do item que deixou de existir aparece riscado e a cifra abre no padrão com aviso.
 - Tempo real: mudança de outra pessoa mostra o banner "O repertório foi alterado. Atualizar"; a tela só muda se a pessoa aceitar (inclusive o tom da cifra aberta). O primeiro snapshot do cache não gera banner.
 - Compartilhar: botão WhatsApp (canto inferior esquerdo, qualquer papel) com título, data, louvores com tom e o link; sem Web Share, copia e avisa "Link copiado.".
@@ -200,6 +202,7 @@ Regra do aviso de repertório novo:
 ### PWA e desempenho
 
 - App instalável na tela inicial, com service worker do app shell e aviso "Atualizar" quando há versão nova.
+- Convite "Cifras como app" na aba Músicas (só logado). Android/Chromium: o `beforeinstallprompt` é guardado já no carregamento; o botão "Adicionar" abre o diálogo de instalação, e recusar o diálogo conta como "Agora não". iPhone e iPad com Safari: sem botão, com a instrução de Compartilhar. Não aparece no app instalado (`display-mode` standalone, fullscreen ou minimal-ui, ou `navigator.standalone`) nem depois de `appinstalled` na sessão. "Agora não" dispensa por 30 dias, guardado no aparelho em `localStorage` (chave `cifras.installCard.v1`); sem armazenamento, o convite volta a cada carga.
 - PDFs com cache imutável; code splitting por rota; `pdf.js` e `pdf-lib` carregados sob demanda só no visualizador e no upload.
 - Meta: abrir uma cifra já visitada em menos de 1 s no celular; troca de tom na prévia em menos de 100 ms.
 - Sem modo offline completo, só cache do app e dos arquivos já usados.
@@ -256,6 +259,9 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Acervo acima de cerca de 2.000 músicas pede revisão da busca em memória.
 - `origin` é conferido só na forma, e `rehearsalAt` na forma e contra a janela do `date`: a Rules não confere se a origem é a do site que gravou (protege contra engano, não contra abuso). O token de aparelho fica no Firestore, fechado ao cliente.
 - Verificação em aparelho real (Android e iPhone) é manual: o áudio do pad, o compartilhamento de arquivo e a tela bloqueada não são verificáveis em CI.
+- Data, rótulo e ensaio do repertório são last-write-wins quando a folha de edição está aberta em dois aparelhos: ao abrir, ela parte do estado mais novo do servidor e não acompanha mudanças feitas depois; quem salva por último vence.
+- A tela do repertório e o cartão "Próximo culto" calculam o estado muted (já passou da hora) no momento em que abrem; sem atualização ao vivo enquanto ficam abertos.
+- Convite de instalação: Firefox Android e outros navegadores sem `beforeinstallprompt` não recebem o convite (não há API que instale com confiança). No iPhone e no iPad, só o Safari recebe a instrução: Chrome e Firefox do iOS ficam sem convite. No iOS não existe evento de instalação: quem instalou no iPhone e abre o site no Safari vê a instrução até dispensar.
 - Aviso de repertório novo: se o envio falha depois de criada a marca, o aviso se perde (não há reenvio).
 - Aviso de repertório novo: com `config/push.enabled === false`, a marca é criada mesmo assim; religar o interruptor não avisa esse repertório.
 - Aviso de repertório novo: repertório que chega a 4 louvores com data inválida não recebe aviso. Na prática não acontece, porque cliente e Rules validam a data.

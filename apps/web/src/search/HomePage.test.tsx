@@ -13,6 +13,7 @@ import { fakeCatalogApi, makeSong, sampleSongs } from '../test/fakeCatalogApi';
 import { fakeSetlistApi, makeSetlist, type FakeSetlistApi } from '../test/fakeSetlistApi';
 import { testUser } from '../test/fakeGateway';
 import { HomePage } from './HomePage';
+import { IPHONE_SAFARI } from '../test/installFixtures';
 
 /** Lyrics for `sampleSongs` (s1 Sonda-me, s2 Ressuscita-me, s3 Grande é o Senhor). */
 const LYRICS = {
@@ -443,6 +444,7 @@ describe('HomePage', () => {
         date: '2026-11-19',
         label: 'Quinta',
         items: [],
+        rehearsalAt: null,
       });
     });
 
@@ -467,5 +469,29 @@ describe('HomePage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('install card on the Músicas tab', () => {
+  const originalUserAgent = navigator.userAgent;
+
+  beforeEach(() => {
+    Object.defineProperty(navigator, 'userAgent', { value: IPHONE_SAFARI, configurable: true });
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'userAgent', { value: originalUserAgent, configurable: true });
+    localStorage.clear();
+  });
+
+  it('shows on Músicas (iPhone Safari case)', () => {
+    renderHome({ path: '/' });
+    expect(screen.getByRole('region', { name: 'Cifras como app' })).toBeInTheDocument();
+  });
+
+  it('is not shown on the other tabs', () => {
+    renderHome({ path: '/?aba=cantores' });
+    expect(screen.queryByRole('region', { name: 'Cifras como app' })).not.toBeInTheDocument();
   });
 });
