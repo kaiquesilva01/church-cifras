@@ -10,7 +10,8 @@ const redesignCss =
   readFileSync(resolve(import.meta.dirname, 'redesign-setlists.css'), 'utf8') +
   readFileSync(resolve(import.meta.dirname, 'redesign-forms.css'), 'utf8') +
   readFileSync(resolve(import.meta.dirname, 'redesign-states.css'), 'utf8') +
-  readFileSync(resolve(import.meta.dirname, 'redesign-stats.css'), 'utf8');
+  readFileSync(resolve(import.meta.dirname, 'redesign-stats.css'), 'utf8') +
+  readFileSync(resolve(import.meta.dirname, 'redesign-install.css'), 'utf8');
 const html = readFileSync(resolve(import.meta.dirname, '../../index.html'), 'utf8');
 
 function tokens(block: string): string[] {
@@ -66,5 +67,14 @@ describe('theme tokens', () => {
         .at(-1);
     expect(last('background')).toBe('var(--color-elevated)');
     expect(last('color')).toBe('var(--color-text)');
+  });
+
+  it('styles the install card with the shared shadow token and 44 px tap targets', () => {
+    const install = readFileSync(resolve(import.meta.dirname, 'redesign-install.css'), 'utf8');
+    expect(install).toMatch(/\.install-card \{[^}]*box-shadow: var\(--shadow-pop\);/);
+    expect(install).toMatch(/\.install-card__close \{[^}]*width: 44px;[^}]*height: 44px;/);
+    expect(install).toMatch(/\.install-card__add \{[^}]*min-height: 44px;/);
+    expect(install).toMatch(/\.install-card__add span \{[^}]*height: 36px;/);
+    expect(install).toMatch(/\.install-card__close span \{[^}]*width: 28px;[^}]*height: 28px;/);
   });
 });
