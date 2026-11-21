@@ -22,7 +22,7 @@ Rotas em `apps/web/src/App.tsx`. Tudo fora de `/login` exige login (`RequireAuth
 | `/mais` | Mais | logado | Perfil e papel; Admin (só admin); Importar (só admin); Estatísticas (só admin); Pessoas "Em breve"; Sair |
 | `/cantores/:artistId` | Cantor | logado | Músicas do cantor, com filtro próprio |
 | `/musicas/:songId` | Visualizador | logado | Cifra em PDF, atalhos dos tons salvos, barra de ações, Mudar tom |
-| `/repertorios/:id` | Repertório | logado (edita membro/admin) | Lista de louvores com tom; editar, reordenar, compartilhar |
+| `/repertorios/:id` | Repertório | logado (edita membro/admin) | Lista de louvores com tom; editar data, rótulo e ensaio, reordenar, compartilhar |
 | `/nova` | Nova cifra | membro, admin | Upload de PDF com formulário |
 | `/pessoas` | Pessoas | admin | Lista de quem já logou, com seletor de papel |
 | `/estatisticas` | Estatísticas | admin | PDFs, armazenamento, cifras mais usadas |
@@ -51,9 +51,11 @@ Barra inferior (Músicas, Repertório, Busca, Pad, Mais) só nas 5 telas raiz; a
 ### Repertórios
 
 - Um repertório = data do culto + rótulo (1–60 caracteres) + até 40 itens ordenados (`songId` + tom). Pode haver mais de um no mesmo dia; a mesma música pode repetir (a UI avisa).
+- Hora do ensaio (opcional): dia de 7 dias antes do culto até o próprio dia do culto, inclusive, e hora em Brasília; grava `rehearsalAt`. Limpar apaga o campo. Duplicar não copia a hora.
 - Padrão de criação: próximo dia que seja quinta ou domingo; rótulo padrão é o dia da semana. Duplicar copia os itens com ids novos.
-- Aba Repertórios: "Próximos" (data crescente) e "Recentes" (decrescente, só não expirados). Cartão "Próximo culto" no topo do Início (data mais próxima, hoje incluído).
-- Editar (membro/admin): arrastar pela alça `≡` ou botões ▲ ▼, trocar o tom (entre os salvos da música), remover, adicionar pela folha de busca (entra no fim, no tom feito à mão; músicas sem PDF desabilitadas; "já está" nas repetidas). Visitante vê só título e tom, "Somente leitura".
+- Aba Repertórios: "Próximos" (data crescente) e "Recentes" (decrescente, só não expirados). Cartão "Próximo culto" no topo do Início (data mais próxima, hoje incluído). O cartão mostra o ensaio em segunda linha muted; sem hora, nada.
+- Repertório novo grava `origin` (`teste` no site de teste, `producao` no resto, inclusive localhost); editar não muda.
+- Editar (membro/admin), pelo menu ⋯ "Editar data, rótulo e ensaio": arrastar pela alça `≡` ou botões ▲ ▼, trocar o tom (entre os salvos da música), remover, adicionar pela folha de busca (entra no fim, no tom feito à mão; músicas sem PDF desabilitadas; "já está" nas repetidas). Visitante vê só título e tom, "Somente leitura".
 - Item de música apagada aparece como "Música removida" e é pulado na navegação. Tom do item que deixou de existir aparece riscado e a cifra abre no padrão com aviso.
 - Tempo real: mudança de outra pessoa mostra o banner "O repertório foi alterado. Atualizar"; a tela só muda se a pessoa aceitar (inclusive o tom da cifra aberta). O primeiro snapshot do cache não gera banner.
 - Compartilhar: botão WhatsApp (canto inferior esquerdo, qualquer papel) com título, data, louvores com tom e o link; sem Web Share, copia e avisa "Link copiado.".
