@@ -28,7 +28,7 @@ function text(value: unknown): string {
 }
 
 // Aceita Date e Timestamp do Admin SDK (qualquer objeto com toDate()).
-function toDate(value: unknown): Date | undefined {
+export function toDate(value: unknown): Date | undefined {
   if (value instanceof Date) return value;
   if (
     typeof value === 'object' &&
