@@ -54,7 +54,7 @@ Barra inferior (Músicas, Repertório, Busca, Pad, Mais) só nas 5 telas raiz; a
 - Hora do ensaio (opcional): dia de 7 dias antes do culto até o próprio dia do culto, inclusive, e hora em Brasília; grava `rehearsalAt`. Limpar apaga o campo. Duplicar não copia a hora.
 - Padrão de criação: próximo dia que seja quinta ou domingo; rótulo padrão é o dia da semana. Duplicar copia os itens com ids novos.
 - Aba Repertórios: "Próximos" (data crescente) e "Recentes" (decrescente, só não expirados). Cartão "Próximo culto" no topo do Início (data mais próxima, hoje incluído). O cartão mostra o ensaio em segunda linha muted; sem hora, nada.
-- Repertório novo grava `origin` (`teste` no site de teste, `producao` no resto, inclusive localhost); editar não muda.
+- Repertório novo grava `origin`: `teste` só quando o host é `louvor-hajaluz-teste.web.app` (o `teste` de `SITE_BASE`); `producao` no resto, inclusive localhost. Criar (nova ou duplicar) grava pelo host atual; editar não muda.
 - Editar (membro/admin), pelo menu ⋯ "Editar data, rótulo e ensaio": arrastar pela alça `≡` ou botões ▲ ▼, trocar o tom (entre os salvos da música), remover, adicionar pela folha de busca (entra no fim, no tom feito à mão; músicas sem PDF desabilitadas; "já está" nas repetidas). Visitante vê só título e tom, "Somente leitura".
 - Item de música apagada aparece como "Música removida" e é pulado na navegação. Tom do item que deixou de existir aparece riscado e a cifra abre no padrão com aviso.
 - Tempo real: mudança de outra pessoa mostra o banner "O repertório foi alterado. Atualizar"; a tela só muda se a pessoa aceitar (inclusive o tom da cifra aberta). O primeiro snapshot do cache não gera banner.
@@ -246,6 +246,8 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Acervo acima de cerca de 2.000 músicas pede revisão da busca em memória.
 - `origin` é conferido só na forma, e `rehearsalAt` na forma e contra a janela do `date`: a Rules não confere se a origem é a do site que gravou (protege contra engano, não contra abuso). O token de aparelho fica no Firestore, fechado ao cliente.
 - Verificação em aparelho real (Android e iPhone) é manual: o áudio do pad, o compartilhamento de arquivo e a tela bloqueada não são verificáveis em CI.
+- Data, rótulo e ensaio do repertório são last-write-wins quando a folha de edição está aberta em dois aparelhos: ao abrir, ela parte do estado mais novo do servidor e não acompanha mudanças feitas depois; quem salva por último vence.
+- A tela do repertório e o cartão "Próximo culto" calculam "hoje", "amanhã" e o estado muted no momento em que abrem; sem atualização ao vivo enquanto ficam abertos.
 
 ### Pendências abertas
 
