@@ -112,6 +112,7 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
 | `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
 | `avisosEnviados/{setlistId}_novo` | `setlistId`, `tipo` (`novo`), `createdAt`, `expiresAt` (o maior valor entre agora + 60 dias e o `expiresAt` do repertório; marca do aviso de repertório novo) | nenhuma; só Functions |
+| `avisosEnviados/{setlistId}_{perto\|agora}_{rehearsalAtMs}` | `setlistId`, `tipo` (`perto`/`agora`), `rehearsalAt`, `createdAt`, `expiresAt` (mesma regra do repertório novo); marca dos lembretes do ensaio (#102) | nenhuma; só Functions |
 | `artists/*` | não existe de fato | negada |
 
 - `slug` do tom = tom com `#` trocado por `s` (id do documento). Um tom existe uma vez por música; quem gerar o mesmo tom depois recebe "já existe" e o sistema abre o existente.
@@ -145,9 +146,10 @@ Todas exportadas por `apps/functions/src/index.ts` (algumas definidas em submód
 | `unregisterDevice` | callable | qualquer logado | Apaga o aparelho do próprio chamador (logout); idempotente |
 | `sendTestPush` | callable | membro, admin | Envia "Aviso de teste" só aos aparelhos do chamador; ignora o interruptor; responde `{ sent, failed, pruned }` (só contagens; `pruned` são aparelhos apagados por token morto) |
 | `onSetlistWritten` | Firestore (`setlists/{setlistId}`) | automático | Avisa "Novo repertório" aos aparelhos de membros e admins quando o repertório chega a 4 louvores; uma vez por repertório (marca em `avisosEnviados`); não avisa quem gravou; só aparelhos da mesma origem; respeita `config/push` |
+| `sendRehearsalReminders` | agendada, a cada minuto (`America/Sao_Paulo`) | automático | Avisa "Ensaio em N min" (ensaio em até 30 min; N é o que falta, 30 no caso normal) e "Ensaio agora" (ensaio de até 5 min atrás), uma vez por horário, a membros e admins, inclusive quem gravou; só aparelhos da mesma origem; respeita `config/push` |
 | `health` | callable | qualquer chamada | Verificação de saúde |
 
-Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. O gatilho do repertório novo é `onSetlistWritten` (regra abaixo); os lembretes chegam na #102.
+Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. O gatilho do repertório novo é `onSetlistWritten` (regra abaixo); o lembrete do ensaio é `sendRehearsalReminders` (regra abaixo).
 
 Regras de contagem de uso:
 
@@ -164,6 +166,13 @@ Regra do aviso de repertório novo:
 - A marca `avisosEnviados/{setlistId}_novo` é criada antes do envio; esvaziar e encher o repertório de novo não avisa outra vez.
 - Falha de envio só entra no log; não reenvia.
 - Com `config/push.enabled === false`, a marca é criada e o aviso não sai; religar o interruptor não manda o aviso depois.
+
+Regra dos lembretes do ensaio:
+
+- Agendada a cada minuto; consulta `setlists` com `rehearsalAt` entre agora − 5 min e agora + 30 min.
+- "Ensaio em N min" (N = minutos que faltam, arredondado para cima, mínimo 1; 30 no caso normal): `rehearsalAt` em (agora, agora + 30 min]. "Ensaio agora": `rehearsalAt` em (agora − 5 min, agora]. Sem retroativo além de 5 min.
+- Uma vez por horário: `avisosEnviados/{setlistId}_{tipo}_{rehearsalAtMs}` é criada antes do envio. Gravar a hora a menos de 30 min do ensaio dispara o "perto" na execução seguinte (até 1 min). Se o horário mudou depois de um "perto", o próximo "perto" tem o título `Ensaio mudou para HHhMM`. O "agora" usa a mesma tag e substitui o "30 min" no aparelho.
+- Horas em Brasília (UTC−3, sem horário de verão). Ensaio que cai depois da meia-noite diz `amanhã`. Repertório sem `rehearsalAt`, ou com a hora passada, não avisa.
 
 ### Deploy e produção (`docs/deploy.md`)
 
@@ -266,6 +275,9 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Aviso de repertório novo: com `config/push.enabled === false`, a marca é criada mesmo assim; religar o interruptor não avisa esse repertório.
 - Aviso de repertório novo: repertório que chega a 4 louvores com data inválida não recebe aviso. Na prática não acontece, porque cliente e Rules validam a data.
 - Aviso de repertório novo: se a #101 chegar à produção antes da #99, os repertórios que chegarem a 4 louvores nesse intervalo gastam a marca sem aparelho para receber o aviso.
+- Lembretes do ensaio: até 1 min de atraso (cron). Se a função ficar parada por mais de 5 min, o "agora" daquele horário se perde. Sem horário de silêncio na v1 (decisão da #85).
+- Lembretes do ensaio: falha de envio depois de criada a marca faz o aviso se perder (sem reenvio). Com `config/push.enabled === false`, a marca é criada e o lembrete não sai; religar o interruptor não manda o lembrete depois.
+- Lembretes do ensaio: se o horário volta ao que já foi avisado (A → B → A), não reenvia, porque a marca de A existe. Marcas "agora" de outro horário não contam como mudança. O "perto" também sai com menos de 30 min (ex.: hora gravada 10 min antes), com "Ensaio em 10 min"; se uma execução falha, o N pode aparecer 1 menor (ex.: 29); aceito.
 
 ### Pendências abertas
 
@@ -276,6 +288,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Avisos (push, #85): o backend dos aparelhos está na #98; a tela de avisos ainda não existe. O envio automático existe só para o aviso de repertório novo (#101). Antes da #99: passos manuais 1 e 2 da #85 (número do projeto e chave VAPID).
 - Passos manuais únicos de `deploy.md`: TTL e índice de `setlists` (§10), job do Cloud Scheduler e `setlistUsage` sem TTL (§11), autorizar o domínio e o CORS do site de teste (§13).
 - Antes do deploy da #101: passos 4 e 5 da #85 (APIs Pub/Sub e Eventarc, `deploy.md` §3 e §15; papel Eventarc Admin, `deploy.md` §15); depois, conferir o TTL de `avisosEnviados` (§15).
+- Antes do deploy da #102: nada além do já pedido para a #101. Depois do deploy: conferir o job do Cloud Scheduler (`deploy.md` §16) e o teste no aparelho (`deploy.md` §16).
 
 ### Divergências entre spec e código (o código vale)
 
