@@ -441,7 +441,7 @@ describe('PadProvider', () => {
       const ctor = vi.fn();
       vi.stubGlobal('AudioContext', ctor);
       const { result, fetchBytes, createEngine } = setup();
-      act(() => result.current.prefetch(['C', 'Dm', 'C']));
+      act(() => result.current.prefetch(['C', 'Am', 'F', 'Dm']));
       await flush();
       await flush();
       expect(fetchBytes).toHaveBeenCalledTimes(2);
