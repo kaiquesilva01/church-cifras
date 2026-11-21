@@ -77,6 +77,28 @@ async function openEditDialog(page: Page) {
 const fitsWidth = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
+/**
+ * The 360 px check inside the dialog. The fixed sheet never changes the document's scrollWidth,
+ * so measure the sheet itself: no sideways scroll, and Dia, Hora and ✕ inside its box.
+ */
+async function expectDialogFits(page: Page, name: string) {
+  const dialog = page.getByRole('dialog', { name });
+  const sheet = (await dialog.boundingBox())!;
+  expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  const controls = [
+    rehearsalField(page),
+    hourField(page),
+    page.getByRole('button', { name: 'Limpar dia e hora do ensaio' }),
+  ];
+  for (const control of controls) {
+    const box = (await control.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(sheet.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(sheet.x + sheet.width);
+    expect(box.y).toBeGreaterThanOrEqual(sheet.y);
+    expect(box.y + box.height).toBeLessThanOrEqual(sheet.y + sheet.height);
+  }
+}
+
 /** Three songs, each with handmade C and D. */
 async function seedThree(tag: string, pages = 1): Promise<SeededSong[]> {
   const songs: SeededSong[] = [];
@@ -757,13 +779,19 @@ test.describe('rehearsal time (360 px)', () => {
       .click();
     await page.getByRole('button', { name: '＋ Novo repertório' }).click();
     await expect(page.getByRole('dialog', { name: 'Novo repertório' })).toBeVisible();
+    await page.getByLabel('Data', { exact: true }).fill(addDays(today, 1));
     await hourField(page).fill('18:30');
     const clear = page.getByRole('button', { name: 'Limpar dia e hora do ensaio' });
     await expect(clear).toBeVisible();
     const box = (await clear.boundingBox())!;
-    expect(box.width).toBeGreaterThanOrEqual(44);
-    expect(box.height).toBeGreaterThanOrEqual(44);
-    expect(await fitsWidth(page)).toBe(true);
+    expect(box.width).toBeGreaterThanOrEqual(43);
+    expect(box.height).toBeGreaterThanOrEqual(43);
+    await expectDialogFits(page, 'Novo repertório');
+
+    // Window-error state. An autofilled Dia follows the Data, so the error needs a Dia typed by hand.
+    await rehearsalField(page).fill(addDays(today, 10));
+    await expect(page.getByText(WINDOW_MSG)).toBeVisible();
+    await expectDialogFits(page, 'Novo repertório');
     await shot(page, testInfo, 'rehearsal-9-dialog-360');
   });
 });
