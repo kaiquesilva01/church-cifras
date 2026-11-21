@@ -88,6 +88,9 @@ export async function runRehearsalReminders(deps: ReminderDeps): Promise<Reminde
     }
   }
 
-  console.info('push: lembretes do ensaio', { ...run });
+  // Roda a cada minuto: só loga quando houve algo além de nada a fazer.
+  if (run.sent + run.already + run.blocked + run.failed > 0) {
+    console.info('push: lembretes do ensaio', { ...run });
+  }
   return run;
 }

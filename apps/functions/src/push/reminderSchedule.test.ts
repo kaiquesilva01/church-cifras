@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
   opts: undefined as unknown,
@@ -36,5 +36,24 @@ describe('sendRehearsalReminders: agendamento', () => {
   it('chama o lembrete com as deps reais', async () => {
     await handler();
     expect(h.run).toHaveBeenCalledWith({ fake: 'deps' });
+  });
+});
+
+describe('sendRehearsalReminders: falha inesperada', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('não relança; loga só o código, sem a mensagem de erro', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    h.run.mockRejectedValue(
+      Object.assign(new Error('segredo do token t1 no repertório'), { code: 'unavailable' }),
+    );
+
+    await expect(handler()).resolves.toBeUndefined();
+    expect(err).toHaveBeenCalledWith('push: falha nos lembretes do ensaio', {
+      code: 'unavailable',
+    });
+    expect(JSON.stringify(err.mock.calls)).not.toContain('segredo');
   });
 });

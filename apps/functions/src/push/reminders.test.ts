@@ -177,6 +177,32 @@ describe('runRehearsalReminders: marcas "agora" não contam como mudança', () =
   });
 });
 
+describe('runRehearsalReminders: log', () => {
+  it('sem nada a fazer, não loga (o job roda a cada minuto)', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const { reminderDeps } = setup([doc('passado', at(-6 * MIN))]);
+
+    await runRehearsalReminders(reminderDeps);
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it('com envio, loga só as contagens', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const { reminderDeps } = setup([doc('r1', at(10 * MIN))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+
+    await runRehearsalReminders(reminderDeps);
+    expect(info).toHaveBeenCalledWith('push: lembretes do ensaio', {
+      sent: 1,
+      already: 0,
+      blocked: 0,
+      failed: 0,
+    });
+  });
+});
+
 describe('runRehearsalReminders: janela, interruptor, origem e falhas', () => {
   it('consulta setlists entre agora − 5 min e agora + 30 min', async () => {
     const { reminderDeps, windows } = setup([]);
