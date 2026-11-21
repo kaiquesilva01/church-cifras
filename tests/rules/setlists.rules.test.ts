@@ -279,6 +279,13 @@ describe('setlists rules: rehearsalAt e origin', () => {
     await assertSucceeds(updateDoc(existing(memberDb()), updateData()));
   });
 
+  it.each([
+    ['origem fora da lista', { origin: 'outro' }],
+    ['origem nula', { origin: null }],
+  ])('denies update with %s', async (_name, over) => {
+    await assertFails(updateDoc(existing(memberDb()), updateData(over)));
+  });
+
   it('denies update with rehearsalAt outside the window of the new date', async () => {
     await assertFails(
       updateDoc(existing(memberDb()), updateData({ rehearsalAt: at('2026-11-22T02:59:59Z') })),
