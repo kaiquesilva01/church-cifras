@@ -166,7 +166,7 @@ Regras de contagem de uso:
 
 ### Pad ambiente
 
-- Base sustentada no tom da cifra aberta (não é a música em si). Um só timbre; 12 loops (um por nota) de ~1 MB, em `pads/v1/`. Tom menor usa a mesma nota (Am toca A); bemóis mapeiam para sustenidos nos arquivos.
+- Base sustentada no tom da cifra aberta (não é a música em si). Um só timbre; 12 loops (um por nota) de ~1 MB, em `pads/v1/`. Tom menor toca o pad do tom maior relativo (Am toca C, Em toca G); bemóis mapeiam para sustenidos nos arquivos.
 - Liga/desliga pelo botão **Pad** da cifra, pela aba Pad ou pelo controle compacto na tela do repertório. Volume de 0 a 100 % (padrão 60 %), lembrado no aparelho.
 - Sempre com fade: nunca estalo nem corte. O pad começa pelo início original do arquivo (crescimento de ~3,5 s). Troca de tom faz transição cruzada; mesmo tom não reinicia.
 - Segue o tom salvo exibido, nunca a prévia do painel Mudar tom.

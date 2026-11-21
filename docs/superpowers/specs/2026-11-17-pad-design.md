@@ -70,8 +70,8 @@ Segue o design principal (§2). **Todos os papéis** (visitante, membro, admin) 
 ### 5.1 Qual tom toca
 
 O pad segue o **tom salvo exibido** na cifra (o tom selecionado na URL ou o padrão), nunca a prévia do painel de
-transposição: a prévia só vira pad ao **abrir/confirmar** aquele tom [decisão nossa]. Cifra em tom menor usa o pad da
-**mesma nota** (Am → pad A; F#m → pad F#), que é a prática com pads de nota-raiz [proposta]. Bemóis do app são
+transposição: a prévia só vira pad ao **abrir/confirmar** aquele tom [decisão nossa]. Cifra em tom menor usa o pad do
+**tom maior relativo** (Am → pad C; Em → pad G; F#m → pad A) [decisão #97, substitui a regra da mesma nota]. Bemóis do app são
 mapeados para os sustenidos dos arquivos (Bb → A#, Eb → D#, Ab → G#).
 
 ### 5.2 Quando o pad continua e quando para
@@ -150,7 +150,7 @@ licença nas tags (ver §9).
 
 | Unidade | Responsabilidade |
 |---|---|
-| `padKeys` | `KeyName` → arquivo do pad (sustenidos/bemóis, menor → mesma nota); puro |
+| `padKeys` | `KeyName` → arquivo do pad (sustenidos/bemóis, menor → maior relativo); puro |
 | `padEngine` | Envolve o Web Audio: `play(key)`, `crossfadeTo(key)`, `stop()`, `setVolume()`; recebe `AudioContext` e carregador por injeção (testável sem áudio real); nunca deixa o ganho dar salto |
 | `padApi` | Baixa o loop do Storage (`getBlob`, como `getPdfBytes`) e entrega bytes |
 | `PadProvider` | Estado (`off`/`loading`/`playing`/`error`, tom, volume), regras do §5.2, pré-carga do §5.4; fica ao lado do `ActiveSetlistProvider` no `AppShell`, acima das rotas da cifra e do repertório |
