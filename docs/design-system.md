@@ -76,7 +76,7 @@ Novo token: crie nos **dois** blocos, na mesma mudança, e na tabela acima e no 
 importados em `main.tsx` **nesta ordem**: `redesign.css` (cabeçalhos, barra inferior, Mais, Busca, Pad, listas),
 `redesign-cifra.css` (barra de ações e painel Mudar tom), `redesign-setlists.css` (repertórios),
 `redesign-forms.css` (login, formulários, diálogos), `redesign-states.css` (alertas, avisos, aviso de
-atualização). Área nova → arquivo novo (ou seção dele), importado depois dos existentes, **escopado** pelo
+atualização), `redesign-stats.css` (estatísticas), `redesign-install.css` (convite de instalação). Área nova → arquivo novo (ou seção dele), importado depois dos existentes, **escopado** pelo
 componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.test.ts` lê todos eles.
 
 ## 5. Componentes e padrões
@@ -104,6 +104,7 @@ componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.tes
 | **Alertas** | caixa suave vermelha (alerta de página); aviso de sucesso `.notice`; erro de campo só texto | `redesign-states.css` |
 | **Diálogos** | cartão 22 px com ações em pílula. **Destrutivo** = Cancelar neutro à esquerda + botão de confirmar vermelho sólido à direita (`--color-error`, texto `--color-on-primary`), ambos 46 px; foco inicial no Cancelar; Escape cancela; sem digitar nada para confirmar | `.dialog`, `ConfirmDialog`, `.confirm-actions` |
 | **Aviso de atualização** | pílula no topo, centralizada, botão âmbar "Atualizar" | `UpdatePrompt` |
+| **Convite de instalação** | cartão fixo no topo da aba Músicas, só logado, abaixo da barra de status. Logo `icons/icon.svg` 48 px, título "Cifras como app" (15 px, 800), apoio "Abra direto da tela inicial" (13 px, muted). Android/Chromium: botão âmbar "Adicionar" (pílula 36 px, alvo 44 px) abre o diálogo de instalação. iPhone/iPad com Safari: sem botão; apoio "Toque em Compartilhar e depois em Adicionar à Tela de Início". "×" (aria-label "Agora não"; disco 28 px, alvo 44 px) dispensa por 30 dias. Some no app instalado e em outros navegadores sem o evento | `InstallCard`, `pwa/useInstallPrompt.ts`, `ui/redesign-install.css` |
 | **Faixa de teste** | faixa no topo, só no site de teste (`louvor-hajaluz-teste`): texto "TESTE · #N" (13 px, negrito, centralizado) sobre `--color-warn-soft`, com `--color-warn`; no topo da página, rola com o conteúdo; nunca cobre controles (sem `sticky` nem `fixed`), com `env(safe-area-inset-top)`. Não aparece em produção (sem `VITE_TEST_BANNER`) | `TestBanner`, `.test-banner` |
 
 Estados obrigatórios por tela: **carregando, vazio, erro** (e "somente leitura" para visitante). Ver a tela
@@ -132,8 +133,10 @@ Linha 1 (originais): `01 Músicas`, `02 Repertório`, `03 Busca`, `04 Pad (tocan
 `08 Cantores`, `09 Cantor`, `10 Cifra (PDF)`, `10b Cifra (PDF em tela cheia)`, `11 Mudar tom (painel)`, `12 Repertório (editar)`,
 `13 Repertório (visitante)`, `14 Adicionar louvor`, `15 Tom do item`, `16 Repertório · menu e diálogos`,
 `17 Cifra no repertório`, `18 Cifra · menu admin`, `19 Admin · editar e apagar`, `20 Login`, `21 Nova cifra`,
-`22 Nova cifra · escolher / erro`, `23 Importar em lote`, `24 Pessoas`, `25 Estados e avisos`.
-**Tema claro:** `L1 Músicas`, `L2 Repertório`, `L3 Cifra`, `L4 Mudar tom`, `L5 Pad tocando (bolinha verde na aba)`, `L6 Mais (admin)`
+`22 Nova cifra · escolher / erro`, `23 Importar em lote`, `24 Pessoas`, `25 Estados e avisos`,
+`28 · Músicas · convite para instalar`, `29 · Músicas · convite para instalar (iPhone)`.
+**Tema claro:** `L1 Músicas`, `L2 Repertório`, `L3 Cifra`, `L4 Mudar tom`, `L5 Pad tocando (bolinha verde na aba)`, `L6 Mais (admin)`,
+`L7 · Músicas · convite para instalar (claro)`, `L8 · Músicas · convite para instalar (iPhone, claro)`
 (tokens `--color-light-*`; o Paper não troca variáveis por artboard, então o claro são artboards próprios).
 Numeração nova continua a sequência; telas claras seguem `L<n>`.
 

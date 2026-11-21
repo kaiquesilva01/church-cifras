@@ -16,7 +16,7 @@ Rotas em `apps/web/src/App.tsx`. Tudo fora de `/login` exige login (`RequireAuth
 | Rota | Tela | Quem acessa | O que faz |
 | --- | --- | --- | --- |
 | `/login` | Login | qualquer um | Entrar com Google. Abrir um link sem estar logado leva ao login e, depois, volta ao destino |
-| `/` | Início | logado | Cartão "Próximo culto"; abas Músicas, Harpa, Cantores e Repertórios; campo de busca; "＋ Nova cifra" só para membro/admin |
+| `/` | Início | logado | Cartão "Próximo culto"; abas Músicas, Harpa, Cantores e Repertórios; campo de busca; "＋ Nova cifra" só para membro/admin; convite "Cifras como app" na aba Músicas (ver PWA) |
 | `/busca` | Busca | logado | Busca com filtros Tudo, Músicas, Cantores, Harpa; seção "Na letra" |
 | `/pad` | Pad | logado | Status, grade de 12 tons, volume, parar |
 | `/mais` | Mais | logado | Perfil e papel; Admin (só admin); Importar (só admin); Estatísticas (só admin); Pessoas "Em breve"; Sair |
@@ -188,6 +188,7 @@ Regras de contagem de uso:
 ### PWA e desempenho
 
 - App instalável na tela inicial, com service worker do app shell e aviso "Atualizar" quando há versão nova.
+- Convite "Cifras como app" na aba Músicas (só logado). Android/Chromium: o `beforeinstallprompt` é guardado já no carregamento; o botão "Adicionar" abre o diálogo de instalação, e recusar o diálogo conta como "Agora não". iPhone e iPad com Safari: sem botão, com a instrução de Compartilhar. Não aparece no app instalado (`display-mode` standalone, fullscreen ou minimal-ui, ou `navigator.standalone`) nem depois de `appinstalled` na sessão. "Agora não" dispensa por 30 dias, guardado no aparelho em `localStorage` (chave `cifras.installCard.v1`); sem armazenamento, o convite volta a cada carga.
 - PDFs com cache imutável; code splitting por rota; `pdf.js` e `pdf-lib` carregados sob demanda só no visualizador e no upload.
 - Meta: abrir uma cifra já visitada em menos de 1 s no celular; troca de tom na prévia em menos de 100 ms.
 - Sem modo offline completo, só cache do app e dos arquivos já usados.
@@ -244,6 +245,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Acervo acima de cerca de 2.000 músicas pede revisão da busca em memória.
 - `origin` é conferido só na forma, e `rehearsalAt` na forma e contra a janela do `date`: a Rules não confere se a origem é a do site que gravou (protege contra engano, não contra abuso). O token de aparelho fica no Firestore, fechado ao cliente.
 - Verificação em aparelho real (Android e iPhone) é manual: o áudio do pad, o compartilhamento de arquivo e a tela bloqueada não são verificáveis em CI.
+- Convite de instalação: Firefox Android e outros navegadores sem `beforeinstallprompt` não recebem o convite (não há API que instale com confiança). No iPhone e no iPad, só o Safari recebe a instrução: Chrome e Firefox do iOS ficam sem convite. No iOS não existe evento de instalação: quem instalou no iPhone e abre o site no Safari vê a instrução até dispensar.
 
 ### Pendências abertas
 
