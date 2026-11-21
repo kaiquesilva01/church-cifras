@@ -441,7 +441,7 @@ describe('SetlistPage ensaio', () => {
     openMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Editar data, rótulo e ensaio' }));
     fireEvent.change(screen.getByLabelText('Rótulo'), { target: { value: 'Rótulo' } });
-    fireEvent.change(screen.getByLabelText('Dia'), { target: { value: '2026-11-20' } });
+    // Só a hora: o dia é preenchido pelo culto (autofill do diálogo).
     fireEvent.change(screen.getByLabelText('Hora', { exact: true }), {
       target: { value: '18:30' },
     });
@@ -488,6 +488,31 @@ describe('SetlistPage ensaio', () => {
       }),
     );
     expect(screen.getByText('O repertório foi alterado.')).toBeInTheDocument();
+  });
+
+  it('edits from the newest state, so a rehearsal set on another device survives a label edit', async () => {
+    const api = fakeSetlistApi([makeSetlist({ id: 'r1', date: '2026-11-22', items: [a] })]);
+    mount(api);
+    act(() =>
+      api.push('r1', {
+        setlist: makeSetlist({ id: 'r1', date: '2026-11-22', items: [a], rehearsalAt: at }),
+        fromCache: false,
+      }),
+    );
+    // The banner shows the other device's change, but the page itself still shows the older state.
+    expect(screen.getByText('O repertório foi alterado.')).toBeInTheDocument();
+    openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar data, rótulo e ensaio' }));
+    expect(screen.getByLabelText('Hora', { exact: true })).toHaveValue('18:30');
+    fireEvent.change(screen.getByLabelText('Rótulo'), { target: { value: 'Rótulo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() =>
+      expect(api.updateSetlistMeta).toHaveBeenCalledWith('r1', {
+        date: '2026-11-22',
+        label: 'Rótulo',
+        rehearsalAt: at,
+      }),
+    );
   });
 
   it('duplicates without the rehearsal and without an origin', async () => {

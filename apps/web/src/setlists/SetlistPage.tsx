@@ -115,6 +115,9 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
 
   const editable = canEdit(role) && !active.removed;
   const items = shown.items;
+  // Edição parte do estado mais novo: um ensaio gravado em outro aparelho (ainda não aceito
+  // no banner) não pode ser apagado ao salvar só o rótulo.
+  const newest = active.latest ?? shown;
 
   const run = async (op: SetlistOp): Promise<void> => {
     setMessage(null);
@@ -318,7 +321,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
           mode={dialog}
           initial={
             dialog === 'edit'
-              ? { date: shown.date, label: shown.label, rehearsalAt: shown.rehearsalAt }
+              ? { date: newest.date, label: newest.label, rehearsalAt: newest.rehearsalAt }
               : undefined
           }
           busy={busy}
