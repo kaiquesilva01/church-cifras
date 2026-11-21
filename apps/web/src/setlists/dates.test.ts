@@ -5,6 +5,7 @@ import {
   expiresAtFor,
   isExpired,
   isTooOld,
+  shiftDate,
   todayLocal,
 } from './dates';
 import type { Setlist } from './types';
@@ -38,6 +39,11 @@ describe('dates', () => {
   it('isTooOld blocks dates before 29 days ago', () => {
     expect(isTooOld('2026-10-17', '2026-11-16')).toBe(true);
     expect(isTooOld('2026-10-18', '2026-11-16')).toBe(false);
+  });
+
+  it('shiftDate moves a calendar date by days, without time zone', () => {
+    expect(shiftDate('2026-11-22', -7)).toBe('2026-11-15');
+    expect(shiftDate('2026-12-31', 1)).toBe('2027-01-01');
   });
 
   it('isExpired is true when expiresAt equals now', () => {
