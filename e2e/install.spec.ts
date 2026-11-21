@@ -98,3 +98,65 @@ test.describe('convite Cifras como app (iPhone Safari)', () => {
     await expect(card.getByRole('button', { name: 'Adicionar' })).toHaveCount(0);
   });
 });
+
+test.describe('convite Cifras como app (critérios 3, 4, 6 e 7)', () => {
+  test('recusar o diálogo nativo equivale a dispensar: some e não volta depois de recarregar', async ({
+    page,
+  }) => {
+    await signInAs(page, ADMIN, 'Admin');
+    await fireInstallPrompt(page, 'dismissed');
+    const card = page.getByRole('region', CARD);
+    await expect(card).toBeVisible();
+    await card.getByRole('button', { name: 'Adicionar' }).click();
+    expect(await page.evaluate(() => (window as InstallWindow).__installPrompted)).toBe(1);
+    await expect(card).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
+    await fireInstallPrompt(page);
+    await expect(page.getByRole('region', CARD)).toHaveCount(0);
+  });
+
+  test('appinstalled esconde o cartão na hora, sem recarregar', async ({ page }) => {
+    await signInAs(page, ADMIN, 'Admin');
+    await fireInstallPrompt(page);
+    const card = page.getByRole('region', CARD);
+    await expect(card).toBeVisible();
+    await page.evaluate(() => window.dispatchEvent(new Event('appinstalled')));
+    await expect(card).toHaveCount(0);
+  });
+
+  test('Firefox Android, sem o evento e fora do iOS, não mostra o cartão', async ({ browser }) => {
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0',
+    });
+    const page = await context.newPage();
+    try {
+      await signInAs(page, ADMIN, 'Admin');
+      await expect(page.getByRole('region', CARD)).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('os botões do cartão têm alvo de pelo menos 44 px e nome acessível', async ({ page }) => {
+    await signInAs(page, ADMIN, 'Admin');
+    await fireInstallPrompt(page);
+    const card = page.getByRole('region', CARD);
+    await expect(card).toBeVisible();
+    for (const name of ['Adicionar', 'Agora não']) {
+      const button = card.getByRole('button', { name });
+      await expect(button).toBeVisible();
+      const box = await button.boundingBox();
+      expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test('sem login o convite não aparece', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Entrar com Google' })).toBeVisible();
+    await fireInstallPrompt(page);
+    await expect(page.getByRole('region', CARD)).toHaveCount(0);
+  });
+});
