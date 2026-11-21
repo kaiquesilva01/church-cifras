@@ -59,10 +59,10 @@ export async function announceNewSetlist(
     });
     return 'sent';
   } catch (error) {
-    const code =
-      typeof error === 'object' && error !== null && 'code' in error
-        ? (error.code ?? 'error')
-        : 'error';
+    const raw =
+      typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+    // Só texto ou número entram no log: um objeto poderia carregar dados do envio.
+    const code = typeof raw === 'string' || typeof raw === 'number' ? raw : 'error';
     console.error('push: falha ao avisar repertório novo', { setlistId, code });
     return 'failed';
   }

@@ -7,6 +7,11 @@ import {
   type SetlistSnapshot,
 } from './newSetlist';
 
+// Corte: 22/11/2026 00:00 de Brasília (03:00 UTC).
+const CUTOFF = new Date(Date.UTC(2026, 10, 22, 3, 0, 0));
+const CREATED_AFTER = new Date('2026-11-22T12:00:00Z');
+const CREATED_BEFORE = new Date(CUTOFF.getTime() - 1);
+
 const snap = (itemCount: number, extra: Partial<SetlistSnapshot> = {}): SetlistSnapshot => ({
   date: '2026-11-22',
   label: 'Culto de domingo',
@@ -14,6 +19,7 @@ const snap = (itemCount: number, extra: Partial<SetlistSnapshot> = {}): SetlistS
   origin: 'producao',
   createdBy: 'a1',
   updatedBy: 'm1',
+  createdAt: CREATED_AFTER,
   ...extra,
 });
 
@@ -41,6 +47,31 @@ describe('shouldAnnounce: a hora de avisar', () => {
       snap(3, { date: '2026-11-22' }),
       snap(3, { date: '2026-11-29' }),
       false,
+    ],
+    [
+      'criação com 4 criada antes do corte',
+      undefined,
+      snap(4, { createdAt: CREATED_BEFORE }),
+      false,
+    ],
+    ['criação com 4 sem createdAt', undefined, snap(4, { createdAt: undefined }), false],
+    [
+      '3 para 4 criado antes do corte (legado)',
+      snap(3, { createdAt: CREATED_BEFORE }),
+      snap(4, { createdAt: CREATED_BEFORE }),
+      false,
+    ],
+    [
+      '3 para 4 sem createdAt',
+      snap(3, { createdAt: undefined }),
+      snap(4, { createdAt: undefined }),
+      false,
+    ],
+    [
+      '3 para 4 criado no instante do corte',
+      snap(3, { createdAt: CUTOFF }),
+      snap(4, { createdAt: CUTOFF }),
+      true,
     ],
   ])('%s', (_name, before, after, expected) => {
     expect(shouldAnnounce(before, after)).toBe(expected);
@@ -77,6 +108,14 @@ describe('readSetlist', () => {
     expect(readSetlist({ items: [], expiresAt: d })?.expiresAt).toEqual(d);
     expect(readSetlist({ items: [], expiresAt: { toDate: () => d } })?.expiresAt).toEqual(d);
     expect(readSetlist({ items: [] })?.expiresAt).toBeUndefined();
+  });
+
+  it('lê createdAt de Date ou de Timestamp; ausente ou ilegível é undefined', () => {
+    const d = new Date('2026-11-22T12:00:00Z');
+    expect(readSetlist({ items: [], createdAt: d })?.createdAt).toEqual(d);
+    expect(readSetlist({ items: [], createdAt: { toDate: () => d } })?.createdAt).toEqual(d);
+    expect(readSetlist({ items: [] })?.createdAt).toBeUndefined();
+    expect(readSetlist({ items: [], createdAt: '2026-11-22' })?.createdAt).toBeUndefined();
   });
 
   it('sem items é zero; sem dados é undefined', () => {

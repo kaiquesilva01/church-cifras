@@ -7,12 +7,16 @@ const plus = (days: number) => new Date(FAKE_NOW.getTime() + days * DAY_MS);
 
 const items = (n: number) =>
   Array.from({ length: n }, (_, i) => ({ id: `i${i}`, songId: `s${i}`, key: 'C' }));
+// Criado depois do corte (22/11/2026 00:00 de Brasília) por padrão.
+const CREATED_AFTER = new Date('2026-11-22T12:00:00Z');
+const CREATED_BEFORE = new Date(Date.UTC(2026, 10, 22, 3, 0, 0) - 1);
 const setlist = (n: number, extra: Record<string, unknown> = {}) => ({
   date: '2026-11-22',
   label: 'Culto de domingo',
   items: items(n),
   createdBy: 'a1',
   updatedBy: 'a1',
+  createdAt: CREATED_AFTER,
   ...extra,
 });
 
@@ -160,6 +164,21 @@ describe('announceNewSetlist: envio e marca', () => {
     });
   });
 
+  it('código de erro que não é texto nem número é logado como "error", nunca como objeto', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { annDeps } = setup({ ...members, devices: [device('t1', 'm1')] });
+    annDeps.sendBatch = async () => {
+      throw Object.assign(new Error('fcm fora'), { code: { detalhe: 'token-xyz' } });
+    };
+
+    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('failed');
+    expect(errorSpy).toHaveBeenCalledWith('push: falha ao avisar repertório novo', {
+      setlistId: 'r1',
+      code: 'error',
+    });
+  });
+
   it('erro ao criar a marca (que não seja já existente) propaga e não envia', async () => {
     const { annDeps, calls } = setup({ ...members, devices: [device('t1', 'm1')] });
     annDeps.claimMarker = async () => {
@@ -201,6 +220,14 @@ describe('announceNewSetlist: quando não avisa', () => {
     ['5 → 4', setlist(5), setlist(4)],
     ['edição de rótulo com 4', setlist(4), setlist(4, { label: 'Outro' })],
     ['exclusão', setlist(4), undefined],
+    [
+      '3 → 4 em repertório criado antes do corte (legado)',
+      setlist(3),
+      setlist(4, { createdAt: CREATED_BEFORE }),
+    ],
+    ['criação com 4 criada antes do corte', undefined, setlist(4, { createdAt: CREATED_BEFORE })],
+    ['3 → 4 sem createdAt legível', setlist(3), setlist(4, { createdAt: undefined })],
+    ['criação com 4 sem createdAt legível', undefined, setlist(4, { createdAt: 'ontem' })],
   ])('%s: "not-due", sem marca e sem envio', async (_name, before, after) => {
     const { annDeps, claims, calls } = setup({ ...members, devices: [device('t1', 'm1')] });
 
