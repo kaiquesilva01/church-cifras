@@ -10,6 +10,12 @@ import { requireRole } from './auth/requireRole';
 import { countSettledSetlists } from './stats/countUsage';
 import { getStatsForAdmin } from './stats/getStats';
 import { createStatsDeps } from './stats/statsDeps';
+import { createPushDeps } from './push/adminDeps';
+import {
+  registerDevice as registerDeviceLogic,
+  sendTestPush as sendTestPushLogic,
+  unregisterDevice as unregisterDeviceLogic,
+} from './push/devices';
 import { buildHealth } from './health';
 import { parseAdminEmails, ROLES } from './roles';
 import {
@@ -224,3 +230,25 @@ export const setUserRole = onCall({ region: REGION }, async (request) => {
     newRole: data.role,
   });
 });
+
+const pushDeps = createPushDeps();
+
+export const registerDevice = onCall({ region: REGION }, (request) =>
+  registerDeviceLogic(
+    { ...pushDeps, ...deps },
+    request.auth?.uid,
+    (request.data ?? {}) as Record<string, unknown>,
+  ),
+);
+
+export const unregisterDevice = onCall({ region: REGION }, (request) =>
+  unregisterDeviceLogic(
+    { ...pushDeps, ...deps },
+    request.auth?.uid,
+    (request.data ?? {}) as Record<string, unknown>,
+  ),
+);
+
+export const sendTestPush = onCall({ region: REGION }, (request) =>
+  sendTestPushLogic({ ...pushDeps, ...deps }, request.auth?.uid),
+);
