@@ -325,3 +325,39 @@ describe('setlists rules: rehearsalAt e origin', () => {
     );
   });
 });
+
+describe('setlists rules: janela do ensaio em bordas de mês e de ano', () => {
+  const at = (iso: string) => Timestamp.fromDate(new Date(iso));
+
+  it.each([
+    [
+      'date 2026-03-07: início da janela (2026-02-28 00:00 de Brasília)',
+      '2026-03-07',
+      '2026-02-28T03:00:00Z',
+    ],
+    ['date 2026-01-02: início da janela no ano anterior', '2026-01-02', '2025-12-26T03:00:00Z'],
+    ['date 2026-12-31: último segundo do dia do culto', '2026-12-31', '2027-01-01T02:59:59Z'],
+  ])('allows member with %s', async (_name, date, rehearsal) => {
+    await assertSucceeds(
+      setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ date, rehearsalAt: at(rehearsal) })),
+    );
+  });
+
+  it.each([
+    ['date 2026-03-07: um segundo antes do início', '2026-03-07', '2026-02-28T02:59:59Z'],
+    [
+      'date 2026-01-02: um segundo antes do início no ano anterior',
+      '2026-01-02',
+      '2025-12-26T02:59:59Z',
+    ],
+    [
+      'date 2026-12-31: 00:00 de 2027-01-01 de Brasília (exclusivo)',
+      '2026-12-31',
+      '2027-01-01T03:00:00Z',
+    ],
+  ])('denies member with %s', async (_name, date, rehearsal) => {
+    await assertFails(
+      setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ date, rehearsalAt: at(rehearsal) })),
+    );
+  });
+});

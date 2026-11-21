@@ -27,6 +27,12 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, 'pushDevices/d1'), { uid: 'm1', token: 'tok', origin: 'producao' });
+    // Aparelho do próprio member1 (uid = auth uid): prova que não há regra de dono.
+    await setDoc(doc(db, 'pushDevices/proprio'), {
+      uid: 'member1',
+      token: 'tok-proprio',
+      origin: 'producao',
+    });
     await setDoc(doc(db, 'avisosEnviados/a1'), { sentAt: new Date() });
     await setDoc(doc(db, 'config/push'), { enabled: true });
     await setDoc(doc(db, 'songs/s1'), { title: 'Música de controle' });
@@ -63,6 +69,16 @@ describe('controle positivo: contexto autenticado lê songs', () => {
 
   it('nega leitura para anônimo', async () => {
     await assertFails(getDoc(doc(dbFor('anonimo'), 'songs/s1')));
+  });
+});
+
+describe('dono do aparelho não ganha acesso ao próprio registro', () => {
+  it('member não lê o aparelho cujo uid é o seu', async () => {
+    await assertFails(getDoc(doc(dbFor('member'), 'pushDevices/proprio')));
+  });
+
+  it('member não apaga o aparelho cujo uid é o seu', async () => {
+    await assertFails(deleteDoc(doc(dbFor('member'), 'pushDevices/proprio')));
   });
 });
 

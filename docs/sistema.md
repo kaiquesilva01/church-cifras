@@ -105,10 +105,10 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 | `songs/{songId}` | `title`, `titleNormalized`, `artistId` (slug), `artistName`, `keys` (tons salvos, mantido por função), `handmadeKeys`, `createdBy`, `createdAt`, `updatedAt` | só `create` por membro/admin; sem update nem delete |
 | `songs/{songId}/arrangements/{slug}` | `key` (um dos 24 tons), `storagePath`, `source` (`handmade`/`generated`), `derivedFromKey` (só gerado), `writer` (`upload`/`overlay`), `chordCount`, `collisions`, `createdBy`, `createdAt` | só `create` por membro/admin; sem update nem delete |
 | `songLyrics/{songId}` | `text` (1–20.000 caracteres), `createdBy`, `createdAt` | só `create` por membro/admin, com a música existindo na mesma operação |
-| `setlists/{setlistId}` | `date` (`YYYY-MM-DD`), `label`, `items[]` (`id`, `songId`, `key`), `expiresAt`, `createdBy/At`, `updatedBy/At`, `rehearsalAt` (opcional: hora do ensaio, de 7 dias antes do culto até o fim do dia dele), `origin` (opcional: `producao`/`teste`) | membro/admin: create, update e delete |
+| `setlists/{setlistId}` | `date` (`YYYY-MM-DD`), `label`, `items[]` (`id`, `songId`, `key`), `expiresAt`, `createdBy/At`, `updatedBy/At`, `rehearsalAt` (opcional: hora do ensaio, dentro da janela do culto: de 00:00 de 7 dias antes do dia até 00:00 do dia seguinte, exclusivo; `null` é negado), `origin` (opcional: `producao`/`teste`) | membro/admin: create, update e delete |
 | `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt` | nenhuma; só Admin SDK (negado por padrão) |
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
-| `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga) | nenhuma; só Admin SDK e console |
+| `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
 | `artists/*` | não existe de fato | negada |
 
 - `slug` do tom = tom com `#` trocado por `s` (id do documento). Um tom existe uma vez por música; quem gerar o mesmo tom depois recebe "já existe" e o sistema abre o existente.
@@ -119,6 +119,7 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 - `pushDevices`, `avisosEnviados` e `config/*` são fechados ao cliente (deny-all); só Functions leem e gravam.
 - TTL do Firestore em `setlists.expiresAt`, com índice ascendente mantido. `setlistUsage` não pode ter TTL.
 - `expiresAt` (fim do dia da data + 30 dias, fuso `America/Sao_Paulo`) é calculado pelo cliente (`apps/web/src/setlists/dates.ts`); `firestore.rules` só confere que é um timestamp. Nada no servidor impede um valor errado.
+- Contrato do cliente para `rehearsalAt` (#100): limpar o ensaio é `deleteField()` num `updateDoc` (ou omitir o campo num `setDoc` completo); `rehearsalAt: null` é negado. Trocar `date` revalida o `rehearsalAt` gravado contra a nova janela: se ele cair fora, a gravação é negada. Por isso o cliente manda um `rehearsalAt` novo ou `deleteField()` na mesma gravação. O cliente monta o instante em UTC-3 (`America/Sao_Paulo`, sem horário de verão), não no fuso do aparelho.
 
 ## Functions e jobs
 
@@ -138,7 +139,7 @@ Todas exportadas por `apps/functions/src/index.ts` (algumas definidas em submód
 | `countSetlistUsage` | agendada, todo dia 04:00 (`America/Sao_Paulo`) | automático | Grava `setlistUsage` dos repertórios fechados |
 | `registerDevice` | callable | membro, admin | Grava o aparelho para os avisos (`pushDevices/{sha256(token)}`); o mesmo token mantém um registro |
 | `unregisterDevice` | callable | qualquer logado | Apaga o aparelho do próprio chamador (logout); idempotente |
-| `sendTestPush` | callable | membro, admin | Envia "Aviso de teste" só aos aparelhos do chamador; ignora o interruptor |
+| `sendTestPush` | callable | membro, admin | Envia "Aviso de teste" só aos aparelhos do chamador; ignora o interruptor; responde `{ sent, failed, pruned }` (só contagens; `pruned` são aparelhos apagados por token morto) |
 | `health` | callable | qualquer chamada | Verificação de saúde |
 
 Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. Ainda não há gatilho: os avisos chegam nas entregas #101 e #102.
@@ -241,7 +242,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Estatísticas: se o agendador ficasse parado por mais de cerca de 28 dias, repertórios expirariam sem contagem. Repertório já contado e depois re-datado não é contado de novo.
 - O TTL do Firestore pode demorar um dia ou mais para apagar; o cliente já esconde os expirados.
 - Acervo acima de cerca de 2.000 músicas pede revisão da busca em memória.
-- `origin` e `rehearsalAt` são conferidos só na forma: a Rules não confere se a origem é a do site que gravou (protege contra engano, não contra abuso). O token de aparelho fica no Firestore, fechado ao cliente.
+- `origin` é conferido só na forma, e `rehearsalAt` na forma e contra a janela do `date`: a Rules não confere se a origem é a do site que gravou (protege contra engano, não contra abuso). O token de aparelho fica no Firestore, fechado ao cliente.
 - Verificação em aparelho real (Android e iPhone) é manual: o áudio do pad, o compartilhamento de arquivo e a tela bloqueada não são verificáveis em CI.
 
 ### Pendências abertas
