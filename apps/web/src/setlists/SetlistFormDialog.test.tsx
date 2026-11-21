@@ -190,12 +190,42 @@ describe('SetlistFormDialog', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
-    it('o erro da janela continua com role alert', () => {
+    it('a região de status já existe, vazia, ao abrir o diálogo', () => {
+      setup();
+      expect(screen.getByRole('status').textContent).toBe('');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('o erro da janela continua com role alert e a região de status fica sem a regra de par', () => {
       setup();
       fireEvent.change(hourInput(), { target: { value: '18:30' } });
       fireEvent.change(dayInput(), { target: { value: '2026-11-11' } });
       expect(screen.getByRole('alert')).toHaveTextContent(RULE_WINDOW);
-      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.getByRole('status').textContent).toBe('');
+    });
+
+    it('aria-describedby de Dia e Hora aponta para a ajuda e para o aviso exibido', () => {
+      setup();
+      expect(dayInput()).toHaveAttribute('aria-describedby', 'setlist-rehearsal-help');
+      fireEvent.change(dayInput(), { target: { value: '2026-11-18' } });
+      expect(dayInput()).toHaveAttribute(
+        'aria-describedby',
+        'setlist-rehearsal-help setlist-rehearsal-status',
+      );
+      expect(hourInput()).toHaveAttribute(
+        'aria-describedby',
+        'setlist-rehearsal-help setlist-rehearsal-status',
+      );
+      fireEvent.change(hourInput(), { target: { value: '18:30' } });
+      fireEvent.change(dayInput(), { target: { value: '2026-11-11' } });
+      expect(dayInput()).toHaveAttribute(
+        'aria-describedby',
+        'setlist-rehearsal-help setlist-rehearsal-err',
+      );
+      expect(hourInput()).toHaveAttribute(
+        'aria-describedby',
+        'setlist-rehearsal-help setlist-rehearsal-err',
+      );
     });
 
     it('dia que acompanha a data continua acompanhando quando a data fica vazia e volta válida', () => {

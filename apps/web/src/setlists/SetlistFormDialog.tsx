@@ -77,20 +77,16 @@ export function SetlistFormDialog({
   const range = dateValid ? rehearsalWindow(date) : null;
   // Par incompleto avisa por status (leitor de tela não interrompe ao escolher só o dia);
   // janela fora do intervalo é erro de verdade e segue como alert.
-  const partialRehearsal = dateValid && hasDay !== hasHour;
-  let rehearsalError: string | null = null;
   // Sem culto válido não há janela nem par a cobrar: o erro da data já basta.
-  if (partialRehearsal) rehearsalError = PARTIAL_MSG;
-  else if (dateValid && hasDay && !isRehearsalDayInWindow(rehearsalDay, date))
-    rehearsalError = WINDOW_MSG;
-  const errorLive = partialRehearsal
-    ? ({ role: 'status', 'aria-live': 'polite' } as const)
-    : ({ role: 'alert' } as const);
+  const partialRehearsal = dateValid && hasDay !== hasHour;
+  const windowError =
+    !partialRehearsal && dateValid && hasDay && !isRehearsalDayInWindow(rehearsalDay, date);
   const canSave =
     dateValid &&
     !tooOld &&
     labelValid &&
-    rehearsalError === null &&
+    !partialRehearsal &&
+    !windowError &&
     (!hasHour || isValidHour(rehearsalHour));
 
   const changeDate = (value: string): void => {
@@ -122,9 +118,12 @@ export function SetlistFormDialog({
     dayInputRef.current?.focus();
   };
 
-  const describedBy = rehearsalError
-    ? 'setlist-rehearsal-help setlist-rehearsal-err'
-    : 'setlist-rehearsal-help';
+  const rehearsalInvalid = partialRehearsal || windowError;
+  const describedBy = [
+    'setlist-rehearsal-help',
+    ...(partialRehearsal ? ['setlist-rehearsal-status'] : []),
+    ...(windowError ? ['setlist-rehearsal-err'] : []),
+  ].join(' ');
 
   return (
     <Dialog titleId="setlist-form-title" onClose={onCancel} busy={busy}>
@@ -188,7 +187,7 @@ export function SetlistFormDialog({
                 value={rehearsalDay}
                 min={range?.first}
                 max={range?.last}
-                aria-invalid={rehearsalError ? true : undefined}
+                aria-invalid={rehearsalInvalid ? true : undefined}
                 aria-describedby={describedBy}
                 onChange={(e) => changeDay(e.target.value)}
               />
@@ -200,7 +199,7 @@ export function SetlistFormDialog({
                 type="time"
                 className="input"
                 value={rehearsalHour}
-                aria-invalid={rehearsalError ? true : undefined}
+                aria-invalid={rehearsalInvalid ? true : undefined}
                 aria-describedby={describedBy}
                 onChange={(e) => changeHour(e.target.value)}
               />
@@ -220,9 +219,22 @@ export function SetlistFormDialog({
           <p id="setlist-rehearsal-help" className="field-help">
             Quem ativou os avisos é lembrado 30 min antes e na hora.
           </p>
-          {rehearsalError && (
-            <p id="setlist-rehearsal-err" className="field-error" {...errorLive}>
-              {rehearsalError}
+          {/*
+            Sempre montada: a região de status precisa existir antes de o aviso entrar.
+            Vazia não ocupa espaço: a margem de field-error só vale com o aviso.
+          */}
+          <p
+            id="setlist-rehearsal-status"
+            role="status"
+            aria-live="polite"
+            className={partialRehearsal ? 'field-error' : undefined}
+            style={partialRehearsal ? undefined : { margin: 0 }}
+          >
+            {partialRehearsal ? PARTIAL_MSG : ''}
+          </p>
+          {windowError && (
+            <p id="setlist-rehearsal-err" role="alert" className="field-error">
+              {WINDOW_MSG}
             </p>
           )}
         </fieldset>
