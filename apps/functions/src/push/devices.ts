@@ -64,7 +64,7 @@ export async function unregisterDevice(
 export async function sendTestPush(
   deps: PushDeps,
   uid: string | undefined,
-): Promise<{ sent: number; failed: number }> {
+): Promise<{ sent: number; failed: number; pruned: number }> {
   await requireRole(deps, uid, ['member', 'admin']);
 
   const outcome = await sendToDevices(deps, {
@@ -75,5 +75,6 @@ export async function sendTestPush(
     onlyUid: uid as string,
     respectSwitch: false,
   });
-  return { sent: outcome.sent, failed: outcome.failed };
+  // pruned: aparelhos apagados por token morto (sem tokens na resposta).
+  return { sent: outcome.sent, failed: outcome.failed, pruned: outcome.pruned };
 }

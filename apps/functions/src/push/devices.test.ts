@@ -161,13 +161,30 @@ describe('sendTestPush', () => {
 
     const result = await sendTestPush(deps, 'm1');
 
-    expect(result).toEqual({ sent: 2, failed: 0 });
+    expect(result).toEqual({ sent: 2, failed: 0, pruned: 0 });
     expect(sentTokens(calls).sort()).toEqual(['t1', 't2']);
     expect(calls.flat().map((m) => m.message.title)).toEqual(['Aviso de teste', 'Aviso de teste']);
   });
 
+  it('returns pruned, so "no device" (all zero) differs from "device pruned"', async () => {
+    const none = fakeDeps({ roles: { m1: 'member' } });
+    const pruned = fakeDeps({
+      roles: { m1: 'member' },
+      devices: [device('morto-1', 'm1')],
+      failures: { 'morto-1': 'messaging/registration-token-not-registered' },
+    });
+
+    expect(await sendTestPush(none.deps, 'm1')).toEqual({ sent: 0, failed: 0, pruned: 0 });
+    expect(await sendTestPush(pruned.deps, 'm1')).toEqual({ sent: 0, failed: 0, pruned: 1 });
+    expect(pruned.devices.size).toBe(0);
+  });
+
   it('returns only counts, never tokens', async () => {
-    const { deps } = fakeDeps({ roles: { m1: 'member' }, devices: [device('segredo-1', 'm1')] });
+    const { deps } = fakeDeps({
+      roles: { m1: 'member' },
+      devices: [device('segredo-1', 'm1')],
+      failures: { 'segredo-1': 'messaging/registration-token-not-registered' },
+    });
 
     const result = await sendTestPush(deps, 'm1');
 
