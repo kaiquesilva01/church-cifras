@@ -359,3 +359,26 @@ span.setlist-item-key {
   font-size: 0.8125rem;
   text-align: center;
 }
+
+/* Linha do ensaio: relógio em âmbar de texto; depois da hora, linha e relógio em muted. */
+.rehearsal-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.rehearsal-line svg {
+  flex: none;
+  color: var(--color-accent-text);
+}
+.rehearsal-line.is-muted,
+.rehearsal-line.is-muted svg {
+  color: var(--color-muted);
+}
+.next-culto .rehearsal-line {
+  margin: 4px 0 0;
+  font-weight: 400;
+}

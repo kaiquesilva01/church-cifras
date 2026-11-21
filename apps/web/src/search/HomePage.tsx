@@ -14,7 +14,7 @@ import type { SongSummary } from '../catalog/types';
 import { NextCultoCard } from '../setlists/NextCultoCard';
 import { todayLocal } from '../setlists/dates';
 import type { SetlistApi } from '../setlists/setlistApi';
-import { SetlistFormDialog } from '../setlists/SetlistFormDialog';
+import { type SetlistFormValue, SetlistFormDialog } from '../setlists/SetlistFormDialog';
 import { useSetlistsContext } from '../setlists/SetlistsProvider';
 import { SetlistsTab } from '../setlists/SetlistsTab';
 import { InstallCard } from '../pwa/InstallCard';
@@ -103,7 +103,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
     : 'Nenhuma cifra ainda.';
   const items = tab.id === 'cantores' ? visibleArtists : visibleSongs;
 
-  const createSetlist = async (value: { date: string; label: string }): Promise<void> => {
+  const createSetlist = async (value: SetlistFormValue): Promise<void> => {
     setCreateBusy(true);
     setCreateError(null);
     try {

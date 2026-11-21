@@ -36,6 +36,7 @@ export function sameContent(a: Setlist | null, b: Setlist | null): boolean {
   return (
     a.date === b.date &&
     a.label === b.label &&
+    a.rehearsalAt?.getTime() === b.rehearsalAt?.getTime() &&
     a.items.length === b.items.length &&
     a.items.every((it, i) => {
       const other = b.items[i];

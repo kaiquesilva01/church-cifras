@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import { shortDate, songCount } from './format';
+import { RehearsalLine } from './RehearsalLine';
 import { nextCultos } from './selectors';
 import type { Setlist } from './types';
 
@@ -28,6 +29,7 @@ export function NextCultoCard({
               </span>
               <span className="muted">{songCount(s)} ›</span>
             </Link>
+            <RehearsalLine rehearsalAt={s.rehearsalAt} now={now} muted />
           </li>
         ))}
       </ul>
