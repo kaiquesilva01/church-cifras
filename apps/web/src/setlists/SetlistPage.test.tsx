@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
@@ -258,17 +258,21 @@ describe('SetlistPage menu', () => {
   const openMenu = () =>
     fireEvent.click(screen.getByRole('button', { name: 'Menu do repertório' }));
 
+  beforeEach(() => vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-16T15:00:00Z') }));
+  afterEach(() => vi.useRealTimers());
+
   it('edits date and label', async () => {
     const api = withItems([a]);
     mount(api);
     openMenu();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar data e rótulo' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar data, rótulo e ensaio' }));
     fireEvent.change(screen.getByLabelText('Rótulo'), { target: { value: 'Novo nome' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
     await waitFor(() =>
       expect(api.updateSetlistMeta).toHaveBeenCalledWith('r1', {
         date: '2026-11-20',
         label: 'Novo nome',
+        rehearsalAt: null,
       }),
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -283,7 +287,7 @@ describe('SetlistPage menu', () => {
     });
     mount(api);
     openMenu();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar data e rótulo' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar data, rótulo e ensaio' }));
     fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
     expect(await within(screen.getByRole('dialog')).findByRole('alert')).toBeInTheDocument();
   });
@@ -369,6 +373,137 @@ describe('SetlistPage menu', () => {
     const item = screen.getByRole('menuitem', { name: 'Duplicar' });
     fireEvent.blur(item, { relatedTarget: document.body });
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+});
+
+describe('SetlistPage ensaio', () => {
+  const openMenu = () =>
+    fireEvent.click(screen.getByRole('button', { name: 'Menu do repertório' }));
+  const at = new Date('2026-11-22T21:30:00Z');
+
+  beforeEach(() => vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-16T15:00:00Z') }));
+  afterEach(() => vi.useRealTimers());
+
+  it('shows the rehearsal line with a clock, not muted before the time', () => {
+    vi.setSystemTime(new Date('2026-11-22T12:00:00Z'));
+    mount(
+      fakeSetlistApi([makeSetlist({ id: 'r1', date: '2026-11-22', items: [a], rehearsalAt: at })]),
+    );
+    const line = screen.getByText('Ensaio hoje às 18h30').closest('.rehearsal-line');
+    expect(line).not.toHaveClass('is-muted');
+    expect(line!.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('mutes the rehearsal line once the time has passed', () => {
+    vi.setSystemTime(new Date('2026-11-22T12:00:00Z'));
+    const { container } = mount(
+      fakeSetlistApi([makeSetlist({ id: 'r1', date: '2026-11-22', items: [a], rehearsalAt: at })]),
+    );
+    expect(container.querySelector('.rehearsal-line')).not.toHaveClass('is-muted');
+    cleanup();
+    vi.setSystemTime(new Date('2026-11-22T22:00:00Z'));
+    const again = mount(
+      fakeSetlistApi([makeSetlist({ id: 'r1', date: '2026-11-22', items: [a], rehearsalAt: at })]),
+    );
+    expect(again.container.querySelector('.rehearsal-line')).toHaveClass('is-muted');
+  });
+
+  it('shows no rehearsal line without a time', () => {
+    const { container } = mount(withItems([a]));
+    expect(container.querySelector('.rehearsal-line')).toBeNull();
+  });
+
+  it('shows the rehearsal line to visitors too', () => {
+    mount(withItems([a], { date: '2026-11-22', rehearsalAt: at }), { role: 'viewer' });
+    expect(screen.getByText('Ensaio dom · 22/11 às 18h30')).toBeInTheDocument();
+  });
+
+  it('keeps the stored rehearsal when only the label is edited', async () => {
+    const api = withItems([a], { rehearsalAt: new Date('2026-11-20T21:30:00Z') });
+    mount(api);
+    fireEvent.click(screen.getByRole('button', { name: 'Menu do repertório' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar data, rótulo e ensaio' }));
+    expect(screen.getByLabelText('Hora', { exact: true })).toHaveValue('18:30');
+    fireEvent.change(screen.getByLabelText('Rótulo'), { target: { value: 'Rótulo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() =>
+      expect(api.updateSetlistMeta).toHaveBeenCalledWith('r1', {
+        date: '2026-11-20',
+        label: 'Rótulo',
+        rehearsalAt: new Date('2026-11-20T21:30:00Z'),
+      }),
+    );
+  });
+
+  it('saves the rehearsal time from the edit dialog', async () => {
+    const api = withItems([a]);
+    mount(api);
+    openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar data, rótulo e ensaio' }));
+    fireEvent.change(screen.getByLabelText('Rótulo'), { target: { value: 'Rótulo' } });
+    fireEvent.change(screen.getByLabelText('Dia'), { target: { value: '2026-11-20' } });
+    fireEvent.change(screen.getByLabelText('Hora', { exact: true }), {
+      target: { value: '18:30' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() =>
+      expect(api.updateSetlistMeta).toHaveBeenCalledWith('r1', {
+        date: '2026-11-20',
+        label: 'Rótulo',
+        rehearsalAt: new Date('2026-11-20T21:30:00Z'),
+      }),
+    );
+  });
+
+  it('does not raise the update banner for its own rehearsal save', async () => {
+    const api = withItems([a]);
+    mount(api);
+    openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar data, rótulo e ensaio' }));
+    fireEvent.change(screen.getByLabelText('Dia'), { target: { value: '2026-11-20' } });
+    fireEvent.change(screen.getByLabelText('Hora', { exact: true }), {
+      target: { value: '18:30' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => expect(api.updateSetlistMeta).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.queryByText('O repertório foi alterado.')).not.toBeInTheDocument();
+  });
+
+  it('raises the update banner when only the rehearsal time changes on another device', () => {
+    const api = fakeSetlistApi([
+      makeSetlist({ id: 'r1', date: '2026-11-22', items: [a], rehearsalAt: at }),
+    ]);
+    mount(api);
+    expect(screen.queryByText('O repertório foi alterado.')).not.toBeInTheDocument();
+    act(() =>
+      api.push('r1', {
+        setlist: makeSetlist({
+          id: 'r1',
+          date: '2026-11-22',
+          items: [a],
+          rehearsalAt: new Date('2026-11-22T22:00:00Z'),
+        }),
+        fromCache: false,
+      }),
+    );
+    expect(screen.getByText('O repertório foi alterado.')).toBeInTheDocument();
+  });
+
+  it('duplicates without the rehearsal and without an origin', async () => {
+    const api = withItems([a], {
+      date: '2026-11-22',
+      rehearsalAt: new Date('2026-11-22T21:30:00Z'),
+    });
+    mount(api);
+    openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => expect(api.createSetlist).toHaveBeenCalledTimes(1));
+    const input = vi.mocked(api.createSetlist).mock.calls[0]![0];
+    expect(input).toMatchObject({ date: '2026-11-19', label: 'Quinta', rehearsalAt: null });
+    expect(input).not.toHaveProperty('origin');
+    expect(input.items).toHaveLength(1);
   });
 });
 
