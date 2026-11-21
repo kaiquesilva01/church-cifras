@@ -109,6 +109,7 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 | `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt` | nenhuma; só Admin SDK (negado por padrão) |
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
 | `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
+| `avisosEnviados/{setlistId}_novo` | `setlistId`, `tipo` (`novo`), `createdAt`, `expiresAt` (o maior valor entre agora + 60 dias e o `expiresAt` do repertório; marca do aviso de repertório novo) | nenhuma; só Functions |
 | `artists/*` | não existe de fato | negada |
 
 - `slug` do tom = tom com `#` trocado por `s` (id do documento). Um tom existe uma vez por música; quem gerar o mesmo tom depois recebe "já existe" e o sistema abre o existente.
@@ -118,6 +119,7 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 - `songs`, `arrangements` e `songLyrics` são imutáveis para o cliente; edição e exclusão passam por Functions.
 - `pushDevices`, `avisosEnviados` e `config/*` são fechados ao cliente (deny-all); só Functions leem e gravam.
 - TTL do Firestore em `setlists.expiresAt`, com índice ascendente mantido. `setlistUsage` não pode ter TTL.
+- TTL do Firestore em `avisosEnviados.expiresAt` (o maior valor entre agora + 60 dias e o `expiresAt` do repertório, para a marca não vencer antes dele), sem índice de campo.
 - `expiresAt` (fim do dia da data + 30 dias, fuso `America/Sao_Paulo`) é calculado pelo cliente (`apps/web/src/setlists/dates.ts`); `firestore.rules` só confere que é um timestamp. Nada no servidor impede um valor errado.
 - Contrato do cliente para `rehearsalAt` (#100): limpar o ensaio é `deleteField()` num `updateDoc` (ou omitir o campo num `setDoc` completo); `rehearsalAt: null` é negado. Trocar `date` revalida o `rehearsalAt` gravado contra a nova janela: se ele cair fora, a gravação é negada. Por isso o cliente manda um `rehearsalAt` novo ou `deleteField()` na mesma gravação. O cliente monta o instante em UTC-3 (`America/Sao_Paulo`, sem horário de verão), não no fuso do aparelho.
 
@@ -140,9 +142,10 @@ Todas exportadas por `apps/functions/src/index.ts` (algumas definidas em submód
 | `registerDevice` | callable | membro, admin | Grava o aparelho para os avisos (`pushDevices/{sha256(token)}`); o mesmo token mantém um registro |
 | `unregisterDevice` | callable | qualquer logado | Apaga o aparelho do próprio chamador (logout); idempotente |
 | `sendTestPush` | callable | membro, admin | Envia "Aviso de teste" só aos aparelhos do chamador; ignora o interruptor; responde `{ sent, failed, pruned }` (só contagens; `pruned` são aparelhos apagados por token morto) |
+| `onSetlistWritten` | Firestore (`setlists/{setlistId}`) | automático | Avisa "Novo repertório" aos aparelhos de membros e admins quando o repertório chega a 4 louvores; uma vez por repertório (marca em `avisosEnviados`); não avisa quem gravou; só aparelhos da mesma origem; respeita `config/push` |
 | `health` | callable | qualquer chamada | Verificação de saúde |
 
-Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. Ainda não há gatilho: os avisos chegam nas entregas #101 e #102.
+Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. O gatilho do repertório novo é `onSetlistWritten` (regra abaixo); os lembretes chegam na #102.
 
 Regras de contagem de uso:
 
@@ -150,6 +153,15 @@ Regras de contagem de uso:
 - Uma vez por música por repertório (mesmo em tons diferentes); dois cultos no mesmo dia contam duas vezes.
 - Depois de contado, o uso fica congelado. Repertório apagado antes de fechar não conta.
 - O job usa o Cloud Scheduler (API ativa; ver `deploy.md` §11).
+
+Regra do aviso de repertório novo:
+
+- Sai quando `items.length` passa de 3 ou menos para 4 ou mais, ou quando o repertório nasce com 4 ou mais (por exemplo, ao duplicar).
+- Repertório com menos de 4 louvores nunca avisa.
+- Só repertório criado a partir de 22/11/2026 (00:00, Brasília) pode avisar; os criados antes nunca avisam, então não há marca a preencher para os antigos. Sem `createdAt` legível, também não avisa.
+- A marca `avisosEnviados/{setlistId}_novo` é criada antes do envio; esvaziar e encher o repertório de novo não avisa outra vez.
+- Falha de envio só entra no log; não reenvia.
+- Com `config/push.enabled === false`, a marca é criada e o aviso não sai; religar o interruptor não manda o aviso depois.
 
 ### Deploy e produção (`docs/deploy.md`)
 
@@ -246,6 +258,10 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - `origin` é conferido só na forma, e `rehearsalAt` na forma e contra a janela do `date`: a Rules não confere se a origem é a do site que gravou (protege contra engano, não contra abuso). O token de aparelho fica no Firestore, fechado ao cliente.
 - Verificação em aparelho real (Android e iPhone) é manual: o áudio do pad, o compartilhamento de arquivo e a tela bloqueada não são verificáveis em CI.
 - Convite de instalação: Firefox Android e outros navegadores sem `beforeinstallprompt` não recebem o convite (não há API que instale com confiança). No iPhone e no iPad, só o Safari recebe a instrução: Chrome e Firefox do iOS ficam sem convite. No iOS não existe evento de instalação: quem instalou no iPhone e abre o site no Safari vê a instrução até dispensar.
+- Aviso de repertório novo: se o envio falha depois de criada a marca, o aviso se perde (não há reenvio).
+- Aviso de repertório novo: com `config/push.enabled === false`, a marca é criada mesmo assim; religar o interruptor não avisa esse repertório.
+- Aviso de repertório novo: repertório que chega a 4 louvores com data inválida não recebe aviso. Na prática não acontece, porque cliente e Rules validam a data.
+- Aviso de repertório novo: se a #101 chegar à produção antes da #99, os repertórios que chegarem a 4 louvores nesse intervalo gastam a marca sem aparelho para receber o aviso.
 
 ### Pendências abertas
 
@@ -253,8 +269,9 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Preenchimento das letras das músicas enviadas antes da busca por letra: `npm run lyrics:backfill` (`deploy.md` §12), rodado pelo dono do produto depois do deploy. Até lá só as músicas novas são achadas por letra.
 - Pessoas (músicos, vocais, instrumentos, disponibilidade) aparece como "Em breve" na aba Mais; não existe.
 - O Paper não mostra o chip Harpa nas telas 03b e 03c da busca por letra (spec da busca por letra).
-- Avisos (push, #85): o backend dos aparelhos está na #98, sem tela nem envio automático. Antes da #99: passos manuais 1 e 2 da #85 (número do projeto e chave VAPID). Antes da #101: passos 4 e 5.
+- Avisos (push, #85): o backend dos aparelhos está na #98; a tela de avisos ainda não existe. O envio automático existe só para o aviso de repertório novo (#101). Antes da #99: passos manuais 1 e 2 da #85 (número do projeto e chave VAPID).
 - Passos manuais únicos de `deploy.md`: TTL e índice de `setlists` (§10), job do Cloud Scheduler e `setlistUsage` sem TTL (§11), autorizar o domínio e o CORS do site de teste (§13).
+- Antes do deploy da #101: passos 4 e 5 da #85 (APIs Pub/Sub e Eventarc, `deploy.md` §3 e §15; papel Eventarc Admin, `deploy.md` §15); depois, conferir o TTL de `avisosEnviados` (§15).
 
 ### Divergências entre spec e código (o código vale)
 

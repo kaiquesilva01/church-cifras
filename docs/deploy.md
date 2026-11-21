@@ -22,7 +22,7 @@ Cloud Functions exige o plano Blaze (pago conforme o uso, com cota gratuita). Em
 
 ### APIs do Google Cloud
 
-Para publicar Functions, as seguintes APIs precisam estar ativas: Cloud Functions, Cloud Build, Artifact Registry, Cloud Run e Eventarc (a API de Firebase Extensions não é necessária).
+Para publicar Functions, as seguintes APIs precisam estar ativas: Cloud Functions, Cloud Build, Artifact Registry, Cloud Run, Eventarc e Pub/Sub (a API de Firebase Extensions não é necessária). O gatilho do repertório novo (`onSetlistWritten`) usa Eventarc, que entrega por Pub/Sub.
 O primeiro deploy pode pedir para ativá-las. Recomendado: ativar as APIs pelo console (APIs e serviços > Biblioteca) ou rodar um deploy manual **apenas de Functions** uma vez: `npx firebase deploy --only functions --project <id>`.
 
 > **Atenção:** nunca faça deploy do Hosting a partir de um build local (`firebase deploy` sem `--only`, ou `--only hosting`). O build de produção precisa das variáveis `VITE_FIREBASE_*` e `VITE_USE_EMULATORS=false` definidas pela CI; um build local pode publicar o site apontando para os emuladores ou com configuração errada. O Hosting só é publicado pelo workflow de deploy.
@@ -186,3 +186,22 @@ Passos únicos (feitos uma vez pela pessoa responsável):
 A Cloud Build instala `apps/functions/package.json` sozinho (npm 10, sem lockfile). No npm 10.9.x o par `firebase-admin` + `firebase-functions` quebra a resolução de dependências com esse erro, e **todas** as funções falham no deploy (inclusive as que não mudaram; o erro só aparece quando o código das funções muda, porque o Firebase pula funções sem alteração). Reproduzido localmente com `npx npm@10.9.9 install` numa pasta só com esse `package.json`; no npm 11 funciona.
 
 A correção é o arquivo `apps/functions/.npmrc` com `legacy-peer-deps=true`. Não o remova; o teste `tests/config/workspace-deps.test.ts` cobre a presença dele e que o deploy não o ignora. Se o erro voltar mesmo assim, a alternativa é versionar um `package-lock.json` gerado com o npm 11 dentro de `apps/functions` (a Cloud Build passa a usar `npm ci`), sem nenhum pacote `@cifras/*`.
+
+## 15. Avisos de repertório novo (#101)
+
+Passos manuais da pessoa responsável, nesta ordem.
+
+**Antes do deploy que traz a #101:**
+
+- Confira se as APIs `pubsub.googleapis.com` e `eventarc.googleapis.com` já estão ativas (APIs e serviços > Ativadas). Provavelmente estão: o `onArrangementWritten` já é um gatilho do Firestore na mesma região em produção e usa Eventarc. Se estiverem, pule este passo; se não, ative-as (APIs e serviços > Biblioteca, ou `gcloud services enable pubsub.googleapis.com eventarc.googleapis.com --project <id>`).
+- Confira se a conta de serviço do deploy já tem o papel **Eventarc Admin** (`roles/eventarc.admin`); pelo mesmo motivo, provavelmente tem. Se estiver, pule; se não, dê o papel. Sem ele, o deploy da função `onSetlistWritten` falha. Confirme o nome do papel na documentação oficial do Firebase e do Google Cloud no momento do passo, porque ele pode mudar.
+- Se o primeiro deploy falhar com erro de permissão do agente de serviço do Eventarc, rode o deploy de novo: costuma passar na segunda tentativa.
+
+**Depois do deploy:**
+
+- O primeiro deploy do gatilho pode levar alguns minutos até ele começar a disparar. Espere antes de testar um aviso.
+- Em Firestore > TTL e índices, confira que a política de TTL de `avisosEnviados` no campo `expiresAt` está ativa. Se o deploy não a tiver criado, ative-a à mão.
+- Não há índice de campo para `avisosEnviados.expiresAt`: é esperado.
+- Em Cloud Run ou em Functions, confira que a função `onSetlistWritten` existe na região `southamerica-east1`.
+
+**Atenção:** não apague a coleção `avisosEnviados` à mão. Ela é a trava que impede aviso repetido do mesmo repertório.
