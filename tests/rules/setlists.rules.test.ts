@@ -8,6 +8,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   serverTimestamp,
@@ -219,5 +220,101 @@ describe('setlists rules', () => {
     it('denies viewer', async () => {
       await assertFails(deleteDoc(existing(viewerDb())));
     });
+  });
+});
+
+describe('setlists rules: rehearsalAt e origin', () => {
+  // Culto em 2026-11-22 (domingo). Janela do ensaio: de 2026-11-15 00:00 até 2026-11-23 00:00 (Brasília = UTC-3).
+  const at = (iso: string) => Timestamp.fromDate(new Date(iso));
+
+  it.each([
+    ['sem os campos novos (repertório antigo)', {}],
+    ['ensaio na quinta, 19:30 de Brasília', { rehearsalAt: at('2026-11-19T22:30:00Z') }],
+    [
+      'início da janela (7 dias antes, 00:00 de Brasília)',
+      { rehearsalAt: at('2026-11-15T03:00:00Z') },
+    ],
+    ['último segundo do dia do culto', { rehearsalAt: at('2026-11-23T02:59:59Z') }],
+    ['origem produção', { origin: 'producao' }],
+    ['origem teste', { origin: 'teste' }],
+  ])('allows member with %s', async (_name, over) => {
+    await assertSucceeds(setDoc(doc(memberDb(), 'setlists/n1'), setlistData(over)));
+  });
+
+  it.each([
+    ['um segundo antes da janela', { rehearsalAt: at('2026-11-15T02:59:59Z') }],
+    ['00:00 do dia seguinte ao culto (exclusivo)', { rehearsalAt: at('2026-11-23T03:00:00Z') }],
+    ['texto em vez de timestamp', { rehearsalAt: '2026-11-19T22:30:00Z' }],
+    ['rehearsalAt nulo', { rehearsalAt: null }],
+    ['origem fora da lista', { origin: 'outro' }],
+    ['origem nula', { origin: null }],
+  ])('denies member with %s', async (_name, over) => {
+    await assertFails(setDoc(doc(memberDb(), 'setlists/n1'), setlistData(over)));
+  });
+
+  it('denies viewer even with valid new fields', async () => {
+    await assertFails(
+      setDoc(
+        doc(viewerDb(), 'setlists/n1'),
+        setlistData({
+          createdBy: 'v1',
+          updatedBy: 'v1',
+          rehearsalAt: at('2026-11-19T22:30:00Z'),
+          origin: 'teste',
+        }),
+      ),
+    );
+  });
+
+  it('allows update adding rehearsalAt and origin (culto de updateData é 2026-11-29)', async () => {
+    await assertSucceeds(
+      updateDoc(
+        existing(memberDb()),
+        updateData({ rehearsalAt: at('2026-11-26T22:30:00Z'), origin: 'producao' }),
+      ),
+    );
+  });
+
+  it('allows update of a legacy setlist without the new fields', async () => {
+    await assertSucceeds(updateDoc(existing(memberDb()), updateData()));
+  });
+
+  it('denies update with rehearsalAt outside the window of the new date', async () => {
+    await assertFails(
+      updateDoc(existing(memberDb()), updateData({ rehearsalAt: at('2026-11-22T02:59:59Z') })),
+    );
+  });
+
+  it('allows clearing rehearsalAt with deleteField() in an update', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'setlists/comEnsaio'),
+        setlistData({
+          rehearsalAt: at('2026-11-19T22:30:00Z'),
+          createdAt: at('2026-11-16T00:00:00Z'),
+        }),
+      );
+    });
+    await assertSucceeds(
+      updateDoc(doc(memberDb(), 'setlists/comEnsaio'), updateData({ rehearsalAt: deleteField() })),
+    );
+  });
+
+  it('allows clearing rehearsalAt by omitting it in a full overwrite', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'setlists/comEnsaio'),
+        setlistData({
+          rehearsalAt: at('2026-11-19T22:30:00Z'),
+          createdAt: at('2026-11-16T00:00:00Z'),
+        }),
+      );
+    });
+    await assertSucceeds(
+      setDoc(
+        doc(memberDb(), 'setlists/comEnsaio'),
+        setlistData({ createdAt: at('2026-11-16T00:00:00Z') }),
+      ),
+    );
   });
 });

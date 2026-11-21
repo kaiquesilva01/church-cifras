@@ -103,7 +103,8 @@ service cloud.firestore {
       return validId(setlistId)
         && data.keys().hasOnly([
           'date', 'label', 'items', 'expiresAt',
-          'createdBy', 'createdAt', 'updatedBy', 'updatedAt'
+          'createdBy', 'createdAt', 'updatedBy', 'updatedAt',
+          'rehearsalAt', 'origin'
         ])
         && data.keys().hasAll([
           'date', 'label', 'items', 'expiresAt',
@@ -117,7 +118,19 @@ service cloud.firestore {
         && data.items.size() <= 40
         && data.expiresAt is timestamp
         && data.updatedBy == request.auth.uid
-        && data.updatedAt == request.time;
+        && data.updatedAt == request.time
+        && (!data.keys().hasAny(['rehearsalAt']) || validRehearsal(data))
+        && (!data.keys().hasAny(['origin']) || data.origin in ['producao', 'teste']);
+    }
+
+    // Ensaio: de 00:00 de (date - 7 dias) até 00:00 do dia seguinte ao culto (exclusivo), em Brasília (UTC-3, sem horário de verão).
+    // Em UTC, 00:00 de Brasília = 03:00 do mesmo dia.
+    function validRehearsal(data) {
+      let day = data.date.split('-');
+      let base = timestamp.date(int(day[0]), int(day[1]), int(day[2]));
+      return data.rehearsalAt is timestamp
+        && data.rehearsalAt >= base + duration.value(3, 'h') - duration.value(168, 'h')
+        && data.rehearsalAt < base + duration.value(27, 'h');
     }
 
     match /users/{uid} {
