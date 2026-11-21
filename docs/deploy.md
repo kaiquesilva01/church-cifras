@@ -205,3 +205,16 @@ Passos manuais da pessoa responsável, nesta ordem.
 - Em Cloud Run ou em Functions, confira que a função `onSetlistWritten` existe na região `southamerica-east1`.
 
 **Atenção:** não apague a coleção `avisosEnviados` à mão. Ela é a trava que impede aviso repetido do mesmo repertório.
+
+## 16. Lembretes do ensaio (#102)
+
+**Antes do deploy que traz a #102:** nada além dos passos da #101 (§15). As APIs `pubsub`, `eventarc` e `cloudscheduler` e o papel Eventarc Admin já são exigidos pela #101 (§15) e pelo `countSetlistUsage` (§11).
+
+**Depois do deploy:**
+
+- Em Cloud Scheduler (console do Google Cloud), confira que o job `firebase-schedule-sendRehearsalReminders-southamerica-east1` existe, roda a cada minuto (`* * * * *`, horário de Brasília, `America/Sao_Paulo`) e que a última execução não tem erro.
+- Custo: cerca de 43.200 execuções por mês (1 por minuto). O Cloud Scheduler dá 3 jobs gratuitos por conta de faturamento; este é o 2º (o 1º é `countSetlistUsage`, §11). Confirme o limite atual na documentação do Google Cloud no momento do passo; acima dele, o custo é de centavos por job.
+- Não há TTL nem índice novo: a política de TTL de `avisosEnviados` já foi conferida na §15, e a consulta por `rehearsalAt` usa o índice automático de campo único.
+- Se o job não existir ou não rodar, veja o log da função `sendRehearsalReminders` em Cloud Functions; a falha não abre incidente automático (é agendada, sem volta), então confira à mão depois de cada deploy que mexa nela.
+
+**Teste no aparelho (passo da pessoa, critério 8 da #102):** Android e iPhone com iOS 16.4+, com o app instalado em produção (`https://louvor-hajaluz.web.app`) e os avisos ativados. Crie o repertório também em produção: aparelho só recebe aviso de repertório da mesma origem. Num repertório com 4 louvores e ensaio em cerca de 25 min: chega "Ensaio em N min" (N é o que falta, ex.: "Ensaio em 25 min") com o app fechado, em até 1 min. Na hora do ensaio: "Ensaio agora" substitui o aviso anterior. Mude a hora do ensaio: chega "Ensaio mudou para HHhMM" uma vez, só quando o novo horário fica em até 30 min à frente (chega na execução seguinte, em até 1 min). Desligue `config/push` (`enabled: false`) e confira que nada chega.
