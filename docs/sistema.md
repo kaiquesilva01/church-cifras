@@ -146,7 +146,7 @@ Todas exportadas por `apps/functions/src/index.ts` (algumas definidas em submód
 | `unregisterDevice` | callable | qualquer logado | Apaga o aparelho do próprio chamador (logout); idempotente |
 | `sendTestPush` | callable | membro, admin | Envia "Aviso de teste" só aos aparelhos do chamador; ignora o interruptor; responde `{ sent, failed, pruned }` (só contagens; `pruned` são aparelhos apagados por token morto) |
 | `onSetlistWritten` | Firestore (`setlists/{setlistId}`) | automático | Avisa "Novo repertório" aos aparelhos de membros e admins quando o repertório chega a 4 louvores; uma vez por repertório (marca em `avisosEnviados`); não avisa quem gravou; só aparelhos da mesma origem; respeita `config/push` |
-| `sendRehearsalReminders` | agendada, a cada minuto (`America/Sao_Paulo`) | automático | Avisa "Ensaio em N min" (ensaio em até 30 min; N é o que falta, 30 no caso normal) e "Ensaio agora" (ensaio de até 5 min atrás), uma vez por horário, a membros e admins, inclusive quem gravou; só aparelhos da mesma origem; respeita `config/push` |
+| `sendRehearsalReminders` | agendada, a cada minuto (`America/Sao_Paulo`) | automático | Avisa "Ensaio em N min" (ensaio em até 30 min; N é o que falta, 30 quando o cron roda no horário previsto) e "Ensaio agora" (ensaio de até 5 min atrás), uma vez por horário, a membros e admins, inclusive quem gravou; só aparelhos da mesma origem; respeita `config/push` |
 | `health` | callable | qualquer chamada | Verificação de saúde |
 
 Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. O gatilho do repertório novo é `onSetlistWritten` (regra abaixo); o lembrete do ensaio é `sendRehearsalReminders` (regra abaixo).
@@ -170,9 +170,9 @@ Regra do aviso de repertório novo:
 Regra dos lembretes do ensaio:
 
 - Agendada a cada minuto; consulta `setlists` com `rehearsalAt` entre agora − 5 min e agora + 30 min.
-- "Ensaio em N min" (N = minutos que faltam, arredondado para cima, mínimo 1; 30 no caso normal): `rehearsalAt` em (agora, agora + 30 min]. "Ensaio agora": `rehearsalAt` em (agora − 5 min, agora]. Sem retroativo além de 5 min.
+- "Ensaio em N min" (N = minutos que faltam, arredondado para cima, mínimo 1; 30 quando o cron roda no horário previsto): `rehearsalAt` em (agora, agora + 30 min]. "Ensaio agora": `rehearsalAt` em (agora − 5 min, agora]. Sem retroativo além de 5 min.
 - Uma vez por horário: `avisosEnviados/{setlistId}_{tipo}_{rehearsalAtMs}` é criada antes do envio. Gravar a hora a menos de 30 min do ensaio dispara o "perto" na execução seguinte (até 1 min). Se o horário mudou depois de um "perto", o próximo "perto" tem o título `Ensaio mudou para HHhMM`. O "agora" usa a mesma tag e substitui o "30 min" no aparelho.
-- Horas em Brasília (UTC−3, sem horário de verão). Ensaio que cai depois da meia-noite diz `amanhã`. Repertório sem `rehearsalAt`, ou com a hora passada, não avisa.
+- Horas em Brasília (UTC−3, sem horário de verão). Diz `amanhã` quando o ensaio cai em outro dia civil de Brasília (só na faixa 'perto' que cruza a meia-noite). Repertório sem `rehearsalAt`, ou com a hora passada, não avisa.
 
 ### Deploy e produção (`docs/deploy.md`)
 
@@ -242,7 +242,7 @@ Cada item aponta para o spec e a seção de origem. Para reabrir um deles, o don
 | Estatísticas por tom, por pessoa ou por abertura da cifra; gráficos, exportação, filtro de período; histórico anterior ao deploy | [estatísticas](superpowers/specs/2026-11-19-estatisticas-admin-design.md) "Não-objetivos" |
 | Mudança de regra de negócio no redesign (só visual) | [redesign mobile](superpowers/specs/2026-11-18-redesign-mobile-design.md) §1 |
 
-Notificação push estava nesta lista como "Notificação push, escala de músicos/líder, comentários" ([repertórios](superpowers/specs/2026-11-16-repertorios-design.md) §3). Foi reaberta pela [#85](https://github.com/kaiquesilva01/church-cifras/issues/85), em 21/11/2026: a base dos avisos está nas Functions (`registerDevice`, `unregisterDevice`, `sendTestPush`); tela e envio automático ainda não existem. Escala de músicos/líder e comentários continuam fora.
+Notificação push estava nesta lista como "Notificação push, escala de músicos/líder, comentários" ([repertórios](superpowers/specs/2026-11-16-repertorios-design.md) §3). Foi reaberta pela [#85](https://github.com/kaiquesilva01/church-cifras/issues/85), em 21/11/2026: a base dos avisos está nas Functions (`registerDevice`, `unregisterDevice`, `sendTestPush`); só a tela (#99) ainda não existe. Escala de músicos/líder e comentários continuam fora.
 
 Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 
@@ -285,7 +285,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Preenchimento das letras das músicas enviadas antes da busca por letra: `npm run lyrics:backfill` (`deploy.md` §12), rodado pelo dono do produto depois do deploy. Até lá só as músicas novas são achadas por letra.
 - Pessoas (músicos, vocais, instrumentos, disponibilidade) aparece como "Em breve" na aba Mais; não existe.
 - O Paper não mostra o chip Harpa nas telas 03b e 03c da busca por letra (spec da busca por letra).
-- Avisos (push, #85): o backend dos aparelhos está na #98; a tela de avisos ainda não existe. O envio automático existe só para o aviso de repertório novo (#101). Antes da #99: passos manuais 1 e 2 da #85 (número do projeto e chave VAPID).
+- Avisos (push, #85): o backend dos aparelhos está na #98; a tela de avisos ainda não existe. O envio automático existe para o repertório novo (#101) e para os lembretes do ensaio (#102). Antes da #99: passos manuais 1 e 2 da #85 (número do projeto e chave VAPID).
 - Passos manuais únicos de `deploy.md`: TTL e índice de `setlists` (§10), job do Cloud Scheduler e `setlistUsage` sem TTL (§11), autorizar o domínio e o CORS do site de teste (§13).
 - Antes do deploy da #101: passos 4 e 5 da #85 (APIs Pub/Sub e Eventarc, `deploy.md` §3 e §15; papel Eventarc Admin, `deploy.md` §15); depois, conferir o TTL de `avisosEnviados` (§15).
 - Antes do deploy da #102: nada além do já pedido para a #101. Depois do deploy: conferir o job do Cloud Scheduler (`deploy.md` §16) e o teste no aparelho (`deploy.md` §16).
