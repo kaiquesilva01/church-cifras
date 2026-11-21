@@ -5,7 +5,8 @@ import { createMarkerDeps } from './markers';
 
 const deps: AnnounceDeps = { ...createPushDeps(), ...createMarkerDeps() };
 
-// Sem retry: a marca já foi criada, e um reenvio automático duplicaria o aviso se a marca falhar depois.
+// Sem retry. Um reenvio não duplicaria o aviso (a marca bloqueia o segundo envio), mas o gatilho
+// fica sem reentrega: se criar a marca falhar com erro propagado, o aviso se perde. Trade-off aceito.
 export const onSetlistWritten = onDocumentWritten(
   { document: 'setlists/{setlistId}', region: 'southamerica-east1', retry: false },
   (event) =>

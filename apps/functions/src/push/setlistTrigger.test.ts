@@ -43,12 +43,22 @@ describe('onSetlistWritten: fiação', () => {
       data: { before: { data: () => undefined }, after: { data: () => after } },
     });
 
-    expect(h.announce).toHaveBeenCalledWith(expect.any(Object), 'r1', undefined, after);
+    expect(h.announce).toHaveBeenCalledWith(
+      expect.objectContaining({ claimMarker: expect.any(Function) }),
+      'r1',
+      undefined,
+      after,
+    );
   });
 
   it('sem data no evento, repassa undefined nos dois lados', async () => {
     await handler({ params: { setlistId: 'r1' } });
 
-    expect(h.announce).toHaveBeenCalledWith(expect.any(Object), 'r1', undefined, undefined);
+    expect(h.announce).toHaveBeenCalledWith(
+      expect.objectContaining({ claimMarker: expect.any(Function) }),
+      'r1',
+      undefined,
+      undefined,
+    );
   });
 });
