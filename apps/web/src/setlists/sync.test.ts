@@ -118,4 +118,13 @@ describe('syncReducer', () => {
     expect(s.shown?.items).toHaveLength(1);
     expect(s.latest?.items).toHaveLength(0);
   });
+
+  it('a rehearsal-only change from another person counts as a change', () => {
+    const at = new Date('2026-11-22T21:30:00Z');
+    let s = syncReducer(initialSync, server({ ...sl('A'), rehearsalAt: at }));
+    s = syncReducer(s, server({ ...sl('A'), rehearsalAt: new Date('2026-11-22T22:00:00Z') }));
+    expect(hasChanges(s)).toBe(true);
+    s = syncReducer(s, server({ ...sl('A'), rehearsalAt: at }));
+    expect(hasChanges(s)).toBe(false);
+  });
 });
