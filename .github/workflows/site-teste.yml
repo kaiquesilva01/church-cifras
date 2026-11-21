@@ -73,7 +73,7 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_USE_EMULATORS: 'false'
           VITE_APP_VERSION: ${{ steps.sha.outputs.sha }}
-          VITE_TEST_BANNER: ${{ format('TESTE · #{0}', inputs.issue) }}
+          VITE_TEST_BANNER: "${{ format('TESTE · #{0}', inputs.issue) }}"
         run: npm run build
 
       - uses: actions/upload-artifact@v4
