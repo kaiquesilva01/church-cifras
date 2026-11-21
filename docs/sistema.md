@@ -105,8 +105,10 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 | `songs/{songId}` | `title`, `titleNormalized`, `artistId` (slug), `artistName`, `keys` (tons salvos, mantido por função), `handmadeKeys`, `createdBy`, `createdAt`, `updatedAt` | só `create` por membro/admin; sem update nem delete |
 | `songs/{songId}/arrangements/{slug}` | `key` (um dos 24 tons), `storagePath`, `source` (`handmade`/`generated`), `derivedFromKey` (só gerado), `writer` (`upload`/`overlay`), `chordCount`, `collisions`, `createdBy`, `createdAt` | só `create` por membro/admin; sem update nem delete |
 | `songLyrics/{songId}` | `text` (1–20.000 caracteres), `createdBy`, `createdAt` | só `create` por membro/admin, com a música existindo na mesma operação |
-| `setlists/{setlistId}` | `date` (`YYYY-MM-DD`), `label`, `items[]` (`id`, `songId`, `key`), `expiresAt`, `createdBy/At`, `updatedBy/At` | membro/admin: create, update e delete |
+| `setlists/{setlistId}` | `date` (`YYYY-MM-DD`), `label`, `items[]` (`id`, `songId`, `key`), `expiresAt`, `createdBy/At`, `updatedBy/At`, `rehearsalAt` (opcional: hora do ensaio, dentro da janela do culto: de 00:00 de 7 dias antes do dia até 00:00 do dia seguinte, exclusivo; `null` é negado), `origin` (opcional: `producao`/`teste`) | membro/admin: create, update e delete |
 | `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt` | nenhuma; só Admin SDK (negado por padrão) |
+| `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
+| `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
 | `artists/*` | não existe de fato | negada |
 
 - `slug` do tom = tom com `#` trocado por `s` (id do documento). Um tom existe uma vez por música; quem gerar o mesmo tom depois recebe "já existe" e o sistema abre o existente.
@@ -114,8 +116,10 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 - Não há coleção de cantores: a lista é derivada de `songs` no cliente (`artistId` = nome normalizado: minúsculas, sem acento nem pontuação, espaços colapsados).
 - `setlists.items[].id` é um UUID do item (não da música). As Rules não validam o conteúdo de cada item nem se a música existe; o cliente tolera itens inválidos.
 - `songs`, `arrangements` e `songLyrics` são imutáveis para o cliente; edição e exclusão passam por Functions.
+- `pushDevices`, `avisosEnviados` e `config/*` são fechados ao cliente (deny-all); só Functions leem e gravam.
 - TTL do Firestore em `setlists.expiresAt`, com índice ascendente mantido. `setlistUsage` não pode ter TTL.
 - `expiresAt` (fim do dia da data + 30 dias, fuso `America/Sao_Paulo`) é calculado pelo cliente (`apps/web/src/setlists/dates.ts`); `firestore.rules` só confere que é um timestamp. Nada no servidor impede um valor errado.
+- Contrato do cliente para `rehearsalAt` (#100): limpar o ensaio é `deleteField()` num `updateDoc` (ou omitir o campo num `setDoc` completo); `rehearsalAt: null` é negado. Trocar `date` revalida o `rehearsalAt` gravado contra a nova janela: se ele cair fora, a gravação é negada. Por isso o cliente manda um `rehearsalAt` novo ou `deleteField()` na mesma gravação. O cliente monta o instante em UTC-3 (`America/Sao_Paulo`, sem horário de verão), não no fuso do aparelho.
 
 ## Functions e jobs
 
@@ -133,7 +137,12 @@ Todas exportadas por `apps/functions/src/index.ts` (algumas definidas em submód
 | `deleteSong` | callable | admin | Apaga música, tons, arquivos e `songLyrics`; idempotente |
 | `getStats` | callable | admin | Conta repertórios fechados (idempotente) e devolve contagens, armazenamento e os tops |
 | `countSetlistUsage` | agendada, todo dia 04:00 (`America/Sao_Paulo`) | automático | Grava `setlistUsage` dos repertórios fechados |
+| `registerDevice` | callable | membro, admin | Grava o aparelho para os avisos (`pushDevices/{sha256(token)}`); o mesmo token mantém um registro |
+| `unregisterDevice` | callable | qualquer logado | Apaga o aparelho do próprio chamador (logout); idempotente |
+| `sendTestPush` | callable | membro, admin | Envia "Aviso de teste" só aos aparelhos do chamador; ignora o interruptor; responde `{ sent, failed, pruned }` (só contagens; `pruned` são aparelhos apagados por token morto) |
 | `health` | callable | qualquer chamada | Verificação de saúde |
+
+Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. Ainda não há gatilho: os avisos chegam nas entregas #101 e #102.
 
 Regras de contagem de uso:
 
@@ -166,7 +175,7 @@ Regras de contagem de uso:
 
 ### Pad ambiente
 
-- Base sustentada no tom da cifra aberta (não é a música em si). Um só timbre; 12 loops (um por nota) de ~1 MB, em `pads/v1/`. Tom menor usa a mesma nota (Am toca A); bemóis mapeiam para sustenidos nos arquivos.
+- Base sustentada no tom da cifra aberta (não é a música em si). Um só timbre; 12 loops (um por nota) de ~1 MB, em `pads/v1/`. Tom menor toca o pad do tom maior relativo (Am toca C, Em toca G); bemóis mapeiam para sustenidos nos arquivos.
 - Liga/desliga pelo botão **Pad** da cifra, pela aba Pad ou pelo controle compacto na tela do repertório. Volume de 0 a 100 % (padrão 60 %), lembrado no aparelho.
 - Sempre com fade: nunca estalo nem corte. O pad começa pelo início original do arquivo (crescimento de ~3,5 s). Troca de tom faz transição cruzada; mesmo tom não reinicia.
 - Segue o tom salvo exibido, nunca a prévia do painel Mudar tom.
@@ -193,7 +202,7 @@ Cada item aponta para o spec e a seção de origem. Para reabrir um deles, o don
 | Modo offline completo (só cache do app e dos arquivos) | [design principal](superpowers/specs/2026-11-13-church-cifras-design.md) §3 e [pad](superpowers/specs/2026-11-17-pad-design.md) §3 |
 | OCR/PDF escaneado, PDF fora do padrão, upload de DOCX | [design principal](superpowers/specs/2026-11-13-church-cifras-design.md) §3 |
 | Comentários | [design principal](superpowers/specs/2026-11-13-church-cifras-design.md) §3 |
-| Notificação push, escala de músicos/líder, comentários | [repertórios](superpowers/specs/2026-11-16-repertorios-design.md) §3 |
+| Escala de músicos/líder, comentários | [repertórios](superpowers/specs/2026-11-16-repertorios-design.md) §3 |
 | Anotações por louvor; link público, exportar o repertório em um PDF ou imprimir | [repertórios](superpowers/specs/2026-11-16-repertorios-design.md) §3 |
 | Histórico de versões ou "desfazer" no repertório; gesto de deslizar para trocar de cifra; permissões por repertório | [repertórios](superpowers/specs/2026-11-16-repertorios-design.md) §3 |
 | Tocar a música em si, mixer, equalizador, efeitos, escolha de timbre | [pad](superpowers/specs/2026-11-17-pad-design.md) §3 e §8 |
@@ -208,6 +217,8 @@ Cada item aponta para o spec e a seção de origem. Para reabrir um deles, o don
 | Link público do repertório (sem login) | [compartilhar repertório](superpowers/specs/2026-11-19-compartilhar-repertorio-design.md) "Fora de escopo" |
 | Estatísticas por tom, por pessoa ou por abertura da cifra; gráficos, exportação, filtro de período; histórico anterior ao deploy | [estatísticas](superpowers/specs/2026-11-19-estatisticas-admin-design.md) "Não-objetivos" |
 | Mudança de regra de negócio no redesign (só visual) | [redesign mobile](superpowers/specs/2026-11-18-redesign-mobile-design.md) §1 |
+
+Notificação push estava nesta lista como "Notificação push, escala de músicos/líder, comentários" ([repertórios](superpowers/specs/2026-11-16-repertorios-design.md) §3). Foi reaberta pela [#85](https://github.com/kaiquesilva01/church-cifras/issues/85), em 21/11/2026: a base dos avisos está nas Functions (`registerDevice`, `unregisterDevice`, `sendTestPush`); tela e envio automático ainda não existem. Escala de músicos/líder e comentários continuam fora.
 
 Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 
@@ -231,6 +242,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Estatísticas: se o agendador ficasse parado por mais de cerca de 28 dias, repertórios expirariam sem contagem. Repertório já contado e depois re-datado não é contado de novo.
 - O TTL do Firestore pode demorar um dia ou mais para apagar; o cliente já esconde os expirados.
 - Acervo acima de cerca de 2.000 músicas pede revisão da busca em memória.
+- `origin` é conferido só na forma, e `rehearsalAt` na forma e contra a janela do `date`: a Rules não confere se a origem é a do site que gravou (protege contra engano, não contra abuso). O token de aparelho fica no Firestore, fechado ao cliente.
 - Verificação em aparelho real (Android e iPhone) é manual: o áudio do pad, o compartilhamento de arquivo e a tela bloqueada não são verificáveis em CI.
 
 ### Pendências abertas
@@ -239,6 +251,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Preenchimento das letras das músicas enviadas antes da busca por letra: `npm run lyrics:backfill` (`deploy.md` §12), rodado pelo dono do produto depois do deploy. Até lá só as músicas novas são achadas por letra.
 - Pessoas (músicos, vocais, instrumentos, disponibilidade) aparece como "Em breve" na aba Mais; não existe.
 - O Paper não mostra o chip Harpa nas telas 03b e 03c da busca por letra (spec da busca por letra).
+- Avisos (push, #85): o backend dos aparelhos está na #98, sem tela nem envio automático. Antes da #99: passos manuais 1 e 2 da #85 (número do projeto e chave VAPID). Antes da #101: passos 4 e 5.
 - Passos manuais únicos de `deploy.md`: TTL e índice de `setlists` (§10), job do Cloud Scheduler e `setlistUsage` sem TTL (§11), autorizar o domínio e o CORS do site de teste (§13).
 
 ### Divergências entre spec e código (o código vale)

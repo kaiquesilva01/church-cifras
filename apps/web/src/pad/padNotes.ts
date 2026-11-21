@@ -1,4 +1,4 @@
-import { parseKey, type KeyName } from '@cifras/chords';
+import { parseKey, relativeMajorPc, type KeyName } from '@cifras/chords';
 import manifest from './padManifest.json';
 
 export type PadNote = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
@@ -53,8 +53,8 @@ export const PAD_SAMPLES: Record<PadNote, PadSample> = Object.fromEntries(
   NOTES_BY_PC.map((note) => [note, sample(note)]),
 ) as Record<PadNote, PadSample>;
 
-/** Nota do pad para um tom (maior/menor ignorado); null se o tom for inválido. */
+/** Nota do pad para um tom; tom menor toca o pad do tom maior relativo (Em → G). Null se inválido. */
 export function padNoteFor(key: KeyName): PadNote | null {
   const parsed = parseKey(key);
-  return parsed ? (NOTES_BY_PC[parsed.tonicPc] ?? null) : null;
+  return parsed ? (NOTES_BY_PC[relativeMajorPc(parsed)] ?? null) : null;
 }

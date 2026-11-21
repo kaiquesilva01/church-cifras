@@ -50,10 +50,12 @@ Segue o design principal (§2); nada de papel novo.
 **Não-objetivos**
 - Anotações por louvor (introdução, quem canta, dinâmica) [decisão nossa].
 - Link público, exportar o repertório inteiro em um único PDF ou imprimir [decisão nossa].
-- Notificação push, escala de músicos/líder, comentários [decisão nossa].
+- Escala de músicos/líder e comentários [decisão nossa].
 - Histórico de versões ou "desfazer" de edições [decisão nossa].
 - Gestos de deslizar para trocar de cifra; a navegação é por botões [proposta].
 - Permissões por repertório (todo membro edita todo repertório) [proposta].
+
+**Reaberto em 21/11/2026 pela issue [#85](https://github.com/kaiquesilva01/church-cifras/issues/85):** notificação push para avisos de repertório novo e de ensaio. É opt-in por aparelho, só para membro e admin, e não há tela nem envio automático nesta fase (a base está na #98). Escala de músicos/líder e comentários seguem fora.
 
 **Anti-objetivos (falha mesmo que "funcione")**
 - A lista mudar sozinha na tela do músico enquanto ele lê/toca, sem ele aceitar.
