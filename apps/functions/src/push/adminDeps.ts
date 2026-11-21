@@ -37,12 +37,14 @@ export function createPushDeps(): PushDeps {
         origin: d.data().origin,
       })),
     // getAll em blocos: funciona para qualquer quantidade de uids (where 'in' limita a 30).
+    // uid inválido (vazio ou com "/") não tem papel: o aparelho cai em "stale" e é apagado.
     getUserRoles: async (uids) => {
       const roles = new Map<string, Role>();
-      if (uids.length === 0) return roles;
+      const valid = uids.filter((uid) => uid !== '' && !uid.includes('/'));
+      if (valid.length === 0) return roles;
       const db = getFirestore();
-      for (let start = 0; start < uids.length; start += GET_ALL_BLOCK) {
-        const block = uids.slice(start, start + GET_ALL_BLOCK);
+      for (let start = 0; start < valid.length; start += GET_ALL_BLOCK) {
+        const block = valid.slice(start, start + GET_ALL_BLOCK);
         const snaps = await db.getAll(...block.map((uid) => db.doc(`users/${uid}`)));
         for (const snap of snaps) {
           const role = ROLES.find((r) => r === snap.data()?.role);

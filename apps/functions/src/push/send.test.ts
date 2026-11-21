@@ -94,6 +94,21 @@ describe('sendToDevices: quem recebe', () => {
   });
 });
 
+describe('sendToDevices: aparelho sem uid válido', () => {
+  it('removes the device with empty uid and still sends to the valid ones', async () => {
+    const { deps, devices, calls } = fakeDeps({
+      roles: { m1: 'member' },
+      devices: [device('t1', 'm1', 'producao'), device('t2', '', 'producao')],
+    });
+
+    const out = await sendToDevices(deps, BASE);
+
+    expect(out).toMatchObject({ sent: 1, unauthorizedRemoved: 1 });
+    expect(sentTokens(calls)).toEqual(['t1']);
+    expect([...devices.keys()]).toEqual([deviceId('t1')]);
+  });
+});
+
 describe('sendToDevices: lotes e poda', () => {
   it('splits devices into batches of 500 messages', async () => {
     const many = Array.from({ length: 1001 }, (_, i) => device(`t${i}`, 'm1', 'producao'));
