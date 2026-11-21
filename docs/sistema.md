@@ -53,7 +53,7 @@ Barra inferior (Músicas, Repertório, Busca, Pad, Mais) só nas 5 telas raiz; a
 - Um repertório = data do culto + rótulo (1–60 caracteres) + até 40 itens ordenados (`songId` + tom). Pode haver mais de um no mesmo dia; a mesma música pode repetir (a UI avisa).
 - Hora do ensaio (opcional): dia de 7 dias antes do culto até o próprio dia do culto, inclusive, e hora em Brasília; grava `rehearsalAt`. Limpar apaga o campo. Duplicar não copia a hora.
 - Padrão de criação: próximo dia que seja quinta ou domingo; rótulo padrão é o dia da semana. Duplicar copia os itens com ids novos.
-- Aba Repertórios: "Próximos" (data crescente) e "Recentes" (decrescente, só não expirados). Cartão "Próximo culto" no topo do Início (data mais próxima, hoje incluído). O cartão mostra o ensaio em segunda linha muted; sem hora, nada.
+- Aba Repertórios: "Próximos" (data crescente) e "Recentes" (decrescente, só não expirados). Cartão "Próximo culto" no topo do Início (data mais próxima, hoje incluído). O cartão mostra o ensaio em segunda linha muted; sem hora, nada. A linha do ensaio sempre traz dia da semana e data (`Ensaio sáb · 21/11 às 18h30`), nunca "hoje" nem "amanhã".
 - Repertório novo grava `origin`: `teste` só quando o host é `louvor-hajaluz-teste.web.app` (o `teste` de `SITE_BASE`); `producao` no resto, inclusive localhost. Criar (nova ou duplicar) grava pelo host atual; editar não muda.
 - Editar (membro/admin), pelo menu ⋯ "Editar data, rótulo e ensaio": arrastar pela alça `≡` ou botões ▲ ▼, trocar o tom (entre os salvos da música), remover, adicionar pela folha de busca (entra no fim, no tom feito à mão; músicas sem PDF desabilitadas; "já está" nas repetidas). Visitante vê só título e tom, "Somente leitura".
 - Item de música apagada aparece como "Música removida" e é pulado na navegação. Tom do item que deixou de existir aparece riscado e a cifra abre no padrão com aviso.
@@ -260,7 +260,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - `origin` é conferido só na forma, e `rehearsalAt` na forma e contra a janela do `date`: a Rules não confere se a origem é a do site que gravou (protege contra engano, não contra abuso). O token de aparelho fica no Firestore, fechado ao cliente.
 - Verificação em aparelho real (Android e iPhone) é manual: o áudio do pad, o compartilhamento de arquivo e a tela bloqueada não são verificáveis em CI.
 - Data, rótulo e ensaio do repertório são last-write-wins quando a folha de edição está aberta em dois aparelhos: ao abrir, ela parte do estado mais novo do servidor e não acompanha mudanças feitas depois; quem salva por último vence.
-- A tela do repertório e o cartão "Próximo culto" calculam "hoje", "amanhã" e o estado muted no momento em que abrem; sem atualização ao vivo enquanto ficam abertos.
+- A tela do repertório e o cartão "Próximo culto" calculam o estado muted (já passou da hora) no momento em que abrem; sem atualização ao vivo enquanto ficam abertos.
 - Convite de instalação: Firefox Android e outros navegadores sem `beforeinstallprompt` não recebem o convite (não há API que instale com confiança). No iPhone e no iPad, só o Safari recebe a instrução: Chrome e Firefox do iOS ficam sem convite. No iOS não existe evento de instalação: quem instalou no iPhone e abre o site no Safari vê a instrução até dispensar.
 - Aviso de repertório novo: se o envio falha depois de criada a marca, o aviso se perde (não há reenvio).
 - Aviso de repertório novo: com `config/push.enabled === false`, a marca é criada mesmo assim; religar o interruptor não avisa esse repertório.

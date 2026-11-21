@@ -52,13 +52,14 @@ describe('rehearsal window', () => {
 describe('describeRehearsal', () => {
   const now = new Date('2026-11-22T12:00:00Z'); // 09:00 em Brasília
 
-  it('usa hoje e amanhã quando couber', () => {
+  it('nunca usa hoje nem amanhã: sempre dia da semana e dd/mm', () => {
+    // 2026-11-22 é domingo, 2026-11-23 segunda
     expect(describeRehearsal(rehearsalInstant('2026-11-22', '18:30'), now)).toEqual({
-      text: 'Ensaio hoje às 18h30',
+      text: 'Ensaio dom · 22/11 às 18h30',
       past: false,
     });
     expect(describeRehearsal(rehearsalInstant('2026-11-23', '18:30'), now)).toEqual({
-      text: 'Ensaio amanhã às 18h30',
+      text: 'Ensaio seg · 23/11 às 18h30',
       past: false,
     });
   });
@@ -71,17 +72,38 @@ describe('describeRehearsal', () => {
     });
   });
 
+  it('abrevia cada dia da semana (dom seg ter qua qui sex sáb)', () => {
+    const dias = [
+      '2026-11-15',
+      '2026-11-16',
+      '2026-11-17',
+      '2026-11-18',
+      '2026-11-19',
+      '2026-11-20',
+      '2026-11-21',
+    ];
+    expect(dias.map((d) => describeRehearsal(rehearsalInstant(d, '09:00'), now).text)).toEqual([
+      'Ensaio dom · 15/11 às 09h00',
+      'Ensaio seg · 16/11 às 09h00',
+      'Ensaio ter · 17/11 às 09h00',
+      'Ensaio qua · 18/11 às 09h00',
+      'Ensaio qui · 19/11 às 09h00',
+      'Ensaio sex · 20/11 às 09h00',
+      'Ensaio sáb · 21/11 às 09h00',
+    ]);
+  });
+
   it('marca como passado a partir da hora (inclusive)', () => {
     const at = rehearsalInstant('2026-11-22', '18:30');
     expect(describeRehearsal(at, new Date('2026-11-22T21:29:59Z')).past).toBe(false);
     expect(describeRehearsal(at, new Date('2026-11-22T21:30:00Z')).past).toBe(true);
   });
 
-  it('decide "hoje" pelo dia de Brasília, não pelo UTC', () => {
-    // 2026-11-23 02:30 UTC é 22/11 23:30 em Brasília
+  it('o dia da semana sai do dia de Brasília, não do UTC nem do fuso do aparelho', () => {
+    // 2026-11-23 02:30 UTC é 22/11 23:30 em Brasília (domingo)
     const lateNow = new Date('2026-11-23T02:30:00Z');
     expect(describeRehearsal(rehearsalInstant('2026-11-22', '18:30'), lateNow).text).toBe(
-      'Ensaio hoje às 18h30',
+      'Ensaio dom · 22/11 às 18h30',
     );
   });
 });

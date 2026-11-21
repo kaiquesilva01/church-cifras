@@ -1,4 +1,4 @@
-import { shiftDate, todayLocal } from './dates';
+import { shiftDate } from './dates';
 
 /** O ensaio pode cair até 7 dias antes do culto (Rules: `validRehearsal`). */
 export const REHEARSAL_DAYS_BEFORE = 7;
@@ -33,19 +33,12 @@ export function isRehearsalDayInWindow(day: string, culto: string): boolean {
   return day >= first && day <= last;
 }
 
-/** Texto "Ensaio …" e se já passou (`past`), com "hoje"/"amanhã" pelo dia de Brasília de `now`. */
+/** Texto "Ensaio {dia da semana} · dd/mm às HHhMM" (sempre com dia e data) e se já passou (`past`). */
 export function describeRehearsal(at: Date, now: Date): { text: string; past: boolean } {
   const { day, hour } = rehearsalParts(at);
-  const today = todayLocal(now);
-  let when: string;
-  if (day === today) when = 'hoje';
-  else if (day === shiftDate(today, 1)) when = 'amanhã';
-  else {
-    const weekday = WEEKDAYS_SHORT[new Date(`${day}T12:00:00Z`).getUTCDay()] as string;
-    when = `${weekday} · ${day.slice(8, 10)}/${day.slice(5, 7)}`;
-  }
+  const weekday = WEEKDAYS_SHORT[new Date(`${day}T12:00:00Z`).getUTCDay()] as string;
   return {
-    text: `Ensaio ${when} às ${hour.replace(':', 'h')}`,
+    text: `Ensaio ${weekday} · ${day.slice(8, 10)}/${day.slice(5, 7)} às ${hour.replace(':', 'h')}`,
     past: at.getTime() <= now.getTime(),
   };
 }

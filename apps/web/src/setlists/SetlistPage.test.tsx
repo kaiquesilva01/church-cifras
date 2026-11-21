@@ -389,7 +389,7 @@ describe('SetlistPage ensaio', () => {
     mount(
       fakeSetlistApi([makeSetlist({ id: 'r1', date: '2026-11-22', items: [a], rehearsalAt: at })]),
     );
-    const line = screen.getByText('Ensaio hoje às 18h30').closest('.rehearsal-line');
+    const line = screen.getByText('Ensaio dom · 22/11 às 18h30').closest('.rehearsal-line');
     expect(line).not.toHaveClass('is-muted');
     expect(line!.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });

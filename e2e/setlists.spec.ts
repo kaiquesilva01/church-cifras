@@ -60,7 +60,7 @@ const rehearsalField = (page: Page) => page.getByLabel('Dia', { exact: true });
 const hourField = (page: Page) => page.getByLabel('Hora', { exact: true });
 const saveButton = (page: Page) => page.getByRole('button', { name: 'Salvar' });
 const WINDOW_MSG = 'O ensaio precisa ser entre 7 dias antes do culto e o próprio dia do culto.';
-const REHEARSAL_TEXT = /^Ensaio .* às \d{2}h\d{2}$/;
+const REHEARSAL_TEXT = /^Ensaio (dom|seg|ter|qua|qui|sex|sáb) · \d{2}\/\d{2} às \d{2}h\d{2}$/;
 
 /** Horário de Brasília (UTC-3, sem horário de verão) para um dia (YYYY-MM-DD) e hora (HH:MM). */
 const brasilia = (day: string, hour: string) => new Date(`${day}T${hour}:00-03:00`);

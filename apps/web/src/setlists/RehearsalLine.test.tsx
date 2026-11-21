@@ -14,7 +14,7 @@ describe('RehearsalLine', () => {
 
   it('mostra o texto e, com clock, um relógio escondido de leitores de tela', () => {
     const { container } = render(<RehearsalLine rehearsalAt={at} now={now} clock />);
-    expect(screen.getByText('Ensaio hoje às 18h30')).toBeInTheDocument();
+    expect(screen.getByText('Ensaio dom · 22/11 às 18h30')).toBeInTheDocument();
     const svg = container.querySelector('svg');
     expect(svg).toHaveAttribute('aria-hidden', 'true');
     expect(container.querySelector('.rehearsal-line')).not.toHaveClass('is-muted');
