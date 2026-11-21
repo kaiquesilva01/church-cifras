@@ -55,6 +55,49 @@ const bar = (page: Page) => page.getByRole('navigation', { name: 'Repertório' }
 const next = (page: Page) => bar(page).getByRole('button', { name: /Próxima/ });
 const previous = (page: Page) => bar(page).getByRole('button', { name: /Anterior/ });
 const banner = (page: Page) => page.locator('.update-banner');
+const rehearsal = (page: Page) => page.locator('.rehearsal-line');
+const rehearsalField = (page: Page) => page.getByLabel('Dia', { exact: true });
+const hourField = (page: Page) => page.getByLabel('Hora', { exact: true });
+const saveButton = (page: Page) => page.getByRole('button', { name: 'Salvar' });
+const WINDOW_MSG = 'O ensaio precisa ser entre 7 dias antes do culto e o próprio dia do culto.';
+const REHEARSAL_TEXT = /^Ensaio .* às \d{2}h\d{2}$/;
+
+/** Horário de Brasília (UTC-3, sem horário de verão) para um dia (YYYY-MM-DD) e hora (HH:MM). */
+const brasilia = (day: string, hour: string) => new Date(`${day}T${hour}:00-03:00`);
+const DAY_MS_E2E = 86_400_000;
+
+/** Opens the ⋯ menu of the setlist page and picks "Editar data, rótulo e ensaio". */
+async function openEditDialog(page: Page) {
+  await page.getByRole('button', { name: 'Menu do repertório' }).click();
+  await page.getByRole('menuitem', { name: 'Editar data, rótulo e ensaio' }).click();
+  await expect(page.getByRole('dialog', { name: 'Editar repertório' })).toBeVisible();
+}
+
+/** True when the page does not scroll sideways (the 360 px check). */
+const fitsWidth = (page: Page) =>
+  page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+
+/**
+ * The 360 px check inside the dialog. The fixed sheet never changes the document's scrollWidth,
+ * so measure the sheet itself: no sideways scroll, and Dia, Hora and ✕ inside its box.
+ */
+async function expectDialogFits(page: Page, name: string) {
+  const dialog = page.getByRole('dialog', { name });
+  const sheet = (await dialog.boundingBox())!;
+  expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  const controls = [
+    rehearsalField(page),
+    hourField(page),
+    page.getByRole('button', { name: 'Limpar dia e hora do ensaio' }),
+  ];
+  for (const control of controls) {
+    const box = (await control.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(sheet.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(sheet.x + sheet.width);
+    expect(box.y).toBeGreaterThanOrEqual(sheet.y);
+    expect(box.y + box.height).toBeLessThanOrEqual(sheet.y + sheet.height);
+  }
+}
 
 /** Three songs, each with handmade C and D. */
 async function seedThree(tag: string, pages = 1): Promise<SeededSong[]> {
@@ -558,5 +601,197 @@ test.describe('measurements', () => {
       note: 'informational; 2 means the same PDF object was fetched twice',
     });
     await shot(page, testInfo, 'setlists-11-next-while-preloading');
+  });
+});
+
+test.describe('rehearsal time (390 px)', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('admin cria com hora e vê a linha e o cartão', async ({ page }, testInfo) => {
+    await signInAs(page, ADMIN, 'Admin');
+    await page
+      .getByRole('navigation', { name: 'Principal' })
+      .getByRole('link', { name: 'Repertório' })
+      .click();
+    await page.getByRole('button', { name: '＋ Novo repertório' }).click();
+    await expect(page.getByRole('dialog', { name: 'Novo repertório' })).toBeVisible();
+    await expect(page.getByText('Hora do ensaio (opcional)')).toBeVisible();
+    await expect(
+      page.getByText('Quem ativou os avisos é lembrado 30 min antes e na hora.'),
+    ).toBeVisible();
+    await page.getByLabel('Rótulo').fill('Domingo');
+    await hourField(page).fill('18:30');
+    // The Dia comes filled with the default culto date once the hour is chosen.
+    await expect(rehearsalField(page)).toHaveValue(/^\d{4}-\d{2}-\d{2}$/);
+    await saveButton(page).click();
+
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Domingo');
+    await expect(rehearsal(page)).toHaveText(REHEARSAL_TEXT);
+    await expect(rehearsal(page)).toContainText('às 18h30');
+    await expect(rehearsal(page).locator('svg[aria-hidden="true"]')).toHaveCount(1);
+    await expect(rehearsal(page).locator('svg')).toHaveCount(1);
+    await shot(page, testInfo, 'rehearsal-1-setlist-390');
+
+    await page.goto('/');
+    const card = page.getByRole('region', { name: 'Próximo culto' });
+    await expect(card).toContainText('Domingo');
+    await expect(card.locator('.rehearsal-line')).toHaveText(REHEARSAL_TEXT);
+    await shot(page, testInfo, 'rehearsal-2-card-390');
+  });
+});
+
+test('editar: limpar com ✕ e salvar apaga a hora, mesmo depois de recarregar', async ({
+  page,
+}, testInfo) => {
+  const id = await seedSetlist(addDays(todayInSaoPaulo(), 1), 'Culto', [], {
+    rehearsalAt: new Date(Date.now() + DAY_MS_E2E),
+  });
+  await signInAs(page, ADMIN, 'Admin');
+  await page.goto(`/repertorios/${id}`);
+  await expect(rehearsal(page)).toBeVisible();
+
+  await openEditDialog(page);
+  await page.getByRole('button', { name: 'Limpar dia e hora do ensaio' }).click();
+  await expect(rehearsalField(page)).toHaveValue('');
+  await expect(hourField(page)).toHaveValue('');
+  await saveButton(page).click();
+  await expect(rehearsal(page)).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Culto');
+  await expect(rehearsal(page)).toHaveCount(0);
+  await shot(page, testInfo, 'rehearsal-3-cleared');
+});
+
+test('data do culto muda e o ensaio cai fora da nova janela', async ({ page }, testInfo) => {
+  const today = todayInSaoPaulo();
+  const id = await seedSetlist(addDays(today, 1), 'Culto', [], {
+    rehearsalAt: brasilia(today, '18:30'),
+  });
+  await signInAs(page, ADMIN, 'Admin');
+  await page.goto(`/repertorios/${id}`);
+  await expect(rehearsal(page)).toHaveText(REHEARSAL_TEXT);
+
+  await openEditDialog(page);
+  // The Dia was not the old culto date, so it stays on today: outside [culto+3, culto+10].
+  await page.getByLabel('Data', { exact: true }).fill(addDays(today, 10));
+  await expect(page.getByText(WINDOW_MSG)).toBeVisible();
+  await expect(saveButton(page)).toBeDisabled();
+  await shot(page, testInfo, 'rehearsal-4-out-of-window');
+
+  await rehearsalField(page).fill(addDays(today, 10));
+  await expect(page.getByText(WINDOW_MSG)).toHaveCount(0);
+  await expect(saveButton(page)).toBeEnabled();
+  await saveButton(page).click();
+  await expect(rehearsal(page)).toHaveText(/^Ensaio .* às 18h30$/);
+});
+
+test('dia acompanha a data quando era o mesmo dia', async ({ page }) => {
+  const today = todayInSaoPaulo();
+  const culto = addDays(today, 1);
+  const id = await seedSetlist(culto, 'Culto', [], { rehearsalAt: brasilia(culto, '18:30') });
+  await signInAs(page, ADMIN, 'Admin');
+  await page.goto(`/repertorios/${id}`);
+  await expect(rehearsal(page)).toBeVisible();
+
+  await openEditDialog(page);
+  await page.getByLabel('Data', { exact: true }).fill(addDays(today, 10));
+  await expect(rehearsalField(page)).toHaveValue(addDays(today, 10));
+  await expect(page.getByText(WINDOW_MSG)).toHaveCount(0);
+  await expect(saveButton(page)).toBeEnabled();
+  await saveButton(page).click();
+  await expect(rehearsal(page)).toHaveText(/^Ensaio .* às 18h30$/);
+  await page.reload();
+  await expect(rehearsal(page)).toHaveText(/^Ensaio .* às 18h30$/);
+});
+
+test('visitante vê a hora em muted depois do horário', async ({ page }, testInfo) => {
+  const id = await seedSetlist(todayInSaoPaulo(), 'Culto', [], {
+    rehearsalAt: new Date(Date.now() - 2 * 3_600_000),
+  });
+  await signInAs(page, newAccount('visitante'), 'Visitante');
+  await page.goto(`/repertorios/${id}`);
+  await expect(page.getByText(/Somente leitura/)).toBeVisible();
+  await expect(rehearsal(page)).toHaveText(REHEARSAL_TEXT);
+  await expect(rehearsal(page)).toHaveClass(/is-muted/);
+  await shot(page, testInfo, 'rehearsal-5-visitor-muted');
+});
+
+test('banner: só a hora mudou por outra pessoa', async ({ page, browser }, testInfo) => {
+  const id = await seedSetlist(todayInSaoPaulo(), 'Culto', [], {
+    rehearsalAt: brasilia(todayInSaoPaulo(), '18:30'),
+  });
+  const { context, page: other } = await openSession(browser, testInfo);
+  try {
+    await signInAs(page, ADMIN, 'Admin');
+    await page.goto(`/repertorios/${id}`);
+    await expect(rehearsal(page)).toHaveText(/às 18h30$/);
+
+    await signInAs(other, ADMIN, 'Admin');
+    await other.goto(`/repertorios/${id}`);
+    await expect(rehearsal(other)).toHaveText(/às 18h30$/);
+    // The other session changes only the hour, through its dialog.
+    await openEditDialog(other);
+    await hourField(other).fill('19:00');
+    await saveButton(other).click();
+    await expect(other.getByRole('dialog', { name: 'Editar repertório' })).toHaveCount(0);
+    await expect(rehearsal(other)).toHaveText(/às 19h00$/);
+    await expect(banner(other)).toHaveCount(0);
+
+    await expect(banner(page)).toContainText('O repertório foi alterado.');
+    // The screen only changes when the person accepts the update.
+    await expect(rehearsal(page)).toHaveText(/às 18h30$/);
+    await shot(page, testInfo, 'rehearsal-6-banner');
+    await page.getByRole('button', { name: 'Atualizar' }).click();
+    await expect(rehearsal(page)).toHaveText(/às 19h00$/);
+    await expect(banner(page)).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});
+
+test.describe('rehearsal time (360 px)', () => {
+  test.use({ viewport: { width: 360, height: 800 } });
+
+  test('360 px: sem rolagem horizontal e ✕ com 44 px', async ({ page }, testInfo) => {
+    const today = todayInSaoPaulo();
+    const id = await seedSetlist(addDays(today, 1), 'Culto', [], {
+      rehearsalAt: brasilia(today, '18:30'),
+    });
+    await signInAs(page, ADMIN, 'Admin');
+
+    await page.goto(`/repertorios/${id}`);
+    await expect(rehearsal(page)).toHaveText(REHEARSAL_TEXT);
+    await expect(rehearsal(page)).toBeVisible();
+    expect(await fitsWidth(page)).toBe(true);
+    await shot(page, testInfo, 'rehearsal-7-setlist-360');
+
+    await page.goto('/');
+    const card = page.getByRole('region', { name: 'Próximo culto' });
+    await expect(card.locator('.rehearsal-line')).toBeVisible();
+    expect(await fitsWidth(page)).toBe(true);
+    await shot(page, testInfo, 'rehearsal-8-card-360');
+
+    // The ✕ only exists with a value: create a setlist, fill the hour, measure the clear button.
+    await page
+      .getByRole('navigation', { name: 'Principal' })
+      .getByRole('link', { name: 'Repertório' })
+      .click();
+    await page.getByRole('button', { name: '＋ Novo repertório' }).click();
+    await expect(page.getByRole('dialog', { name: 'Novo repertório' })).toBeVisible();
+    await page.getByLabel('Data', { exact: true }).fill(addDays(today, 1));
+    await hourField(page).fill('18:30');
+    const clear = page.getByRole('button', { name: 'Limpar dia e hora do ensaio' });
+    await expect(clear).toBeVisible();
+    const box = (await clear.boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(43);
+    expect(box.height).toBeGreaterThanOrEqual(43);
+    await expectDialogFits(page, 'Novo repertório');
+
+    // Window-error state. An autofilled Dia follows the Data, so the error needs a Dia typed by hand.
+    await rehearsalField(page).fill(addDays(today, 10));
+    await expect(page.getByText(WINDOW_MSG)).toBeVisible();
+    await expectDialogFits(page, 'Novo repertório');
+    await shot(page, testInfo, 'rehearsal-9-dialog-360');
   });
 });

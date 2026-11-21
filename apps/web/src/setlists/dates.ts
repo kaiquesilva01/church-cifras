@@ -46,6 +46,11 @@ export function defaultLabel(date: string): string {
   return WEEKDAYS[weekday(date)] as string;
 }
 
+/** `date` (YYYY-MM-DD) deslocada em `days` dias, sem fuso. */
+export function shiftDate(date: string, days: number): string {
+  return toIso(dayMs(date) + days * DAY_MS);
+}
+
 /** `date` anterior a 29 dias atrás é barrada. */
 export function isTooOld(date: string, today: string): boolean {
   return date < toIso(dayMs(today) - (TTL_DAYS - 1) * DAY_MS);

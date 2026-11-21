@@ -443,6 +443,7 @@ describe('HomePage', () => {
         date: '2026-11-19',
         label: 'Quinta',
         items: [],
+        rehearsalAt: null,
       });
     });
 
