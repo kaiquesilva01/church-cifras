@@ -4,7 +4,7 @@
 
 **Goal:** Avisar os aparelhos de membros e admins quando um repertório chega a 4 louvores, uma vez por repertório, sem avisar quem gravou e respeitando o interruptor e a origem (produção ou teste).
 
-**Architecture:** Gatilho Firestore v2 `onDocumentWritten('setlists/{setlistId}')` em `southamerica-east1`, exportado por `index.ts` como `onSetlistWritten`. A decisão é uma função pura sobre o `before` e o `after` (contagem de `items`). A idempotência fica numa marca `avisosEnviados/{setlistId}_novo` criada com `create()` antes do envio, e o envio reusa `sendToDevices` da #98. A lógica entra por `PushDeps & MarkerDeps` (mesmo padrão de `stats/`), testada com fakes em memória. Não há mudança em Rules nem em `firebase.json`.
+**Architecture:** Gatilho Firestore v2 `onDocumentWritten('setlists/{setlistId}')` em `southamerica-east1`, exportado por `index.ts` como `onSetlistWritten`. A decisão é uma função pura sobre o `before` e o `after` (contagem de `items`). A idempotência fica numa marca `avisosEnviados/{setlistId}_novo` criada com `create()` antes do envio, e o envio reusa `sendToDevices` da #98. A lógica entra por `PushDeps & MarkerDeps` (mesmo padrão de `stats/`), testada com fakes em memória. Não há mudança em Rules nem em `firebase.json`. **Dependência: #100** (ver Global Constraints): esta entrega só entra na `develop` depois da #100.
 
 **Tech Stack:** TypeScript 6.0.3 em `strict` + `noUncheckedIndexedAccess`; firebase-admin 14.5.1 (`firestore`, `messaging`); firebase-functions 7.4.0 (`firebase-functions/v2/firestore`, `onDocumentWritten` com `retry` padrão `false`, confirmado em `node_modules/firebase-functions/lib/v2/providers/firestore.js`); vitest 5.1.0; firebase-tools 15.36.0 (validador de `fieldOverrides`); `@firebase/rules-unit-testing` no emulador.
 
@@ -12,10 +12,11 @@
 
 ## Global Constraints
 
+- Dependência: #100 (o app web grava `origin` em `setlists`). A entrega só entra na `develop` depois da #100. Antes dela, `origin` ausente vale `producao` via `readSetlist`, o que é seguro: não há repertório de teste antes da #100.
 - Região do gatilho: `southamerica-east1` (igual a `onArrangementWritten` em `songs/keys.ts`).
 - Limiar: `NEW_SETLIST_MIN_ITEMS = 4`, contado por `items.length` do documento gravado (inclusive "Música removida").
 - Aviso sai só quando `before` ausente ou com menos de 4 itens, e `after` com 4 ou mais. Repertório com menos de 4 nunca avisa.
-- Marca: `avisosEnviados/{setlistId}_novo`, criada com `create()` **antes** do envio; campos exatos `setlistId`, `tipo: 'novo'`, `createdAt`, `expiresAt` (agora + 60 dias). `ALREADY_EXISTS` (código gRPC 6) → não envia.
+- Marca: `avisosEnviados/{setlistId}_novo`, criada com `create()` **antes** do envio; campos exatos `setlistId`, `tipo: 'novo'`, `createdAt`, `expiresAt` = o maior valor entre agora + 60 dias e o `expiresAt` do repertório (a marca nunca vence antes do repertório; ver `markerExpiresAt`). `ALREADY_EXISTS` (código gRPC 6) → não envia.
 - Título exato: `Novo repertório`. Corpo: `{rótulo} · {dia abreviado} {dd/mm}`, ex.: `Culto de domingo · dom 22/11`. Abreviações pt-BR: `dom seg ter qua qui sex sáb`.
 - Dia da semana calculado com `Date.UTC` + `getUTCDay()`, sem depender do fuso da máquina.
 - `link`: `/repertorios/{setlistId}` (o domínio vem da origem do aparelho, em `sendToDevices`). `tag`: `setlist-{setlistId}-novo`.
@@ -25,18 +26,18 @@
 - Falha de envio: loga com `setlistId` e `code` (nunca token nem mensagem completa do erro), não relança e não reenvia. Erro ao criar a marca que não seja `ALREADY_EXISTS` **propaga** e não envia.
 - Gatilho com `retry: false` explícito (padrão já é `false` em firebase-functions 7.4.0).
 - Logs só com contagens, ids de repertório e `shortHash` quando for preciso. Token nunca aparece em log, resposta ou mensagem de erro.
-- Texto de UI e de aviso em pt-BR; identificadores em inglês; Conventional Commits em inglês.
+- Texto de UI e de aviso em pt-BR; identificadores em inglês. Commits: prefixo do tipo em inglês (Conventional Commits) e descrição em pt-BR, como no histórico do repo. Cada implementador acrescenta o trailer `Co-Authored-By:` com o nome do próprio modelo; o plano não fixa modelo.
 - Não tocar: `apps/web`, `firestore.rules`, `firebase.json`, `.github/`, `.claude/`, `AGENTS.md`, `CLAUDE.md`, `cors.json`, `storage.rules`, `push/token.ts`, `push/send.ts`, `push/types.ts`, `push/adminDeps.ts`, `push/fakeDeps.ts`.
 - Lembretes (#102) ficam fora.
 - Testes primeiro: em cada tarefa o teste é escrito e visto falhando antes do código.
 
 ## Review Focus
 
-1. Repertório com data inválida (`''`, `2026-02-31`, texto qualquer): não avisa e **não** cria a marca; deve ser `invalid`. Coberto na Tarefa 3 (`invalid`) e na Tarefa 1 (`formatCultoDate` retorna `null`).
-2. Repertório que já avisou, esvaziado e enchido de novo, ou editado com 4 itens antes de a marca existir: a marca impede o segundo aviso. Coberto na Tarefa 3 (`5 → 3 → 4` e `already-announced`).
-3. Origem ausente ou desconhecida: vai para produção, sem erro. Coberto na Tarefa 1 (`readSetlist`) e na Tarefa 3 (origem `teste` só para aparelhos de teste).
-4. Falha do FCM (indisponível) no meio do envio: só loga, não relança e não reenvia no próximo evento. Coberto na Tarefa 3 (`failed`).
-5. Reentrega do mesmo evento (o Firestore pode entregar o mesmo `write` mais de uma vez): a segunda chamada não envia. Coberto na Tarefa 3 (reentrega) e na Tarefa 2 (`ALREADY_EXISTS`).
+1. Repertório com data inválida (`''`, `2026-02-31`, texto qualquer): não avisa e **não** cria a marca; deve ser `invalid`. Coberto na Tarefa 6 (`invalid`) e na Tarefa 1 (`formatCultoDate` retorna `null`).
+2. Repertório que já avisou, esvaziado e enchido de novo, ou editado com 4 itens antes de a marca existir: a marca impede o segundo aviso. Coberto na Tarefa 6 (marca de envio anterior; sequência 3 → 4 → 3 → 4; `already-announced`).
+3. Origem ausente ou desconhecida: vai para produção, sem erro. Coberto na Tarefa 1 (`readSetlist`) e na Tarefa 6 (origem `teste` só para aparelhos de teste).
+4. Falha do FCM (indisponível) no meio do envio: só loga, não relança e não reenvia no próximo evento. Coberto na Tarefa 6 (`failed`).
+5. Reentrega do mesmo evento (o Firestore pode entregar o mesmo `write` mais de uma vez): a segunda chamada não envia. Coberto na Tarefa 6 (reentrega) e na Tarefa 2 (`ALREADY_EXISTS`).
 
 ---
 
@@ -71,8 +72,8 @@ Tarefas 1, 2, 3, 4 e 5 são independentes (arquivos disjuntos): podem rodar em p
 - Consumes: `parseOrigin`, `Origin` de `./token`; `SendInput` de `./send` (já existentes).
 - Produces:
   - `NEW_SETLIST_MIN_ITEMS = 4` (`number`)
-  - `type SetlistSnapshot = { date: string; label: string; itemCount: number; origin: Origin; createdBy: string; updatedBy: string }`
-  - `readSetlist(data: Record<string, unknown> | undefined): SetlistSnapshot | undefined`: `undefined` se `data` ausente; `itemCount` = `items.length` (0 se não for array); campos ausentes viram `''`; origem via `parseOrigin ?? 'producao'`.
+  - `type SetlistSnapshot = { date: string; label: string; itemCount: number; origin: Origin; createdBy: string; updatedBy: string; expiresAt?: Date | undefined }`
+  - `readSetlist(data: Record<string, unknown> | undefined): SetlistSnapshot | undefined`: `undefined` se `data` ausente; `itemCount` = `items.length` (0 se não for array); campos ausentes viram `''`; origem via `parseOrigin ?? 'producao'`; `expiresAt` via `toDate` (ver Step 3), `undefined` se ausente.
   - `shouldAnnounce(before: SetlistSnapshot | undefined, after: SetlistSnapshot | undefined): boolean`
   - `formatCultoDate(date: string): string | null`: `'dom 22/11'`, ou `null` se `date` não for `YYYY-MM-DD` real.
   - `buildNewSetlistMessage(setlistId: string, setlist: SetlistSnapshot, before: SetlistSnapshot | undefined): SendInput | null`: `null` se `formatCultoDate` falhar.
@@ -142,6 +143,13 @@ describe('readSetlist', () => {
     expect(readSetlist({ origin: 'teste', items: [] })?.origin).toBe('teste');
   });
 
+  it('lê expiresAt de Date ou de Timestamp; ausente é undefined', () => {
+    const d = new Date('2027-01-31T03:00:00Z');
+    expect(readSetlist({ items: [], expiresAt: d })?.expiresAt).toEqual(d);
+    expect(readSetlist({ items: [], expiresAt: { toDate: () => d } })?.expiresAt).toEqual(d);
+    expect(readSetlist({ items: [] })?.expiresAt).toBeUndefined();
+  });
+
   it('sem items é zero; sem dados é undefined', () => {
     expect(readSetlist({ date: '2026-11-22' })?.itemCount).toBe(0);
     expect(readSetlist(undefined)).toBeUndefined();
@@ -167,8 +175,8 @@ describe('formatCultoDate: dia da semana independe do fuso', () => {
 });
 
 describe('buildNewSetlistMessage', () => {
-  it('criação: texto, link, tag, origem, quem gravou fica de fora', () => {
-    expect(buildNewSetlistMessage('r1', snap(4, { createdBy: 'a1', updatedBy: 'a1' }), undefined)).toEqual({
+  it('criação: exclui createdBy (não updatedBy); texto, link, tag e origem', () => {
+    expect(buildNewSetlistMessage('r1', snap(4, { createdBy: 'a1', updatedBy: 'm1' }), undefined)).toEqual({
       title: 'Novo repertório',
       body: 'Culto de domingo · dom 22/11',
       link: '/repertorios/r1',
@@ -202,6 +210,7 @@ Expected: FAIL com "Cannot find module './newSetlist'" (ou erro equivalente de i
 - [ ] **Step 3: Implementar `apps/functions/src/push/newSetlist.ts`**
 
 Assinaturas exatas em Interfaces. Pontos que a assinatura não fixa:
+- `expiresAt` em `readSetlist`: auxiliar `toDate(value: unknown): Date | undefined` que aceita `Date` e qualquer objeto com `toDate()` (Timestamp do Admin SDK); outro valor vira `undefined`. Tolerante de propósito: documento sem `expiresAt` não quebra a leitura.
 - `WEEKDAYS` é uma constante `['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']` indexada por `getUTCDay()`. Com `noUncheckedIndexedAccess`, o acesso devolve `string | undefined`: conferir antes de usar.
 - `formatCultoDate`: regex `^\d{4}-\d{2}-\d{2}$`; montar `Date.UTC(ano, mês - 1, dia)` com `Number(...)` de `slice`; recusar se `toISOString().slice(0, 10) !== date` (pega dia 31 de fevereiro).
 - `buildNewSetlistMessage`: `body` = `` `${label} · ${when}` `` com `·` (U+00B7). `excludeUid` = `(before ? setlist.updatedBy : setlist.createdBy) || undefined`. `respectSwitch: true`.
@@ -421,7 +430,7 @@ Expected: `0`.
 
 1. **§3, "APIs do Google Cloud":** na frase que lista as APIs (Cloud Functions, Cloud Build, Artifact Registry, Cloud Run e Eventarc), acrescentar **Pub/Sub**, e uma frase: "O gatilho do repertório novo (`onSetlistWritten`) usa Eventarc, que entrega por Pub/Sub."
 2. **Nova seção no fim do arquivo, depois de §14:** `## 15. Avisos de repertório novo (#101)`, com:
-   - **Antes do deploy que traz a #101 (passo manual da pessoa):** ativar as APIs `pubsub.googleapis.com` e `eventarc.googleapis.com` no projeto (APIs e serviços > Biblioteca, ou `gcloud services enable pubsub.googleapis.com eventarc.googleapis.com --project <id>`); dar à conta de serviço do deploy o papel **Eventarc Admin** (`roles/eventarc.admin`). Sem isso, o deploy da função `onSetlistWritten` falha.
+   - **Antes do deploy que traz a #101 (passo manual da pessoa):** ativar as APIs `pubsub.googleapis.com` e `eventarc.googleapis.com` no projeto (APIs e serviços > Biblioteca, ou `gcloud services enable pubsub.googleapis.com eventarc.googleapis.com --project <id>`); dar à conta de serviço do deploy o papel **Eventarc Admin** (`roles/eventarc.admin`). Sem isso, o deploy da função `onSetlistWritten` falha. Confirmar o nome do papel na documentação oficial do Firebase e do Google Cloud no momento do passo, porque ele pode mudar; quem executa é a pessoa, e a nota fica no `deploy.md`.
    - **Depois do deploy:** em Firestore > TTL e índices, conferir que a política de TTL de `avisosEnviados` no campo `expiresAt` está ativa. Se o deploy não a tiver criado, ativá-la à mão. Não há índice de campo para `avisosEnviados.expiresAt`: é esperado.
    - **Conferência:** no Cloud Run ou em Functions, a função `onSetlistWritten` existe na região `southamerica-east1`.
    - Nota: a coleção `avisosEnviados` não deve ser apagada à mão, porque ela é a trava contra aviso repetido.
@@ -457,21 +466,23 @@ git commit -m "docs(deploy): APIs Pub/Sub e Eventarc e TTL de avisosEnviados"
 - Consumes (existente): `sendToDevices` de `./send`; `PushDeps` de `./types`; `FAKE_NOW`, `device`, `fakeDeps`, `sentTokens`, `FakeOptions` de `./fakeDeps` (só nos testes).
 - Produces:
   - `NEW_SETLIST_TTL_DAYS = 60` (`number`)
+  - `markerExpiresAt(now: Date, setlistExpiresAt: Date | undefined): Date`: o maior entre `now + 60 dias` e `setlistExpiresAt`; `undefined` ou menor vira `now + 60 dias`.
   - `type AnnounceDeps = PushDeps & MarkerDeps`
   - `type AnnounceResult = 'not-due' | 'invalid' | 'already-announced' | 'blocked' | 'sent' | 'failed'`
   - `announceNewSetlist(deps: AnnounceDeps, setlistId: string, beforeData: Record<string, unknown> | undefined, afterData: Record<string, unknown> | undefined): Promise<AnnounceResult>`
 
-Fluxo exato: (1) `before`/`after` via `readSetlist`; (2) sem `after` ou `!shouldAnnounce` → `'not-due'`; (3) `buildNewSetlistMessage(setlistId, after, before)` nulo → `'invalid'` (antes de qualquer marca); (4) `now = deps.now()`, `claimMarker(`${setlistId}_novo`, { setlistId, tipo: 'novo', createdAt: now, expiresAt: new Date(now.getTime() + 60 dias) })`; (5) `'exists'` → `'already-announced'`; (6) `sendToDevices(deps, input)` dentro de `try`: `blocked` → `'blocked'`; senão `console.info` com contagens e `'sent'`; (7) `catch` → `console.error('push: falha ao avisar repertório novo', { setlistId, code })` com `code` de `(error as { code?: unknown }).code ?? 'error'` e `'failed'`. Erro de `claimMarker` fica **fora** do `try` e propaga.
+Fluxo exato: (1) `before`/`after` via `readSetlist`; (2) sem `after` ou `!shouldAnnounce` → `'not-due'`; (3) `buildNewSetlistMessage(setlistId, after, before)` nulo → `'invalid'` (antes de qualquer marca); (4) `now = deps.now()`, `claimMarker(`${setlistId}_novo`, { setlistId, tipo: 'novo', createdAt: now, expiresAt: markerExpiresAt(now, after.expiresAt) })`; (5) `'exists'` → `'already-announced'`; (6) `sendToDevices(deps, input)` dentro de `try`: `blocked` → `'blocked'`; senão `console.info` com contagens e `'sent'`; (7) `catch` → `console.error('push: falha ao avisar repertório novo', { setlistId, code })` com `code` de `(error as { code?: unknown }).code ?? 'error'` e `'failed'`. Erro de `claimMarker` fica **fora** do `try` e propaga.
 
 - [ ] **Step 1: Escrever os testes (falham)**
 
 ```ts
 // apps/functions/src/push/announce.test.ts
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { announceNewSetlist, type AnnounceDeps } from './announce';
+import { announceNewSetlist, markerExpiresAt, type AnnounceDeps } from './announce';
 import { device, fakeDeps, FAKE_NOW, sentTokens, type FakeOptions } from './fakeDeps';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const plus = (days: number) => new Date(FAKE_NOW.getTime() + days * DAY_MS);
 
 const items = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `i${i}`, songId: `s${i}`, key: 'C' }));
 const setlist = (n: number, extra: Record<string, unknown> = {}) => ({
@@ -512,7 +523,8 @@ describe('announceNewSetlist: envio e marca', () => {
       devices: [device('t1', 'm1', 'producao'), device('t2', 'a1', 'producao')],
     });
 
-    const result = await announceNewSetlist(annDeps, 'r1', undefined, setlist(4));
+    // createdBy a1 fica de fora (a1 não recebe); updatedBy m1 não é excluído na criação.
+    const result = await announceNewSetlist(annDeps, 'r1', undefined, setlist(4, { updatedBy: 'm1' }));
 
     expect(result).toBe('sent');
     expect(markers.get('r1_novo')).toEqual({
@@ -530,7 +542,7 @@ describe('announceNewSetlist: envio e marca', () => {
     });
   });
 
-  it('marca já existente não envia (5 → 3 → 4 não avisa de novo)', async () => {
+  it('marca de envio anterior: 3 → 4 não envia de novo', async () => {
     const { annDeps, calls } = setup({ ...members, devices: [device('t1', 'm1')] }, ['r1_novo']);
 
     expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('already-announced');
@@ -543,6 +555,34 @@ describe('announceNewSetlist: envio e marca', () => {
     expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('sent');
     expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('already-announced');
     expect(sentTokens(calls)).toEqual(['t1']);
+  });
+
+  it('sequência 3 → 4 → 3 → 4: avisa uma vez só, mesmo caindo abaixo de 4', async () => {
+    const { annDeps, calls, markers } = setup({ ...members, devices: [device('t1', 'm1')] });
+
+    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('sent');
+    expect(await announceNewSetlist(annDeps, 'r1', setlist(4), setlist(3))).toBe('not-due');
+    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('already-announced');
+    expect(sentTokens(calls)).toEqual(['t1']);
+    expect(markers.has('r1_novo')).toBe(true);
+  });
+
+  it('atualização que chega a 4 exclui updatedBy (não createdBy)', async () => {
+    const { annDeps, calls } = setup({
+      ...members,
+      devices: [device('t1', 'm1', 'producao'), device('t2', 'a1', 'producao')],
+    });
+
+    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4, { updatedBy: 'm1' }))).toBe('sent');
+    expect(sentTokens(calls)).toEqual(['t2']);
+  });
+
+  it('marca não vence antes de um repertório com data futura', async () => {
+    const { annDeps, markers } = setup({ ...members, devices: [] });
+
+    await announceNewSetlist(annDeps, 'r1', undefined, setlist(4, { expiresAt: plus(200) }));
+
+    expect(markers.get('r1_novo')?.expiresAt).toEqual(plus(200));
   });
 
   it('interruptor desligado: bloqueado, sem envio; a marca fica', async () => {
@@ -602,6 +642,16 @@ describe('announceNewSetlist: envio e marca', () => {
   });
 });
 
+describe('markerExpiresAt: a marca não vence antes do repertório', () => {
+  it.each([
+    ['repertório sem expiresAt: agora + 60 dias', undefined, plus(60)],
+    ['repertório vence antes de 60 dias: agora + 60 dias', plus(10), plus(60)],
+    ['repertório vence depois de 60 dias: a marca vence junto', plus(200), plus(200)],
+  ])('%s', (_name, setlistExpiresAt, expected) => {
+    expect(markerExpiresAt(FAKE_NOW, setlistExpiresAt)).toEqual(expected);
+  });
+});
+
 describe('announceNewSetlist: quando não avisa', () => {
   it.each([
     ['0 → 3', setlist(0), setlist(3)],
@@ -629,7 +679,7 @@ Expected: FAIL com "Cannot find module './announce'".
 
 - [ ] **Step 3: Implementar `apps/functions/src/push/announce.ts`**
 
-Assinaturas exatas em Interfaces, e o fluxo exato em sete passos (ver texto acima da lista de testes). Constante local `DAY_MS = 24 * 60 * 60 * 1000`. Imports de `./newSetlist`, `./markers` (só o tipo `MarkerDeps`), `./send` e `./types`. Nenhum log com token.
+Assinaturas exatas em Interfaces, e o fluxo exato em sete passos (ver texto acima da lista de testes). Constante local `DAY_MS = 24 * 60 * 60 * 1000`. `markerExpiresAt` fica exportada e é testada direto: `minimo = now.getTime() + NEW_SETLIST_TTL_DAYS * DAY_MS`; devolve `setlistExpiresAt` se existir e for maior que `minimo`, senão `new Date(minimo)`. Imports de `./newSetlist`, `./markers` (só o tipo `MarkerDeps`), `./send` e `./types`. Nenhum log com token.
 
 - [ ] **Step 4: Rodar e ver passar**
 
@@ -851,7 +901,7 @@ git commit -m "style(functions): formata arquivos do aviso de repertório novo"
 Estes passos não são tarefas de agente. Estão em `docs/deploy.md` §15 (Tarefa 5):
 
 1. Ativar as APIs `pubsub.googleapis.com` e `eventarc.googleapis.com`.
-2. Dar à conta de serviço do deploy o papel Eventarc Admin (`roles/eventarc.admin`).
+2. Dar à conta de serviço do deploy o papel Eventarc Admin (`roles/eventarc.admin`). Confirmar o nome do papel na documentação oficial no momento do passo.
 3. Depois do deploy: conferir o TTL de `avisosEnviados.expiresAt` no console (Firestore > TTL e índices).
 4. Teste no aparelho real (critério 7 [A]): com o app fechado, o aviso chega e o toque abre o repertório.
 
@@ -870,18 +920,19 @@ Estes passos não são tarefas de agente. Estão em `docs/deploy.md` §15 (Taref
 
 **2. Varredura de passos:** os passos de código dão assinatura, fluxo e testes exatos. Corpos completos aparecem só nos testes e onde o formato é fixo (`setlistTrigger.ts`, pela própria fiação).
 
-**3. Consistência de tipos:** `SetlistSnapshot` (Tarefa 1) é usado com os mesmos campos na Tarefa 6. `MarkerDeps.claimMarker(id, data)` (Tarefa 2) bate com a chamada da Tarefa 6. `AnnounceDeps = PushDeps & MarkerDeps` (Tarefa 6) é o tipo de `deps` na Tarefa 7. `AnnounceResult` é o mesmo nos testes da Tarefa 6.
+**3. Consistência de tipos:** `SetlistSnapshot` (Tarefa 1) é usado com os mesmos campos na Tarefa 6. `MarkerDeps.claimMarker(id, data)` (Tarefa 2) bate com a chamada da Tarefa 6. `AnnounceDeps = PushDeps & MarkerDeps` (Tarefa 6) é o tipo de `deps` na Tarefa 7. `AnnounceResult` é o mesmo nos testes da Tarefa 6. `SetlistSnapshot.expiresAt` (Tarefa 1) é lido na Tarefa 6 por `markerExpiresAt`.
 
 **4. Review Focus:** cinco entradas, cada uma com teste na tarefa dona (ver a seção).
 
 **5. Proporção:** o plano descreve código, não o escreve por inteiro; os corpos de código ficam nos testes e nos pontos que o spec fixa.
 
-## Dúvidas para o orquestrador
+## Decisões registradas (orquestrador)
 
-1. **Interruptor desligado grava a marca.** Com `config/push.enabled === false`, a marca é criada e o aviso não sai; ao religar, o repertório não avisa mais. O plano mantém a ordem da spec (marca antes do envio) e não checa o interruptor antes da marca (evita corrida, mas perde o aviso). Confirmar se é esse o comportamento desejado, ou se prefere checar o interruptor antes e aceitar o risco de corrida pequena.
-2. **Critério 5 [E2E] (sem sessão, o link leva ao login e volta ao repertório).** Não há E2E novo neste plano, porque o envio não roda no emulador e a rota `/repertorios/:id` já existe (`apps/web/src/App.tsx:93`). Se quiser um E2E desse critério, é tarefa do `frontend-dev`/`qa` em outra entrega.
-3. **TTL sem índice.** `"indexes": []` é o formato que o validador do firebase-tools 15.36.0 exige (a chave `indexes` é obrigatória). Se o primeiro deploy não criar a política de TTL, o `docs/deploy.md` §15 manda ativar à mão.
-4. **Abreviação `sáb`** (com acento) no corpo do aviso. Fica como está salvo objeção.
-5. **Execução:** recomendo subagent-driven, com as Tarefas 1, 2, 3, 4 e 5 em paralelo (arquivos disjuntos), depois a 6, a 7 e a 8. Quem decide é o orquestrador.
+1. **Interruptor desligado grava a marca: decidido.** Aceito como parada de emergência. Com `config/push.enabled === false`, a marca é criada e o aviso não sai; ao religar, o repertório não avisa de novo. A marca vem antes do envio e o interruptor não é checado antes dela.
+2. **Critério 5 [E2E]: decidido.** Sem E2E novo. O retorno ao destino depois do login já tem E2E; o envio de push não roda no emulador.
+3. **Abreviação `sáb`** (com acento) no corpo do aviso: decidido.
+4. **Papel Eventarc Admin: a confirmar no passo manual.** O nome do papel (`roles/eventarc.admin`) deve ser conferido na documentação oficial no momento em que a pessoa executar o passo. A nota fica em `docs/deploy.md` §15 (Tarefa 5).
+5. **TTL sem índice: verificado.** `"indexes": []` é o formato que o validador do firebase-tools 15.36.0 exige (a chave `indexes` é obrigatória). Se o primeiro deploy não criar a política de TTL, o `deploy.md` §15 manda ativar à mão.
+6. **Execução:** a decidir pelo orquestrador. Recomendo subagent-driven, com as Tarefas 1 a 5 em paralelo (arquivos disjuntos), depois a 6, a 7 e a 8.
 
-Nada foi executado: os testes não rodaram (o `npm ci` ainda está em segundo plano), e nenhum commit foi feito.
+Nada foi executado: os testes não rodaram e nenhum commit foi feito.
