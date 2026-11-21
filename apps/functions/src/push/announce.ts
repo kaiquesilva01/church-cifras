@@ -17,6 +17,13 @@ export function markerExpiresAt(now: Date, setlistExpiresAt: Date | undefined): 
   return new Date(minimum);
 }
 
+/** Código do erro para o log: só texto ou número (um objeto poderia carregar dados do envio). */
+export function failureCode(error: unknown): string | number {
+  const raw =
+    typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+  return typeof raw === 'string' || typeof raw === 'number' ? raw : 'error';
+}
+
 export type AnnounceDeps = PushDeps & MarkerDeps;
 
 export type AnnounceResult =
@@ -59,11 +66,10 @@ export async function announceNewSetlist(
     });
     return 'sent';
   } catch (error) {
-    const raw =
-      typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-    // Só texto ou número entram no log: um objeto poderia carregar dados do envio.
-    const code = typeof raw === 'string' || typeof raw === 'number' ? raw : 'error';
-    console.error('push: falha ao avisar repertório novo', { setlistId, code });
+    console.error('push: falha ao avisar repertório novo', {
+      setlistId,
+      code: failureCode(error),
+    });
     return 'failed';
   }
 }
