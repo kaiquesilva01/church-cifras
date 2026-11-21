@@ -193,11 +193,13 @@ Passos manuais da pessoa responsável, nesta ordem.
 
 **Antes do deploy que traz a #101:**
 
-- Ative as APIs `pubsub.googleapis.com` e `eventarc.googleapis.com` no projeto (APIs e serviços > Biblioteca, ou `gcloud services enable pubsub.googleapis.com eventarc.googleapis.com --project <id>`).
-- Dê à conta de serviço do deploy o papel **Eventarc Admin** (`roles/eventarc.admin`). Sem ele, o deploy da função `onSetlistWritten` falha. Confirme o nome do papel na documentação oficial do Firebase e do Google Cloud no momento do passo, porque ele pode mudar.
+- Confira se as APIs `pubsub.googleapis.com` e `eventarc.googleapis.com` já estão ativas (APIs e serviços > Ativadas). Provavelmente estão: o `onArrangementWritten` já é um gatilho do Firestore na mesma região em produção e usa Eventarc. Se estiverem, pule este passo; se não, ative-as (APIs e serviços > Biblioteca, ou `gcloud services enable pubsub.googleapis.com eventarc.googleapis.com --project <id>`).
+- Confira se a conta de serviço do deploy já tem o papel **Eventarc Admin** (`roles/eventarc.admin`); pelo mesmo motivo, provavelmente tem. Se estiver, pule; se não, dê o papel. Sem ele, o deploy da função `onSetlistWritten` falha. Confirme o nome do papel na documentação oficial do Firebase e do Google Cloud no momento do passo, porque ele pode mudar.
+- Se o primeiro deploy falhar com erro de permissão do agente de serviço do Eventarc, rode o deploy de novo: costuma passar na segunda tentativa.
 
 **Depois do deploy:**
 
+- O primeiro deploy do gatilho pode levar alguns minutos até ele começar a disparar. Espere antes de testar um aviso.
 - Em Firestore > TTL e índices, confira que a política de TTL de `avisosEnviados` no campo `expiresAt` está ativa. Se o deploy não a tiver criado, ative-a à mão.
 - Não há índice de campo para `avisosEnviados.expiresAt`: é esperado.
 - Em Cloud Run ou em Functions, confira que a função `onSetlistWritten` existe na região `southamerica-east1`.
