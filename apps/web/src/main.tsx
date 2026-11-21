@@ -5,6 +5,7 @@ import {
   scheduleClearReloadMarker,
 } from './lib/preloadError';
 import { prefetchForPath } from './lib/prefetch';
+import './pwa/installPromptStore';
 import './ui/styles.css';
 import './ui/redesign.css';
 import './ui/redesign-cifra.css';
@@ -12,6 +13,7 @@ import './ui/redesign-setlists.css';
 import './ui/redesign-forms.css';
 import './ui/redesign-states.css';
 import './ui/redesign-stats.css';
+import './ui/redesign-install.css';
 
 const storage = getSessionStorage(window);
 installPreloadErrorReload(window, storage);

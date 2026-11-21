@@ -17,6 +17,7 @@ import type { SetlistApi } from '../setlists/setlistApi';
 import { type SetlistFormValue, SetlistFormDialog } from '../setlists/SetlistFormDialog';
 import { useSetlistsContext } from '../setlists/SetlistsProvider';
 import { SetlistsTab } from '../setlists/SetlistsTab';
+import { InstallCard } from '../pwa/InstallCard';
 import { ScreenHeader } from '../ui/ScreenHeader';
 import { SearchInput } from '../ui/SearchInput';
 import { dayEyebrow } from '../ui/screenDate';
@@ -116,6 +117,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
 
   return (
     <section>
+      {tab.id === 'musicas' && <InstallCard />}
       {notice && (
         <p role="status" className="notice">
           {notice}
