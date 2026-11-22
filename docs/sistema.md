@@ -19,7 +19,7 @@ Rotas em `apps/web/src/App.tsx`. Tudo fora de `/login` exige login (`RequireAuth
 | `/` | Início | logado | Cartão "Próximo culto"; abas Músicas, Harpa, Cantores e Repertórios; campo de busca; "＋ Nova cifra" só para membro/admin; convite "Cifras como app" na aba Músicas (ver PWA) |
 | `/busca` | Busca | logado | Busca com filtros Tudo, Músicas, Cantores, Harpa; seção "Na letra" |
 | `/pad` | Pad | logado | Status, grade de 12 tons, volume, parar |
-| `/mais` | Mais | logado | Perfil e papel; Admin (só admin); Importar (só admin); Estatísticas (só admin); Pessoas "Em breve"; Sair |
+| `/mais` | Mais | logado | Perfil e papel; Admin (só admin); Importar (só admin); Estatísticas (só admin); Avisos (membro e admin); Pessoas "Em breve"; Sair |
 | `/cantores/:artistId` | Cantor | logado | Músicas do cantor, com filtro próprio |
 | `/musicas/:songId` | Visualizador | logado | Cifra em PDF, atalhos dos tons salvos, barra de ações, Mudar tom |
 | `/repertorios/:id` | Repertório | logado (edita membro/admin) | Lista de louvores com tom; editar data, rótulo e ensaio, reordenar, compartilhar |
@@ -71,6 +71,7 @@ Barra inferior (Músicas, Repertório, Busca, Pad, Mais) só nas 5 telas raiz; a
 
 - Admin apaga um tom, apaga a música inteira, corrige título e cantor (só metadados; o título impresso no PDF não muda). Não pode apagar o último tom feito à mão enquanto existirem tons gerados.
 - Pessoas: lista de quem já logou e troca de papel.
+- Avisos (membro e admin): ativar e desativar os avisos neste aparelho e enviar aviso de teste; visitante não vê.
 - Estatísticas: total de tons e de músicas (com divisão feitos à mão × gerados), armazenamento dos PDFs de `songs/` (o pad fica de fora), top 10 cifras mais usadas (todo o período e 30 dias). "Uso" = a música estar em repertório já fechado (ver "Functions e jobs").
 
 ### Padrões de UI que valem para toda tela
@@ -211,6 +212,7 @@ Regra dos lembretes do ensaio:
 ### PWA e desempenho
 
 - App instalável na tela inicial, com service worker do app shell e aviso "Atualizar" quando há versão nova.
+- Avisos (push, #99): `firebase-messaging-sw.js` é gerado no build com a config do Firebase e escopo `/firebase-cloud-messaging-push-scope` (padrão do SDK), separado do SW de cache (Workbox, `registerType: "prompt"`, sem mudança). Usa os scripts compat do `firebase` na mesma versão, vindos do gstatic. O app revalida o token ao abrir (membro ou admin com avisos ativos): regrava o registro só se o token mudou ou se tem mais de 7 dias. O chunk do SDK de mensagens fica fora do precache. No iPhone, os avisos só funcionam com o app instalado na tela inicial (iOS 16.4+).
 - Convite "Cifras como app" na aba Músicas (só logado). Android/Chromium: o `beforeinstallprompt` é guardado já no carregamento; o botão "Adicionar" abre o diálogo de instalação, e recusar o diálogo conta como "Agora não". iPhone e iPad com Safari: sem botão, com a instrução de Compartilhar. Não aparece no app instalado (`display-mode` standalone, fullscreen ou minimal-ui, ou `navigator.standalone`) nem depois de `appinstalled` na sessão. "Agora não" dispensa por 30 dias, guardado no aparelho em `localStorage` (chave `cifras.installCard.v1`); sem armazenamento, o convite volta a cada carga.
 - PDFs com cache imutável; code splitting por rota; `pdf.js` e `pdf-lib` carregados sob demanda só no visualizador e no upload.
 - Meta: abrir uma cifra já visitada em menos de 1 s no celular; troca de tom na prévia em menos de 100 ms.
@@ -242,7 +244,7 @@ Cada item aponta para o spec e a seção de origem. Para reabrir um deles, o don
 | Estatísticas por tom, por pessoa ou por abertura da cifra; gráficos, exportação, filtro de período; histórico anterior ao deploy | [estatísticas](superpowers/specs/2026-11-19-estatisticas-admin-design.md) "Não-objetivos" |
 | Mudança de regra de negócio no redesign (só visual) | [redesign mobile](superpowers/specs/2026-11-18-redesign-mobile-design.md) §1 |
 
-Notificação push estava nesta lista como "Notificação push, escala de músicos/líder, comentários" ([repertórios](superpowers/specs/2026-11-16-repertorios-design.md) §3). Foi reaberta pela [#85](https://github.com/kaiquesilva01/church-cifras/issues/85), em 21/11/2026: a base dos avisos está nas Functions (`registerDevice`, `unregisterDevice`, `sendTestPush`); só a tela (#99) ainda não existe. Escala de músicos/líder e comentários continuam fora.
+Notificação push estava nesta lista como "Notificação push, escala de músicos/líder, comentários" ([repertórios](superpowers/specs/2026-11-16-repertorios-design.md) §3). Foi reaberta pela [#85](https://github.com/kaiquesilva01/church-cifras/issues/85), em 21/11/2026: a base dos avisos está nas Functions (`registerDevice`, `unregisterDevice`, `sendTestPush`); a tela está na #99. Escala de músicos/líder e comentários continuam fora.
 
 Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 
@@ -257,6 +259,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 
 ### Limites aceitos
 
+- Avisos (#99): sem horário de silêncio na v1; com o modo foco do aparelho ligado, o aviso fica silenciado; a descoberta é só pela aba Mais.
 - Troca de tom por sobreposição: o texto antigo dos acordes continua no conteúdo do PDF gerado, sob a camada desenhada (copiar texto traz o acorde velho). A abordagem de reescrever o conteúdo (`RewriteWriter`) segue só em esqueleto.
 - Os PDFs reais do acervo não vão para o git (letras com direitos autorais; repositório público). A CI usa PDFs sintéticos; a amostra real é pequena, então a importação em lote serve de teste em massa.
 - Corridas de identidade: renomear ou criar músicas ao mesmo tempo pode gerar duas com a mesma identidade (`titleNormalized + artistId`); resolve o admin à mão.
@@ -285,7 +288,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Preenchimento das letras das músicas enviadas antes da busca por letra: `npm run lyrics:backfill` (`deploy.md` §12), rodado pelo dono do produto depois do deploy. Até lá só as músicas novas são achadas por letra.
 - Pessoas (músicos, vocais, instrumentos, disponibilidade) aparece como "Em breve" na aba Mais; não existe.
 - O Paper não mostra o chip Harpa nas telas 03b e 03c da busca por letra (spec da busca por letra).
-- Avisos (push, #85): o backend dos aparelhos está na #98; a tela de avisos ainda não existe. O envio automático existe para o repertório novo (#101) e para os lembretes do ensaio (#102). Antes da #99: passos manuais 1 e 2 da #85 (número do projeto e chave VAPID).
+- Avisos (push, #85): o backend dos aparelhos está na #98; a tela fica na aba Mais (#99). O envio automático existe para o repertório novo (#101) e para os lembretes do ensaio (#102). Antes da #99: passos manuais 1 e 2 da #85 (número do projeto e chave VAPID).
 - Passos manuais únicos de `deploy.md`: TTL e índice de `setlists` (§10), job do Cloud Scheduler e `setlistUsage` sem TTL (§11), autorizar o domínio e o CORS do site de teste (§13).
 - Antes do deploy da #101: passos 4 e 5 da #85 (APIs Pub/Sub e Eventarc, `deploy.md` §3 e §15; papel Eventarc Admin, `deploy.md` §15); depois, conferir o TTL de `avisosEnviados` (§15).
 - Antes do deploy da #102: nada além do já pedido para a #101. Depois do deploy: conferir o job do Cloud Scheduler (`deploy.md` §16) e o teste no aparelho (`deploy.md` §16).
@@ -295,6 +298,6 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Cantor "Harpa" / aba Harpa: existe no app (`catalog/search.ts`, `HomePage`, `BuscaPage`) e na busca por letra, e o spec da [busca por letra](superpowers/specs/2026-11-19-busca-por-letra-design.md) descreve o filtro e a aba Harpa; nenhum spec define o critério, que no código é o cantor se chamar "Harpa".
 - Barra da cifra: o spec de compartilhar PDF fala em `⬇ PDF` + `↗` + `Mudar tom`; o redesign (§2) lista ⬇ (ícone), WhatsApp, **Pad** e **Mudar tom**; só o design system ("Sem download") e o código não têm o botão de download.
 - Aba Pad: o redesign (§2) diz "Sem escolha manual de nota"; o design system e `PadPage.tsx` têm grade de 12 tons em que o toque liga o pad ou troca o tom.
-- Aba Mais: o spec do redesign (§2) deixa Importar em cinza "Em breve"; o código liga Importar (admin) a `/importar` e acrescenta Estatísticas (admin), que o design system ainda não lista. Só Pessoas (músicos) segue "Em breve".
+- Aba Mais: o spec do redesign (§2) deixa Importar em cinza "Em breve"; o código liga Importar (admin) a `/importar` e acrescenta Estatísticas (admin), que o design system ainda não lista. Só Pessoas (músicos) segue "Em breve"; Avisos (#99) entrou na aba Mais e não está no spec do redesign.
 - Pad ao sair da cifra: o spec do pad (§3 item 5) diz que fora do repertório o pad sai com fade; a tabela do §5.2 do mesmo spec e o design system dizem que ele continua tocando e para pela aba Pad. Vale a segunda leitura.
 - Funções do spec principal: `onSongDeleted` foi substituída pela callable `deleteSong`; há ainda `getStats`, `countSetlistUsage` e `health`, que o spec principal não lista.
