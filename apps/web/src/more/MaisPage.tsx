@@ -1,6 +1,9 @@
+import { useContext } from 'react';
 import { Link } from 'react-router';
-import { ROLE_LABELS, isAdmin } from '../auth/roles';
+import { ROLE_LABELS, canEdit, isAdmin } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
+import { AvisosRow } from '../push/AvisosRow';
+import { PushContext } from '../push/types';
 import { initialsOf } from '../ui/initials';
 import { ScreenHeader } from '../ui/ScreenHeader';
 
@@ -39,6 +42,7 @@ function Icon({ children }: { children: React.ReactNode }) {
 
 export function MaisPage() {
   const { user, role, signOut } = useAuth();
+  const push = useContext(PushContext);
   const name = user?.displayName ?? user?.email ?? '';
   return (
     <section>
@@ -68,6 +72,7 @@ export function MaisPage() {
             </Link>
           </li>
         )}
+        {push && canEdit(role) && <AvisosRow service={push} />}
         <li>
           <div className="menu-row is-soon" aria-disabled="true">
             <Icon>

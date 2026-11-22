@@ -1,0 +1,158 @@
+import type { ReactNode } from 'react';
+import type { AvisosStatus, PushService } from './types';
+import { usePushAvisos } from './usePushAvisos';
+
+const BELL = 'M6 8a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 14 6 8M10 20a2 2 0 0 0 4 0';
+const MUTED_AVAILABLE = 'Receba repertório novo e lembrete do ensaio neste aparelho';
+
+interface Copy {
+  text: ReactNode;
+  hint?: string;
+  action?: {
+    label: string;
+    aria?: string;
+    kind: 'primary' | 'secondary';
+    disabled: boolean;
+    run: 'enable' | 'disable';
+  };
+}
+
+function copyFor(status: AvisosStatus): Copy {
+  switch (status) {
+    case 'checking':
+      return {
+        text: 'Verificando…',
+        action: { label: 'Ativar', kind: 'primary', disabled: true, run: 'enable' },
+      };
+    case 'available':
+      return {
+        text: MUTED_AVAILABLE,
+        action: {
+          label: 'Ativar',
+          aria: 'Ativar avisos neste aparelho',
+          kind: 'primary',
+          disabled: false,
+          run: 'enable',
+        },
+      };
+    case 'enabling':
+      return {
+        text: 'Ativando…',
+        action: { label: 'Ativar', kind: 'primary', disabled: true, run: 'enable' },
+      };
+    case 'active':
+      return {
+        // Só a palavra "Ativados" usa --color-success (.push-on); o resto da frase fica em muted.
+        text: (
+          <>
+            <span className="push-on">Ativados</span> neste aparelho
+          </>
+        ),
+        action: {
+          label: 'Desativar',
+          aria: 'Desativar avisos neste aparelho',
+          kind: 'secondary',
+          disabled: false,
+          run: 'disable',
+        },
+      };
+    case 'disabling':
+      return {
+        text: 'Desativando…',
+        action: { label: 'Desativar', kind: 'secondary', disabled: true, run: 'disable' },
+      };
+    case 'blocked':
+      return {
+        text: 'Bloqueados no navegador. Libere as notificações nas configurações do site e volte aqui',
+      };
+    case 'ios-install':
+      return {
+        text: 'Instale o app na tela inicial para receber avisos',
+        hint: 'No Safari: Compartilhar › Adicionar à Tela de Início',
+      };
+    case 'unsupported':
+      return { text: 'Seu navegador não permite avisos' };
+    case 'error':
+      return {
+        text: MUTED_AVAILABLE,
+        action: { label: 'Tentar de novo', kind: 'primary', disabled: false, run: 'enable' },
+      };
+  }
+}
+
+export function AvisosRow({ service }: { service: PushService }) {
+  const view = usePushAvisos(service);
+  const copy = copyFor(view.status);
+  const active = view.status === 'active';
+  const busy = view.status === 'enabling' || view.status === 'disabling';
+  const action = copy.action;
+
+  return (
+    <li className="push-row" aria-busy={busy || undefined}>
+      <div className="menu-row">
+        <span className="menu-icon" aria-hidden="true">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill={active ? 'currentColor' : 'none'}
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d={BELL} />
+          </svg>
+        </span>
+        <span className="menu-text">
+          <strong>Avisos</strong>
+          <span className="muted">{copy.text}</span>
+          {copy.hint && <span className="push-hint">{copy.hint}</span>}
+        </span>
+        {action && (
+          <button
+            type="button"
+            className={
+              action.kind === 'primary'
+                ? 'push-action btn-primary'
+                : 'push-action push-action--secondary'
+            }
+            aria-label={action.aria}
+            disabled={action.disabled}
+            onClick={action.run === 'enable' ? view.enable : view.disable}
+          >
+            {action.label}
+          </button>
+        )}
+      </div>
+      {active && (
+        <div className="push-test">
+          <button
+            type="button"
+            className="push-test-button"
+            onClick={view.sendTest}
+            disabled={view.test === 'sending'}
+          >
+            Enviar aviso de teste
+          </button>
+        </div>
+      )}
+      {/* Feedback do teste fora do bloco "active": sobrevive quando a poda devolve a linha a "available". */}
+      {view.test === 'sent' && (
+        <p role="status" className="notice">
+          Aviso de teste enviado. Ele chega em instantes.
+        </p>
+      )}
+      {view.test === 'failed' && (
+        <p role="alert" className="notice">
+          Não foi possível enviar o teste.
+        </p>
+      )}
+      {view.status === 'error' && (
+        <p role="alert" className="notice">
+          Não foi possível ativar os avisos. Tente de novo.
+        </p>
+      )}
+    </li>
+  );
+}

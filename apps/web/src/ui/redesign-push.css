@@ -1,0 +1,45 @@
+/* Linha "Avisos" na aba Mais (issue 99). Reusa .menu-row; a ação é pílula de 44 px. Só tokens. */
+.push-action {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.push-action:disabled {
+  opacity: 0.55;
+}
+
+.push-action--secondary {
+  background: var(--color-elevated);
+  color: var(--color-text);
+}
+
+.push-on {
+  color: var(--color-success);
+}
+
+.push-hint {
+  display: block;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.push-test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 12px 60px;
+}
+
+.push-test-button {
+  min-height: 44px;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font-weight: 700;
+}
