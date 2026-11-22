@@ -30,7 +30,7 @@ export function createPushRecordStore(storage: StorageLike | undefined): PushRec
       try {
         storage?.setItem(PUSH_RECORD_KEY, JSON.stringify(record));
       } catch {
-        // Sem armazenamento: o próximo abrir do app revalida pelo SDK.
+        // Sem armazenamento, a linha volta a 'Ativar' e a próxima ativação regrava o mesmo token.
       }
     },
     clear() {
