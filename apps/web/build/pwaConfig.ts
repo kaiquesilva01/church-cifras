@@ -98,6 +98,8 @@ export const createPwaOptions = (
       '**/assets/{Roboto,RobotoMono,LiberationSans,LiberationMono}-*.js',
       '**/assets/*.worker*',
       '**/assets/pdf.worker*',
+      // SDK de mensagens: só carrega com a linha "Avisos" (aba Mais); fora do precache do app shell.
+      '**/assets/messaging-*',
     ],
     navigateFallback: '/index.html',
     navigateFallbackDenylist: [/^\/__\//],
