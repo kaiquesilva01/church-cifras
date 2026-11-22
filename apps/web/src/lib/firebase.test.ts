@@ -70,11 +70,15 @@ describe('createFirebase', () => {
   it('adds messagingSenderId to the app config only when given', () => {
     vi.mocked(initializeApp).mockClear();
     createFirebase(baseEnv);
-    expect(vi.mocked(initializeApp).mock.calls[0][0]).not.toHaveProperty('messagingSenderId');
+    expect(initializeApp).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ messagingSenderId: expect.anything() }),
+    );
 
     vi.mocked(initializeApp).mockClear();
     createFirebase(baseEnv, { messagingSenderId: '123' });
-    expect(vi.mocked(initializeApp).mock.calls[0][0]).toMatchObject({ messagingSenderId: '123' });
+    expect(initializeApp).toHaveBeenLastCalledWith(
+      expect.objectContaining({ messagingSenderId: '123' }),
+    );
   });
 
   it('loads storage and functions lazily', async () => {

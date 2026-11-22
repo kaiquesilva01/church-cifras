@@ -41,6 +41,12 @@ describe('readPushConfig', () => {
     expect(readPushConfig({ VITE_FIREBASE_VAPID_KEY: 'vapid' })).toBeNull();
   });
 
+  it('treats an empty string as absent', () => {
+    expect(
+      readPushConfig({ VITE_FIREBASE_VAPID_KEY: '', VITE_FIREBASE_MESSAGING_SENDER_ID: '123' }),
+    ).toBeNull();
+  });
+
   it('returns both values when both exist', () => {
     expect(
       readPushConfig({
