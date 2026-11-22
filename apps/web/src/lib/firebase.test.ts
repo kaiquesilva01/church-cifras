@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { initializeApp } from 'firebase/app';
 
 vi.mock('firebase/app', () => ({ initializeApp: vi.fn(() => ({ name: 'app' })) }));
 vi.mock('firebase/auth', () => ({
@@ -64,6 +65,16 @@ describe('createFirebase', () => {
     expect(connectFirestoreEmulator).not.toHaveBeenCalled();
     expect(connectStorageEmulator).not.toHaveBeenCalled();
     expect(connectFunctionsEmulator).not.toHaveBeenCalled();
+  });
+
+  it('adds messagingSenderId to the app config only when given', () => {
+    vi.mocked(initializeApp).mockClear();
+    createFirebase(baseEnv);
+    expect(vi.mocked(initializeApp).mock.calls[0][0]).not.toHaveProperty('messagingSenderId');
+
+    vi.mocked(initializeApp).mockClear();
+    createFirebase(baseEnv, { messagingSenderId: '123' });
+    expect(vi.mocked(initializeApp).mock.calls[0][0]).toMatchObject({ messagingSenderId: '123' });
   });
 
   it('loads storage and functions lazily', async () => {
