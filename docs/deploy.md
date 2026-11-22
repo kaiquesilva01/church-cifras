@@ -58,8 +58,8 @@ No repositório: Settings > Secrets and variables > Actions > aba **Variables**.
 | `VITE_FIREBASE_PROJECT_ID` | `projectId` |
 | `VITE_FIREBASE_STORAGE_BUCKET` | `storageBucket` |
 | `VITE_FIREBASE_APP_ID` | `appId` |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | `messagingSenderId` (Firebase › Configurações do projeto › Cloud Messaging › "ID do remetente"); opcional: sem ele e sem a chave abaixo, os avisos push ficam desligados no app |
-| `VITE_FIREBASE_VAPID_KEY` | chave **pública** de push da Web (Cloud Messaging › Configuração da Web › Certificados push da Web › "Gerar par de chaves"); opcional, como a anterior |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | `messagingSenderId` (Firebase › Configurações do projeto › Cloud Messaging › "ID do remetente"); opcional, usada pela tela de avisos push (#99) |
+| `VITE_FIREBASE_VAPID_KEY` | chave **pública** de push da Web (Cloud Messaging › Configuração da Web › Certificados push da Web › "Gerar par de chaves"); opcional, usada pela tela de avisos push (#99), que só aparece com as duas definidas |
 | `ADMIN_EMAILS` | e-mails dos administradores, separados por vírgula (ex.: `a@igreja.org,b@igreja.org`) |
 
 Esses valores não são segredos (os `VITE_*` vão para o site publicado; `ADMIN_EMAILS` é gravado em `apps/functions/.env.<projectId>` durante o deploy). A comparação de e-mails ignora maiúsculas.

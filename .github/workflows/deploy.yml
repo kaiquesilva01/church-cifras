@@ -44,6 +44,7 @@ jobs:
         run: |
           total=0
           missing=""
+          # VITE_FIREBASE_MESSAGING_SENDER_ID e VITE_FIREBASE_VAPID_KEY são opcionais de propósito (avisos push, #99): ficam fora desta lista.
           for name in FIREBASE_PROJECT_ID FIREBASE_SERVICE_ACCOUNT VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_STORAGE_BUCKET VITE_FIREBASE_APP_ID ADMIN_EMAILS; do
             total=$((total + 1))
             if [ -z "${!name}" ]; then
