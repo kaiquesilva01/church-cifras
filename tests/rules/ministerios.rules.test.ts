@@ -7,7 +7,9 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  collection,
   collectionGroup,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -185,4 +187,92 @@ describe('ministerios: escrita', () => {
       ),
     );
   });
+});
+
+describe('ministerios: listagem do ministério', () => {
+  const PERMITIDOS = ['adminHaja', 'adminApp'] as Ctx[];
+  for (const colecao of ['members', 'requests']) {
+    for (const nome of TODOS) {
+      it(`lista ${colecao} do ministério (${nome}) ${PERMITIDOS.includes(nome) ? 'permite' : 'nega'}`, async () => {
+        const op = getDocs(collection(CTX[nome](), `ministries/hajaluz/${colecao}`));
+        if (PERMITIDOS.includes(nome)) await assertSucceeds(op);
+        else await assertFails(op);
+      });
+    }
+  }
+});
+
+describe('ministerios: edição e exclusão do setlist', () => {
+  const S1 = 'ministries/hajaluz/setlists/s1';
+  // withSecurityRulesDisabled não devolve o resultado do callback: guarda numa variável.
+  const s1Atual = async () => {
+    let dados: { createdBy: string; createdAt: Timestamp } | undefined;
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const snap = await getDoc(doc(ctx.firestore(), S1));
+      dados = snap.data() as { createdBy: string; createdAt: Timestamp };
+    });
+    if (!dados) throw new Error('setlist s1 não semeado');
+    return dados;
+  };
+
+  it('edita setlist do ministério (adminHaja): permite, reenviando createdBy e createdAt', async () => {
+    const atual = await s1Atual();
+    await assertSucceeds(
+      setDoc(
+        doc(CTX.adminHaja(), S1),
+        setlistData({
+          label: 'Noite',
+          createdBy: atual.createdBy,
+          createdAt: atual.createdAt,
+          updatedBy: 'm1',
+        }),
+      ),
+    );
+  });
+
+  for (const nome of TODOS.filter((c) => c !== 'adminHaja')) {
+    it(`não edita setlist do ministério (${nome})`, async () => {
+      const atual = await s1Atual();
+      await assertFails(
+        setDoc(
+          doc(CTX[nome](), S1),
+          setlistData({
+            label: 'Noite',
+            createdBy: atual.createdBy,
+            createdAt: atual.createdAt,
+            updatedBy: UID[nome],
+          }),
+        ),
+      );
+    });
+  }
+
+  it('edição do adminHaja não troca createdBy: negado', async () => {
+    const atual = await s1Atual();
+    await assertFails(
+      setDoc(
+        doc(CTX.adminHaja(), S1),
+        setlistData({ createdBy: 'outro', createdAt: atual.createdAt, updatedBy: 'm1' }),
+      ),
+    );
+  });
+
+  it('edição do adminHaja não troca createdAt: negado', async () => {
+    await assertFails(
+      setDoc(
+        doc(CTX.adminHaja(), S1),
+        setlistData({ createdBy: 'm1', createdAt: serverTimestamp(), updatedBy: 'm1' }),
+      ),
+    );
+  });
+
+  it('exclui setlist do ministério (adminHaja): permite', async () => {
+    await assertSucceeds(deleteDoc(doc(CTX.adminHaja(), S1)));
+  });
+
+  for (const nome of TODOS.filter((c) => c !== 'adminHaja')) {
+    it(`não exclui setlist do ministério (${nome})`, async () => {
+      await assertFails(deleteDoc(doc(CTX[nome](), S1)));
+    });
+  }
 });
