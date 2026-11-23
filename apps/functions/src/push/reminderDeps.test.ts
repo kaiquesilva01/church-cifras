@@ -29,7 +29,7 @@ beforeEach(() => {
 });
 
 describe('createReminderDeps.listRehearsalSetlists', () => {
-  it('consulta setlists por rehearsalAt entre from e to, com id e dados', async () => {
+  it('consulta setlists por rehearsalAt em (after, until], com id e dados', async () => {
     const from = new Date('2026-11-21T11:55:00Z');
     const to = new Date('2026-11-21T12:30:00Z');
     fs.docs.push({ id: 'r1', data: () => ({ label: 'Culto' }) });
@@ -38,7 +38,7 @@ describe('createReminderDeps.listRehearsalSetlists', () => {
 
     expect(fs.collections).toEqual(['setlists']);
     expect(fs.wheres).toEqual([
-      ['rehearsalAt', '>=', from],
+      ['rehearsalAt', '>', from],
       ['rehearsalAt', '<=', to],
     ]);
     expect(found).toEqual([{ id: 'r1', data: { label: 'Culto' } }]);

@@ -11,12 +11,13 @@ export function createReminderDeps(): ReminderDeps {
   return {
     ...createPushDeps(),
     ...createMarkerDeps(),
-    listRehearsalSetlists: async (from, to) =>
+    /** Setlists com `rehearsalAt` em (after, until]. */
+    listRehearsalSetlists: async (after, until) =>
       (
         await getFirestore()
           .collection('setlists')
-          .where('rehearsalAt', '>=', from)
-          .where('rehearsalAt', '<=', to)
+          .where('rehearsalAt', '>', after)
+          .where('rehearsalAt', '<=', until)
           .get()
       ).docs.map((d) => ({ id: d.id, data: d.data() })),
     listRehearsalMarkers: async (setlistId) =>
