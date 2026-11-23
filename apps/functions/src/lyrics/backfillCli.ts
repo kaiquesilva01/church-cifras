@@ -14,6 +14,7 @@ import {
   type BackfillDeps,
   type BackfillReport,
 } from './backfill';
+import { resolveProjectId } from '../cli/projectId';
 import { describeTarget } from './backfillTarget';
 import { pickHandmadePath } from './handmadePath';
 
@@ -48,26 +49,6 @@ function connect(bucketName: string) {
   const projectId = process.env.GOOGLE_CLOUD_PROJECT ?? process.env.GCLOUD_PROJECT;
   initializeApp({ storageBucket: bucketName, projectId });
   return { db: getFirestore(), bucket: getStorage().bucket() };
-}
-
-// O id que o Firestore de fato vai usar (explícito ou detectado pelo ADC).
-async function resolveProjectId(db: Firestore): Promise<string | undefined> {
-  const read = () => {
-    try {
-      // `projectId` existe em runtime mas não está nos tipos publicados.
-      return (db as unknown as { projectId?: string }).projectId || undefined;
-    } catch {
-      return undefined; // cliente ainda não inicializou
-    }
-  };
-  const direct = read();
-  if (direct) return direct;
-  try {
-    await db.collection('songs').limit(1).get(); // força a detecção do projeto
-  } catch {
-    // sem credenciais ou sem acesso: o projeto segue não identificado
-  }
-  return read();
 }
 
 function realDeps(db: Firestore, bucket: Bucket): BackfillDeps {

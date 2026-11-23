@@ -8,7 +8,12 @@ const SETLISTS: SettledSetlist[] = [
 
 function setup(opts: { now: string; setlists?: SettledSetlist[]; existing?: string[] }) {
   const cutoffs: string[] = [];
-  const recorded: Array<{ setlistId: string; date: string; songIds: string[] }> = [];
+  const recorded: Array<{
+    setlistId: string;
+    date: string;
+    songIds: string[];
+    ministryId: string;
+  }> = [];
   const existing = new Set(opts.existing ?? []);
   const deps: UsageDeps = {
     listSettledSetlists: async (cutoff) => {
@@ -61,7 +66,9 @@ describe('countSettledSetlists', () => {
 
     await countSettledSetlists(deps);
 
-    expect(recorded).toEqual([{ setlistId: 's1', date: '2026-11-20', songIds: ['a', 'b'] }]);
+    expect(recorded).toEqual([
+      { setlistId: 's1', date: '2026-11-20', songIds: ['a', 'b'], ministryId: 'hajaluz' },
+    ]);
   });
 
   it('drops invalid song ids before deduplicating and recording', async () => {
@@ -72,7 +79,9 @@ describe('countSettledSetlists', () => {
 
     await countSettledSetlists(deps);
 
-    expect(recorded).toEqual([{ setlistId: 's1', date: '2026-11-20', songIds: ['ok', 'ok2'] }]);
+    expect(recorded).toEqual([
+      { setlistId: 's1', date: '2026-11-20', songIds: ['ok', 'ok2'], ministryId: 'hajaluz' },
+    ]);
   });
 
   it('still records a setlist that only has invalid song ids, with an empty list', async () => {
@@ -83,7 +92,9 @@ describe('countSettledSetlists', () => {
 
     await countSettledSetlists(deps);
 
-    expect(recorded).toEqual([{ setlistId: 's1', date: '2026-11-20', songIds: [] }]);
+    expect(recorded).toEqual([
+      { setlistId: 's1', date: '2026-11-20', songIds: [], ministryId: 'hajaluz' },
+    ]);
   });
 
   it('records an empty setlist with an empty songIds list', async () => {
@@ -94,7 +105,9 @@ describe('countSettledSetlists', () => {
 
     await countSettledSetlists(deps);
 
-    expect(recorded).toEqual([{ setlistId: 's1', date: '2026-11-20', songIds: [] }]);
+    expect(recorded).toEqual([
+      { setlistId: 's1', date: '2026-11-20', songIds: [], ministryId: 'hajaluz' },
+    ]);
   });
 
   it('counts an already recorded setlist as alreadyCounted without throwing', async () => {

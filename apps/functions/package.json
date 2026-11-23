@@ -11,7 +11,8 @@
     "build:watch": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lyrics:backfill": "tsup --config tsup.backfill.config.ts && node lib/backfillCli.mjs"
+    "lyrics:backfill": "tsup --config tsup.backfill.config.ts && node lib/backfillCli.mjs",
+    "ministries:migrate": "tsup --config tsup.migrate.config.ts && node lib/migrateCli.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

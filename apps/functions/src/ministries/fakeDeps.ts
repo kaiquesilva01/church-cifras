@@ -1,0 +1,145 @@
+import type { Role } from '../roles';
+import type { Claims } from './claims';
+import type {
+  MembershipRecord,
+  MembershipRole,
+  MinistryDeps,
+  MinistryReads,
+  MinistryTx,
+  RequestRecord,
+  UserRecord,
+  WriteOp,
+} from './deps';
+import { paths } from './model';
+
+export const NOW = new Date('2026-11-23T12:00:00Z');
+
+const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+
+export function createFakeMinistryDeps(seed: Record<string, Record<string, unknown>>) {
+  const docs = new Map<string, Record<string, unknown>>(
+    Object.entries(seed).map(([path, data]) => [path, { ...data }]),
+  );
+  const claimCalls: Array<[string, Claims]> = [];
+
+  const toMembership = (d: Record<string, unknown>): MembershipRecord => ({
+    uid: d.uid as string,
+    role: d.role as MembershipRole,
+    displayName: str(d.displayName),
+    email: str(d.email),
+    photoURL: str(d.photoURL),
+  });
+  const toRequest = (d: Record<string, unknown>): RequestRecord => ({
+    uid: d.uid as string,
+    status: d.status as RequestRecord['status'],
+    displayName: str(d.displayName),
+    email: str(d.email),
+    photoURL: str(d.photoURL),
+  });
+
+  const reads: MinistryReads = {
+    async readUser(uid): Promise<UserRecord | null> {
+      const d = docs.get(paths.user(uid));
+      if (!d) return null;
+      return {
+        role: d.role as Role | undefined,
+        appAdmin: d.appAdmin === true,
+        displayName: str(d.displayName),
+        email: str(d.email),
+        photoURL: str(d.photoURL),
+      };
+    },
+    async readMinistry(id) {
+      const d = docs.get(paths.ministry(id));
+      return d ? { name: d.name as string, city: d.city as string } : null;
+    },
+    async readMembership(mid, uid) {
+      const d = docs.get(paths.member(mid, uid));
+      return d ? toMembership(d) : null;
+    },
+    async readRequest(mid, uid) {
+      const d = docs.get(paths.request(mid, uid));
+      return d ? toRequest(d) : null;
+    },
+    async listAdminUids(mid) {
+      return [...docs.entries()]
+        .filter(([path, d]) => path.startsWith(`ministries/${mid}/members/`) && d.role === 'admin')
+        .map(([, d]) => d.uid as string);
+    },
+  };
+
+  // Aplica uma escrita sobre um mapa de documentos (o do commit, ou um rascunho).
+  function applyWrite(target: Map<string, Record<string, unknown>>, op: WriteOp): void {
+    const current = target.get(op.path);
+    if (op.op === 'create') {
+      if (current) {
+        throw Object.assign(new Error('ALREADY_EXISTS'), { code: 6 });
+      }
+      target.set(op.path, { ...op.data });
+    } else if (op.op === 'set') {
+      target.set(op.path, { ...op.data });
+    } else if (op.op === 'merge') {
+      target.set(op.path, { ...current, ...op.data });
+    } else {
+      target.delete(op.path);
+    }
+  }
+
+  // Transação como no Firestore: leituras antes das escritas, escritas só no fim e tudo ou nada.
+  async function runTransaction<T>(fn: (tx: MinistryTx) => Promise<T>): Promise<T> {
+    const buffered: WriteOp[] = [];
+    const guard =
+      <A extends unknown[], R>(read: (...args: A) => Promise<R>) =>
+      (...args: A): Promise<R> => {
+        if (buffered.length > 0) {
+          throw new Error('Leitura depois de escrita na mesma transação');
+        }
+        return read(...args);
+      };
+    const txReads: MinistryReads = {
+      readUser: guard(reads.readUser),
+      readMinistry: guard(reads.readMinistry),
+      readMembership: guard(reads.readMembership),
+      readRequest: guard(reads.readRequest),
+      listAdminUids: guard(reads.listAdminUids),
+    };
+    const result = await fn({
+      ...txReads,
+      write(op) {
+        buffered.push(op);
+      },
+    });
+    // Commit num rascunho: se uma escrita falhar, nenhuma é aplicada.
+    const draft = new Map([...docs.entries()].map(([path, data]) => [path, { ...data }] as const));
+    for (const op of buffered) applyWrite(draft, op);
+    docs.clear();
+    for (const [path, data] of draft) docs.set(path, data);
+    return result;
+  }
+
+  const deps: MinistryDeps = {
+    ...reads,
+    now: () => NOW,
+    runTransaction,
+    async listMembershipsOfUser(uid) {
+      return [...docs.entries()]
+        .filter(([k, d]) => /^ministries\/[^/]+\/members\/[^/]+$/.test(k) && d.uid === uid)
+        .map(([k, d]) => ({ ministryId: k.split('/')[1] ?? '', role: d.role as MembershipRole }));
+    },
+    async listPendingRequestsOfUser(uid) {
+      return [...docs.entries()]
+        .filter(
+          ([k, d]) =>
+            /^ministries\/[^/]+\/requests\/[^/]+$/.test(k) &&
+            d.uid === uid &&
+            d.status === 'pending',
+        )
+        .map(([k]) => ({ ministryId: k.split('/')[1] ?? '' }));
+    },
+    async setClaims(uid, claims) {
+      claimCalls.push([uid, claims]);
+    },
+  };
+
+  return { deps, docs, claimCalls };
+}
