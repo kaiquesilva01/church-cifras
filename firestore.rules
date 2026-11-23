@@ -14,6 +14,10 @@ service cloud.firestore {
       return signedIn() && role() in ['member', 'admin'];
     }
 
+    function isAdmin() {
+      return signedIn() && role() == 'admin';
+    }
+
     // Mantenha igual a KEY_OPTIONS (packages/chords/src/keys.ts): maiores e depois menores.
     function keyNames() {
       return [
@@ -167,15 +171,15 @@ service cloud.firestore {
 
     match /setlists/{setlistId} {
       allow read: if signedIn();
-      allow create: if isEditor()
+      allow create: if isAdmin()
         && validSetlist(request.resource.data, setlistId)
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time;
-      allow update: if isEditor()
+      allow update: if isAdmin()
         && validSetlist(request.resource.data, setlistId)
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt;
-      allow delete: if isEditor();
+      allow delete: if isAdmin();
     }
 
     // setlistUsage é acessado só pelo Admin SDK (Cloud Functions): sem regra, fica negado por padrão.

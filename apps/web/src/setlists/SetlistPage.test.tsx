@@ -33,7 +33,7 @@ function Probe() {
 function mount(
   api: ReturnType<typeof fakeSetlistApi>,
   {
-    role = 'member',
+    role = 'admin',
     path = '/repertorios/r1',
     songs = sampleSongs,
     catalog,
@@ -665,7 +665,7 @@ describe('SetlistPage share button', () => {
 });
 
 describe('SetlistPage read-only view (Paper 13)', () => {
-  const NOTE = 'Somente leitura · só membros e admins editam o repertório';
+  const NOTE = 'Somente leitura · só admins editam o repertório';
 
   it('shows the song count under the title', () => {
     mount(withItems([a, b]), { role: 'viewer' });
@@ -708,8 +708,15 @@ describe('SetlistPage read-only view (Paper 13)', () => {
     expect(screen.getByText(NOTE)).toBeInTheDocument();
   });
 
+  it('keeps members read-only too: only admins edit', () => {
+    mount(withItems([a]), { role: 'member' });
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Adicionar/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Menu do repertório' })).not.toBeInTheDocument();
+  });
+
   it('keeps the edit screen as it is: no count line and no read-only note for editors', () => {
-    mount(withItems([a, b]), { role: 'member' });
+    mount(withItems([a, b]), { role: 'admin' });
     expect(screen.queryByText('2 louvores')).not.toBeInTheDocument();
     expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sonda-me' }).querySelector('svg')).not.toBeNull();
