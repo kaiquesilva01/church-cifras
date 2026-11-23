@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from '../App';
 import type { Role } from '../auth/roles';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
@@ -13,8 +13,10 @@ const peopleApi: PeopleApi = {
   setRole: () => Promise.resolve(),
 };
 
-function setup(path: string, signedIn?: Role) {
+/** O claim do token é a fonte do gate: ele é definido antes do login, como no Firebase. */
+async function setup(path: string, signedIn?: Role) {
   const gateway = createFakeGateway();
+  if (signedIn) gateway.claimRole = signedIn;
   render(
     <App
       gateway={gateway}
@@ -25,32 +27,34 @@ function setup(path: string, signedIn?: Role) {
       initialPath={path}
     />,
   );
-  act(() => gateway.emitUser(signedIn ? testUser : null));
-  if (signedIn) act(() => gateway.emitRole(signedIn));
+  await act(async () => gateway.emitUser(signedIn ? testUser : null));
+  if (signedIn) await act(async () => gateway.emitRole(signedIn));
   return gateway;
 }
 
 describe('routes', () => {
-  it('redirects signed-out user to login', () => {
-    setup('/');
+  it('redirects signed-out user to login', async () => {
+    await setup('/');
     expect(screen.getByText('Entrar com Google')).toBeInTheDocument();
   });
 
-  it('login explains that new people start as visitors', () => {
-    setup('/login');
+  it('login explains that the first access needs an admin release', async () => {
+    await setup('/login');
     expect(
-      screen.getByText('Quem entra pela primeira vez começa como visitante.'),
+      screen.getByText(
+        'Quem entra pela primeira vez precisa da liberação de um admin do ministério para ver as cifras.',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Cifras · Louvor' })).toBeInTheDocument();
   });
 
-  it('login screen warms the sign-in popup on mount', () => {
-    const gateway = setup('/login');
+  it('login screen warms the sign-in popup on mount', async () => {
+    const gateway = await setup('/login');
     expect(gateway.prepareSignIn).toHaveBeenCalledTimes(1);
   });
 
-  it('login button calls signIn', () => {
-    const gateway = setup('/login');
+  it('login button calls signIn', async () => {
+    const gateway = await setup('/login');
     fireEvent.click(screen.getByText('Entrar com Google'));
     expect(gateway.signIn).toHaveBeenCalledTimes(1);
   });
@@ -95,53 +99,54 @@ describe('routes', () => {
     },
   );
 
-  it('shows home for signed-in viewer without Pessoas link', () => {
-    setup('/', 'viewer');
+  it('shows home for a signed-in member without Pessoas link', async () => {
+    await setup('/', 'member');
     expect(
       screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Pessoas' })).not.toBeInTheDocument();
   });
 
-  it('shows the Admin link (to Pessoas) in Mais for admin only', () => {
-    setup('/mais', 'admin');
+  it('shows the Admin link (to Pessoas) in Mais for admin only', async () => {
+    await setup('/mais', 'admin');
     expect(screen.getByRole('link', { name: /Admin/ })).toHaveAttribute('href', '/pessoas');
     cleanup();
-    setup('/mais', 'member');
+    await setup('/mais', 'member');
     expect(screen.queryByRole('link', { name: /Admin/ })).not.toBeInTheDocument();
   });
 
-  it('redirects non-admin away from /pessoas', () => {
-    setup('/pessoas', 'member');
+  it('redirects non-admin away from /pessoas', async () => {
+    await setup('/pessoas', 'member');
     expect(
       screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
     ).toBeInTheDocument();
   });
 
-  it('RequireRole allows listed roles and redirects others', () => {
-    setup('/pessoas', 'admin');
+  it('RequireRole allows listed roles and redirects others', async () => {
+    await setup('/pessoas', 'admin');
     expect(screen.getByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
     cleanup();
-    setup('/pessoas', 'viewer');
+    await setup('/pessoas', 'member');
     expect(screen.queryByRole('heading', { name: 'Pessoas' })).not.toBeInTheDocument();
     expect(
       screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
     ).toBeInTheDocument();
   });
 
-  it('RequireRole sends non-admins from /estatisticas to home and lets admins in', () => {
-    setup('/estatisticas', 'member');
+  it('RequireRole sends non-admins from /estatisticas to home and lets admins in', async () => {
+    await setup('/estatisticas', 'member');
     expect(
       screen.getByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Estatísticas' })).not.toBeInTheDocument();
     cleanup();
-    setup('/estatisticas', 'admin');
+    await setup('/estatisticas', 'admin');
     expect(screen.getByRole('heading', { level: 1, name: 'Estatísticas' })).toBeInTheDocument();
   });
 
-  it('waits for the role before deciding on /pessoas', () => {
+  it('waits for the role before deciding on /pessoas', async () => {
     const gateway = createFakeGateway();
+    gateway.claimRole = 'admin';
     render(
       <App
         gateway={gateway}
@@ -152,13 +157,13 @@ describe('routes', () => {
         initialPath="/pessoas"
       />,
     );
-    act(() => gateway.emitUser(testUser));
+    await act(async () => gateway.emitUser(testUser));
     expect(screen.getByText('Carregando…')).toBeInTheDocument();
-    act(() => gateway.emitRole('admin'));
+    await act(async () => gateway.emitRole('admin'));
     expect(screen.getByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
   });
 
-  it('disables the login button while the popup is open', () => {
+  it('disables the login button while the popup is open', async () => {
     const gateway = createFakeGateway();
     gateway.signIn = () => new Promise(() => undefined);
     render(
@@ -176,8 +181,8 @@ describe('routes', () => {
     expect(screen.getByRole('button', { name: 'Entrar com Google' })).toBeDisabled();
   });
 
-  it('Mais shows the role label and Sair', () => {
-    const gateway = setup('/mais', 'member');
+  it('Mais shows the role label and Sair', async () => {
+    const gateway = await setup('/mais', 'member');
     expect(screen.getByText('Membro')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Sair/ }));
     expect(gateway.signOut).toHaveBeenCalledTimes(1);
@@ -185,6 +190,7 @@ describe('routes', () => {
 
   it('returns to the protected screen after signing in, not to home', async () => {
     const gateway = createFakeGateway();
+    gateway.claimRole = 'member';
     const setlistApi = fakeSetlistApi([makeSetlist({ id: 'r1', label: 'Culto de domingo' })]);
     render(
       <App
@@ -199,8 +205,8 @@ describe('routes', () => {
     act(() => gateway.emitUser(null));
     expect(screen.getByText('Entrar com Google')).toBeInTheDocument();
 
-    act(() => gateway.emitUser(testUser));
-    act(() => gateway.emitRole('member'));
+    await act(async () => gateway.emitUser(testUser));
+    await act(async () => gateway.emitRole('member'));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Culto de domingo' }),
     ).toBeInTheDocument();
@@ -209,11 +215,76 @@ describe('routes', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows the bottom bar on the root screens and hides it on details', () => {
-    setup('/', 'member');
+  it('shows the bottom bar on the root screens and hides it on details', async () => {
+    await setup('/', 'member');
     expect(screen.getByRole('navigation', { name: 'Principal' })).toBeInTheDocument();
     cleanup();
-    setup('/nova', 'member');
+    await setup('/nova', 'member');
     expect(screen.queryByRole('navigation', { name: 'Principal' })).not.toBeInTheDocument();
+  });
+});
+
+describe('visitante sem acesso (#126)', () => {
+  it.each([
+    '/',
+    '/busca',
+    '/pad',
+    '/mais',
+    '/musicas/s1',
+    '/repertorios/r1',
+    '/pessoas',
+    '/nova',
+    '/importar',
+  ])('visitor sees only the access screen at %s', async (path) => {
+    await setup(path, 'viewer');
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Acesso ainda não liberado' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Principal' })).not.toBeInTheDocument();
+  });
+
+  it('visitor does not start any data provider', async () => {
+    const subscribeSongs = vi.fn(() => () => undefined);
+    const subscribeSetlists = vi.fn(() => () => undefined);
+    const gateway = createFakeGateway();
+    gateway.claimRole = 'viewer';
+    render(
+      <App
+        gateway={gateway}
+        peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
+        catalogApi={fakeCatalogApi(undefined, { subscribeSongs })}
+        setlistApi={fakeSetlistApi([], { subscribeSetlists })}
+        initialPath="/"
+      />,
+    );
+    await act(async () => gateway.emitUser(testUser));
+    await act(async () => gateway.emitRole('viewer'));
+    expect(screen.getByRole('heading', { name: 'Acesso ainda não liberado' })).toBeInTheDocument();
+    expect(subscribeSongs).not.toHaveBeenCalled();
+    expect(subscribeSetlists).not.toHaveBeenCalled();
+  });
+
+  it('member is redirected to the app after the claim arrives', async () => {
+    const gateway = createFakeGateway();
+    gateway.claimRole = 'viewer';
+    render(
+      <App
+        gateway={gateway}
+        peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
+        catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
+        initialPath="/"
+      />,
+    );
+    await act(async () => gateway.emitUser(testUser));
+    await act(async () => gateway.emitRole('viewer'));
+    expect(screen.getByRole('heading', { name: 'Acesso ainda não liberado' })).toBeInTheDocument();
+    await act(async () => gateway.emitRole('member'));
+    expect(
+      await screen.findByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Acesso ainda não liberado' })).toBeNull();
   });
 });

@@ -14,6 +14,8 @@ import { fakeSetlistApi, makeSetlist, type FakeSetlistApi } from '../test/fakeSe
 import { testUser } from '../test/fakeGateway';
 import { HomePage } from './HomePage';
 import { IPHONE_SAFARI } from '../test/installFixtures';
+import { PushContext, type PushService } from '../push/types';
+import { fakePushService } from '../test/fakePushService';
 
 /** Lyrics for `sampleSongs` (s1 Sonda-me, s2 Ressuscita-me, s3 Grande é o Senhor). */
 const LYRICS = {
@@ -68,6 +70,7 @@ function renderHome(
     setlists?: Setlist[];
     setlistApi?: FakeSetlistApi;
     catalog?: Partial<CatalogApi>;
+    push?: PushService;
   } = {},
 ) {
   const setlistApi = options.setlistApi ?? fakeSetlistApi(options.setlists);
@@ -76,29 +79,32 @@ function renderHome(
     status: 'signed-in',
     user: testUser,
     role: options.role ?? 'viewer',
+    access: 'granted',
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),
   };
   return render(
     <AuthContext.Provider value={auth}>
-      <MemoryRouter
-        initialEntries={[
-          options.state === undefined
-            ? (options.path ?? '/')
-            : { pathname: options.path ?? '/', state: options.state },
-        ]}
-      >
-        <SongsProvider api={catalogApi}>
-          <LyricsProvider api={catalogApi}>
-            <SetlistsProvider api={setlistApi}>
-              <HomePage setlistApi={setlistApi} />
-              <StateProbe />
-              <PathProbe />
-            </SetlistsProvider>
-          </LyricsProvider>
-        </SongsProvider>
-      </MemoryRouter>
+      <PushContext.Provider value={options.push ?? null}>
+        <MemoryRouter
+          initialEntries={[
+            options.state === undefined
+              ? (options.path ?? '/')
+              : { pathname: options.path ?? '/', state: options.state },
+          ]}
+        >
+          <SongsProvider api={catalogApi}>
+            <LyricsProvider api={catalogApi}>
+              <SetlistsProvider api={setlistApi}>
+                <HomePage setlistApi={setlistApi} />
+                <StateProbe />
+                <PathProbe />
+              </SetlistsProvider>
+            </LyricsProvider>
+          </SongsProvider>
+        </MemoryRouter>
+      </PushContext.Provider>
     </AuthContext.Provider>,
   );
 }
@@ -201,6 +207,7 @@ describe('HomePage', () => {
           status: 'signed-in',
           user: testUser,
           role: 'viewer',
+          access: 'granted',
           prepareSignIn: () => Promise.resolve(),
           signIn: () => Promise.resolve(),
           signOut: () => Promise.resolve(),
@@ -498,5 +505,40 @@ describe('install card on the Músicas tab', () => {
   it('is not shown on the other tabs', () => {
     renderHome({ path: '/?aba=cantores' });
     expect(screen.queryByRole('region', { name: 'Cifras como app' })).not.toBeInTheDocument();
+  });
+});
+
+describe('avisos card on the Músicas tab', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({ matches: query === '(display-mode: standalone)' }),
+    });
+  });
+
+  afterEach(() => {
+    delete (window as { matchMedia?: unknown }).matchMedia;
+    localStorage.clear();
+  });
+
+  it('aparece na Músicas para membro, no app instalado, com o estado disponível', async () => {
+    renderHome({ role: 'member', path: '/', push: fakePushService() });
+    expect(await screen.findByRole('region', { name: 'Ative os avisos' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Cifras como app' })).not.toBeInTheDocument();
+  });
+
+  it('não aparece nas outras abas', async () => {
+    const service = fakePushService();
+    renderHome({ role: 'member', path: '/?aba=cantores', push: service });
+    await waitFor(() => expect(screen.queryByRole('region')).not.toBeInTheDocument());
+    expect(service.load).not.toHaveBeenCalled();
+  });
+
+  it('não aparece para visitante', async () => {
+    const service = fakePushService();
+    renderHome({ role: 'viewer', path: '/', push: service });
+    expect(screen.queryByRole('region', { name: 'Ative os avisos' })).not.toBeInTheDocument();
+    expect(service.load).not.toHaveBeenCalled();
   });
 });

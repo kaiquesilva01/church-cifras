@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { avisosSession } from './avisosSession';
 import type { AvisosStatus, PushService } from './types';
 import { usePushAvisos } from './usePushAvisos';
 
@@ -156,5 +157,17 @@ describe('usePushAvisos', () => {
     expect(result.current.test).toBe('sent');
     await act(async () => result.current.enable());
     expect(result.current.test).toBe('idle');
+  });
+
+  it('desativar fecha a sessão do convite, para ele não voltar agora', async () => {
+    avisosSession.reset();
+    const s = service();
+    const { result } = renderHook(() => usePushAvisos(s));
+    await waitFor(() => expect(result.current.status).toBe('available'));
+    await act(async () => {
+      result.current.disable();
+    });
+    expect(avisosSession.isClosed()).toBe(true);
+    avisosSession.reset();
   });
 });

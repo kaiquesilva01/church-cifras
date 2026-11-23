@@ -109,8 +109,8 @@ describe('firestore.rules', () => {
     await assertFails(setDoc(doc(db, 'users/u2'), { role: 'admin' }));
   });
 
-  it('allows signed-in read of songs, arrangements and artists', async () => {
-    const db = env.authenticatedContext('u1').firestore();
+  it('allows member read of songs, arrangements and artists', async () => {
+    const db = env.authenticatedContext('m1', { role: 'member' }).firestore();
     await assertSucceeds(getDoc(doc(db, 'songs/s1')));
     await assertSucceeds(getDoc(doc(db, 'songs/s1/arrangements/a1')));
     await assertSucceeds(getDoc(doc(db, 'artists/ar1')));
@@ -485,9 +485,9 @@ describe('songLyrics rules', () => {
     await assertFails(deleteDoc(doc(db, 'songLyrics/s1')));
   });
 
-  it('signed-in reads songLyrics', async () => {
+  it('member reads songLyrics', async () => {
     await seedLyrics('s1', { text: 'a', createdBy: 'm1', createdAt: new Date() });
-    const db = env.authenticatedContext('u1').firestore();
+    const db = env.authenticatedContext('m1', { role: 'member' }).firestore();
     await assertSucceeds(getDoc(doc(db, 'songLyrics/s1')));
   });
 

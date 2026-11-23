@@ -112,6 +112,7 @@ function renderViewer(options: Options = {}) {
     status: 'signed-in',
     user: testUser,
     role: options.role ?? 'member',
+    access: 'granted',
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),

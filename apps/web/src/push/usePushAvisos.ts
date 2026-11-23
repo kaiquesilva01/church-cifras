@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { avisosSession } from './avisosSession';
 import type { AvisosStatus, PushService, TestStatus } from './types';
 
 export interface AvisosView {
@@ -53,6 +54,8 @@ export function usePushAvisos(service: PushService): AvisosView {
     },
     disable: () => {
       setTest('idle');
+      // Desativar é "agora não" nesta sessão: o convite da Músicas não volta até a próxima carga.
+      avisosSession.close();
       run('disabling', () => service.disable());
     },
     sendTest: () => {

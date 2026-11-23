@@ -29,6 +29,7 @@ function setup(role: Role) {
       initialPath="/nova"
     />,
   );
+  gateway.claimRole = role;
   act(() => gateway.emitUser(testUser));
   act(() => gateway.emitRole(role));
 }
@@ -40,9 +41,11 @@ describe('/nova route', () => {
     expect(await screen.findByText('Nova cifra (marker)')).toBeInTheDocument();
   });
 
-  it('redirects viewers to the home page', async () => {
+  it('shows only the access screen to visitors', async () => {
     setup('viewer');
-    expect(await screen.findByRole('searchbox')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Acesso ainda não liberado' }),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Nova cifra (marker)')).not.toBeInTheDocument();
   });
 });

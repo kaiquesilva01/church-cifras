@@ -15,6 +15,7 @@ import './ui/redesign-states.css';
 import './ui/redesign-stats.css';
 import './ui/redesign-install.css';
 import './ui/redesign-push.css';
+import './ui/redesign-access.css';
 
 const storage = getSessionStorage(window);
 installPreloadErrorReload(window, storage);

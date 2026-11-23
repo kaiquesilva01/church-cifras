@@ -57,7 +57,10 @@ export function LoginPage() {
       <button type="button" className="btn btn-primary" onClick={handleClick} disabled={busy}>
         Entrar com Google
       </button>
-      <p className="login-note">Quem entra pela primeira vez começa como visitante.</p>
+      <p className="login-note">
+        Quem entra pela primeira vez precisa da liberação de um admin do ministério para ver as
+        cifras.
+      </p>
       {failed && (
         <p role="alert" className="error">
           Não foi possível entrar. Tente de novo.

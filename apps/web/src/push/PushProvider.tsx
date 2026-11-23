@@ -14,9 +14,9 @@ export function PushProvider({
   service: PushService | null;
   children: ReactNode;
 }) {
-  const { status, user, role } = useAuth();
+  const { status, user, role, access } = useAuth();
   const uid = status === 'signed-in' ? user?.uid : undefined;
-  const eligible = canEdit(role);
+  const eligible = access === 'granted' && canEdit(role);
 
   useEffect(() => {
     if (!service || !uid || !eligible) return;

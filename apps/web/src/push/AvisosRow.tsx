@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
+import { BELL_PATH } from './bell';
 import type { AvisosStatus, PushService } from './types';
 import { type AvisosView, usePushAvisos } from './usePushAvisos';
 
-const BELL = 'M6 8a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 14 6 8M10 20a2 2 0 0 0 4 0';
 const MUTED_AVAILABLE = 'Receba repertório novo e lembrete do ensaio neste aparelho';
 
 interface Copy {
@@ -112,7 +112,7 @@ export function AvisosRow({ service }: { service: PushService }) {
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d={BELL} />
+            <path d={BELL_PATH} />
           </svg>
         </span>
         <span className="menu-text">
