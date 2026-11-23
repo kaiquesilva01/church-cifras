@@ -33,8 +33,8 @@ Segue o design principal (§2); nada de papel novo.
 | Papel | Repertórios |
 |---|---|
 | **Visitante** | Ver repertórios e navegar pelas cifras deles; **sem** controles de edição [proposta] |
-| **Membro** | + criar, editar (ordem, tom, itens, data/rótulo), duplicar e apagar repertórios [proposta] |
-| **Admin** | Igual ao membro |
+| **Membro** | Só lê repertórios (decisão de 23/11/2026, PR #127: a escrita passou a ser só do admin) |
+| **Admin** | + criar, editar (ordem, tom, itens, data/rótulo), duplicar e apagar repertórios |
 
 ## 3. Objetivos, não-objetivos e anti-objetivos
 
@@ -53,7 +53,7 @@ Segue o design principal (§2); nada de papel novo.
 - Escala de músicos/líder e comentários [decisão nossa].
 - Histórico de versões ou "desfazer" de edições [decisão nossa].
 - Gestos de deslizar para trocar de cifra; a navegação é por botões [proposta].
-- Permissões por repertório (todo membro edita todo repertório) [proposta].
+- Permissões por repertório (todo admin edita todo repertório) [proposta].
 
 **Reaberto em 21/11/2026 pela issue [#85](https://github.com/kaiquesilva01/church-cifras/issues/85):** notificação push para avisos de repertório novo e de ensaio. É opt-in por aparelho, só para membro e admin, e não há tela nem envio automático nesta fase (a base está na #98). Escala de músicos/líder e comentários seguem fora.
 
@@ -146,18 +146,18 @@ Esboço; as condições exatas ficam para o plano.
 ```
 match /setlists/{setlistId} {
   allow read:   if signedIn();
-  allow create: if isEditor() && validSetlist(request.resource.data) && createdBy/updatedBy == auth.uid
+  allow create: if isAdmin() && validSetlist(request.resource.data) && createdBy/updatedBy == auth.uid
                    && createdAt/updatedAt == request.time;
-  allow update: if isEditor() && validSetlist(request.resource.data)
+  allow update: if isAdmin() && validSetlist(request.resource.data)
                    && createdBy e createdAt inalterados && updatedBy == auth.uid && updatedAt == request.time;
-  allow delete: if isEditor();
+  allow delete: if isAdmin();
 }
 ```
 
 - `validSetlist`: chaves exatas, `date` no padrão `YYYY-MM-DD`, `label` de 1–60 caracteres, `items` é lista de até 40,
   `expiresAt` é timestamp.
 - **Limite conhecido:** as rules não iteram sobre `items`, então não validam o formato de cada item nem se `songId`
-  existe. Como só membro/admin escreve, o risco é aceito [decidido, §5.4]. O cliente valida e tolera itens inválidos
+  existe. Como só admin escreve, o risco é aceito [decidido, §5.4]. O cliente valida e tolera itens inválidos
   (renderiza "Música removida" e ignora tom inválido).
 - O padrão de `date` aceita datas impossíveis (`2026-13-45`); o cliente valida a data real.
 - `expiresAt`: as rules **podem** conferir o cálculo a partir de `date` (UTC−3 fixo, sem horário de verão desde 2019),
@@ -223,7 +223,7 @@ Próximo culto
 ```
 
 **Aba Repertórios.** "Próximos" (data crescente) e "Recentes" (data decrescente, só não expirados). Nessa aba o campo
-de busca da tela inicial **não aparece** [decisão nossa]. "＋ Novo repertório" só para membro/admin, como botão flutuante,
+de busca da tela inicial **não aparece** [decisão nossa]. "＋ Novo repertório" só para admin, como botão flutuante,
 igual ao "＋ Nova cifra" (que continua nas outras abas).
 
 **Criar/editar repertório** (diálogo): data (padrão: o próximo dia que seja quinta ou domingo, hoje incluído) e rótulo
@@ -244,7 +244,7 @@ itens copiados (ids novos) e data/rótulo para o novo culto.
 
 - `≡` arrasta (alça própria, para não brigar com a rolagem); ▲ ▼ movem uma posição; `✕` remove; tocar no **tom** abre a
   escolha entre os tons salvos da música; tocar no **título** abre a cifra (§6.7).
-- Visitante vê só título e tom, sem controles.
+- Visitante e membro veem só título e tom, sem controles.
 - **＋ Adicionar** abre uma folha de busca (mesma busca em memória de `filterSongs`); tocar numa música a acrescenta **ao
   fim** no seu **tom feito à mão** (o primeiro, em ordem de tons; se não houver, o primeiro tom salvo, como o visualizador já faz) e a folha continua aberta para acrescentar mais.
   Músicas sem PDF aparecem desabilitadas; músicas já no repertório ganham o selo "já está" [decisão nossa].
