@@ -71,12 +71,18 @@ describe('theme tokens', () => {
     expect(last('color')).toBe('var(--color-text)');
   });
 
-  it('styles the install card with the shared shadow token and 44 px tap targets', () => {
+  it('styles the convite cards with the shared shadow token, 44 px tap targets and the accent tile', () => {
     const install = readFileSync(resolve(import.meta.dirname, 'redesign-install.css'), 'utf8');
-    expect(install).toMatch(/\.install-card \{[^}]*box-shadow: var\(--shadow-pop\);/);
-    expect(install).toMatch(/\.install-card__close \{[^}]*width: 44px;[^}]*height: 44px;/);
-    expect(install).toMatch(/\.install-card__add \{[^}]*min-height: 44px;/);
-    expect(install).toMatch(/\.install-card__add span \{[^}]*height: 36px;/);
-    expect(install).toMatch(/\.install-card__close span \{[^}]*width: 28px;[^}]*height: 28px;/);
+    expect(install).toMatch(/\.convite \{[^}]*box-shadow: var\(--shadow-pop\);/);
+    expect(install).toMatch(/\.convite__close \{[^}]*width: 44px;[^}]*height: 44px;/);
+    expect(install).toMatch(/\.convite__action \{[^}]*min-height: 44px;/);
+    expect(install).toMatch(/\.convite__action span \{[^}]*height: 36px;/);
+    expect(install).toMatch(/\.convite__close span \{[^}]*width: 28px;[^}]*height: 28px;/);
+    expect(install).toMatch(/\.convite__tile \{[^}]*background: var\(--color-accent-soft\);/);
+  });
+
+  it('drops the legacy install-card styles now that the install card uses .convite', () => {
+    const install = readFileSync(resolve(import.meta.dirname, 'redesign-install.css'), 'utf8');
+    expect(install).not.toMatch(/install-card/);
   });
 });

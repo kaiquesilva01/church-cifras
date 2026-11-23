@@ -1,13 +1,17 @@
-/** Chave versionada do convite no localStorage. Mudar o formato pede nova versão da chave. */
+import {
+  isDismissedAt,
+  readDismissRecord,
+  writeDismissRecord,
+  type DismissRecord,
+} from '../lib/dismissRecord';
+
+/** Chave versionada do convite de instalação. Mudar o formato pede nova versão da chave. */
 export const INSTALL_RECORD_KEY = 'cifras.installCard.v1';
-/** "Agora não" vale por 30 dias. */
-export const DISMISS_MS = 30 * 24 * 60 * 60 * 1000;
+export { DISMISS_MS } from '../lib/dismissRecord';
 
 export type InstallCardMode = 'hidden' | 'prompt' | 'ios';
 
-export interface InstallRecord {
-  dismissedAt: number | null;
-}
+export type InstallRecord = DismissRecord;
 
 export interface InstallEnvironment {
   userAgent: string;
@@ -59,10 +63,7 @@ export function isStandalone(env: InstallEnvironment): boolean {
 
 export function decideInstallCard(input: InstallDecisionInput): InstallCardMode {
   if (input.standalone || input.installed) return 'hidden';
-  if (input.dismissedAt !== null) {
-    const age = input.now - input.dismissedAt;
-    if (age >= 0 && age < DISMISS_MS) return 'hidden';
-  }
+  if (isDismissedAt(input.dismissedAt, input.now)) return 'hidden';
   if (input.hasPrompt) return 'prompt';
   return input.iosSafari ? 'ios' : 'hidden';
 }
@@ -77,27 +78,12 @@ export function localStorageOrUndefined(win: Window): Storage | undefined {
 }
 
 export function readInstallRecord(storage: Pick<Storage, 'getItem'> | undefined): InstallRecord {
-  try {
-    const raw = storage?.getItem(INSTALL_RECORD_KEY);
-    if (!raw) return { dismissedAt: null };
-    const parsed: unknown = JSON.parse(raw);
-    const dismissedAt = (parsed as { dismissedAt?: unknown } | null)?.dismissedAt;
-    return {
-      dismissedAt:
-        typeof dismissedAt === 'number' && Number.isFinite(dismissedAt) ? dismissedAt : null,
-    };
-  } catch {
-    return { dismissedAt: null };
-  }
+  return readDismissRecord(storage, INSTALL_RECORD_KEY);
 }
 
 export function writeInstallRecord(
   storage: Pick<Storage, 'setItem'> | undefined,
   record: InstallRecord,
 ): void {
-  try {
-    storage?.setItem(INSTALL_RECORD_KEY, JSON.stringify(record));
-  } catch {
-    // Armazenamento bloqueado ou cheio: o "Agora não" vale só nesta sessão.
-  }
+  writeDismissRecord(storage, INSTALL_RECORD_KEY, record);
 }
