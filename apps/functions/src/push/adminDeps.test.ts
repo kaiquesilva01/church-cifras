@@ -47,7 +47,7 @@ beforeEach(() => {
 });
 
 describe('createPushDeps.sendBatch', () => {
-  it('builds the exact sendEach message for one device', async () => {
+  it('builds the exact sendEach message for one device, with renotify next to the tag', async () => {
     msg.sendEach.mockResolvedValue({ responses: [{ success: true }] });
 
     await createPushDeps().sendBatch([
@@ -69,6 +69,7 @@ describe('createPushDeps.sendBatch', () => {
         webpush: {
           notification: {
             tag: 'rep-r1',
+            renotify: true,
             icon: 'https://louvor-hajaluz.web.app/icons/icon-192.png',
             badge: 'https://louvor-hajaluz.web.app/icons/badge-96.png',
           },
@@ -96,6 +97,7 @@ describe('createPushDeps.sendBatch', () => {
     const sent = msg.sendEach.mock.calls[0]?.[0] as Array<{ webpush: { notification: unknown } }>;
     expect(sent[0]?.webpush.notification).toEqual({
       tag: 'teste-1',
+      renotify: true,
       icon: 'https://louvor-hajaluz-teste.web.app/icons/icon-192.png',
       badge: 'https://louvor-hajaluz-teste.web.app/icons/badge-96.png',
     });

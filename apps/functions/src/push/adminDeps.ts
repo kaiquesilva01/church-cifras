@@ -65,6 +65,8 @@ export function createPushDeps(): PushDeps {
           webpush: {
             notification: {
               tag: message.tag,
+              // Com a mesma tag, um aviso novo substitui o antigo; renotify faz o aparelho alertar de novo.
+              renotify: true,
               icon: siteAsset(message.link, '/icons/icon-192.png'),
               badge: siteAsset(message.link, '/icons/badge-96.png'),
             },
