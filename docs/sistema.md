@@ -113,7 +113,7 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
 | `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
 | `avisosEnviados/{setlistId}_novo` | `setlistId`, `tipo` (`novo`), `createdAt`, `expiresAt` (o maior valor entre agora + 60 dias e o `expiresAt` do repertório; marca do aviso de repertório novo) | nenhuma; só Functions |
-| `avisosEnviados/{setlistId}_{perto\|agora}_{rehearsalAtMs}` | `setlistId`, `tipo` (`perto`/`agora`), `rehearsalAt`, `createdAt`, `expiresAt` (mesma regra do repertório novo); marca dos lembretes do ensaio (#102) | nenhuma; só Functions |
+| `avisosEnviados/{setlistId}_{vespera\|dia\|perto}_{rehearsalAtMs}` | `setlistId`, `tipo` (`vespera`/`dia`/`perto`), `rehearsalAt`, `createdAt`, `expiresAt` (mesma regra do repertório novo); marca dos lembretes do ensaio (#102, #121) |
 | `artists/*` | não existe de fato | negada |
 
 - `slug` do tom = tom com `#` trocado por `s` (id do documento). Um tom existe uma vez por música; quem gerar o mesmo tom depois recebe "já existe" e o sistema abre o existente.
@@ -147,7 +147,7 @@ Todas exportadas por `apps/functions/src/index.ts` (algumas definidas em submód
 | `unregisterDevice` | callable | qualquer logado | Apaga o aparelho do próprio chamador (logout); idempotente |
 | `sendTestPush` | callable | membro, admin | Envia "Aviso de teste" só aos aparelhos do chamador; ignora o interruptor; responde `{ sent, failed, pruned }` (só contagens; `pruned` são aparelhos apagados por token morto) |
 | `onSetlistWritten` | Firestore (`setlists/{setlistId}`) | automático | Avisa "Novo repertório" aos aparelhos de membros e admins quando o repertório chega a 4 louvores; uma vez por repertório (marca em `avisosEnviados`); não avisa quem gravou; só aparelhos da mesma origem; respeita `config/push` |
-| `sendRehearsalReminders` | agendada, a cada minuto (`America/Sao_Paulo`) | automático | Avisa "Ensaio em N min" (ensaio em até 30 min; N é o que falta, 30 quando o cron roda no horário previsto) e "Ensaio agora" (ensaio de até 5 min atrás), uma vez por horário, a membros e admins, inclusive quem gravou; só aparelhos da mesma origem; respeita `config/push` |
+| `sendRehearsalReminders` | agendada, a cada minuto (`America/Sao_Paulo`) | automático | Avisa o ensaio com horário em até 24 h: "Ensaio amanhã às HHhMM" (24 h antes), "Ensaio hoje às HHhMM" (08h00 do dia, ensaio às 11h00 ou depois) e "Ensaio em N min" / "Ensaio em 1 hora" (até 60 min antes, retroativo); uma vez por horário, a membros e admins, inclusive quem gravou; só aparelhos da mesma origem; respeita `config/push` |
 | `health` | callable | qualquer chamada | Verificação de saúde |
 
 Avisos (push): o auxiliar `sendToDevices` (`apps/functions/src/push/send.ts`) envia em lotes de 500 mensagens, usa o link da origem de cada aparelho, ignora e apaga aparelho de quem não é mais membro ou admin, poda só tokens inválidos e respeita `config/push` quando pedido. O gatilho do repertório novo é `onSetlistWritten` (regra abaixo); o lembrete do ensaio é `sendRehearsalReminders` (regra abaixo).
@@ -161,8 +161,7 @@ Regras de contagem de uso:
 
 Regra do aviso de repertório novo:
 
-- Sai quando `items.length` passa de 3 ou menos para 4 ou mais, ou quando o repertório nasce com 4 ou mais (por exemplo, ao duplicar).
-- Repertório com menos de 4 louvores nunca avisa.
+- Sai quando `items.length` passa de 3 ou menos para 4 ou mais, ou quando o repertório nasce com 4 ou mais (por exemplo, ao duplicar); com menos de 4 louvores nunca avisa.
 - Só repertório criado a partir de 22/11/2026 (00:00, Brasília) pode avisar; os criados antes nunca avisam, então não há marca a preencher para os antigos. Sem `createdAt` legível, também não avisa.
 - A marca `avisosEnviados/{setlistId}_novo` é criada antes do envio; esvaziar e encher o repertório de novo não avisa outra vez.
 - Falha de envio só entra no log; não reenvia.
@@ -170,10 +169,10 @@ Regra do aviso de repertório novo:
 
 Regra dos lembretes do ensaio:
 
-- Agendada a cada minuto; consulta `setlists` com `rehearsalAt` entre agora − 5 min e agora + 30 min.
-- "Ensaio em N min" (N = minutos que faltam, arredondado para cima, mínimo 1; 30 quando o cron roda no horário previsto): `rehearsalAt` em (agora, agora + 30 min]. "Ensaio agora": `rehearsalAt` em (agora − 5 min, agora]. Sem retroativo além de 5 min.
-- Uma vez por horário: `avisosEnviados/{setlistId}_{tipo}_{rehearsalAtMs}` é criada antes do envio. Gravar a hora a menos de 30 min do ensaio dispara o "perto" na execução seguinte (até 1 min). Se o horário mudou depois de um "perto", o próximo "perto" tem o título `Ensaio mudou para HHhMM`. O "agora" usa a mesma tag e substitui, no aparelho, o aviso anterior do ensaio ("Ensaio em N min" ou "Ensaio mudou para HHhMM").
-- Horas em Brasília (UTC−3, sem horário de verão). Diz `amanhã` quando o ensaio cai em outro dia civil de Brasília (só na faixa 'perto' que cruza a meia-noite). Repertório sem `rehearsalAt`, ou com a hora passada, não avisa.
+- Agendada a cada minuto; consulta `setlists` com `rehearsalAt` em (agora, agora + 24 h]. Marcas só são lidas quando há aviso devido.
+- Três avisos, cada um numa faixa: véspera (ensaio em (agora + 24 h − 10 min, agora + 24 h]); no dia (agora entre 08h00 e 08h10 de Brasília, ensaio no mesmo dia às 11h00 ou depois); 1 hora (ensaio em (agora, agora + 60 min]; é o único retroativo). Todos com a tag `setlist-{id}-ensaio`, que substitui o aviso anterior no aparelho.
+- Uma vez por horário: `avisosEnviados/{setlistId}_{tipo}_{rehearsalAtMs}` é criada antes do envio. Marca antiga `perto` vale para o aviso de 1 hora.
+- Horário mudou: se a marca de maior `createdAt` entre as marcas de ensaios ainda futuros (véspera, dia e 1 hora; marcas `agora` e de repertório novo não contam) é de outro horário, o título vira `Ensaio mudou para HHhMM` (mesmo dia) ou `Ensaio mudou para dom 22/11 às HHhMM`. Horas e datas em Brasília (UTC−3, sem horário de verão); sem `rehearsalAt`, ou com a hora passada, não avisa.
 
 ### Deploy e produção (`docs/deploy.md`)
 
@@ -277,12 +276,10 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Data, rótulo e ensaio do repertório são last-write-wins quando a folha de edição está aberta em dois aparelhos: ao abrir, ela parte do estado mais novo do servidor e não acompanha mudanças feitas depois; quem salva por último vence.
 - A tela do repertório e o cartão "Próximo culto" calculam o estado muted (já passou da hora) no momento em que abrem; sem atualização ao vivo enquanto ficam abertos.
 - Convite de instalação: Firefox Android e outros navegadores sem `beforeinstallprompt` não recebem o convite (não há API que instale com confiança). No iPhone e no iPad, só o Safari recebe a instrução: Chrome e Firefox do iOS ficam sem convite. No iOS não existe evento de instalação: quem instalou no iPhone e abre o site no Safari vê a instrução até dispensar.
-- Aviso de repertório novo: se o envio falha depois de criada a marca, o aviso se perde (não há reenvio).
-- Aviso de repertório novo: com `config/push.enabled === false`, a marca é criada mesmo assim; religar o interruptor não avisa esse repertório.
+- Aviso de repertório novo: se o envio falha depois de criada a marca, o aviso se perde (não há reenvio); com `config/push.enabled === false`, a marca é criada mesmo assim e religar o interruptor não avisa esse repertório.
 - Aviso de repertório novo: repertório que chega a 4 louvores com data inválida não recebe aviso. Na prática não acontece, porque cliente e Rules validam a data.
-- Lembretes do ensaio: até 1 min de atraso (cron). Se a função ficar parada por mais de 5 min, o "agora" daquele horário se perde. Sem horário de silêncio na v1 (decisão da #85).
-- Lembretes do ensaio: falha de envio depois de criada a marca faz o aviso se perder (sem reenvio). Com `config/push.enabled === false`, a marca é criada e o lembrete não sai; religar o interruptor não manda o lembrete depois.
-- Lembretes do ensaio: se o horário volta ao que já foi avisado (A → B → A), não reenvia, porque a marca de A existe. Marcas "agora" de outro horário não contam como mudança. O "perto" também sai com menos de 30 min (ex.: hora gravada 10 min antes), com "Ensaio em 10 min"; se uma execução falha, o N pode aparecer 1 menor (ex.: 29); aceito.
+- Lembretes do ensaio: até 1 min de atraso (cron). Se a função ficar parada por mais de 10 min, o aviso da véspera ou do dia daquela janela se perde. Falha de envio depois da marca perde o aviso (sem reenvio); com `config/push.enabled === false`, a marca é criada e nada sai. Sem horário de silêncio na v1 (decisão da #85).
+- Lembretes do ensaio: A → B → A não reenvia o horário já avisado, mas pode enviar um tipo ainda não enviado para A. O "mudou" chega no próximo aviso devido, que pode ser horas depois.
 
 ### Pendências abertas
 
