@@ -1,6 +1,7 @@
 import { expect, test as base, type Browser, type Page, type TestInfo } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { createGoogleUser, waitForUserDoc } from './emulator';
 import { lettersTag } from './names';
 
 export { expect };
@@ -19,9 +20,14 @@ export function newAccount(label: string): Account {
 
 /**
  * Signs in through the real Google popup of the Auth emulator: "Add new account", fill the form,
- * submit. Waits until the app shows the signed-in bottom bar.
+ * submit. Waits until the app shows the signed-in bottom bar (`'nav'`, the default) or, for an
+ * account without access, the access screen (`'access'`, #126).
  */
-export async function signInWithPopup(page: Page, account: Account): Promise<void> {
+export async function signInWithPopup(
+  page: Page,
+  account: Account,
+  wait: 'nav' | 'access' = 'nav',
+): Promise<void> {
   await page.goto('/');
   const popupPromise = page.waitForEvent('popup');
   const enter = page.getByRole('button', { name: 'Entrar com Google' });
@@ -39,7 +45,54 @@ export async function signInWithPopup(page: Page, account: Account): Promise<voi
     await popup.getByLabel(/display name/i).fill(account.name);
     await popup.getByRole('button', { name: /sign in with google/i }).click();
   }
-  await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
+  if (wait === 'access') {
+    await expect(page.getByRole('heading', { name: 'Acesso ainda não liberado' })).toBeVisible();
+  } else {
+    await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
+  }
+}
+
+/** Signs in with an account that has no role yet: the access screen is what it sees (#126). */
+export async function signInToAccessScreen(page: Page, account: Account): Promise<void> {
+  await signInWithPopup(page, account, 'access');
+}
+
+/**
+ * Creates a Google account in the Auth emulator and waits for its users/{uid} doc. It has no role
+ * (visitante): the access screen is all it can see until an admin releases it.
+ */
+export async function registerVisitor(label: string): Promise<Account> {
+  const account = newAccount(label);
+  await waitForUserDoc(await createGoogleUser(account.email, account.name));
+  return account;
+}
+
+/**
+ * In a separate browser session (so the test's own page keeps its sign-in), the admin releases the
+ * account as member in Pessoas, the way an admin does it in production (#126).
+ */
+export async function promoteToMember(
+  browser: Browser,
+  testInfo: TestInfo,
+  person: Account,
+): Promise<void> {
+  const { context, page } = await openSession(browser, testInfo);
+  try {
+    await signInAs(page, ADMIN, 'Admin');
+    await page
+      .getByRole('navigation', { name: 'Principal' })
+      .getByRole('link', { name: 'Mais' })
+      .click();
+    await page.getByRole('link', { name: /Admin/ }).click();
+    await expect(page.getByRole('heading', { name: 'Pessoas' })).toBeVisible();
+    const select = page.getByLabel(`Papel de ${person.name}`);
+    await expect(select).toHaveValue('viewer');
+    await select.selectOption({ label: 'Membro' });
+    await expect(page.getByRole('status').filter({ hasText: 'Papel atualizado' })).toBeVisible();
+    await expect(select).toHaveValue('member');
+  } finally {
+    await context.close();
+  }
 }
 
 /**

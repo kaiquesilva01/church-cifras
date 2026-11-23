@@ -124,6 +124,7 @@ function setup(
     status: 'signed-in',
     user: testUser,
     role,
+    access: 'granted',
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),

@@ -108,7 +108,8 @@ componente (`.song-card .chip`, não `.chip`) e só com tokens. `themeTokens.tes
 | **Alertas** | caixa suave vermelha (alerta de página); aviso de sucesso `.notice`; erro de campo só texto | `redesign-states.css` |
 | **Diálogos** | cartão 22 px com ações em pílula. **Destrutivo** = Cancelar neutro à esquerda + botão de confirmar vermelho sólido à direita (`--color-error`, texto `--color-on-primary`), ambos 46 px; foco inicial no Cancelar; Escape cancela; sem digitar nada para confirmar | `.dialog`, `ConfirmDialog`, `.confirm-actions` |
 | **Aviso de atualização** | pílula no topo, centralizada, botão âmbar "Atualizar" | `UpdatePrompt` |
-| **Convite de instalação** | cartão fixo no topo da aba Músicas, só logado, abaixo da barra de status. Logo `icons/icon.svg` 48 px, título "Cifras como app" (15 px, 800), apoio "Abra direto da tela inicial" (13 px, muted). Android/Chromium: botão âmbar "Adicionar" (pílula 36 px, alvo 44 px) abre o diálogo de instalação. iPhone/iPad com Safari: sem botão; apoio "Toque em Compartilhar e depois em Adicionar à Tela de Início". "×" (aria-label "Agora não"; disco 28 px, alvo 44 px) dispensa por 30 dias. Some no app instalado e em outros navegadores sem o evento | `InstallCard`, `pwa/useInstallPrompt.ts`, `ui/redesign-install.css` |
+| **Convite de instalação** | cartão fixo no topo da aba Músicas, só membro e admin, abaixo da barra de status. Logo `icons/icon.svg` 48 px, título "Cifras como app" (15 px, 800), apoio "Abra direto da tela inicial" (13 px, muted). Android/Chromium: botão âmbar "Adicionar" (pílula 36 px, alvo 44 px) abre o diálogo de instalação. iPhone/iPad com Safari: sem botão; apoio "Toque em Compartilhar e depois em Adicionar à Tela de Início". "×" (aria-label "Agora não"; disco 28 px, alvo 44 px) dispensa por 30 dias. Some no app instalado e em outros navegadores sem o evento | `InstallCard`, `pwa/useInstallPrompt.ts`, `ui/redesign-install.css` |
+| **Tela de acesso pendente** | tela escura (o Paper só tem o tema escuro; o código usa tokens nos dois temas): cadeado em bloco de 64 px, título "Acesso ainda não liberado", texto, cartão com a conta ("Conta"), botão "Sair". Visitante sem liberação vê só ela, em qualquer rota, na própria URL | `AccessPending`, `RequireAccess`, `ui/redesign-access.css` |
 | **Faixa de teste** | faixa no topo, só no site de teste (`louvor-hajaluz-teste`): texto "TESTE · #N" (13 px, negrito, centralizado) sobre `--color-warn-soft`, com `--color-warn`; no topo da página, rola com o conteúdo; nunca cobre controles (sem `sticky` nem `fixed`), com `env(safe-area-inset-top)`. Não aparece em produção (sem `VITE_TEST_BANNER`) | `TestBanner`, `.test-banner` |
 
 Textos fixos dos avisos (pt-BR, usar exatamente):
@@ -116,12 +117,11 @@ Textos fixos dos avisos (pt-BR, usar exatamente):
 - Linha Avisos: "Receba repertório novo e lembrete do ensaio neste aparelho"; "Ativados neste aparelho"; "Bloqueados no navegador. Libere as notificações nas configurações do site e volte aqui"; "Instale o app na tela inicial para receber avisos" + "No Safari: Compartilhar › Adicionar à Tela de Início"; "Seu navegador não permite avisos"; "Não foi possível ativar os avisos. Tente de novo."; "Aviso de teste enviado. Ele chega em instantes."; "Não foi possível enviar o teste.". Estados transitórios: "Verificando…", "Ativando…", "Desativando…" (texto muted, pílula desabilitada). Pílulas: "Ativar" (primária), "Desativar" (secundária), "Tentar de novo" (primária, em erro) e "Enviar aviso de teste" (segunda linha, com avisos ativos). Erros usam a caixa vermelha de alerta (`.push-alert`); o sucesso do teste usa `.notice`.
 - Aviso do sistema: "Novo repertório" / "{rótulo} · {dia} {dd/mm}"; "Ensaio amanhã às {hora}" / "{rótulo} · {dia-sem dd/mm}. Toque para ver os louvores." (24 h antes); "Ensaio hoje às {hora}" / mesmo corpo (08h00 do dia do ensaio, só para ensaio às 11h00 ou depois); "Ensaio em 1 hora" ou "Ensaio em {N} min" / "{rótulo} · {hoje|amanhã} às {hora}. Toque para ver os louvores." (até 60 min antes; N ≥ 59 vira "1 hora"); "Ensaio mudou para {hora}" ou "Ensaio mudou para {dia-sem dd/mm} às {hora}" / "{rótulo} · {dia-sem dd/mm}. Toque para ver os louvores."; "Aviso de teste" / "Está tudo certo. Você vai receber os avisos do Church Cifras neste aparelho.". `{hora}` no formato `18h30`; `{dia-sem dd/mm}` no formato `sáb 21/11`.
 
-Estados obrigatórios por tela: **carregando, vazio, erro** (e "somente leitura" para visitante). Ver a tela
-"Estados e avisos" no Paper.
+Estados obrigatórios por tela: **carregando, vazio, erro**. Ver a tela "Estados e avisos" no Paper.
 
 ## 6. Regras de produto que afetam o visual
 
-- Papéis: visitante só lê e baixa; membro sobe cifras e troca tom; só admin cria e edita repertórios e gerencia. Controles que o papel não pode usar
+- Papéis: visitante não vê nada além da tela de acesso pendente; membro sobe cifras e troca tom; só admin cria e edita repertórios e gerencia. Controles que o papel não pode usar
   **não aparecem** (exceto o item "Em breve" de Pessoas).
 - Mudar tom: o espaçamento afasta acordes vizinhos; **não** existe aviso de "acorde encosta". Vermelho só
   para o que não coube (vizinho que não é acorde ou margem).
@@ -138,12 +138,12 @@ Estados obrigatórios por tela: **carregando, vazio, erro** (e "somente leitura"
 ## 8. Paper: mapa das telas
 
 Linha 1 (originais): `01 Músicas`, `02 Repertório`, `03 Busca`, `04 Pad (tocando; bolinha verde na aba)`, `05 Mais (admin)`,
-`06 Cifra (overlay)`. Demais: `04b Pad (desligado, layout antigo)`, `04c Pad (desligado, como no app; tons salvos com borda âmbar)`, `05b Mais (membro/visitante)`, `07 Músicas (membro)`,
+`06 Cifra (overlay)`. Demais: `04b Pad (desligado, layout antigo)`, `04c Pad (desligado, como no app; tons salvos com borda âmbar)`, `05b Mais (membro/visitante; obsoleta: visitante não vê Mais)`, `07 Músicas (membro)`,
 `08 Cantores`, `09 Cantor`, `10 Cifra (PDF)`, `10b Cifra (PDF em tela cheia)`, `11 Mudar tom (painel)`, `12 Repertório (editar)`,
-`13 Repertório (visitante)`, `14 Adicionar louvor`, `15 Tom do item`, `16 Repertório · menu e diálogos`,
+`13 Repertório (visitante; obsoleta: visitante não vê repertórios)`, `14 Adicionar louvor`, `15 Tom do item`, `16 Repertório · menu e diálogos`,
 `17 Cifra no repertório`, `18 Cifra · menu admin`, `19 Admin · editar e apagar`, `20 Login`, `21 Nova cifra`,
 `22 Nova cifra · escolher / erro`, `23 Importar em lote`, `24 Pessoas`, `25 Estados e avisos`,
-`28 · Músicas · convite para instalar`, `29 · Músicas · convite para instalar (iPhone)`, `30 · Avisos · estados`, `31 · Aviso do sistema`.
+`28 · Músicas · convite para instalar`, `29 · Músicas · convite para instalar (iPhone)`, `30 · Avisos · estados`, `31 · Aviso do sistema`, `33 · Visitante sem acesso` (tela de acesso pendente, escura).
 **Tema claro:** `L1 Músicas`, `L2 Repertório`, `L3 Cifra`, `L4 Mudar tom`, `L5 Pad tocando (bolinha verde na aba)`, `L6 Mais (admin)`,
 `L7 · Músicas · convite para instalar (claro)`, `L8 · Músicas · convite para instalar (iPhone, claro)`, `L9 · Avisos · estados (claro)`
 (tokens `--color-light-*`; o Paper não troca variáveis por artboard, então o claro são artboards próprios).

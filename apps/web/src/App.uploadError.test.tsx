@@ -32,6 +32,7 @@ describe('/nova route failure', () => {
         onReload={onReload}
       />,
     );
+    gateway.claimRole = 'member';
     act(() => gateway.emitUser(testUser));
     act(() => gateway.emitRole('member'));
     expect(await screen.findByText('Não foi possível carregar a página.')).toBeInTheDocument();

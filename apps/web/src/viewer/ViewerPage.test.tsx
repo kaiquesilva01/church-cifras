@@ -42,6 +42,7 @@ function renderViewer(path: string, api = fakeCatalogApi()) {
     status: 'signed-in',
     user: testUser,
     role: 'member',
+    access: 'granted',
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),

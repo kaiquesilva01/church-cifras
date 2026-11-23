@@ -60,6 +60,7 @@ const auth: AuthState = {
   status: 'signed-in',
   user: testUser,
   role: 'viewer',
+  access: 'granted',
   prepareSignIn: () => Promise.resolve(),
   signIn: () => Promise.resolve(),
   signOut: () => Promise.resolve(),

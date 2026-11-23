@@ -18,11 +18,16 @@ function fakeService(): PushService {
   };
 }
 
-function authOf(status: AuthState['status'], role: Role): AuthState {
+function authOf(
+  status: AuthState['status'],
+  role: Role,
+  access: AuthState['access'] = 'granted',
+): AuthState {
   return {
     status,
     user: status === 'signed-in' ? testUser : null,
     role,
+    access,
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),
@@ -59,6 +64,18 @@ describe('PushProvider', () => {
     const service = fakeService();
     renderWith(service, authOf('signed-in', 'viewer'));
     expect(service.revalidate).not.toHaveBeenCalled();
+  });
+
+  it('does not revalidate while access is not granted', () => {
+    const service = fakeService();
+    renderWith(service, authOf('signed-in', 'member', 'blocked'));
+    expect(service.revalidate).not.toHaveBeenCalled();
+  });
+
+  it('revalidates with access granted and member role', () => {
+    const service = fakeService();
+    renderWith(service, authOf('signed-in', 'member', 'granted'));
+    expect(service.revalidate).toHaveBeenCalledTimes(1);
   });
 
   it('não revalida sem sessão', () => {

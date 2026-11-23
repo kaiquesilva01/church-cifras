@@ -33,9 +33,24 @@ afterAll(async () => {
 });
 
 describe('storage.rules', () => {
-  it('allows signed-in read under songs/', async () => {
-    const storage = env.authenticatedContext('u1', { role: 'viewer' }).storage();
+  it('allows member read under songs/', async () => {
+    const storage = env.authenticatedContext('m1', { role: 'member' }).storage();
     await assertSucceeds(getBytes(ref(storage, 'songs/s1/original.pdf')));
+  });
+
+  it('allows admin read under songs/', async () => {
+    const storage = env.authenticatedContext('a1', { role: 'admin' }).storage();
+    await assertSucceeds(getBytes(ref(storage, 'songs/s1/original.pdf')));
+  });
+
+  it('denies viewer read under songs/', async () => {
+    const storage = env.authenticatedContext('u1', { role: 'viewer' }).storage();
+    await assertFails(getBytes(ref(storage, 'songs/s1/original.pdf')));
+  });
+
+  it('denies read under songs/ without role claim', async () => {
+    const storage = env.authenticatedContext('u1').storage();
+    await assertFails(getBytes(ref(storage, 'songs/s1/original.pdf')));
   });
 
   it('denies unauthenticated read under songs/', async () => {
@@ -118,9 +133,19 @@ describe('storage.rules', () => {
     await assertFails(deleteObject(ref(storage, 'songs/s1/original.pdf')));
   });
 
-  it('allows signed-in viewer to read pads/', async () => {
-    const storage = env.authenticatedContext('u1', { role: 'viewer' }).storage();
+  it('allows member read pads/', async () => {
+    const storage = env.authenticatedContext('m1', { role: 'member' }).storage();
     await assertSucceeds(getBytes(ref(storage, 'pads/v1/DS04-C.m4a')));
+  });
+
+  it('denies viewer read pads/', async () => {
+    const storage = env.authenticatedContext('u1', { role: 'viewer' }).storage();
+    await assertFails(getBytes(ref(storage, 'pads/v1/DS04-C.m4a')));
+  });
+
+  it('denies read pads/ without role claim', async () => {
+    const storage = env.authenticatedContext('u1').storage();
+    await assertFails(getBytes(ref(storage, 'pads/v1/DS04-C.m4a')));
   });
 
   it('denies unauthenticated read under pads/', async () => {
@@ -128,8 +153,8 @@ describe('storage.rules', () => {
     await assertFails(getBytes(ref(storage, 'pads/v1/DS04-C.m4a')));
   });
 
-  it('denies signed-in read of the old flat pads/ path', async () => {
-    const storage = env.authenticatedContext('u1', { role: 'viewer' }).storage();
+  it('denies member read of the old flat pads/ path', async () => {
+    const storage = env.authenticatedContext('m1', { role: 'member' }).storage();
     await assertFails(getBytes(ref(storage, 'pads/DS04-C.m4a')));
   });
 

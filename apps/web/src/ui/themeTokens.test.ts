@@ -12,7 +12,8 @@ const redesignCss =
   readFileSync(resolve(import.meta.dirname, 'redesign-states.css'), 'utf8') +
   readFileSync(resolve(import.meta.dirname, 'redesign-stats.css'), 'utf8') +
   readFileSync(resolve(import.meta.dirname, 'redesign-install.css'), 'utf8') +
-  readFileSync(resolve(import.meta.dirname, 'redesign-push.css'), 'utf8');
+  readFileSync(resolve(import.meta.dirname, 'redesign-push.css'), 'utf8') +
+  readFileSync(resolve(import.meta.dirname, 'redesign-access.css'), 'utf8');
 const html = readFileSync(resolve(import.meta.dirname, '../../index.html'), 'utf8');
 
 function tokens(block: string): string[] {

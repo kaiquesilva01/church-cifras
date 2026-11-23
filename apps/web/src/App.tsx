@@ -16,6 +16,7 @@ import type { StatsApi } from './stats/statsApi';
 import { StatsPage } from './stats/StatsPage';
 import { loadViewerRoute } from './lib/prefetch';
 import { LoginPage } from './routes/LoginPage';
+import { RequireAccess } from './routes/RequireAccess';
 import { RequireAuth } from './routes/RequireAuth';
 import { ErrorBoundary } from './routes/ErrorBoundary';
 import { RequireRole } from './routes/RequireRole';
@@ -63,55 +64,39 @@ function AppRoutes({
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
-        <Route
-          element={
-            <SongsProvider api={catalogApi}>
-              <LyricsProvider api={catalogApi}>
-                <SetlistsProvider api={setlistApi}>
-                  <ActiveSetlistProvider api={setlistApi}>
-                    <PadProvider fetchBytes={catalogApi.getPdfBytes}>
-                      <AppShell />
-                    </PadProvider>
-                  </ActiveSetlistProvider>
-                </SetlistsProvider>
-              </LyricsProvider>
-            </SongsProvider>
-          }
-        >
-          <Route index element={<HomePage setlistApi={setlistApi} />} />
-          <Route path="/busca" element={<BuscaPage />} />
-          <Route path="/pad" element={<PadPage />} />
-          <Route path="/mais" element={<MaisPage />} />
-          <Route path="/cantores/:artistId" element={<ArtistPage />} />
+        <Route element={<RequireAccess />}>
           <Route
-            path="/musicas/:songId"
             element={
-              <ErrorBoundary onReload={onReload}>
-                <Suspense fallback={<CifraLoader />}>
-                  <ViewerRoute api={catalogApi} />
-                </Suspense>
-              </ErrorBoundary>
+              <SongsProvider api={catalogApi}>
+                <LyricsProvider api={catalogApi}>
+                  <SetlistsProvider api={setlistApi}>
+                    <ActiveSetlistProvider api={setlistApi}>
+                      <PadProvider fetchBytes={catalogApi.getPdfBytes}>
+                        <AppShell />
+                      </PadProvider>
+                    </ActiveSetlistProvider>
+                  </SetlistsProvider>
+                </LyricsProvider>
+              </SongsProvider>
             }
-          />
-          <Route
-            path="/repertorios/:id"
-            element={
-              <ErrorBoundary onReload={onReload}>
-                <Suspense
-                  fallback={
-                    <p role="status" className="status">
-                      Carregando…
-                    </p>
-                  }
-                >
-                  <SetlistRoute api={setlistApi} />
-                </Suspense>
-              </ErrorBoundary>
-            }
-          />
-          <Route element={<RequireRole roles={['member', 'admin']} />}>
+          >
+            <Route index element={<HomePage setlistApi={setlistApi} />} />
+            <Route path="/busca" element={<BuscaPage />} />
+            <Route path="/pad" element={<PadPage />} />
+            <Route path="/mais" element={<MaisPage />} />
+            <Route path="/cantores/:artistId" element={<ArtistPage />} />
             <Route
-              path="/nova"
+              path="/musicas/:songId"
+              element={
+                <ErrorBoundary onReload={onReload}>
+                  <Suspense fallback={<CifraLoader />}>
+                    <ViewerRoute api={catalogApi} />
+                  </Suspense>
+                </ErrorBoundary>
+              }
+            />
+            <Route
+              path="/repertorios/:id"
               element={
                 <ErrorBoundary onReload={onReload}>
                   <Suspense
@@ -121,31 +106,49 @@ function AppRoutes({
                       </p>
                     }
                   >
-                    <UploadRoute api={catalogApi} />
+                    <SetlistRoute api={setlistApi} />
                   </Suspense>
                 </ErrorBoundary>
               }
             />
-          </Route>
-          <Route element={<RequireRole roles={['admin']} />}>
-            <Route path="/pessoas" element={<PeoplePage api={peopleApi} />} />
-            <Route path="/estatisticas" element={<StatsPage api={statsApi} />} />
-            <Route
-              path="/importar"
-              element={
-                <ErrorBoundary onReload={onReload}>
-                  <Suspense
-                    fallback={
-                      <p role="status" className="status">
-                        Carregando…
-                      </p>
-                    }
-                  >
-                    <ImportRoute api={catalogApi} />
-                  </Suspense>
-                </ErrorBoundary>
-              }
-            />
+            <Route element={<RequireRole roles={['member', 'admin']} />}>
+              <Route
+                path="/nova"
+                element={
+                  <ErrorBoundary onReload={onReload}>
+                    <Suspense
+                      fallback={
+                        <p role="status" className="status">
+                          Carregando…
+                        </p>
+                      }
+                    >
+                      <UploadRoute api={catalogApi} />
+                    </Suspense>
+                  </ErrorBoundary>
+                }
+              />
+            </Route>
+            <Route element={<RequireRole roles={['admin']} />}>
+              <Route path="/pessoas" element={<PeoplePage api={peopleApi} />} />
+              <Route path="/estatisticas" element={<StatsPage api={statsApi} />} />
+              <Route
+                path="/importar"
+                element={
+                  <ErrorBoundary onReload={onReload}>
+                    <Suspense
+                      fallback={
+                        <p role="status" className="status">
+                          Carregando…
+                        </p>
+                      }
+                    >
+                      <ImportRoute api={catalogApi} />
+                    </Suspense>
+                  </ErrorBoundary>
+                }
+              />
+            </Route>
           </Route>
         </Route>
       </Route>

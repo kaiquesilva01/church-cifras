@@ -143,17 +143,17 @@ service cloud.firestore {
     }
 
     match /artists/{id} {
-      allow read: if signedIn();
+      allow read: if isEditor();
       allow write: if false;
     }
 
     match /songs/{songId} {
-      allow read: if signedIn();
+      allow read: if isEditor();
       allow create: if isEditor() && validSong(request.resource.data, songId);
       allow update, delete: if false;
 
       match /arrangements/{slug} {
-        allow read: if signedIn();
+        allow read: if isEditor();
         allow create: if isEditor()
           && existsAfter(/databases/$(database)/documents/songs/$(songId))
           && validArrangement(request.resource.data, songId, slug);
@@ -162,7 +162,7 @@ service cloud.firestore {
     }
 
     match /songLyrics/{songId} {
-      allow read: if signedIn();
+      allow read: if isEditor();
       allow create: if isEditor()
         && existsAfter(/databases/$(database)/documents/songs/$(songId))
         && validLyrics(request.resource.data, songId);
@@ -170,7 +170,7 @@ service cloud.firestore {
     }
 
     match /setlists/{setlistId} {
-      allow read: if signedIn();
+      allow read: if isEditor();
       allow create: if isAdmin()
         && validSetlist(request.resource.data, setlistId)
         && request.resource.data.createdBy == request.auth.uid

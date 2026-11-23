@@ -5,28 +5,29 @@ Cada PR de entrega atualiza este arquivo; o `code-reviewer` cobra quando faltar.
 Resumo do que o app faz hoje, para os agentes de negócio lerem antes de refinar uma issue. Quando um spec e o código divergem, vale o código e a divergência vai em "Limites conhecidos e pendências". Detalhes: specs em `docs/superpowers/specs/`, [design-system.md](design-system.md), [deploy.md](deploy.md).
 Fontes: os specs, `design-system.md`, `deploy.md`, `firestore.rules`, `storage.rules`, `firebase.json`, `.github/workflows/deploy.yml` e `site-teste.yml`, `apps/functions/src/index.ts`, `apps/web/src/App.tsx` e `apps/web/src/setlists/dates.ts`.
 
-**Em uma frase:** site de cifras (PDFs com acordes) do ministério de louvor de uma igreja: busca, abre a cifra no celular, troca o tom sobrepondo acordes novos no PDF, monta repertórios de culto e toca um pad ambiente no tom da música. Todo acesso exige login Google; não há link público.
+**Em uma frase:** site de cifras (PDFs com acordes) do ministério de louvor de uma igreja: busca, abre a cifra no celular, troca o tom sobrepondo acordes novos no PDF, monta repertórios de culto e toca um pad ambiente no tom da música. Todo acesso exige login Google e liberação de um admin (quem não foi liberado vê só a tela de acesso); não há link público.
 
 Stack: React + TypeScript (`apps/web`), Cloud Functions Node (`apps/functions`), núcleo de acordes (`packages/chords`), sobreposição no PDF (`packages/overlay`), Firebase (Hosting, Auth, Firestore, Storage), monorepo npm. Região `southamerica-east1`.
 
 ## Telas
 
-Rotas em `apps/web/src/App.tsx`. Tudo fora de `/login` exige login (`RequireAuth`); rota desconhecida volta para `/`.
+Rotas em `apps/web/src/App.tsx`. Tudo fora de `/login` exige login e liberação (`RequireAuth`, depois `RequireAccess`); rota desconhecida volta para `/`.
 
 | Rota | Tela | Quem acessa | O que faz |
 | --- | --- | --- | --- |
 | `/login` | Login | qualquer um | Entrar com Google. Abrir um link sem estar logado leva ao login e, depois, volta ao destino |
-| `/` | Início | logado | Cartão "Próximo culto"; abas Músicas, Harpa, Cantores e Repertórios; campo de busca; "＋ Nova cifra" só para membro/admin; "＋ Novo repertório" (aba Repertórios) só para admin; convite "Cifras como app" na aba Músicas (ver PWA) |
-| `/busca` | Busca | logado | Busca com filtros Tudo, Músicas, Cantores, Harpa; seção "Na letra" |
-| `/pad` | Pad | logado | Status, grade de 12 tons, volume, parar |
-| `/mais` | Mais | logado | Perfil e papel; Admin (só admin); Importar (só admin); Estatísticas (só admin); Avisos (membro e admin); Pessoas "Em breve"; Sair |
-| `/cantores/:artistId` | Cantor | logado | Músicas do cantor, com filtro próprio |
-| `/musicas/:songId` | Visualizador | logado | Cifra em PDF, atalhos dos tons salvos, barra de ações, Mudar tom |
-| `/repertorios/:id` | Repertório | logado (edita só admin) | Lista de louvores com tom; editar data, rótulo e ensaio, reordenar, compartilhar |
+| `/` | Início | membro e admin | Cartão "Próximo culto"; abas Músicas, Harpa, Cantores e Repertórios; campo de busca; "＋ Nova cifra" só para membro/admin; "＋ Novo repertório" (aba Repertórios) só para admin; convite "Cifras como app" na aba Músicas (ver PWA) |
+| `/busca` | Busca | membro e admin | Busca com filtros Tudo, Músicas, Cantores, Harpa; seção "Na letra" |
+| `/pad` | Pad | membro e admin | Status, grade de 12 tons, volume, parar |
+| `/mais` | Mais | membro e admin | Perfil e papel; Admin (só admin); Importar (só admin); Estatísticas (só admin); Avisos (membro e admin); Pessoas "Em breve"; Sair |
+| `/cantores/:artistId` | Cantor | membro e admin | Músicas do cantor, com filtro próprio |
+| `/musicas/:songId` | Visualizador | membro e admin | Cifra em PDF, atalhos dos tons salvos, barra de ações, Mudar tom |
+| `/repertorios/:id` | Repertório | membro e admin (edita só admin) | Lista de louvores com tom; editar data, rótulo e ensaio, reordenar, compartilhar |
 | `/nova` | Nova cifra | membro, admin | Upload de PDF com formulário |
 | `/pessoas` | Pessoas | admin | Lista de quem já logou, com seletor de papel |
 | `/estatisticas` | Estatísticas | admin | PDFs, armazenamento, cifras mais usadas |
 | `/importar` | Importar em lote | admin | Vários PDFs de uma vez (pensada para computador) |
+| qualquer rota | Acesso ainda não liberado | visitante | Só esta tela (e-mail e Sair); a URL não muda |
 
 Barra inferior (Músicas, Repertório, Busca, Pad, Mais) só nas 5 telas raiz; as de detalhe e formulários são tela cheia com `‹ Voltar`. Botão sol/lua escolhe tema claro/escuro (lembrado no aparelho; sem escolha, segue o sistema).
 
@@ -41,11 +42,10 @@ Barra inferior (Músicas, Repertório, Busca, Pad, Mais) só nas 5 telas raiz; a
 ### Visualizador (cifra)
 
 - Cabeçalho com música, cantor e tom; PDF em papel branco (também no tema escuro), com botão de tela cheia.
-- Atalhos dos tons salvos (o padrão em âmbar). O visitante só vê os atalhos, não o "Mudar tom".
+- Atalhos dos tons salvos (o padrão em âmbar).
 - Barra de ações: WhatsApp (abre a folha de compartilhar do aparelho com o PDF do tom exibido; some se o navegador não compartilha arquivo), **Pad** (liga/desliga o pad do tom exibido), **Mudar tom** (só membro/admin).
 - Mudar tom: painel inferior com 12 tons (salvos em verde, escolhido em âmbar), ± ½ tom, Cancelar/Confirmar. A prévia é instantânea (só redesenha uma camada sobre o PDF). Se o tom já existe, Confirmar apenas abre; senão gera o PDF no navegador, envia e abre o novo tom.
-- Transposição parte sempre de um PDF feito à mão, nunca de um gerado. Só os acordes e o tom no título (`(X)` ou `Tom: X`) mudam; layout e letra não.
-- Acorde novo que encosta no seguinte empurra o seguinte para a direita, deixando dois espaços (em cadeia, nunca para a esquerda). Vermelho só para o que não coube (vizinho que não é acorde ou margem); não há aviso de "acorde encosta".
+- Transposição parte sempre de um PDF feito à mão, nunca de um gerado. Só os acordes e o tom no título (`(X)` ou `Tom: X`) mudam; layout e letra não. Acorde novo que encosta no seguinte empurra o seguinte para a direita, deixando dois espaços (em cadeia, nunca para a esquerda). Vermelho só para o que não coube (vizinho que não é acorde ou margem); não há aviso de "acorde encosta".
 - Aberta pelo repertório (`?repertorio=&item=`): abre no tom do item e mostra "‹ Anterior · N de M · Próxima ›" (navega por `replace`). Trocar o tom na cifra não altera o repertório e mostra "Tom do repertório: X · Voltar ao X".
 
 ### Repertórios
@@ -55,7 +55,7 @@ Barra inferior (Músicas, Repertório, Busca, Pad, Mais) só nas 5 telas raiz; a
 - Padrão de criação: próximo dia que seja quinta ou domingo; rótulo padrão é o dia da semana. Duplicar copia os itens com ids novos.
 - Aba Repertórios: "Próximos" (data crescente) e "Recentes" (decrescente, só não expirados). Cartão "Próximo culto" no topo do Início (data mais próxima, hoje incluído). O cartão mostra o ensaio em segunda linha muted; sem hora, nada. A linha do ensaio sempre traz dia da semana e data (`Ensaio sáb · 21/11 às 18h30`), nunca "hoje" nem "amanhã".
 - Repertório novo grava `origin`: `teste` só quando o host é `louvor-hajaluz-teste.web.app` (o `teste` de `SITE_BASE`); `producao` no resto, inclusive localhost. Criar (nova ou duplicar) grava pelo host atual; editar não muda.
-- Editar (só admin), pelo menu ⋯ "Editar data, rótulo e ensaio": arrastar pela alça `≡` ou botões ▲ ▼, trocar o tom (entre os salvos da música), remover, adicionar pela folha de busca (entra no fim, no tom feito à mão; músicas sem PDF desabilitadas; "já está" nas repetidas). Visitante e membro veem só título e tom, "Somente leitura · só admins editam o repertório".
+- Editar (só admin), pelo menu ⋯ "Editar data, rótulo e ensaio": arrastar pela alça `≡` ou botões ▲ ▼, trocar o tom (entre os salvos da música), remover, adicionar pela folha de busca (entra no fim, no tom feito à mão; músicas sem PDF desabilitadas; "já está" nas repetidas). Membro vê só título e tom, "Somente leitura · só admins editam o repertório".
 - Item de música apagada aparece como "Música removida" e é pulado na navegação. Tom do item que deixou de existir aparece riscado e a cifra abre no padrão com aviso.
 - Tempo real: mudança de outra pessoa mostra o banner "O repertório foi alterado. Atualizar"; a tela só muda se a pessoa aceitar (inclusive o tom da cifra aberta). O primeiro snapshot do cache não gera banner.
 - Compartilhar: botão WhatsApp (canto inferior esquerdo, qualquer papel) com título, data, louvores com tom e o link; sem Web Share, copia e avisa "Link copiado.".
@@ -77,7 +77,7 @@ Barra inferior (Músicas, Repertório, Busca, Pad, Mais) só nas 5 telas raiz; a
 ### Padrões de UI que valem para toda tela
 
 - Mobile-first (390 px; testar 360 px), alvos de toque de 44 px, só tokens de cor, dois temas, Paper atualizado no mesmo PR (ver `docs/design-system.md`).
-- Estados obrigatórios: carregando, vazio, erro (e "somente leitura" para visitante). Controles que o papel não pode usar não aparecem.
+- Estados obrigatórios: carregando, vazio, erro (visitante vê só a tela de acesso). Controles que o papel não pode usar não aparecem.
 - Texto de UI em pt-BR.
 
 ## Papéis e permissões
@@ -86,21 +86,20 @@ Papel em `users/{uid}.role` e no custom claim `role`; lido nas Rules por `reques
 
 | Papel | Pode |
 | --- | --- |
-| Visitante (padrão no 1º login) | Buscar, abrir, baixar e compartilhar cifras; ver repertórios; tocar o pad |
+| Visitante (padrão no 1º login) | Nada: vê só a tela "Acesso ainda não liberado" até um admin liberar em Pessoas |
 | Membro | + subir cifras, gerar e salvar tons, descartar o próprio upload, substituir tom gerado |
 | Admin | + criar/editar/duplicar/apagar repertórios, apagar tom ou música, corrigir título/cantor, alterar papéis, importar em lote, ver Estatísticas |
 
 - Primeiro admin: e-mails em `ADMIN_EMAILS` (variável do deploy), só no primeiro login de cada pessoa e só com e-mail verificado. Depois, o papel muda pela tela Pessoas.
 - Mudança de papel só vale para escritas depois do refresh do token; o cliente observa `users/{uid}` e chama `getIdToken(true)`.
-- Só o provedor Google fica ativo no Auth (sem e-mail/senha nem anônimo), porque qualquer logado conta como leitor.
-- Segurança vale no backend (Rules e Functions), não só na interface.
-- Pad e compartilhamento são locais ao aparelho e liberados a todos os papéis; o pad não sincroniza entre pessoas.
+- Leitura exige membro ou admin (Rules e gate do app): um logado sem papel não lê nada. Só o provedor Google fica ativo no Auth (sem e-mail/senha nem anônimo).
+- Segurança vale no backend (Rules e Functions), não só na interface. Pad e compartilhamento são locais ao aparelho e liberados a membro e admin; o pad não sincroniza entre pessoas.
 
 ## Dados
 
 ### Firestore (`firestore.rules`)
 
-Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todos). Escrita pelo cliente só onde indicado.
+Leitura: membro e admin, exceto `users` (cada um lê o próprio; admin lê todos). Escrita pelo cliente só onde indicado.
 
 | Coleção | Campos principais | Escrita pelo cliente |
 | --- | --- | --- |
@@ -108,7 +107,7 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 | `songs/{songId}` | `title`, `titleNormalized`, `artistId` (slug), `artistName`, `keys` (tons salvos, mantido por função), `handmadeKeys`, `createdBy`, `createdAt`, `updatedAt` | só `create` por membro/admin; sem update nem delete |
 | `songs/{songId}/arrangements/{slug}` | `key` (um dos 24 tons), `storagePath`, `source` (`handmade`/`generated`), `derivedFromKey` (só gerado), `writer` (`upload`/`overlay`), `chordCount`, `collisions`, `createdBy`, `createdAt` | só `create` por membro/admin; sem update nem delete |
 | `songLyrics/{songId}` | `text` (1–20.000 caracteres), `createdBy`, `createdAt` | só `create` por membro/admin, com a música existindo na mesma operação |
-| `setlists/{setlistId}` | `date` (`YYYY-MM-DD`), `label`, `items[]` (`id`, `songId`, `key`), `expiresAt`, `createdBy/At`, `updatedBy/At`, `rehearsalAt` (opcional: hora do ensaio, dentro da janela do culto: de 00:00 de 7 dias antes do dia até 00:00 do dia seguinte, exclusivo; `null` é negado), `origin` (opcional: `producao`/`teste`) | só admin: create, update e delete (membro e visitante só leem) |
+| `setlists/{setlistId}` | `date` (`YYYY-MM-DD`), `label`, `items[]` (`id`, `songId`, `key`), `expiresAt`, `createdBy/At`, `updatedBy/At`, `rehearsalAt` (opcional: hora do ensaio, dentro da janela do culto: de 00:00 de 7 dias antes do dia até 00:00 do dia seguinte, exclusivo; `null` é negado), `origin` (opcional: `producao`/`teste`) | só admin: create, update e delete (membro só lê; visitante não lê) |
 | `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt` | nenhuma; só Admin SDK (negado por padrão) |
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
 | `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
@@ -189,8 +188,8 @@ Regra dos lembretes do ensaio:
 
 | Caminho | Leitura | Escrita |
 | --- | --- | --- |
-| `songs/{songId}/{tom}-{fileId}.pdf` | logado | só criação, por membro/admin: `application/pdf`, até 10 MB, sem sobrescrever, metadado `uploadedBy` igual ao uid |
-| `pads/{versão}/{arquivo}` (convenção: `.m4a`; a regra não restringe nome nem extensão) | logado | ninguém (só script administrativo com Admin SDK) |
+| `songs/{songId}/{tom}-{fileId}.pdf` | membro e admin | só criação, por membro/admin: `application/pdf`, até 10 MB, sem sobrescrever, metadado `uploadedBy` igual ao uid |
+| `pads/{versão}/{arquivo}` (convenção: `.m4a`; a regra não restringe nome nem extensão) | membro e admin | ninguém (só script administrativo com Admin SDK) |
 | qualquer outro | negado | negado |
 
 - PDFs são imutáveis (substituir grava arquivo novo em outro caminho e apaga o antigo), então o cache de 1 ano é seguro.
@@ -212,7 +211,7 @@ Regra dos lembretes do ensaio:
 
 - App instalável na tela inicial, com service worker do app shell e aviso "Atualizar" quando há versão nova.
 - Avisos (push, #99): `firebase-messaging-sw.js` é gerado no build com a config do Firebase e escopo `/firebase-cloud-messaging-push-scope` (padrão do SDK), separado do SW de cache (Workbox, `registerType: "prompt"`, sem mudança). Usa os scripts compat do `firebase` na mesma versão, vindos do gstatic. O app revalida o token ao abrir (membro ou admin com avisos ativos): regrava o registro só se o token mudou ou se tem mais de 7 dias. O chunk do SDK de mensagens fica fora do precache. Com o app aberto, o próprio SW também mostra o aviso (o SDK sozinho o esconderia). No iPhone, os avisos só funcionam com o app instalado na tela inicial (iOS 16.4+). O registro deste aparelho fica no `localStorage`, chave `cifras.push.v1` (token e `registeredAt`); Desativar e Sair apagam a chave.
-- Convite "Cifras como app" na aba Músicas (só logado). Android/Chromium: o `beforeinstallprompt` é guardado já no carregamento; o botão "Adicionar" abre o diálogo de instalação, e recusar o diálogo conta como "Agora não". iPhone e iPad com Safari: sem botão, com a instrução de Compartilhar. Não aparece no app instalado (`display-mode` standalone, fullscreen ou minimal-ui, ou `navigator.standalone`) nem depois de `appinstalled` na sessão. "Agora não" dispensa por 30 dias, guardado no aparelho em `localStorage` (chave `cifras.installCard.v1`); sem armazenamento, o convite volta a cada carga.
+- Convite "Cifras como app" na aba Músicas (só membro e admin). Android/Chromium: o `beforeinstallprompt` é guardado já no carregamento; o botão "Adicionar" abre o diálogo de instalação, e recusar o diálogo conta como "Agora não". iPhone e iPad com Safari: sem botão, com a instrução de Compartilhar. Não aparece no app instalado (`display-mode` standalone, fullscreen ou minimal-ui, ou `navigator.standalone`) nem depois de `appinstalled` na sessão. "Agora não" dispensa por 30 dias, guardado no aparelho em `localStorage` (chave `cifras.installCard.v1`); sem armazenamento, o convite volta a cada carga.
 - PDFs com cache imutável; code splitting por rota; `pdf.js` e `pdf-lib` carregados sob demanda só no visualizador e no upload.
 - Meta: abrir uma cifra já visitada em menos de 1 s no celular; troca de tom na prévia em menos de 100 ms.
 - Sem modo offline completo, só cache do app e dos arquivos já usados.
@@ -272,6 +271,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - O TTL do Firestore pode demorar um dia ou mais para apagar; o cliente já esconde os expirados.
 - Acervo acima de cerca de 2.000 músicas pede revisão da busca em memória.
 - `origin` é conferido só na forma, e `rehearsalAt` na forma e contra a janela do `date`: a Rules não confere se a origem é a do site que gravou (protege contra engano, não contra abuso). O token de aparelho fica no Firestore, fechado ao cliente.
+- Quem perde o acesso (ou nunca foi liberado) mantém no aparelho o que já estava em cache (PDFs, pads e a lista de cifras); as Rules barram só as leituras novas.
 - Verificação em aparelho real (Android e iPhone) é manual: o áudio do pad, o compartilhamento de arquivo e a tela bloqueada não são verificáveis em CI.
 - Data, rótulo e ensaio do repertório são last-write-wins quando a folha de edição está aberta em dois aparelhos: ao abrir, ela parte do estado mais novo do servidor e não acompanha mudanças feitas depois; quem salva por último vence.
 - A tela do repertório e o cartão "Próximo culto" calculam o estado muted (já passou da hora) no momento em que abrem; sem atualização ao vivo enquanto ficam abertos.

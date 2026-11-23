@@ -54,6 +54,7 @@ const auth: AuthState = {
   status: 'signed-in',
   user: testUser,
   role: 'member',
+  access: 'granted',
   prepareSignIn: () => Promise.resolve(),
   signIn: () => Promise.resolve(),
   signOut: () => Promise.resolve(),
