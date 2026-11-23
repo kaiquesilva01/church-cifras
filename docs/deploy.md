@@ -221,3 +221,9 @@ Passos manuais da pessoa responsável, nesta ordem.
 - Sem migração: marcas antigas `perto` e `agora` ficam; um aviso já enviado antes do deploy não se repete.
 
 **Teste no aparelho (passo da pessoa, critério 8 da #102; atualizado pela #121):** Android e iPhone com iOS 16.4+, com o app instalado em produção (`https://louvor-hajaluz.web.app`) e os avisos ativados. Crie o repertório também em produção: aparelho só recebe aviso de repertório da mesma origem. Com um ensaio marcado para amanhã, às HHhMM: chega "Ensaio amanhã às HHhMM" na véspera, entre HHhMM e HHhMM+10 min (horário de Brasília), com o app fechado. No dia, entre 08h00 e 08h10, se o ensaio for às 11h00 ou depois: "Ensaio hoje às HHhMM". Uma hora antes: "Ensaio em 1 hora". Mude a hora do ensaio depois de um aviso: o próximo aviso devido chega com "Ensaio mudou para HHhMM" (ou "Ensaio mudou para dom 22/11 às HHhMM", se o dia mudou), uma vez, e pode ser horas depois. Para ver a véspera sem esperar um dia, marque o ensaio para amanhã com um horário alguns minutos antes da hora atual (ex.: são 18h20, marque amanhã às 18h15); o aviso chega em até um minuto. Deixe o aviso anterior na bandeja para conferir que o próximo alerta de novo. Desligue `config/push` (`enabled: false`) e confira que nada chega.
+
+## 17. Visitantes sem acesso (#126)
+
+- As Rules de Firestore e Storage mudam neste release: quem não é membro nem admin deixa de ler cifras, repertórios e pads. Publicar `firestore` e `storage` já faz parte do deploy; não há passo novo de configuração.
+- **Antes de publicar**, avise os admins para liberarem em **Pessoas** as pessoas que hoje usam o app como visitante (elas são o público afetado). Sem a liberação, essas pessoas veem só a tela "Acesso ainda não liberado" depois do deploy.
+- Quem for liberado precisa entrar de novo no app para ver o conteúdo (o token é renovado sozinho com a tela aberta, mas entrar de novo é o caminho garantido).
