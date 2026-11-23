@@ -15,7 +15,8 @@ interface Loaded {
  * Duas causas separadas: falha de carga rejeita (vira erro na linha); `false` só quando o SDK diz que
  * o navegador não suporta. `isSupported()` no mount deixa tudo pronto: `getToken` chama o SDK sem nenhum
  * `await` antes, e o pedido de permissão acontece dentro do toque em Ativar (exigência do Safari).
- * Sem assinatura de mensagens em primeiro plano: com o app aberto nenhum aviso aparece (critério 11).
+ * Sem assinatura de mensagens em primeiro plano: a página não recebe mensagens; com o app aberto, o próprio SW
+ * mostra o aviso (sem duplicata; critério 11).
  */
 export function createMessagingPort(
   app: FirebaseApp,
