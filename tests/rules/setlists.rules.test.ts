@@ -58,6 +58,8 @@ type Db = ReturnType<ReturnType<RulesTestEnvironment['authenticatedContext']>['f
 const asRole = (uid: string, role: string): Db =>
   env.authenticatedContext(uid, { role }).firestore();
 const memberDb = (): Db => asRole('m1', 'member');
+// Quem escreve repertório é só admin; usa o uid 'm1' porque os dados de teste têm createdBy 'm1'.
+const editorDb = (): Db => asRole('m1', 'admin');
 const viewerDb = (): Db => asRole('v1', 'viewer');
 const adminDb = (): Db => asRole('a1', 'admin');
 const anonDb = (): Db => env.unauthenticatedContext().firestore();
@@ -107,8 +109,11 @@ describe('setlists rules', () => {
   });
 
   describe('create', () => {
-    it('allows member', async () => {
-      await assertSucceeds(setDoc(doc(memberDb(), 'setlists/n1'), setlistData()));
+    it('allows admin writing as the creator', async () => {
+      await assertSucceeds(setDoc(doc(editorDb(), 'setlists/n1'), setlistData()));
+    });
+    it('denies member', async () => {
+      await assertFails(setDoc(doc(memberDb(), 'setlists/n1'), setlistData()));
     });
     it('allows admin', async () => {
       await assertSucceeds(
@@ -124,98 +129,101 @@ describe('setlists rules', () => {
       await assertFails(setDoc(doc(anonDb(), 'setlists/n1'), setlistData()));
     });
     it('allows empty items', async () => {
-      await assertSucceeds(setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ items: [] })));
+      await assertSucceeds(setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ items: [] })));
     });
     it('allows 40 items', async () => {
       await assertSucceeds(
-        setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ items: items(40) })),
+        setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ items: items(40) })),
       );
     });
     it('denies 41 items', async () => {
-      await assertFails(setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ items: items(41) })));
+      await assertFails(setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ items: items(41) })));
     });
     it('denies empty label', async () => {
-      await assertFails(setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ label: '' })));
+      await assertFails(setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ label: '' })));
     });
     it('allows 60-char label', async () => {
       await assertSucceeds(
-        setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ label: 'a'.repeat(60) })),
+        setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ label: 'a'.repeat(60) })),
       );
     });
     it('denies 61-char label', async () => {
       await assertFails(
-        setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ label: 'a'.repeat(61) })),
+        setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ label: 'a'.repeat(61) })),
       );
     });
     it('denies malformed date', async () => {
       await assertFails(
-        setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ date: '22/11/2026' })),
+        setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ date: '22/11/2026' })),
       );
     });
     it('denies extra key', async () => {
-      await assertFails(setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ extra: 1 })));
+      await assertFails(setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ extra: 1 })));
     });
     it('denies missing key', async () => {
       const rest: Record<string, unknown> = setlistData();
       delete rest.label;
-      await assertFails(setDoc(doc(memberDb(), 'setlists/n1'), rest));
+      await assertFails(setDoc(doc(editorDb(), 'setlists/n1'), rest));
     });
     it('denies string expiresAt', async () => {
       await assertFails(
-        setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ expiresAt: '2026-12-23' })),
+        setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ expiresAt: '2026-12-23' })),
       );
     });
     it('denies createdBy of another uid', async () => {
       await assertFails(
-        setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ createdBy: 'other' })),
+        setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ createdBy: 'other' })),
       );
     });
     it('denies updatedBy of another uid', async () => {
       await assertFails(
-        setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ updatedBy: 'other' })),
+        setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ updatedBy: 'other' })),
       );
     });
     it('denies client-supplied createdAt', async () => {
       await assertFails(
-        setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ createdAt: Timestamp.now() })),
+        setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ createdAt: Timestamp.now() })),
       );
     });
     it('denies 101-char id', async () => {
-      await assertFails(setDoc(doc(memberDb(), `setlists/${'x'.repeat(101)}`), setlistData()));
+      await assertFails(setDoc(doc(editorDb(), `setlists/${'x'.repeat(101)}`), setlistData()));
     });
   });
 
   describe('update', () => {
-    it('allows member changing items, label, date and expiresAt', async () => {
-      await assertSucceeds(updateDoc(existing(memberDb()), updateData()));
+    it('allows admin changing items, label, date and expiresAt', async () => {
+      await assertSucceeds(updateDoc(existing(editorDb()), updateData()));
+    });
+    it('denies member', async () => {
+      await assertFails(updateDoc(existing(memberDb()), updateData()));
     });
     it('denies viewer', async () => {
       await assertFails(updateDoc(existing(viewerDb()), updateData({ updatedBy: 'v1' })));
     });
     it('denies changing createdBy', async () => {
-      await assertFails(updateDoc(existing(memberDb()), updateData({ createdBy: 'other' })));
+      await assertFails(updateDoc(existing(editorDb()), updateData({ createdBy: 'other' })));
     });
     it('denies changing createdAt', async () => {
       await assertFails(
-        updateDoc(existing(memberDb()), updateData({ createdAt: serverTimestamp() })),
+        updateDoc(existing(editorDb()), updateData({ createdAt: serverTimestamp() })),
       );
     });
     it('denies updatedBy of another uid', async () => {
-      await assertFails(updateDoc(existing(memberDb()), updateData({ updatedBy: 'other' })));
+      await assertFails(updateDoc(existing(editorDb()), updateData({ updatedBy: 'other' })));
     });
     it('denies client-supplied updatedAt', async () => {
       await assertFails(
-        updateDoc(existing(memberDb()), updateData({ updatedAt: Timestamp.now() })),
+        updateDoc(existing(editorDb()), updateData({ updatedAt: Timestamp.now() })),
       );
     });
     it('denies 41 items', async () => {
-      await assertFails(updateDoc(existing(memberDb()), updateData({ items: items(41) })));
+      await assertFails(updateDoc(existing(editorDb()), updateData({ items: items(41) })));
     });
   });
 
   describe('delete', () => {
-    it('allows member', async () => {
-      await assertSucceeds(deleteDoc(existing(memberDb())));
+    it('denies member', async () => {
+      await assertFails(deleteDoc(existing(memberDb())));
     });
     it('allows admin', async () => {
       await assertSucceeds(deleteDoc(existing(adminDb())));
@@ -240,8 +248,8 @@ describe('setlists rules: rehearsalAt e origin', () => {
     ['último segundo do dia do culto', { rehearsalAt: at('2026-11-23T02:59:59Z') }],
     ['origem produção', { origin: 'producao' }],
     ['origem teste', { origin: 'teste' }],
-  ])('allows member with %s', async (_name, over) => {
-    await assertSucceeds(setDoc(doc(memberDb(), 'setlists/n1'), setlistData(over)));
+  ])('allows admin with %s', async (_name, over) => {
+    await assertSucceeds(setDoc(doc(editorDb(), 'setlists/n1'), setlistData(over)));
   });
 
   it.each([
@@ -251,8 +259,8 @@ describe('setlists rules: rehearsalAt e origin', () => {
     ['rehearsalAt nulo', { rehearsalAt: null }],
     ['origem fora da lista', { origin: 'outro' }],
     ['origem nula', { origin: null }],
-  ])('denies member with %s', async (_name, over) => {
-    await assertFails(setDoc(doc(memberDb(), 'setlists/n1'), setlistData(over)));
+  ])('denies admin with %s', async (_name, over) => {
+    await assertFails(setDoc(doc(editorDb(), 'setlists/n1'), setlistData(over)));
   });
 
   it('denies viewer even with valid new fields', async () => {
@@ -272,26 +280,26 @@ describe('setlists rules: rehearsalAt e origin', () => {
   it('allows update adding rehearsalAt and origin (culto de updateData é 2026-11-29)', async () => {
     await assertSucceeds(
       updateDoc(
-        existing(memberDb()),
+        existing(editorDb()),
         updateData({ rehearsalAt: at('2026-11-26T22:30:00Z'), origin: 'producao' }),
       ),
     );
   });
 
   it('allows update of a legacy setlist without the new fields', async () => {
-    await assertSucceeds(updateDoc(existing(memberDb()), updateData()));
+    await assertSucceeds(updateDoc(existing(editorDb()), updateData()));
   });
 
   it.each([
     ['origem fora da lista', { origin: 'outro' }],
     ['origem nula', { origin: null }],
   ])('denies update with %s', async (_name, over) => {
-    await assertFails(updateDoc(existing(memberDb()), updateData(over)));
+    await assertFails(updateDoc(existing(editorDb()), updateData(over)));
   });
 
   it('denies update with rehearsalAt outside the window of the new date', async () => {
     await assertFails(
-      updateDoc(existing(memberDb()), updateData({ rehearsalAt: at('2026-11-22T02:59:59Z') })),
+      updateDoc(existing(editorDb()), updateData({ rehearsalAt: at('2026-11-22T02:59:59Z') })),
     );
   });
 
@@ -306,7 +314,7 @@ describe('setlists rules: rehearsalAt e origin', () => {
       );
     });
     await assertSucceeds(
-      updateDoc(doc(memberDb(), 'setlists/comEnsaio'), updateData({ rehearsalAt: deleteField() })),
+      updateDoc(doc(editorDb(), 'setlists/comEnsaio'), updateData({ rehearsalAt: deleteField() })),
     );
   });
 
@@ -322,7 +330,7 @@ describe('setlists rules: rehearsalAt e origin', () => {
     });
     await assertSucceeds(
       setDoc(
-        doc(memberDb(), 'setlists/comEnsaio'),
+        doc(editorDb(), 'setlists/comEnsaio'),
         setlistData({ createdAt: at('2026-11-16T00:00:00Z') }),
       ),
     );
@@ -340,9 +348,9 @@ describe('setlists rules: janela do ensaio em bordas de mês e de ano', () => {
     ],
     ['date 2026-01-02: início da janela no ano anterior', '2026-01-02', '2025-12-26T03:00:00Z'],
     ['date 2026-12-31: último segundo do dia do culto', '2026-12-31', '2027-01-01T02:59:59Z'],
-  ])('allows member with %s', async (_name, date, rehearsal) => {
+  ])('allows admin with %s', async (_name, date, rehearsal) => {
     await assertSucceeds(
-      setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ date, rehearsalAt: at(rehearsal) })),
+      setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ date, rehearsalAt: at(rehearsal) })),
     );
   });
 
@@ -358,9 +366,9 @@ describe('setlists rules: janela do ensaio em bordas de mês e de ano', () => {
       '2026-12-31',
       '2027-01-01T03:00:00Z',
     ],
-  ])('denies member with %s', async (_name, date, rehearsal) => {
+  ])('denies admin with %s', async (_name, date, rehearsal) => {
     await assertFails(
-      setDoc(doc(memberDb(), 'setlists/n1'), setlistData({ date, rehearsalAt: at(rehearsal) })),
+      setDoc(doc(editorDb(), 'setlists/n1'), setlistData({ date, rehearsalAt: at(rehearsal) })),
     );
   });
 });
