@@ -3,7 +3,6 @@ import {
   ADMIN,
   expect,
   expectRole,
-  newAccount,
   openSession,
   signInAs,
   signInWithPopup,
@@ -92,16 +91,6 @@ test('membro vê "Avisos" antes de "Pessoas" na aba Mais', async ({ page, browse
   } finally {
     await member.context.close();
   }
-});
-
-test('visitante não vê "Avisos" na aba Mais', async ({ page }) => {
-  await signInAs(page, newAccount('visitante-avisos'), 'Visitante');
-  await abrirMais(page);
-
-  // Âncora positiva: "Pessoas" aparece para todos os papéis, então a Mais já carregou antes das negativas.
-  await expect(page.getByText('Pessoas', { exact: true })).toBeVisible();
-  await expect(linhaAvisos(page)).toHaveCount(0);
-  await expect(page.getByText('Avisos', { exact: true })).toHaveCount(0);
 });
 
 test('ativar avisos mostra "Ativados" e permite o teste, com falha do envio em alerta', async ({

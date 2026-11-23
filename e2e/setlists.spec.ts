@@ -6,8 +6,9 @@ import {
   chip,
   expect,
   expectPdfRendered,
-  newAccount,
   openSession,
+  promoteToMember,
+  registerVisitor,
   shot,
   signInAs,
   test,
@@ -349,42 +350,6 @@ test('live update inside a cifra: banner without swapping the PDF, then the new 
   }
 });
 
-test('visitor sees the setlist and the bar but no editing controls', async ({ page }, testInfo) => {
-  const tag = lettersTag();
-  const [aurora, brisa, cais] = await seedThree(tag);
-  const id = await seedSetlist(addDays(todayInSaoPaulo(), 1), 'Culto', [
-    { songId: aurora!.id, key: 'C' },
-    { songId: brisa!.id, key: 'D' },
-    { songId: cais!.id, key: 'C' },
-  ]);
-  await signInAs(page, newAccount('visitante'), 'Visitante');
-
-  // The "Próximo culto" card on the home page leads to the setlist.
-  const card = page.getByRole('region', { name: 'Próximo culto' });
-  await expect(card).toBeVisible();
-  await card.getByRole('link', { name: /Culto/ }).click();
-  await expect(page).toHaveURL(new RegExp(`/repertorios/${id}$`));
-  await expect(rowTitles(page)).toHaveText([aurora!.title, brisa!.title, cais!.title]);
-  await expect(rowFor(page, brisa!.title).locator('.setlist-item-key')).toHaveText('D');
-
-  await expect(page.getByRole('button', { name: /^Arrastar / })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /^Mover / })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /^Remover / })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /alterar$/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '＋ Adicionar' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Menu do repertório' })).toHaveCount(0);
-  await shot(page, testInfo, 'setlists-7-visitor-page');
-
-  await rowFor(page, aurora!.title).getByRole('link').click();
-  await expect(bar(page)).toContainText('1 de 3');
-  await expectPdfRendered(page);
-  await next(page).click();
-  await expect(bar(page)).toContainText('2 de 3');
-  await expect(chip(page, brisa!.title, 'D')).toHaveAttribute('aria-current', 'true');
-  await expect(page.getByRole('button', { name: /Mudar tom/ })).toHaveCount(0);
-  await shot(page, testInfo, 'setlists-8-visitor-viewer');
-});
-
 test('an expired setlist is hidden from the tab and the next-culto card; a future one is shown', async ({
   page,
 }, testInfo) => {
@@ -705,16 +670,21 @@ test('dia acompanha a data quando era o mesmo dia', async ({ page }) => {
   await expect(rehearsal(page)).toHaveText(/^Ensaio .* às 18h30$/);
 });
 
-test('visitante vê a hora em muted depois do horário', async ({ page }, testInfo) => {
+test('membro vê a hora em muted depois do horário, sem "Somente leitura" (membro edita)', async ({
+  page,
+  browser,
+}, testInfo) => {
   const id = await seedSetlist(todayInSaoPaulo(), 'Culto', [], {
     rehearsalAt: new Date(Date.now() - 2 * 3_600_000),
   });
-  await signInAs(page, newAccount('visitante'), 'Visitante');
+  const member = await registerVisitor('membro-hora');
+  await promoteToMember(browser, testInfo, member);
+  await signInAs(page, member, 'Membro');
   await page.goto(`/repertorios/${id}`);
-  await expect(page.getByText(/Somente leitura/)).toBeVisible();
+  await expect(page.getByText(/Somente leitura/)).toHaveCount(0);
   await expect(rehearsal(page)).toHaveText(REHEARSAL_TEXT);
   await expect(rehearsal(page)).toHaveClass(/is-muted/);
-  await shot(page, testInfo, 'rehearsal-5-visitor-muted');
+  await shot(page, testInfo, 'rehearsal-5-member-muted');
 });
 
 test('banner: só a hora mudou por outra pessoa', async ({ page, browser }, testInfo) => {
