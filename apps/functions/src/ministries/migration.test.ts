@@ -273,6 +273,22 @@ describe('migrateMinistries', () => {
     expect(recalc).toBeGreaterThan(marca);
   });
 
+  it('--app-admin com uid fora de users: recusa antes de qualquer escrita, no dry-run e na real', async () => {
+    for (const dryRun of [false, true]) {
+      const s = emptyState();
+      s.emails.set('fora@example.test', 'fora');
+      s.users = [user('ana', 'member')];
+      s.roots.set('s1', { title: 'Raiz' });
+
+      await expect(
+        migrateMinistries(fakeDeps(s), { dryRun, appAdminEmail: 'fora@example.test' }),
+      ).rejects.toThrow('O admin da app precisa ter entrado no app ao menos uma vez.');
+      expect(s.writes).toEqual([]);
+      expect(s.ministries.size).toBe(0);
+      expect(s.appAdmins).toEqual([]);
+    }
+  });
+
   it('--app-admin marca só esse uid como appAdmin', async () => {
     const s = emptyState();
     s.emails.set('dono@example.test', 'dono');

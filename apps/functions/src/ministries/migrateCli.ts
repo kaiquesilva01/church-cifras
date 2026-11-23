@@ -20,17 +20,24 @@ function isAlreadyExists(error: unknown): boolean {
   return code === ALREADY_EXISTS || code === 'ALREADY_EXISTS';
 }
 
+// Erro de escrita com o id do documento (uid, setlist...) e a causa, para a pessoa localizar.
+function writeFailure(label: string, error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  return new Error(`falha ao gravar ${label}: ${message}`, { cause: error });
+}
+
 // Create-only: false se o documento já existe. Nunca sobrescreve.
 async function createOnce(
   ref: { create(data: Record<string, unknown>): Promise<unknown> },
   data: Record<string, unknown>,
+  label: string,
 ): Promise<boolean> {
   try {
     await ref.create(data);
     return true;
   } catch (error) {
     if (isAlreadyExists(error)) return false;
-    throw error;
+    throw writeFailure(label, error);
   }
 }
 
@@ -54,16 +61,18 @@ export function realMigrationDeps(db: Firestore): MigrationDeps {
         };
       }),
     ministryExists: async (id) => (await db.doc(paths.ministry(id)).get()).exists,
-    createMinistry: (id, data) => createOnce(db.doc(paths.ministry(id)), data),
+    createMinistry: (id, data) => createOnce(db.doc(paths.ministry(id)), data, `ministério ${id}`),
     memberUids: (mid) => idsOf(db, `ministries/${mid}/members`),
     requestUids: (mid) => idsOf(db, `ministries/${mid}/requests`),
-    createMembership: (mid, uid, data) => createOnce(db.doc(paths.member(mid, uid)), data),
-    createRequest: (mid, uid, data) => createOnce(db.doc(paths.request(mid, uid)), data),
+    createMembership: (mid, uid, data) =>
+      createOnce(db.doc(paths.member(mid, uid)), data, `membro ${uid}`),
+    createRequest: (mid, uid, data) =>
+      createOnce(db.doc(paths.request(mid, uid)), data, `pedido ${uid}`),
     listRootSetlists: async () =>
       (await db.collection('setlists').get()).docs.map((d) => ({ id: d.id, data: d.data() })),
     targetSetlistIds: (mid) => idsOf(db, `ministries/${mid}/setlists`),
     createTargetSetlist: (mid, id, data) =>
-      createOnce(db.doc(`ministries/${mid}/setlists/${id}`), data),
+      createOnce(db.doc(`ministries/${mid}/setlists/${id}`), data, `repertório ${id}`),
     // Lê tudo e filtra aqui: `== null` no Firestore não acha campo ausente.
     usageIdsWithoutMinistry: async () =>
       (await db.collection('setlistUsage').get()).docs
@@ -72,13 +81,17 @@ export function realMigrationDeps(db: Firestore): MigrationDeps {
     setUsageMinistry: async (setlistId, ministryId) => {
       const ref = db.doc(`setlistUsage/${setlistId}`);
       // Transação: só escreve se o campo continua ausente (nunca sobrescreve).
-      await db.runTransaction(async (t) => {
-        const snap = await t.get(ref);
-        if (!snap.exists) return;
-        const current = snap.get('ministryId');
-        if (current !== undefined && current !== null) return;
-        t.update(ref, { ministryId });
-      });
+      try {
+        await db.runTransaction(async (t) => {
+          const snap = await t.get(ref);
+          if (!snap.exists) return;
+          const current = snap.get('ministryId');
+          if (current !== undefined && current !== null) return;
+          t.update(ref, { ministryId });
+        });
+      } catch (error) {
+        throw writeFailure(`uso ${setlistId}`, error);
+      }
     },
     resolveUidByEmail: async (email) => {
       try {
@@ -97,7 +110,11 @@ export function realMigrationDeps(db: Firestore): MigrationDeps {
       }
     },
     setAppAdmin: async (uid) => {
-      await db.doc(paths.user(uid)).set({ appAdmin: true }, { merge: true });
+      try {
+        await db.doc(paths.user(uid)).set({ appAdmin: true }, { merge: true });
+      } catch (error) {
+        throw writeFailure(`admin da app ${uid}`, error);
+      }
     },
     recalcClaims: async (uid) => {
       try {
@@ -131,9 +148,9 @@ function printReport(report: MigrationReport): void {
     `repertórios no ministério: copiados${pending} ${report.setlists.copied}, mantidos ${report.setlists.kept}`,
   );
   console.log(`uso sem ministério atualizado${pending}: ${report.usage.updated}`);
-  console.log(`admin da app (uid): ${report.appAdmin ?? '-'}`);
+  console.log(`admin da app (uid)${pending}: ${report.appAdmin ?? '-'}`);
   console.log(
-    `claims: ok ${report.claims.ok}, falhas (${report.claims.failed.length}): ${report.claims.failed.join(', ') || '-'}`,
+    `claims${report.dryRun ? ' (a recalcular)' : ''}: ok ${report.claims.ok}, falhas (${report.claims.failed.length}): ${report.claims.failed.join(', ') || '-'}`,
   );
 }
 

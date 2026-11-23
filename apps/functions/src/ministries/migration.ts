@@ -71,6 +71,12 @@ export async function migrateMinistries(
     : null;
   const users = await deps.listUsers();
 
+  // O admin precisa ter perfil em users: senão a marca criaria um doc parcial (sem nome)
+  // e o recálculo de claims pularia esse uid. Recusa antes de qualquer escrita.
+  if (appAdmin && !users.some((user) => user.uid === appAdmin)) {
+    throw new Error('O admin da app precisa ter entrado no app ao menos uma vez.');
+  }
+
   // (2) Ministério Haja Luz, se ainda não existe.
   const ministryCreated = !(await deps.ministryExists(HAJALUZ_ID))
     ? dryRun || (await deps.createMinistry(HAJALUZ_ID, ministryDoc(now)))
