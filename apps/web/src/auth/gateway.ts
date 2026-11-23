@@ -15,7 +15,10 @@ import { isRole } from './roles';
 
 export function createAuthGateway(
   { auth, db }: FirebaseServices,
-  { reload = () => window.location.reload() }: { reload?: () => void } = {},
+  {
+    reload = () => window.location.reload(),
+    beforeSignOut,
+  }: { reload?: () => void; beforeSignOut?: () => Promise<void> } = {},
 ): AuthGateway {
   return {
     onUser: (cb) =>
@@ -71,6 +74,12 @@ export function createAuthGateway(
     },
     // O cache persistente do Firestore guarda dados da pessoa anterior: apaga e recarrega.
     signOut: async () => {
+      // Antes do signOut: a callable de avisos exige sessão. Falha não impede o logout.
+      try {
+        await beforeSignOut?.();
+      } catch (error) {
+        console.warn('Falha ao desativar os avisos ao sair', error);
+      }
       await signOut(auth);
       try {
         await terminate(db);

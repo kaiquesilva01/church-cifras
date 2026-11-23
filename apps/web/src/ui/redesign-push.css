@@ -1,0 +1,60 @@
+/* Linha "Avisos" na aba Mais (issue 99). Reusa .menu-row; a ação é pílula de 44 px. Só tokens. */
+.push-action {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.push-action:disabled {
+  opacity: 0.6;
+}
+
+.push-action--secondary {
+  background: var(--color-elevated);
+  color: var(--color-text);
+}
+
+.push-on {
+  color: var(--color-success);
+}
+
+.push-hint {
+  display: block;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.push-test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 12px 70px;
+}
+
+.push-test-button {
+  min-height: 44px;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font-weight: 700;
+}
+
+/* Região de status sempre montada: vazia na maioria das vezes, sem espaço próprio. */
+.push-status .notice {
+  margin: 0 16px 12px;
+}
+
+/* Erro da linha: mesmo papel visual do alerta de erro do app, em tokens. */
+.push-alert {
+  margin: 0 16px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-error);
+  border-radius: 14px;
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}

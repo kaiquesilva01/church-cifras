@@ -5,6 +5,8 @@ import type { CatalogApi } from './catalog/catalogApi';
 import { LyricsProvider } from './catalog/LyricsProvider';
 import { SongsProvider } from './catalog/SongsProvider';
 import { PadProvider } from './pad/PadProvider';
+import { PushProvider } from './push/PushProvider';
+import type { PushService } from './push/types';
 import { ActiveSetlistProvider } from './setlists/ActiveSetlistProvider';
 import type { SetlistApi } from './setlists/setlistApi';
 import { SetlistsProvider } from './setlists/SetlistsProvider';
@@ -40,6 +42,8 @@ export interface AppProps {
   initialPath?: string;
   /** Recarrega a página (injetável nos testes). */
   onReload?: () => void;
+  /** Avisos de push; `null` (ou ausente) quando não há VAPID configurada. */
+  pushService?: PushService | null;
 }
 
 function AppRoutes({
@@ -160,6 +164,7 @@ export function App({
   setlistApi,
   initialPath,
   onReload = reloadPage,
+  pushService,
 }: AppProps) {
   const router = useMemo(
     () =>
@@ -188,7 +193,9 @@ export function App({
   );
   return (
     <ThemeProvider>
-      <AuthProvider gateway={gateway}>{router}</AuthProvider>
+      <AuthProvider gateway={gateway}>
+        <PushProvider service={pushService ?? null}>{router}</PushProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

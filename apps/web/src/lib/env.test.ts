@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readWebEnv } from './env';
+import { readPushConfig, readWebEnv } from './env';
 
 const full = {
   VITE_FIREBASE_API_KEY: 'k',
@@ -28,5 +28,31 @@ describe('readWebEnv', () => {
     expect(() => readWebEnv(raw)).toThrow(
       'Configuração ausente: VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID',
     );
+  });
+});
+
+describe('readPushConfig', () => {
+  it('is null without the VAPID key, and never throws', () => {
+    expect(readPushConfig({})).toBeNull();
+    expect(readPushConfig({ VITE_FIREBASE_MESSAGING_SENDER_ID: '123' })).toBeNull();
+  });
+
+  it('is null without the sender id (the line would be dead)', () => {
+    expect(readPushConfig({ VITE_FIREBASE_VAPID_KEY: 'vapid' })).toBeNull();
+  });
+
+  it('treats an empty string as absent', () => {
+    expect(
+      readPushConfig({ VITE_FIREBASE_VAPID_KEY: '', VITE_FIREBASE_MESSAGING_SENDER_ID: '123' }),
+    ).toBeNull();
+  });
+
+  it('returns both values when both exist', () => {
+    expect(
+      readPushConfig({
+        VITE_FIREBASE_VAPID_KEY: 'vapid',
+        VITE_FIREBASE_MESSAGING_SENDER_ID: '123',
+      }),
+    ).toEqual({ vapidKey: 'vapid', messagingSenderId: '123' });
   });
 });

@@ -7,6 +7,9 @@ import type { DeviceRecord, PushDeps, SendResult } from './types';
 const GET_ALL_BLOCK = 300;
 const DELETE_BLOCK = 500;
 
+// Ícone e distintivo saem do site da origem do link (o aparelho de teste usa o site de teste).
+const siteAsset = (link: string, path: string): string => new URL(path, link).href;
+
 /** Implementação real de PushDeps com firebase-admin. Sem lógica: só traduz chamadas. */
 export function createPushDeps(): PushDeps {
   return {
@@ -60,7 +63,11 @@ export function createPushDeps(): PushDeps {
           token,
           notification: { title: message.title, body: message.body },
           webpush: {
-            notification: { tag: message.tag },
+            notification: {
+              tag: message.tag,
+              icon: siteAsset(message.link, '/icons/icon-192.png'),
+              badge: siteAsset(message.link, '/icons/badge-96.png'),
+            },
             fcmOptions: { link: message.link },
           },
         })),
