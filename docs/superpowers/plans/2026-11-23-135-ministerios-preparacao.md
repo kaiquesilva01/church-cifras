@@ -2099,7 +2099,7 @@ Mudanças:
 7. **Admin do ministério rebaixando a si mesmo:** permitido, desde que não seja o último. O spec não fala.
 8. **Id do ministério:** slug do nome; colisão de id vira erro. Nomes iguais com slugs diferentes são aceitos (o spec não exige unicidade de nome).
 9. **Espelho:** lê a raiz no momento em vez do evento (ordem e repetição não importam) e usa `retry: true` (idempotente). Proposta.
-10. **Migração e corrida com edição:** cópias só de criação (um repertório editado depois da cópia não é revertido) e varredura final dos destinos sem raiz. Corrida rara (apagar um repertório durante a migração) é corrigida pela varredura; a migração roda depois do espelho já ativo.
+10. **Migração e corrida com edição:** cópias só de criação (um repertório editado depois da cópia não é revertido). ~~Varredura final dos destinos sem raiz~~: removida na execução (ver "Decisões tomadas na execução"); a migração nunca apaga. Corrida rara (apagar um repertório durante a migração) pode recriar o destino; recomendação operacional: não editar repertórios durante a execução.
 11. **Um pedido pendente por pessoa, entre ministérios:** conferido por consulta fora da transação; corrida muito rara aceita.
 12. **`countSettledSetlists` grava `ministryId: 'hajaluz'` já nesta entrega** (tarefa 8), senão os registros novos saem sem o campo até o Pacote. Confirmar: é uma mudança de comportamento invisível, mas não estava na lista da Preparação.
 13. **Tamanho de `docs/sistema.md`:** já tem cerca de 300 linhas (teto do AGENTS.md). A tarefa 13 condensa texto da seção afetada.
@@ -2108,6 +2108,18 @@ Mudanças:
 16. **`onUserCreated`:** continua gravando o `role` legado (`admin` para `ADMIN_EMAILS`) além de `appAdmin: true`. O spec diz "deixa de dar papel de leitura"; manter o legado evita tirar o acesso do dono do cliente atual antes do Pacote.
 17. **Callables que já existem** (`updateSongMeta`, `deleteSong`, etc.) continuam com `requireRole` por `role`; a troca para `appAdmin` é do Pacote.
 18. **Adaptadores (tarefa 10) e CLI (tarefa 11) sem teste unitário de I/O:** a lógica testada está em `migration.ts` e nos módulos de domínio; o restante é validado por typecheck, dry-run e checagem depois do release.
+
+### Decisões tomadas na execução (orquestrador, 23/11)
+
+O código vale sobre o texto das tarefas acima onde houver diferença.
+
+- **Fake de transação (tarefa 2):** escritas bufferizadas e aplicadas só no fim (tudo ou nada), leitura depois de escrita lança, `create` em documento existente falha com código 6, como no Firestore. Testes próprios em `fakeDeps.test.ts`.
+- **Espelho (tarefa 3):** leitura da raiz e escrita do destino numa única transação do Admin SDK, para execuções concorrentes não regredirem o destino.
+- **Aprovar pedido (tarefa 4), trocar papel e remover (tarefa 5), admin da app (tarefa 6):** repetir a mesma chamada responde ok e recalcula os claims (recuperação de falha no recálculo depois do commit). Remover quem já saiu: ok se `users/{uid}` existe; `not-found` se não existe.
+- **Último admin (tarefa 5):** a contagem é lida dentro da transação (`tx.get(query)` no adaptador, tarefa 10).
+- **Ponte da tela Pessoas (tarefa 7/12):** sem `ministries/hajaluz`, a ponte não faz nada (em vez de `failed-precondition`). Antes da migração, trocar papel funciona como hoje; a migração lê `users.role` depois.
+- **Migração (tarefa 9/11):** nunca apaga (a varredura de órfãos saiu; `deleteTargetSetlist` saiu do contrato). E-mail do `--app-admin` sem diferença de maiúsculas; em branco é erro; precisa ser de quem já entrou no app (senão para antes de gravar). `create*` só criam; `setlistUsage.ministryId` só onde falta. Falhas de escrita e de claims imprimem o id.
+- **Risco do índice de grupo:** `recalcClaims` usa a consulta de grupo em `members.uid`; até o índice ficar "Ativado" (minutos, coleção vazia), trocar papel em Pessoas grava o papel e falha no recálculo. Mitigação: conferir os índices logo depois do release.
 
 ---
 
