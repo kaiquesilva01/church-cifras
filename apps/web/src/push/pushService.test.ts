@@ -447,6 +447,104 @@ describe('pushService.revalidate', () => {
   });
 });
 
+describe('pushService: sem await entre a checagem e a escrita no registro', () => {
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('revalidate com token trocado: disable durante o unregister do antigo não é desfeito', async () => {
+    const resolvers: Array<() => void> = [];
+    const api = fakeApi({
+      unregister: vi.fn(() => new Promise<void>((resolve) => resolvers.push(resolve))),
+    });
+    const store = memoryStore(RECORD);
+    const { svc } = build({ api, store });
+    const pending = svc.revalidate();
+    await tick();
+    expect(api.unregister).toHaveBeenCalledWith('tok-old');
+    expect(await svc.disable()).toBe('available');
+    resolvers.forEach((resolve) => resolve());
+    await pending;
+    expect(store.value).toBeNull();
+  });
+
+  it('disable limpa o registro antes de esperar o servidor: gravação durante a espera sobrevive', async () => {
+    const api = fakeApi({ unregister: vi.fn(() => new Promise<void>(() => {})) });
+    const store = memoryStore(RECORD);
+    const { svc } = build({ api, store });
+    const pending = svc.disable();
+    const other: PushRecord = { token: 'tok-outro', registeredAt: 5_000 };
+    store.write(other);
+    await pending;
+    expect(store.value).toEqual(other);
+  });
+
+  it('forgetDevice limpa o registro antes de esperar o servidor', async () => {
+    const api = fakeApi({ unregister: vi.fn(() => new Promise<void>(() => {})) });
+    const store = memoryStore(RECORD);
+    const { svc } = build({ api, store });
+    const pending = svc.forgetDevice();
+    expect(store.value).toBeNull();
+    await pending;
+  });
+
+  it('revalidate com register pendente e disable em andamento: desfaz o registro novo, sem esperar o antigo', async () => {
+    let resolveRegister: () => void = () => {};
+    const api = fakeApi({
+      register: vi.fn(() => new Promise<void>((resolve) => (resolveRegister = resolve))),
+      unregister: vi.fn((token: string) =>
+        token === 'tok-old' ? new Promise<void>(() => {}) : Promise.resolve(),
+      ),
+    });
+    const store = memoryStore(RECORD);
+    const { svc } = build({ api, store });
+    const pending = svc.revalidate();
+    await tick();
+    const disabling = svc.disable();
+    resolveRegister();
+    const outcome = await Promise.race([
+      pending.then(() => 'done'),
+      new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 200)),
+    ]);
+    await disabling;
+    expect(outcome).toBe('done');
+    expect(api.unregister).toHaveBeenCalledWith('tok-1');
+    expect(store.value).toBeNull();
+  });
+
+  it('sendTest com token podado: limpa o registro antes de apagar o token local', async () => {
+    let resolveDelete: () => void = () => {};
+    const api = fakeApi({ sendTest: vi.fn(async () => ({ sent: 0, failed: 0, pruned: 1 })) });
+    const port = fakePort({
+      deleteToken: vi.fn(() => new Promise<void>((resolve) => (resolveDelete = resolve))),
+    });
+    const store = memoryStore(RECORD);
+    const { svc } = build({ api, port, store });
+    const pending = svc.sendTest();
+    await tick();
+    expect(store.value).toBeNull();
+    const other: PushRecord = { token: 'tok-outro', registeredAt: 5_000 };
+    store.write(other);
+    resolveDelete();
+    expect(await pending).toBe('failed');
+    expect(store.value).toEqual(other);
+  });
+
+  it('revalidate nunca lança, mesmo se a leitura do registro ou a permissão falharem', async () => {
+    const store = memoryStore(RECORD);
+    store.read = () => {
+      throw new Error('storage');
+    };
+    const { svc } = build({ store });
+    await expect(svc.revalidate()).resolves.toBeUndefined();
+    const port = fakePort({
+      permission: vi.fn(() => {
+        throw new Error('permission');
+      }),
+    });
+    const second = build({ port, store: memoryStore(RECORD) });
+    await expect(second.svc.revalidate()).resolves.toBeUndefined();
+  });
+});
+
 describe('pushService.revalidate com permissão denied', () => {
   it('não chama getToken nem unregister (o token sai só em load)', async () => {
     const port = fakePort({ permission: vi.fn(() => 'denied' as const) });

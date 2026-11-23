@@ -28,7 +28,6 @@ export interface PushServiceDeps {
 }
 
 const DEFAULT_RELEASE_TIMEOUT_MS = 5000;
-const FORGET_TIMEOUT_MS = 5000;
 
 /** Resolve quando `work` termina ou depois de `ms`. Nunca lança. */
 function within(work: Promise<unknown>, ms: number): Promise<void> {
@@ -64,10 +63,12 @@ export function createPushService(deps: PushServiceDeps): PushService {
     ]);
   };
 
-  // Sem registro, não toca no servidor nem no SDK.
-  const release = async (record: PushRecord | null, ms = limit): Promise<void> => {
-    if (record) await within(releaseRemote(record), ms);
+  // Sem registro, não toca no servidor nem no SDK. Lê e limpa o registro de forma síncrona,
+  // antes de qualquer await: uma gravação feita durante a espera do servidor não é apagada.
+  const release = async (): Promise<void> => {
+    const record = deps.store.read();
     deps.store.clear();
+    if (record) await within(releaseRemote(record), limit);
   };
 
   const current = async (): Promise<AvisosStatus> =>
@@ -91,12 +92,11 @@ export function createPushService(deps: PushServiceDeps): PushService {
   return {
     async load() {
       try {
-        const record = deps.store.read();
         // Permissão revogada (ou resetada para 'default') com aparelho gravado: remove o token,
         // porque o navegador não avisa. Sem registro, nada é tocado.
         const permission = deps.port.permission();
-        if (record && (permission === 'denied' || permission === 'default')) {
-          await release(record);
+        if (deps.store.read() && (permission === 'denied' || permission === 'default')) {
+          await release();
         }
         return await current();
       } catch (error) {
@@ -135,7 +135,7 @@ export function createPushService(deps: PushServiceDeps): PushService {
     },
 
     async disable() {
-      await release(deps.store.read());
+      await release();
       return settle();
     },
 
@@ -144,10 +144,11 @@ export function createPushService(deps: PushServiceDeps): PushService {
         const result = await deps.api.sendTest();
         if (result.sent === 0 && result.pruned > 0 && result.failed === 0) {
           // O servidor apagou o aparelho (token morto): libera o local também.
+          // Limpa antes de esperar o SDK: nada de await entre a decisão e a escrita.
+          deps.store.clear();
           await deps.port
             .deleteToken()
             .catch((error: unknown) => warn('Falha ao apagar o token local', error));
-          deps.store.clear();
           return 'failed';
         }
         return result.sent > 0 ? 'sent' : 'failed';
@@ -158,10 +159,10 @@ export function createPushService(deps: PushServiceDeps): PushService {
     },
 
     async revalidate() {
-      const record = deps.store.read();
-      // Permissão 'denied' não remove o token aqui: ele sai em load(), ao abrir a aba Mais (D18).
-      if (!record || deps.port.permission() !== 'granted') return;
       try {
+        const record = deps.store.read();
+        // Permissão 'denied' não remove o token aqui: ele sai em load(), ao abrir a aba Mais (D18).
+        if (!record || deps.port.permission() !== 'granted') return;
         // Com a permissão concedida, getToken não pergunta de novo.
         const token = await deps.port.getToken(deps.vapidKey);
         // Desativado ou trocado enquanto o SDK respondia: não registra.
@@ -179,19 +180,21 @@ export function createPushService(deps: PushServiceDeps): PushService {
           return;
         }
         if (after.token !== record.token) return;
+        // Sem await entre a checagem acima e a escrita: o resto não decide a escrita.
+        deps.store.write({ token, registeredAt: now() });
         if (token !== record.token) {
-          await deps.api
+          // Best-effort e sem await: o token antigo sai do servidor sem segurar a revalidação.
+          void deps.api
             .unregister(record.token)
             .catch((error: unknown) => warn('Falha ao remover o token antigo', error));
         }
-        deps.store.write({ token, registeredAt: now() });
       } catch (error) {
         warn('Falha ao revalidar o aparelho dos avisos', error);
       }
     },
 
     async forgetDevice() {
-      await release(deps.store.read(), deps.releaseTimeoutMs ?? FORGET_TIMEOUT_MS);
+      await release();
     },
   };
 }
