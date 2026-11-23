@@ -528,6 +528,15 @@ describe('pushService: sem await entre a checagem e a escrita no registro', () =
     expect(store.value).toEqual(other);
   });
 
+  it('forgetDevice nunca lança, mesmo se a leitura do registro falhar', async () => {
+    const store = memoryStore(RECORD);
+    store.read = () => {
+      throw new Error('storage');
+    };
+    const { svc } = build({ store });
+    await expect(svc.forgetDevice()).resolves.toBeUndefined();
+  });
+
   it('revalidate nunca lança, mesmo se a leitura do registro ou a permissão falharem', async () => {
     const store = memoryStore(RECORD);
     store.read = () => {
@@ -542,6 +551,68 @@ describe('pushService: sem await entre a checagem e a escrita no registro', () =
     });
     const second = build({ port, store: memoryStore(RECORD) });
     await expect(second.svc.revalidate()).resolves.toBeUndefined();
+  });
+});
+
+describe('pushService: sair durante um Ativar em andamento', () => {
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  function pendingRegister() {
+    let resolveRegister: () => void = () => {};
+    const api = fakeApi({
+      register: vi.fn(() => new Promise<void>((resolve) => (resolveRegister = resolve))),
+    });
+    return { api, resolveRegister: () => resolveRegister() };
+  }
+
+  it('forgetDevice durante o register do enable: não grava, desfaz o token novo e não retorna active', async () => {
+    const { api, resolveRegister } = pendingRegister();
+    const { svc, store } = build({ api });
+    const pending = svc.enable();
+    await tick();
+    expect(api.register).toHaveBeenCalledWith('tok-1', 'producao');
+    await svc.forgetDevice();
+    resolveRegister();
+    const status = await pending;
+    expect(store.value).toBeNull();
+    expect(api.unregister).toHaveBeenCalledWith('tok-1');
+    expect(status).not.toBe('active');
+  });
+
+  it('disable durante o register do enable: não grava, desfaz o token novo e não retorna active', async () => {
+    const { api, resolveRegister } = pendingRegister();
+    const { svc, store } = build({ api });
+    const pending = svc.enable();
+    await tick();
+    await svc.disable();
+    resolveRegister();
+    const status = await pending;
+    expect(store.value).toBeNull();
+    expect(api.unregister).toHaveBeenCalledWith('tok-1');
+    expect(status).not.toBe('active');
+  });
+
+  it('um release que terminou antes do enable começar não o bloqueia', async () => {
+    const { svc, api, store } = build({ store: memoryStore(RECORD) });
+    await svc.forgetDevice();
+    await svc.disable();
+    expect(await svc.enable()).toBe('active');
+    expect(store.value).toEqual({ token: 'tok-1', registeredAt: 1000 });
+    expect(api.unregister).not.toHaveBeenCalledWith('tok-1');
+  });
+
+  it('revalidate com register pendente e release no meio, mesmo com o registro regravado: não grava', async () => {
+    const { api, resolveRegister } = pendingRegister();
+    const store = memoryStore(RECORD);
+    const { svc } = build({ api, store });
+    const pending = svc.revalidate();
+    await tick();
+    await svc.forgetDevice();
+    store.write(RECORD);
+    resolveRegister();
+    await pending;
+    expect(api.unregister).toHaveBeenCalledWith('tok-1');
+    expect(store.value).toEqual(RECORD);
   });
 });
 

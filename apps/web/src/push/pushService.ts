@@ -65,7 +65,12 @@ export function createPushService(deps: PushServiceDeps): PushService {
 
   // Sem registro, não toca no servidor nem no SDK. Lê e limpa o registro de forma síncrona,
   // antes de qualquer await: uma gravação feita durante a espera do servidor não é apagada.
+  // Época de soltura: sobe, de forma síncrona, a cada release. Um enable ou revalidate que começou
+  // antes e termina depois (o register estava pendente) vê a época mudada e não grava.
+  let epoch = 0;
+
   const release = async (): Promise<void> => {
+    epoch += 1;
     const record = deps.store.read();
     deps.store.clear();
     if (record) await within(releaseRemote(record), limit);
@@ -108,6 +113,7 @@ export function createPushService(deps: PushServiceDeps): PushService {
 
     async enable() {
       // Primeira ação, sem await antes: o SDK pede a permissão dentro do toque.
+      const started = epoch;
       let token: string;
       try {
         token = await deps.port.getToken(deps.vapidKey);
@@ -121,6 +127,13 @@ export function createPushService(deps: PushServiceDeps): PushService {
       } catch (error) {
         warn('Falha ao gravar o aparelho nos avisos', error);
         return 'error';
+      }
+      // Saiu (ou desativou) durante o register: não grava, e o token novo sai do servidor.
+      if (epoch !== started) {
+        void deps.api
+          .unregister(token)
+          .catch((error: unknown) => warn('Falha ao remover o aparelho dos avisos', error));
+        return settle();
       }
       // Lê o registro depois do getToken: pode ter mudado enquanto o SDK respondia.
       const previous = deps.store.read();
@@ -159,6 +172,7 @@ export function createPushService(deps: PushServiceDeps): PushService {
     },
 
     async revalidate() {
+      const started = epoch;
       try {
         const record = deps.store.read();
         // Permissão 'denied' não remove o token aqui: ele sai em load(), ao abrir a aba Mais (D18).
@@ -173,7 +187,7 @@ export function createPushService(deps: PushServiceDeps): PushService {
         await deps.api.register(token, origin);
         // Desativado ou trocado durante o register: não regrava. Se foi desativado, desfaz o registro novo.
         const after = deps.store.read();
-        if (!after) {
+        if (!after || epoch !== started) {
           await deps.api
             .unregister(token)
             .catch((error: unknown) => warn('Falha ao remover o aparelho dos avisos', error));
@@ -194,7 +208,11 @@ export function createPushService(deps: PushServiceDeps): PushService {
     },
 
     async forgetDevice() {
-      await release();
+      try {
+        await release();
+      } catch (error) {
+        warn('Falha ao esquecer o aparelho dos avisos', error);
+      }
     },
   };
 }
