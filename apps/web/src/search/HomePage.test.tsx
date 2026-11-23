@@ -419,14 +419,19 @@ describe('HomePage', () => {
     });
 
     it('shows the right FAB per tab and role', () => {
-      const { unmount } = renderHome({ role: 'member', path: '/?aba=repertorios' });
+      const { unmount } = renderHome({ role: 'admin', path: '/?aba=repertorios' });
       expect(screen.getByRole('button', { name: '＋ Novo repertório' })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /Nova cifra/ })).not.toBeInTheDocument();
       unmount();
-      const second = renderHome({ role: 'admin' });
+      const second = renderHome({ role: 'member' });
       expect(screen.getByRole('link', { name: '＋ Nova cifra' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Novo repertório/ })).not.toBeInTheDocument();
       second.unmount();
+      // Membro vê os repertórios, mas não cria: só admin.
+      const third = renderHome({ role: 'member', path: '/?aba=repertorios' });
+      expect(screen.queryByRole('button', { name: /Novo repertório/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /Nova cifra/ })).not.toBeInTheDocument();
+      third.unmount();
       renderHome({ role: 'viewer', path: '/?aba=repertorios' });
       expect(screen.queryByRole('button', { name: /Novo repertório/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /Nova cifra/ })).not.toBeInTheDocument();
@@ -434,7 +439,7 @@ describe('HomePage', () => {
 
     it('creates a setlist and navigates to it', async () => {
       const setlistApi = fakeSetlistApi();
-      renderHome({ role: 'member', path: '/?aba=repertorios', setlistApi });
+      renderHome({ role: 'admin', path: '/?aba=repertorios', setlistApi });
       fireEvent.click(screen.getByRole('button', { name: '＋ Novo repertório' }));
       fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
       await waitFor(() =>
@@ -452,7 +457,7 @@ describe('HomePage', () => {
       const setlistApi = fakeSetlistApi([], {
         createSetlist: vi.fn(() => Promise.reject(new Error('boom'))),
       });
-      renderHome({ role: 'member', path: '/?aba=repertorios', setlistApi });
+      renderHome({ role: 'admin', path: '/?aba=repertorios', setlistApi });
       fireEvent.click(screen.getByRole('button', { name: '＋ Novo repertório' }));
       fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
       expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -464,7 +469,7 @@ describe('HomePage', () => {
     });
 
     it('closes the dialog on cancel', () => {
-      renderHome({ role: 'member', path: '/?aba=repertorios' });
+      renderHome({ role: 'admin', path: '/?aba=repertorios' });
       fireEvent.click(screen.getByRole('button', { name: '＋ Novo repertório' }));
       fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

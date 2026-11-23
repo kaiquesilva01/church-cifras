@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
-import { canEdit } from '../auth/roles';
+import { canEdit, canEditSetlists } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import {
   compareTitles,
@@ -198,7 +198,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
           )}
         </div>
       )}
-      {canEdit(role) &&
+      {(tab.id === 'repertorios' ? canEditSetlists(role) : canEdit(role)) &&
         (tab.id === 'repertorios' ? (
           <button
             type="button"

@@ -29,7 +29,7 @@ function mount(padValue: PadContextValue | null) {
   const auth: AuthState = {
     status: 'signed-in',
     user: testUser,
-    role: 'member',
+    role: 'admin',
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),

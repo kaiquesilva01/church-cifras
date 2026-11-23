@@ -16,13 +16,13 @@ Rotas em `apps/web/src/App.tsx`. Tudo fora de `/login` exige login (`RequireAuth
 | Rota | Tela | Quem acessa | O que faz |
 | --- | --- | --- | --- |
 | `/login` | Login | qualquer um | Entrar com Google. Abrir um link sem estar logado leva ao login e, depois, volta ao destino |
-| `/` | Início | logado | Cartão "Próximo culto"; abas Músicas, Harpa, Cantores e Repertórios; campo de busca; "＋ Nova cifra" só para membro/admin; convite "Cifras como app" na aba Músicas (ver PWA) |
+| `/` | Início | logado | Cartão "Próximo culto"; abas Músicas, Harpa, Cantores e Repertórios; campo de busca; "＋ Nova cifra" só para membro/admin; "＋ Novo repertório" (aba Repertórios) só para admin; convite "Cifras como app" na aba Músicas (ver PWA) |
 | `/busca` | Busca | logado | Busca com filtros Tudo, Músicas, Cantores, Harpa; seção "Na letra" |
 | `/pad` | Pad | logado | Status, grade de 12 tons, volume, parar |
 | `/mais` | Mais | logado | Perfil e papel; Admin (só admin); Importar (só admin); Estatísticas (só admin); Avisos (membro e admin); Pessoas "Em breve"; Sair |
 | `/cantores/:artistId` | Cantor | logado | Músicas do cantor, com filtro próprio |
 | `/musicas/:songId` | Visualizador | logado | Cifra em PDF, atalhos dos tons salvos, barra de ações, Mudar tom |
-| `/repertorios/:id` | Repertório | logado (edita membro/admin) | Lista de louvores com tom; editar data, rótulo e ensaio, reordenar, compartilhar |
+| `/repertorios/:id` | Repertório | logado (edita só admin) | Lista de louvores com tom; editar data, rótulo e ensaio, reordenar, compartilhar |
 | `/nova` | Nova cifra | membro, admin | Upload de PDF com formulário |
 | `/pessoas` | Pessoas | admin | Lista de quem já logou, com seletor de papel |
 | `/estatisticas` | Estatísticas | admin | PDFs, armazenamento, cifras mais usadas |
@@ -55,7 +55,7 @@ Barra inferior (Músicas, Repertório, Busca, Pad, Mais) só nas 5 telas raiz; a
 - Padrão de criação: próximo dia que seja quinta ou domingo; rótulo padrão é o dia da semana. Duplicar copia os itens com ids novos.
 - Aba Repertórios: "Próximos" (data crescente) e "Recentes" (decrescente, só não expirados). Cartão "Próximo culto" no topo do Início (data mais próxima, hoje incluído). O cartão mostra o ensaio em segunda linha muted; sem hora, nada. A linha do ensaio sempre traz dia da semana e data (`Ensaio sáb · 21/11 às 18h30`), nunca "hoje" nem "amanhã".
 - Repertório novo grava `origin`: `teste` só quando o host é `louvor-hajaluz-teste.web.app` (o `teste` de `SITE_BASE`); `producao` no resto, inclusive localhost. Criar (nova ou duplicar) grava pelo host atual; editar não muda.
-- Editar (membro/admin), pelo menu ⋯ "Editar data, rótulo e ensaio": arrastar pela alça `≡` ou botões ▲ ▼, trocar o tom (entre os salvos da música), remover, adicionar pela folha de busca (entra no fim, no tom feito à mão; músicas sem PDF desabilitadas; "já está" nas repetidas). Visitante vê só título e tom, "Somente leitura".
+- Editar (só admin), pelo menu ⋯ "Editar data, rótulo e ensaio": arrastar pela alça `≡` ou botões ▲ ▼, trocar o tom (entre os salvos da música), remover, adicionar pela folha de busca (entra no fim, no tom feito à mão; músicas sem PDF desabilitadas; "já está" nas repetidas). Visitante e membro veem só título e tom, "Somente leitura · só admins editam o repertório".
 - Item de música apagada aparece como "Música removida" e é pulado na navegação. Tom do item que deixou de existir aparece riscado e a cifra abre no padrão com aviso.
 - Tempo real: mudança de outra pessoa mostra o banner "O repertório foi alterado. Atualizar"; a tela só muda se a pessoa aceitar (inclusive o tom da cifra aberta). O primeiro snapshot do cache não gera banner.
 - Compartilhar: botão WhatsApp (canto inferior esquerdo, qualquer papel) com título, data, louvores com tom e o link; sem Web Share, copia e avisa "Link copiado.".
@@ -87,8 +87,8 @@ Papel em `users/{uid}.role` e no custom claim `role`; lido nas Rules por `reques
 | Papel | Pode |
 | --- | --- |
 | Visitante (padrão no 1º login) | Buscar, abrir, baixar e compartilhar cifras; ver repertórios; tocar o pad |
-| Membro | + subir cifras, gerar e salvar tons, descartar o próprio upload, substituir tom gerado, criar/editar/duplicar/apagar repertórios |
-| Admin | + apagar tom ou música, corrigir título/cantor, alterar papéis, importar em lote, ver Estatísticas |
+| Membro | + subir cifras, gerar e salvar tons, descartar o próprio upload, substituir tom gerado |
+| Admin | + criar/editar/duplicar/apagar repertórios, apagar tom ou música, corrigir título/cantor, alterar papéis, importar em lote, ver Estatísticas |
 
 - Primeiro admin: e-mails em `ADMIN_EMAILS` (variável do deploy), só no primeiro login de cada pessoa e só com e-mail verificado. Depois, o papel muda pela tela Pessoas.
 - Mudança de papel só vale para escritas depois do refresh do token; o cliente observa `users/{uid}` e chama `getIdToken(true)`.
@@ -108,7 +108,7 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 | `songs/{songId}` | `title`, `titleNormalized`, `artistId` (slug), `artistName`, `keys` (tons salvos, mantido por função), `handmadeKeys`, `createdBy`, `createdAt`, `updatedAt` | só `create` por membro/admin; sem update nem delete |
 | `songs/{songId}/arrangements/{slug}` | `key` (um dos 24 tons), `storagePath`, `source` (`handmade`/`generated`), `derivedFromKey` (só gerado), `writer` (`upload`/`overlay`), `chordCount`, `collisions`, `createdBy`, `createdAt` | só `create` por membro/admin; sem update nem delete |
 | `songLyrics/{songId}` | `text` (1–20.000 caracteres), `createdBy`, `createdAt` | só `create` por membro/admin, com a música existindo na mesma operação |
-| `setlists/{setlistId}` | `date` (`YYYY-MM-DD`), `label`, `items[]` (`id`, `songId`, `key`), `expiresAt`, `createdBy/At`, `updatedBy/At`, `rehearsalAt` (opcional: hora do ensaio, dentro da janela do culto: de 00:00 de 7 dias antes do dia até 00:00 do dia seguinte, exclusivo; `null` é negado), `origin` (opcional: `producao`/`teste`) | membro/admin: create, update e delete |
+| `setlists/{setlistId}` | `date` (`YYYY-MM-DD`), `label`, `items[]` (`id`, `songId`, `key`), `expiresAt`, `createdBy/At`, `updatedBy/At`, `rehearsalAt` (opcional: hora do ensaio, dentro da janela do culto: de 00:00 de 7 dias antes do dia até 00:00 do dia seguinte, exclusivo; `null` é negado), `origin` (opcional: `producao`/`teste`) | só admin: create, update e delete (membro e visitante só leem) |
 | `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt` | nenhuma; só Admin SDK (negado por padrão) |
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
 | `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
@@ -258,6 +258,8 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 
 ### Limites aceitos
 
+- Repertórios: desde o PR #124 só admin escreve; os specs de repertórios (2026-11-16) e o principal (2026-11-13) ainda dizem "membro/admin". Vale o código.
+
 - Avisos (#99): sem horário de silêncio na v1; com o modo foco do aparelho ligado, o aviso fica silenciado; a descoberta é só pela aba Mais.
 - Avisos (#99): Desativar apaga o registro local antes da resposta do servidor. Se o app fecha nesses até 5 s com rede ruim, o aparelho pode seguir recebendo avisos; recuperação: Ativar e depois Desativar, ou bloquear as notificações do site. Corridas muito estreitas entre Ativar, Desativar, a revalidação ao abrir e o teste (sub-segundo, em rede lenta) podem deixar servidor e aparelho fora de sincronia; a próxima revalidação ou a poda da #98 corrige.
 - Avisos (#99): "Tentar de novo" recarrega a linha e volta a "Ativar" (o pedido de permissão no Safari exige novo toque): um toque a mais depois de falha. "Enviar aviso de teste" vale para todos os aparelhos da conta; com outro aparelho ativo, este pode mostrar "enviado" mesmo tendo sido podado.
@@ -266,7 +268,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 - Os PDFs reais do acervo não vão para o git (letras com direitos autorais; repositório público). A CI usa PDFs sintéticos; a amostra real é pequena, então a importação em lote serve de teste em massa.
 - Corridas de identidade: renomear ou criar músicas ao mesmo tempo pode gerar duas com a mesma identidade (`titleNormalized + artistId`); resolve o admin à mão.
 - Papel novo só vale depois do refresh do token (até cerca de 1 h se o cliente não forçar).
-- As Rules de `setlists` não iteram sobre `items`: não validam cada item nem a existência da música (risco aceito, só membro/admin escreve). O padrão de `date` aceita datas impossíveis; o cliente valida.
+- As Rules de `setlists` não iteram sobre `items`: não validam cada item nem a existência da música (risco aceito, só admin escreve). O padrão de `date` aceita datas impossíveis; o cliente valida.
 - Pad: bloquear a tela à mão pode parar o áudio, sobretudo no iOS. Wake Lock cobre o resto. Só 12 loops de um timbre.
 - Estatísticas: se o agendador ficasse parado por mais de cerca de 28 dias, repertórios expirariam sem contagem. Repertório já contado e depois re-datado não é contado de novo.
 - O TTL do Firestore pode demorar um dia ou mais para apagar; o cliente já esconde os expirados.

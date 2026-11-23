@@ -121,7 +121,7 @@ Estados obrigatórios por tela: **carregando, vazio, erro** (e "somente leitura"
 
 ## 6. Regras de produto que afetam o visual
 
-- Papéis: visitante só lê e baixa; membro cria/edita; admin gerencia. Controles que o papel não pode usar
+- Papéis: visitante só lê e baixa; membro sobe cifras e troca tom; só admin cria e edita repertórios e gerencia. Controles que o papel não pode usar
   **não aparecem** (exceto o item "Em breve" de Pessoas).
 - Mudar tom: o espaçamento afasta acordes vizinhos; **não** existe aviso de "acorde encosta". Vermelho só
   para o que não coube (vizinho que não é acorde ou margem).
