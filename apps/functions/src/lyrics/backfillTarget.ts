@@ -2,12 +2,17 @@
 // em qual projeto, bucket e (se houver) emulador a execução vai atuar.
 export type TargetInfo = {
   projectId: string | undefined;
-  bucket: string;
+  bucket?: string;
   dryRun: boolean;
   env: Record<string, string | undefined>;
 };
 
-const EMULATOR_VARS = ['FIRESTORE_EMULATOR_HOST', 'FIREBASE_STORAGE_EMULATOR_HOST'] as const;
+// Emuladores que mudam o alvo: Firestore, Storage e Auth (o CLI de migração dos ministérios usa getAuth).
+const EMULATOR_VARS = [
+  'FIRESTORE_EMULATOR_HOST',
+  'FIREBASE_STORAGE_EMULATOR_HOST',
+  'FIREBASE_AUTH_EMULATOR_HOST',
+] as const;
 
 export function describeTarget({ projectId, bucket, dryRun, env }: TargetInfo): {
   lines: string[];
@@ -16,9 +21,9 @@ export function describeTarget({ projectId, bucket, dryRun, env }: TargetInfo): 
   const resolved = Boolean(projectId);
   const lines = [
     `projeto: ${resolved ? projectId : '(não identificado)'}`,
-    `bucket: ${bucket}`,
     `modo: ${dryRun ? 'dry-run' : 'gravando'}`,
   ];
+  if (bucket) lines.splice(1, 0, `bucket: ${bucket}`);
   for (const name of EMULATOR_VARS) {
     const value = env[name];
     if (value) lines.push(`${name}: ${value}`);

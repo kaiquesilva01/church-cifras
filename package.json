@@ -23,6 +23,7 @@
     "format:check": "prettier --check .",
     "smoke:upload": "node scripts/smoke/upload.mjs",
     "lyrics:backfill": "npm run lyrics:backfill -w @cifras/functions --",
+    "ministries:migrate": "npm run ministries:migrate -w @cifras/functions --",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-church-cifras \"npm run test:rules -w @cifras/tests\"",
     "test:e2e": "npm run build -w @cifras/functions && firebase emulators:exec --only auth,firestore,storage,functions --project demo-church-cifras \"npm run e2e -w @cifras/e2e\""
   },
