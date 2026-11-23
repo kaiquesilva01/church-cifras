@@ -281,9 +281,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
         />
       )}
       {!editable && (
-        <p className="setlist-readonly-note">
-          Somente leitura · só admins editam o repertório
-        </p>
+        <p className="setlist-readonly-note">Somente leitura · só admins editam o repertório</p>
       )}
       {editable && (
         <button type="button" className="fab setlist-fab" onClick={() => setDialog('add')}>
