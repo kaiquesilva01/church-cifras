@@ -11,8 +11,20 @@ const base = {
   signIn: () => Promise.resolve(),
   signOut: () => Promise.resolve(),
 };
-const signedOut: AuthState = { ...base, status: 'signed-out', user: null, role: 'viewer' };
-const signedIn: AuthState = { ...base, status: 'signed-in', user: testUser, role: 'member' };
+const signedOut: AuthState = {
+  ...base,
+  status: 'signed-out',
+  user: null,
+  role: 'viewer',
+  access: 'granted',
+};
+const signedIn: AuthState = {
+  ...base,
+  status: 'signed-in',
+  user: testUser,
+  role: 'member',
+  access: 'granted',
+};
 
 function Where() {
   const { pathname, search, hash } = useLocation();

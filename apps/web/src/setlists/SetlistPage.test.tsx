@@ -43,6 +43,7 @@ function mount(
     status: 'signed-in',
     user: testUser,
     role: role as Role,
+    access: 'granted',
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),

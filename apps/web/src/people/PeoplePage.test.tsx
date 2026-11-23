@@ -24,6 +24,7 @@ function renderPage(api: PeopleApi) {
     status: 'signed-in',
     user: testUser,
     role: 'admin',
+    access: 'granted',
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
     signOut: () => Promise.resolve(),

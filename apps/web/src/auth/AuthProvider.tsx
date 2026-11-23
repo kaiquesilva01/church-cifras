@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Role } from './roles';
+import { canEdit, type Role } from './roles';
 import { AuthContext, type AuthState } from './useAuth';
 
 export interface SessionUser {
@@ -27,11 +27,34 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     loaded: false,
     role: undefined,
   });
+  // Papel do token (mesma fonte das Rules): é ele que libera o acesso aos dados.
+  const [claim, setClaim] = useState<{ loaded: boolean; role: Role | undefined }>({
+    loaded: false,
+    role: undefined,
+  });
   const uid = session.resolved ? session.user?.uid : undefined;
 
   useEffect(() => {
     return gateway.onUser((user) => setSession({ resolved: true, user }));
   }, [gateway]);
+
+  useEffect(() => {
+    if (!uid) return;
+    let active = true;
+    gateway.getClaimRole().then(
+      (role) => {
+        if (active) setClaim({ loaded: true, role });
+      },
+      (error: unknown) => {
+        console.warn('Falha ao ler o papel do token', error);
+        if (active) setClaim({ loaded: true, role: undefined });
+      },
+    );
+    return () => {
+      active = false;
+      setClaim({ loaded: false, role: undefined });
+    };
+  }, [gateway, uid]);
 
   useEffect(() => {
     if (!uid) return;
@@ -43,9 +66,12 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
       try {
         // O gatilho define o claim depois do login: renova o token se estiver defasado.
         if ((await gateway.getClaimRole()) !== role && active) await gateway.refreshToken();
+        // Relê o claim renovado: o gate de acesso libera ou bloqueia sem recarregar.
+        if (active) setClaim({ loaded: true, role: await gateway.getClaimRole() });
       } catch (error) {
         last = undefined;
         console.warn('Falha ao atualizar o token de sessão', error);
+        if (active) setClaim({ loaded: true, role: undefined });
       }
     };
     const unsubscribe = gateway.onUserDoc(uid, (role) => {
@@ -64,16 +90,24 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
 
   const value = useMemo<AuthState>(() => {
     const user = session.resolved ? session.user : null;
+    const status: AuthState['status'] =
+      !session.resolved || (user && !doc.loaded) ? 'loading' : user ? 'signed-in' : 'signed-out';
+    const access: AuthState['access'] =
+      status !== 'signed-in' || !claim.loaded
+        ? 'checking'
+        : canEdit(claim.role ?? 'viewer')
+          ? 'granted'
+          : 'blocked';
     return {
-      status:
-        !session.resolved || (user && !doc.loaded) ? 'loading' : user ? 'signed-in' : 'signed-out',
+      status,
       user,
       role: doc.role ?? 'viewer',
+      access,
       prepareSignIn,
       signIn: () => gateway.signIn(),
       signOut: () => gateway.signOut(),
     };
-  }, [session, doc, gateway, prepareSignIn]);
+  }, [session, doc, claim, gateway, prepareSignIn]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
