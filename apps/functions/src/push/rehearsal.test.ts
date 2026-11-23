@@ -5,10 +5,8 @@ import {
   formatSaoPauloDay,
   formatSaoPauloHour,
   lastRehearsalAt,
-  planRehearsalReminder,
   readRehearsalSetlist,
   saoPauloMinuteOfDay,
-  type RehearsalSetlist,
 } from './rehearsal';
 
 const MIN = 60 * 1000;
@@ -23,15 +21,6 @@ const at = (ms: number) => new Date(NOW.getTime() + ms);
 it('guarda do helper br: interpreta hh:mm e hh:mm:ss em Brasília', () => {
   expect(br('2026-11-21', '08:09:59').getTime()).not.toBeNaN();
   expect(br('2026-11-21', '17:00')).toEqual(NOW);
-});
-
-const setlist = (rehearsalAt: Date, extra: Partial<RehearsalSetlist> = {}): RehearsalSetlist => ({
-  id: 'r1',
-  label: 'Culto de domingo',
-  origin: 'producao',
-  rehearsalAt,
-  expiresAt: undefined,
-  ...extra,
 });
 
 const ORIGINAL_TZ = process.env.TZ;
@@ -106,105 +95,6 @@ describe('readRehearsalSetlist', () => {
 
   it('sem dados devolve undefined', () => {
     expect(readRehearsalSetlist('r1', undefined)).toBeUndefined();
-  });
-});
-
-describe('planRehearsalReminder: faixas e bordas', () => {
-  it.each([
-    ['30 min exatos à frente', 30 * MIN, 'perto'],
-    ['1 min à frente', 1 * MIN, 'perto'],
-    ['10 min à frente (gravado tarde): sai na hora', 10 * MIN, 'perto'],
-    ['30 min e 1 ms à frente', 30 * MIN + 1, null],
-    ['exatamente agora', 0, 'agora'],
-    ['4 min 59 s atrás', -5 * MIN + 1000, 'agora'],
-    ['5 min atrás (limite exclusivo)', -5 * MIN, null],
-    ['6 min atrás: sem retroativo', -6 * MIN, null],
-  ])('%s', (_name, offset, expected) => {
-    expect(planRehearsalReminder(NOW, setlist(at(offset)), [])?.tipo ?? null).toBe(expected);
-  });
-});
-
-describe('planRehearsalReminder: textos e envio', () => {
-  it('ensaio em 30 min: título, corpo, tag e link exatos', () => {
-    expect(planRehearsalReminder(NOW, setlist(at(30 * MIN)), [])).toEqual({
-      tipo: 'perto',
-      rehearsalAtMs: at(30 * MIN).getTime(),
-      input: {
-        title: 'Ensaio em 30 min',
-        body: 'Culto de domingo · hoje às 17h30. Toque para ver os louvores.',
-        link: '/repertorios/r1',
-        tag: 'setlist-r1-ensaio',
-        origin: 'producao',
-        respectSwitch: true,
-      },
-    });
-  });
-
-  it('ensaio agora: título e corpo exatos, mesma tag', () => {
-    expect(planRehearsalReminder(NOW, setlist(NOW), [])).toEqual({
-      tipo: 'agora',
-      rehearsalAtMs: NOW.getTime(),
-      input: {
-        title: 'Ensaio agora',
-        body: 'Culto de domingo · começa às 17h00.',
-        link: '/repertorios/r1',
-        tag: 'setlist-r1-ensaio',
-        origin: 'producao',
-        respectSwitch: true,
-      },
-    });
-  });
-
-  it('ensaio depois da meia-noite de Brasília: "amanhã às 00h10"', () => {
-    // agora: 22/11 02:45Z = 21/11 23:45 em Brasília; ensaio: 22/11 03:10Z = 22/11 00:10 (25 min à frente).
-    const now = new Date('2026-11-22T02:45:00Z');
-    expect(
-      planRehearsalReminder(now, setlist(new Date('2026-11-22T03:10:00Z')), [])?.input.body,
-    ).toBe('Culto de domingo · amanhã às 00h10. Toque para ver os louvores.');
-  });
-
-  it('não define excludeUid: o lembrete vai para todos', () => {
-    expect(planRehearsalReminder(NOW, setlist(at(MIN)), [])?.input).not.toHaveProperty(
-      'excludeUid',
-    );
-  });
-
-  it('a origem do repertório segue para o envio', () => {
-    expect(
-      planRehearsalReminder(NOW, setlist(at(MIN), { origin: 'teste' }), [])?.input.origin,
-    ).toBe('teste');
-  });
-});
-
-describe('planRehearsalReminder: título com os minutos que faltam', () => {
-  it.each([
-    { name: '30 min exatos', offset: 30 * MIN, title: 'Ensaio em 30 min' },
-    { name: '10 min', offset: 10 * MIN, title: 'Ensaio em 10 min' },
-    { name: '1 ms', offset: 1, title: 'Ensaio em 1 min' },
-    { name: '29 min 30 s', offset: 29 * MIN + 30 * 1000, title: 'Ensaio em 30 min' },
-  ])('$name: título "$title"', ({ offset, title }) => {
-    expect(planRehearsalReminder(NOW, setlist(at(offset)), [])?.input.title).toBe(title);
-  });
-});
-
-describe('planRehearsalReminder: mudança de horário', () => {
-  it('horário diferente de um perto anterior: "Ensaio mudou para 17h20"', () => {
-    const earlier = [at(25 * MIN).getTime()];
-    expect(planRehearsalReminder(NOW, setlist(at(20 * MIN)), earlier)?.input.title).toBe(
-      'Ensaio mudou para 17h20',
-    );
-  });
-
-  it('mesmo horário do perto anterior: título comum', () => {
-    const earlier = [at(20 * MIN).getTime()];
-    expect(planRehearsalReminder(NOW, setlist(at(20 * MIN)), earlier)?.input.title).toBe(
-      'Ensaio em 20 min',
-    );
-  });
-
-  it('a mudança não altera o "agora"', () => {
-    const earlier = [at(25 * MIN).getTime()];
-    expect(planRehearsalReminder(NOW, setlist(NOW), earlier)?.input.title).toBe('Ensaio agora');
   });
 });
 

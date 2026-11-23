@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { device, fakeDeps, FAKE_NOW, sentTokens, type FakeOptions } from './fakeDeps';
+import { device, fakeDeps, sentTokens, type FakeOptions } from './fakeDeps';
 import { runRehearsalReminders, type ReminderDeps } from './reminders';
 
-const MIN = 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
-// FAKE_NOW = 12:00Z = 09:00 em Brasília.
-const at = (ms: number) => new Date(FAKE_NOW.getTime() + ms);
-const markerId = (ms: number, tipo = 'perto', setlistId = 'r1') =>
-  `${setlistId}_${tipo}_${at(ms).getTime()}`;
+// Horário de Brasília (UTC−3 fixo), independente do fuso da máquina.
+const br = (day: string, t: string) => new Date(`${day}T${t.length === 5 ? `${t}:00` : t}-03:00`);
+expect(br('2026-11-21', '08:09:59').getTime()).not.toBeNaN();
+
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
 
 type Doc = { id: string; data: Record<string, unknown> };
 const doc = (
@@ -38,9 +39,9 @@ function setup(
   fake: FakeOptions = {},
   markers: Array<[string, Record<string, unknown>]> = [],
 ) {
-  const { deps, calls } = fakeDeps(fake);
+  const { deps, calls, clock } = fakeDeps(fake);
   const store = new Map<string, Record<string, unknown>>(markers);
-  const windows: Array<[Date, Date]> = [];
+  const reads = { setlists: [] as Array<[Date, Date]>, markers: [] as string[] };
   const reminderDeps: ReminderDeps = {
     ...deps,
     claimMarker: async (id, data) => {
@@ -48,106 +49,231 @@ function setup(
       store.set(id, data);
       return 'created';
     },
-    // Devolve todos os documentos: o filtro por janela é da consulta do Firestore (Tarefa 3).
-    // Assim os testes de "sem hora" e "passado" passam por readRehearsalSetlist e pelo planner.
-    listRehearsalSetlists: async (from, to) => {
-      windows.push([from, to]);
-      return docs;
+    // Filtra por (after, until] como a consulta do Firestore.
+    listRehearsalSetlists: async (after, until) => {
+      reads.setlists.push([after, until]);
+      return docs.filter((d) => {
+        const at = d.data.rehearsalAt;
+        return at instanceof Date && at > after && at <= until;
+      });
     },
-    listRehearsalMarkers: async (setlistId) =>
-      [...store.values()].filter((m) => m.setlistId === setlistId),
+    listRehearsalMarkers: async (setlistId) => {
+      reads.markers.push(setlistId);
+      return [...store.values()].filter((m) => m.setlistId === setlistId);
+    },
   };
-  return { reminderDeps, calls, store, windows };
+  return { reminderDeps, calls, store, clock, reads };
 }
 
-describe('runRehearsalReminders: envio e marca', () => {
-  it('ensaio em 10 min: envia o perto uma vez, para todos (inclusive quem gravou)', async () => {
-    const { reminderDeps, calls, store } = setup([doc('r1', at(10 * MIN))], {
+describe('runRehearsalReminders: janela e leituras', () => {
+  it('consulta (agora, agora + 24 h] e não lê marcas sem aviso devido', async () => {
+    const now = br('2026-11-21', '12:00');
+    const { reminderDeps, clock, reads } = setup([doc('r1', br('2026-11-22', '18:30'))], {
       ...members,
-      devices: [device('t1', 'm1', 'producao'), device('t2', 'a1', 'producao')],
+      devices: [device('t1', 'm1')],
     });
+    clock.now = now;
 
     expect(await runRehearsalReminders(reminderDeps)).toEqual({
-      sent: 2,
+      sent: 0,
       already: 0,
       blocked: 0,
       failed: 0,
     });
-    expect(sentTokens(calls)).toEqual(['t1', 't2']);
-    expect(calls.flat()[0]?.message).toEqual({
-      title: 'Ensaio em 10 min',
-      body: 'Culto de domingo · hoje às 09h10. Toque para ver os louvores.',
-      tag: 'setlist-r1-ensaio',
-      link: 'https://louvor-hajaluz.web.app/repertorios/r1',
-    });
-    expect(store.get(markerId(10 * MIN))).toEqual({
-      setlistId: 'r1',
-      tipo: 'perto',
-      rehearsalAt: at(10 * MIN),
-      createdAt: FAKE_NOW,
-      expiresAt: new Date(FAKE_NOW.getTime() + 60 * DAY_MS),
-    });
+    expect(reads.setlists).toEqual([[now, new Date(now.getTime() + DAY)]]);
+    expect(reads.markers).toEqual([]);
   });
+});
 
-  it('reentrega e execução concorrente não duplicam', async () => {
-    const { reminderDeps, calls } = setup([doc('r1', at(10 * MIN))], {
+describe('runRehearsalReminders: véspera', () => {
+  it('véspera: sexta 18h30 avisa "Ensaio amanhã às 18h30", uma vez', async () => {
+    const { reminderDeps, calls, store, clock } = setup([doc('r1', br('2026-11-21', '18:30'))], {
       ...members,
       devices: [device('t1', 'm1')],
     });
+    clock.now = br('2026-11-20', '18:30');
 
-    const [a, b] = await Promise.all([
-      runRehearsalReminders(reminderDeps),
-      runRehearsalReminders(reminderDeps),
-    ]);
-    expect(sentTokens(calls)).toEqual(['t1']);
-    expect(a.sent + b.sent).toBe(1);
-    expect(a.already + b.already).toBe(1);
+    expect(await runRehearsalReminders(reminderDeps)).toMatchObject({ sent: 1 });
+    expect(calls.flat()[0]?.message).toEqual({
+      title: 'Ensaio amanhã às 18h30',
+      body: 'Culto de domingo · sáb 21/11. Toque para ver os louvores.',
+      tag: 'setlist-r1-ensaio',
+      link: 'https://louvor-hajaluz.web.app/repertorios/r1',
+    });
     expect(await runRehearsalReminders(reminderDeps)).toEqual({
       sent: 0,
       already: 1,
       blocked: 0,
       failed: 0,
     });
+    expect(store.get(`r1_vespera_${br('2026-11-21', '18:30').getTime()}`)).toMatchObject({
+      setlistId: 'r1',
+      tipo: 'vespera',
+    });
   });
 
-  it('ensaio agora: usa o marcador "agora" e a mesma tag', async () => {
-    const { reminderDeps, calls, store } = setup([doc('r1', at(0))], {
+  it('véspera: fora da janela não sai', async () => {
+    const { reminderDeps, calls, clock } = setup([doc('r1', br('2026-11-21', '18:30'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-20', '18:29:59');
+    await runRehearsalReminders(reminderDeps);
+    clock.now = br('2026-11-20', '18:40:00');
+    await runRehearsalReminders(reminderDeps);
+    expect(calls).toEqual([]);
+  });
+
+  it('repertório gravado depois da véspera não recebe véspera', async () => {
+    const { reminderDeps, calls, clock, reads } = setup([doc('r1', br('2026-11-21', '18:30'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-20', '18:45');
+
+    expect(await runRehearsalReminders(reminderDeps)).toMatchObject({ sent: 0 });
+    expect(calls).toEqual([]);
+    expect(reads.markers).toEqual([]);
+  });
+
+  it('ensaio às 7h: véspera às 7h do dia anterior e 1 hora às 6h, sem no dia', async () => {
+    const ensaio = br('2026-11-21', '07:00');
+    const { reminderDeps, calls, clock } = setup([doc('r1', ensaio)], {
       ...members,
       devices: [device('t1', 'm1')],
     });
 
+    clock.now = br('2026-11-20', '07:00');
     await runRehearsalReminders(reminderDeps);
-    expect(calls.flat()[0]?.message).toMatchObject({
-      title: 'Ensaio agora',
-      body: 'Culto de domingo · começa às 09h00.',
-      tag: 'setlist-r1-ensaio',
-    });
-    expect(store.has(markerId(0, 'agora'))).toBe(true);
+    clock.now = br('2026-11-21', '06:00');
+    await runRehearsalReminders(reminderDeps);
+    clock.now = br('2026-11-21', '08:05');
+    await runRehearsalReminders(reminderDeps);
+
+    expect(calls.flat().map((m) => m.message.title)).toEqual([
+      'Ensaio amanhã às 07h00',
+      'Ensaio em 1 hora',
+    ]);
   });
 });
 
-describe('runRehearsalReminders: mudança de horário', () => {
-  const oldPerto = (ms: number): Array<[string, Record<string, unknown>]> => [
-    [markerId(ms), { setlistId: 'r1', tipo: 'perto', rehearsalAt: at(ms) }],
-  ];
+describe('runRehearsalReminders: no dia', () => {
+  it('no dia: ensaio às 18h30, às 08h00 sai "Ensaio hoje às 18h30"; às 08h10 não sai', async () => {
+    const { reminderDeps, calls, clock } = setup([doc('r1', br('2026-11-21', '18:30'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
 
-  it('horário novo depois de um perto: "Ensaio mudou para 09h20"', async () => {
-    const { reminderDeps, calls } = setup(
-      [doc('r1', at(20 * MIN))],
-      { ...members, devices: [device('t1', 'm1')] },
-      oldPerto(25 * MIN),
-    );
-
+    clock.now = br('2026-11-21', '08:00');
     await runRehearsalReminders(reminderDeps);
-    expect(calls.flat()[0]?.message.title).toBe('Ensaio mudou para 09h20');
+    expect(calls.flat()[0]?.message.title).toBe('Ensaio hoje às 18h30');
+
+    clock.now = br('2026-11-21', '08:10');
+    await runRehearsalReminders(reminderDeps);
+    expect(calls).toHaveLength(1);
   });
 
-  it('voltar ao horário já avisado não reenvia', async () => {
-    const { reminderDeps, calls } = setup(
-      [doc('r1', at(25 * MIN))],
+  it('no dia: ensaio às 10h59 não recebe; às 11h00 recebe', async () => {
+    const docs = [doc('r1', br('2026-11-21', '10:59'))];
+    const { reminderDeps, calls, clock } = setup(docs, {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+
+    clock.now = br('2026-11-21', '08:05');
+    await runRehearsalReminders(reminderDeps);
+    expect(calls).toEqual([]);
+
+    docs[0] = doc('r1', br('2026-11-21', '11:00'));
+    await runRehearsalReminders(reminderDeps);
+    expect(calls.flat()[0]?.message.title).toBe('Ensaio hoje às 11h00');
+  });
+
+  it('no dia: repertório gravado às 08h20 não recebe', async () => {
+    const { reminderDeps, calls, clock } = setup([doc('r1', br('2026-11-21', '18:30'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-21', '08:20');
+
+    expect(await runRehearsalReminders(reminderDeps)).toMatchObject({ sent: 0 });
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('runRehearsalReminders: 1 hora', () => {
+  it('1 hora: gravado 20 min antes sai na hora, com "Ensaio em 20 min"', async () => {
+    const { reminderDeps, calls, clock } = setup([doc('r1', br('2026-11-21', '17:20'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-21', '17:00');
+
+    await runRehearsalReminders(reminderDeps);
+    expect(calls.flat()[0]?.message).toMatchObject({
+      title: 'Ensaio em 20 min',
+      body: 'Culto de domingo · hoje às 17h20. Toque para ver os louvores.',
+    });
+  });
+
+  it('1 hora: um único aviso para 60, 30 e 5 min antes (sem aviso de 30 min)', async () => {
+    const { reminderDeps, calls, clock } = setup([doc('r1', br('2026-11-21', '18:00'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    let sent = 0;
+    for (const t of ['17:00', '17:01', '17:30', '17:55']) {
+      clock.now = br('2026-11-21', t);
+      sent += (await runRehearsalReminders(reminderDeps)).sent;
+    }
+
+    expect(calls.flat().map((m) => m.message.title)).toEqual(['Ensaio em 1 hora']);
+    expect(sent).toBe(1);
+  });
+
+  it('1 hora: 61 min antes não sai; ensaio passado não sai', async () => {
+    const docs = [doc('r1', br('2026-11-21', '18:01'))];
+    const { reminderDeps, calls, clock } = setup(docs, {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-21', '17:00');
+    expect(await runRehearsalReminders(reminderDeps)).toMatchObject({ sent: 0 });
+
+    docs[0] = doc('r1', br('2026-11-21', '16:59'));
+    expect(await runRehearsalReminders(reminderDeps)).toMatchObject({ sent: 0 });
+    expect(calls).toEqual([]);
+  });
+
+  it('cron atrasado: parado 15 min, ensaio a 40 min ainda sai o 1 hora', async () => {
+    const { reminderDeps, calls, clock } = setup([doc('r1', br('2026-11-21', '18:05'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-21', '17:25');
+
+    expect(await runRehearsalReminders(reminderDeps)).toMatchObject({ sent: 1 });
+    expect(calls.flat()[0]?.message.title).toBe('Ensaio em 40 min');
+  });
+
+  it('marca perto antiga do mesmo horário impede novo 1 hora (deploy)', async () => {
+    const ensaio = br('2026-11-21', '17:20');
+    const { reminderDeps, calls, clock } = setup(
+      [doc('r1', ensaio)],
       { ...members, devices: [device('t1', 'm1')] },
-      oldPerto(25 * MIN),
+      [
+        [
+          `r1_perto_${ensaio.getTime()}`,
+          {
+            setlistId: 'r1',
+            tipo: 'perto',
+            rehearsalAt: ensaio,
+            createdAt: br('2026-11-21', '16:00'),
+          },
+        ],
+      ],
     );
+    clock.now = br('2026-11-21', '17:00');
 
     expect(await runRehearsalReminders(reminderDeps)).toEqual({
       sent: 0,
@@ -157,80 +283,182 @@ describe('runRehearsalReminders: mudança de horário', () => {
     });
     expect(calls).toEqual([]);
   });
-});
 
-describe('runRehearsalReminders: marcas "agora" não contam como mudança', () => {
-  it('um marcador "agora" de outro horário não transforma o próximo perto em mudança', async () => {
-    const { reminderDeps, calls } = setup(
-      [doc('r1', at(20 * MIN))],
+  it('marcas "agora" e "novo" não contam como mudança', async () => {
+    const ensaio = br('2026-11-21', '17:20');
+    const { reminderDeps, calls, clock } = setup(
+      [doc('r1', ensaio)],
       { ...members, devices: [device('t1', 'm1')] },
       [
         [
-          markerId(25 * MIN, 'agora'),
-          { setlistId: 'r1', tipo: 'agora', rehearsalAt: at(25 * MIN) },
+          'r1_agora_1',
+          {
+            setlistId: 'r1',
+            tipo: 'agora',
+            rehearsalAt: br('2026-11-21', '19:00'),
+            createdAt: br('2026-11-21', '16:55'),
+          },
         ],
+        ['r1_novo', { setlistId: 'r1', createdAt: br('2026-11-21', '16:56') }],
       ],
     );
+    clock.now = br('2026-11-21', '17:00');
 
     await runRehearsalReminders(reminderDeps);
     expect(calls.flat()[0]?.message.title).toBe('Ensaio em 20 min');
   });
 });
 
-describe('runRehearsalReminders: log', () => {
-  it('sem nada a fazer, não loga (o job roda a cada minuto)', async () => {
-    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
-    const { reminderDeps } = setup([doc('passado', at(-6 * MIN))]);
+describe('runRehearsalReminders: mudança de horário', () => {
+  it('mudou no mesmo dia: "Ensaio mudou para 19h00"; o aviso seguinte volta ao normal', async () => {
+    const { reminderDeps, calls, clock } = setup(
+      [doc('r1', br('2026-11-22', '19:00'))],
+      { ...members, devices: [device('t1', 'm1')] },
+      [
+        [
+          `r1_vespera_${br('2026-11-22', '18:30').getTime()}`,
+          {
+            setlistId: 'r1',
+            tipo: 'vespera',
+            rehearsalAt: br('2026-11-22', '18:30'),
+            createdAt: br('2026-11-21', '18:30'),
+          },
+        ],
+      ],
+    );
 
+    clock.now = br('2026-11-21', '19:00');
     await runRehearsalReminders(reminderDeps);
-    expect(info).not.toHaveBeenCalled();
+    expect(calls.flat()[0]?.message.title).toBe('Ensaio mudou para 19h00');
+
+    clock.now = br('2026-11-22', '08:00');
+    await runRehearsalReminders(reminderDeps);
+    expect(calls.flat()[1]?.message.title).toBe('Ensaio hoje às 19h00');
   });
 
-  it('com envio, loga só as contagens', async () => {
-    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
-    const { reminderDeps } = setup([doc('r1', at(10 * MIN))], {
+  it('mudou em outro dia: "Ensaio mudou para sáb 21/11 às 20h00"', async () => {
+    const { reminderDeps, calls, clock } = setup(
+      [doc('r1', br('2026-11-21', '20:00'))],
+      { ...members, devices: [device('t1', 'm1')] },
+      [
+        [
+          `r1_vespera_${br('2026-11-20', '23:30').getTime()}`,
+          {
+            setlistId: 'r1',
+            tipo: 'vespera',
+            rehearsalAt: br('2026-11-20', '23:30'),
+            createdAt: br('2026-11-19', '23:30'),
+          },
+        ],
+      ],
+    );
+    clock.now = br('2026-11-20', '20:00');
+
+    await runRehearsalReminders(reminderDeps);
+    expect(calls.flat()[0]?.message).toMatchObject({
+      title: 'Ensaio mudou para sáb 21/11 às 20h00',
+      body: 'Culto de domingo · sáb 21/11. Toque para ver os louvores.',
+    });
+  });
+
+  it('A→B→A: volta ao horário já enviado não reenvia; tipo ainda não enviado para A sai', async () => {
+    const docs = [doc('r1', br('2026-11-22', '18:30'))];
+    const { reminderDeps, calls, clock } = setup(docs, {
       ...members,
       devices: [device('t1', 'm1')],
     });
 
+    clock.now = br('2026-11-21', '18:30');
     await runRehearsalReminders(reminderDeps);
-    expect(info).toHaveBeenCalledWith('push: lembretes do ensaio', {
-      sent: 1,
-      already: 0,
-      blocked: 0,
-      failed: 0,
+    expect(calls.flat()[0]?.message.title).toBe('Ensaio amanhã às 18h30');
+
+    docs[0] = doc('r1', br('2026-11-22', '19:00'));
+    clock.now = br('2026-11-21', '19:00');
+    await runRehearsalReminders(reminderDeps);
+    expect(calls.flat()[1]?.message.title).toBe('Ensaio mudou para 19h00');
+
+    docs[0] = doc('r1', br('2026-11-22', '18:30'));
+    clock.now = br('2026-11-21', '18:31');
+    expect(await runRehearsalReminders(reminderDeps)).toMatchObject({ already: 1, sent: 0 });
+
+    clock.now = br('2026-11-22', '17:30');
+    expect(await runRehearsalReminders(reminderDeps)).toMatchObject({ sent: 1 });
+    expect(calls.flat()[2]?.message.title).toBe('Ensaio mudou para 18h30');
+  });
+
+  it('repertórios diferentes na mesma execução não interferem', async () => {
+    const { reminderDeps, calls, clock } = setup(
+      [doc('r1', br('2026-11-21', '17:30')), doc('r2', br('2026-11-21', '18:10'))],
+      { ...members, devices: [device('t1', 'm1')] },
+      [
+        [
+          `r2_perto_${br('2026-11-21', '18:05').getTime()}`,
+          {
+            setlistId: 'r2',
+            tipo: 'perto',
+            rehearsalAt: br('2026-11-21', '18:05'),
+            createdAt: br('2026-11-21', '16:00'),
+          },
+        ],
+      ],
+    );
+    clock.now = br('2026-11-21', '17:10');
+
+    await runRehearsalReminders(reminderDeps);
+    const messages = calls.flat().map((m) => m.message);
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toMatchObject({ title: 'Ensaio em 20 min', tag: 'setlist-r1-ensaio' });
+    expect(messages[1]).toMatchObject({
+      title: 'Ensaio mudou para 18h10',
+      tag: 'setlist-r2-ensaio',
+    });
+  });
+
+  it('repertório reaproveitado: marca de ensaio passado não gera "mudou"', async () => {
+    const { reminderDeps, calls, clock } = setup(
+      [doc('r1', br('2026-11-22', '19:00'))],
+      { ...members, devices: [device('t1', 'm1')] },
+      [
+        [
+          `r1_vespera_${br('2026-11-14', '18:30').getTime()}`,
+          {
+            setlistId: 'r1',
+            tipo: 'vespera',
+            rehearsalAt: br('2026-11-14', '18:30'),
+            createdAt: br('2026-11-13', '18:30'),
+          },
+        ],
+      ],
+    );
+    clock.now = br('2026-11-21', '19:00');
+
+    await runRehearsalReminders(reminderDeps);
+    expect(calls.flat()[0]?.message.title).toBe('Ensaio amanhã às 19h00');
+  });
+
+  it('perto da meia-noite UTC: véspera e 1 hora usam o dia de Brasília', async () => {
+    const { reminderDeps, calls, clock } = setup([doc('r1', new Date('2026-11-23T02:35:00Z'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = new Date('2026-11-22T02:40:00Z');
+
+    await runRehearsalReminders(reminderDeps);
+    expect(calls.flat()[0]?.message).toMatchObject({
+      title: 'Ensaio amanhã às 23h35',
+      body: 'Culto de domingo · dom 22/11. Toque para ver os louvores.',
     });
   });
 });
 
-describe('runRehearsalReminders: janela, interruptor, origem e falhas', () => {
-  it('consulta setlists entre agora − 5 min e agora + 30 min', async () => {
-    const { reminderDeps, windows } = setup([]);
-    await runRehearsalReminders(reminderDeps);
-    expect(windows).toEqual([[at(-5 * MIN), at(30 * MIN)]]);
-  });
-
-  it('sem hora gravada, ou com a hora passada, não envia nem falha', async () => {
-    const { reminderDeps, calls } = setup(
-      [doc('semHora', undefined), doc('passado', at(-6 * MIN))],
-      { ...members, devices: [device('t1', 'm1')] },
-    );
-
-    expect(await runRehearsalReminders(reminderDeps)).toEqual({
-      sent: 0,
-      already: 0,
-      blocked: 0,
-      failed: 0,
-    });
-    expect(calls).toEqual([]);
-  });
-
+describe('runRehearsalReminders: interruptor, origem e falhas', () => {
   it('config/push desligado: marca criada, nenhum envio', async () => {
-    const { reminderDeps, calls, store } = setup([doc('r1', at(10 * MIN))], {
+    const { reminderDeps, calls, store, clock } = setup([doc('r1', br('2026-11-21', '18:30'))], {
       ...members,
       devices: [device('t1', 'm1')],
       config: { enabled: false },
     });
+    clock.now = br('2026-11-20', '18:30');
 
     expect(await runRehearsalReminders(reminderDeps)).toEqual({
       sent: 0,
@@ -239,14 +467,18 @@ describe('runRehearsalReminders: janela, interruptor, origem e falhas', () => {
       failed: 0,
     });
     expect(calls).toEqual([]);
-    expect(store.has(markerId(10 * MIN))).toBe(true);
+    expect(store.has(`r1_vespera_${br('2026-11-21', '18:30').getTime()}`)).toBe(true);
   });
 
   it('só aparelhos da mesma origem; link do domínio de teste', async () => {
-    const { reminderDeps, calls } = setup([doc('r1', at(10 * MIN), { origin: 'teste' })], {
-      ...members,
-      devices: [device('t1', 'm1', 'producao'), device('t2', 'm1', 'teste')],
-    });
+    const { reminderDeps, calls, clock } = setup(
+      [doc('r1', br('2026-11-21', '18:00'), { origin: 'teste' })],
+      {
+        ...members,
+        devices: [device('t1', 'm1', 'producao'), device('t2', 'm1', 'teste')],
+      },
+    );
+    clock.now = br('2026-11-21', '17:50');
 
     await runRehearsalReminders(reminderDeps);
     expect(sentTokens(calls)).toEqual(['t2']);
@@ -255,11 +487,12 @@ describe('runRehearsalReminders: janela, interruptor, origem e falhas', () => {
     );
   });
 
-  it('FCM indisponível: conta a falha, não reenvia no próximo minuto', async () => {
-    const { reminderDeps } = setup([doc('r1', at(10 * MIN))], {
+  it('FCM indisponível: conta a falha e não reenvia no minuto seguinte', async () => {
+    const { reminderDeps, clock } = setup([doc('r1', br('2026-11-21', '18:00'))], {
       ...members,
       devices: [device('t1', 'm1')],
     });
+    clock.now = br('2026-11-21', '17:50');
     const broken: ReminderDeps = {
       ...reminderDeps,
       sendBatch: async () => {
@@ -284,12 +517,51 @@ describe('runRehearsalReminders: janela, interruptor, origem e falhas', () => {
     });
   });
 
-  it('erro ao criar a marca: loga só o código, não envia e segue com os outros', async () => {
+  it('falha ao ler marcas: nenhuma marca, nenhum envio; o minuto seguinte envia', async () => {
+    const {
+      reminderDeps: base,
+      calls,
+      store,
+      clock,
+    } = setup([doc('r1', br('2026-11-21', '18:00'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-21', '17:50');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let failing = true;
+    const reminderDeps: ReminderDeps = {
+      ...base,
+      listRehearsalMarkers: async (setlistId) => {
+        if (failing) throw Object.assign(new Error('indisponível'), { code: 'unavailable' });
+        return base.listRehearsalMarkers(setlistId);
+      },
+    };
+
+    expect(await runRehearsalReminders(reminderDeps)).toEqual({
+      sent: 0,
+      already: 0,
+      blocked: 0,
+      failed: 1,
+    });
+    expect(store.size).toBe(0);
+
+    failing = false;
+    expect(await runRehearsalReminders(reminderDeps)).toMatchObject({ sent: 1 });
+    expect(calls.flat()).toHaveLength(1);
+  });
+
+  it('erro ao criar a marca: loga só o código e segue com os outros', async () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const { reminderDeps: base, calls } = setup(
-      [doc('r1', at(10 * MIN)), doc('r2', at(10 * MIN))],
-      { ...members, devices: [device('t1', 'm1')] },
-    );
+    const {
+      reminderDeps: base,
+      calls,
+      clock,
+    } = setup([doc('r1', br('2026-11-21', '17:20')), doc('r2', br('2026-11-21', '17:20'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-21', '17:00');
     const reminderDeps: ReminderDeps = {
       ...base,
       claimMarker: async (id, data) => {
@@ -312,5 +584,63 @@ describe('runRehearsalReminders: janela, interruptor, origem e falhas', () => {
     });
     expect(JSON.stringify(err.mock.calls)).not.toContain('segredo');
     expect(sentTokens(calls)).toEqual(['t1']);
+  });
+
+  it('sem hora gravada, ou com a hora passada, não envia nem falha', async () => {
+    const { reminderDeps, calls, clock } = setup(
+      [doc('semHora', undefined), doc('passado', br('2026-11-21', '16:55'))],
+      { ...members, devices: [device('t1', 'm1')] },
+    );
+    clock.now = br('2026-11-21', '17:00');
+
+    expect(await runRehearsalReminders(reminderDeps)).toEqual({
+      sent: 0,
+      already: 0,
+      blocked: 0,
+      failed: 0,
+    });
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('runRehearsalReminders: log', () => {
+  it('sem nada a fazer, não loga (o job roda a cada minuto)', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const { reminderDeps, clock } = setup([]);
+    clock.now = br('2026-11-21', '17:00');
+
+    await runRehearsalReminders(reminderDeps);
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it('só "already", não loga', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const { reminderDeps, clock } = setup([doc('r1', br('2026-11-21', '18:00'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-21', '17:50');
+
+    await runRehearsalReminders(reminderDeps);
+    info.mockClear();
+    expect(await runRehearsalReminders(reminderDeps)).toMatchObject({ already: 1 });
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it('com envio, loga só as contagens', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const { reminderDeps, clock } = setup([doc('r1', br('2026-11-21', '18:00'))], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-21', '17:50');
+
+    await runRehearsalReminders(reminderDeps);
+    expect(info).toHaveBeenCalledWith('push: lembretes do ensaio', {
+      sent: 1,
+      already: 0,
+      blocked: 0,
+      failed: 0,
+    });
   });
 });
