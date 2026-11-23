@@ -670,7 +670,7 @@ test('dia acompanha a data quando era o mesmo dia', async ({ page }) => {
   await expect(rehearsal(page)).toHaveText(/^Ensaio .* às 18h30$/);
 });
 
-test('membro vê a hora em muted depois do horário, sem "Somente leitura" (membro edita)', async ({
+test('membro vê a hora em muted depois do horário, com "Somente leitura" (só admin edita)', async ({
   page,
   browser,
 }, testInfo) => {
@@ -681,7 +681,7 @@ test('membro vê a hora em muted depois do horário, sem "Somente leitura" (memb
   await promoteToMember(browser, testInfo, member);
   await signInAs(page, member, 'Membro');
   await page.goto(`/repertorios/${id}`);
-  await expect(page.getByText(/Somente leitura/)).toHaveCount(0);
+  await expect(page.getByText(/Somente leitura/)).toBeVisible();
   await expect(rehearsal(page)).toHaveText(REHEARSAL_TEXT);
   await expect(rehearsal(page)).toHaveClass(/is-muted/);
   await shot(page, testInfo, 'rehearsal-5-member-muted');
