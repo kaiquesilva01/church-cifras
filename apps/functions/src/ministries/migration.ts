@@ -37,8 +37,6 @@ export interface MigrationDeps {
     id: string,
     data: Record<string, unknown>,
   ): Promise<boolean>;
-  // Declarado pelo contrato, mas a migração nunca o chama: remoções vêm do espelho.
-  deleteTargetSetlist(ministryId: string, id: string): Promise<void>;
   usageIdsWithoutMinistry(): Promise<string[]>;
   setUsageMinistry(setlistId: string, ministryId: string): Promise<void>;
   // Recebe o e-mail já normalizado (trim + minúsculas). Lança se não existir.

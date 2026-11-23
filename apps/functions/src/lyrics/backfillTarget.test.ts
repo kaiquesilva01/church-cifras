@@ -17,6 +17,12 @@ describe('describeTarget', () => {
     expect(canProceed).toBe(true);
   });
 
+  it('sem bucket não imprime a linha bucket', () => {
+    const { lines } = describeTarget({ projectId: 'p', dryRun: true, env: {} });
+    expect(lines.join('\n')).not.toContain('bucket:');
+    expect(lines[0]).toBe('projeto: p');
+  });
+
   it('indica dry-run no modo', () => {
     const { lines } = describeTarget({ projectId: 'p', bucket: 'b', dryRun: true, env: {} });
     expect(lines).toContain('modo: dry-run');

@@ -90,10 +90,6 @@ function fakeDeps(s: FakeState): MigrationDeps {
       s.targets.set(k, data);
       return true;
     },
-    deleteTargetSetlist: async (mid, id) => {
-      s.writes.push(`deleteTargetSetlist:${mid}/${id}`);
-      s.targets.delete(`${mid}/${id}`);
-    },
     usageIdsWithoutMinistry: async () => [...s.usage].filter(([, mid]) => !mid).map(([id]) => id),
     setUsageMinistry: async (id, mid) => {
       s.writes.push(`setUsageMinistry:${id}`);
@@ -218,7 +214,6 @@ describe('migrateMinistries', () => {
       const report = await migrateMinistries(fakeDeps(s), { dryRun });
 
       expect(s.targets.get('hajaluz/sem-raiz')).toEqual({ title: 'Só no espelho' });
-      expect(s.writes.some((w) => w.startsWith('deleteTargetSetlist'))).toBe(false);
       expect(report.setlists).toEqual({ copied: 0, kept: 1 });
     }
   });
