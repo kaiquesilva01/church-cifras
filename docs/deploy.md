@@ -240,6 +240,7 @@ Esta entrega não muda o que as pessoas veem: a interface segue na raiz `setlist
 
 - Em Firestore > Índices, os três índices de grupo (`members.uid`, `requests.uid` e `requests.status`) devem estar "Ativado" antes da migração.
 - Em Firestore > TTL e índices, a política de `setlists` (campo `expiresAt`) cobre também `ministries/*/setlists`, porque o TTL é por nome de grupo. Confira que continua ativa.
+- **Enquanto os três índices não estiverem "Ativado", não mude papéis em Pessoas.** O papel é gravado, mas o recálculo dos claims falha. Se aconteceu, refaça a mudança depois que os índices estiverem ativos.
 
 **Migração no Cloud Shell**, a partir da raiz do repositório (com `npm ci` já feito, como na seção 12). Primeiro a simulação:
 
@@ -247,7 +248,7 @@ Esta entrega não muda o que as pessoas veem: a interface segue na raiz `setlist
 npm run ministries:migrate -- --dry-run --app-admin <e-mail>
 ```
 
-Confira no cabeçalho da saída o `projeto:` (é o de produção) e que não aparece nenhuma linha `_EMULATOR_HOST`. Depois rode sem `--dry-run`, com o mesmo `--app-admin`:
+Antes, aponte o `gcloud` para o projeto de produção, como na seção 12: `gcloud config set project <id-do-projeto>`. Confira no cabeçalho da saída que o `projeto:` é esse `<id-do-projeto>` e que não aparece nenhuma linha `_EMULATOR_HOST`. Depois rode sem `--dry-run`, com o mesmo `--app-admin`:
 
 ```bash
 npm run ministries:migrate -- --app-admin <e-mail>
@@ -256,12 +257,14 @@ npm run ministries:migrate -- --app-admin <e-mail>
 - O `<e-mail>` do admin da app é comparado sem diferenciar maiúsculas e precisa ser de alguém que já entrou no app; senão a migração para antes de gravar.
 - A migração não apaga nada e pode ser rodada de novo com segurança. Não edite repertórios durante a execução.
 - Membros viram membros do ministério; admins viram admins da Haja Luz (não admin da app); visitantes viram pedidos pendentes na Haja Luz.
-- Avise os admins da Haja Luz antes: cada ex-visitante aparece como pedido pendente, para aprovar ou recusar.
+- Avise os admins da Haja Luz antes: cada ex-visitante aparece como pedido pendente e continua sem acesso até a tela de aprovação (Pacote #136). Até lá, para liberar alguém, o admin usa o caminho de hoje: definir "Membro" em Pessoas, o que também aprova o pedido. Não há como recusar um pedido antes do #136.
 
 **Conferência** (no console):
 
 - Existe `ministries/hajaluz`, e os membros e pedidos batem com Pessoas.
 - A contagem de `ministries/hajaluz/setlists` é igual à de `setlists` (raiz).
 - Os documentos de `setlistUsage` têm `ministryId`.
+- Abra `https://louvor-hajaluz.web.app` como admin: tudo deve estar igual a antes. Em Pessoas, mude o papel de uma pessoa e confira que o documento `ministries/hajaluz/members/<uid>` mudou.
+- Até o Pacote #136, nada no app grava em `ministries/hajaluz/setlists` além do espelho. Uma cópia divergente é sobrescrita na próxima edição do repertório na raiz.
 
 **Passo de volta:** reverta só o código (Functions). Os dados copiados para `ministries/` ficam e não afetam o app de hoje, porque a interface ainda não os lê.

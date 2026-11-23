@@ -92,7 +92,7 @@ Papel em `users/{uid}.role` e no custom claim `role`; lido nas Rules por `reques
 
 - Primeiro admin: e-mails em `ADMIN_EMAILS` (variável do deploy), só no primeiro login de cada pessoa e só com e-mail verificado. Depois, o papel muda pela tela Pessoas.
 - Mudança de papel só vale para escritas depois do refresh do token; o cliente observa `users/{uid}` e chama `getIdToken(true)`.
-- Claims `role`, `appAdmin`, `hasMinistry` e `canUploadSong` são gravados sempre os quatro juntos (`setCustomUserClaims` troca o objeto inteiro). Só `role` tem efeito hoje; os outros ainda não mudam nada visível (#135, preparação).
+- Claims `role`, `appAdmin`, `hasMinistry` e `canUploadSong` são gravados sempre os quatro juntos (`setCustomUserClaims` troca o objeto inteiro). `role` e `appAdmin` têm efeito (`appAdmin` só nas Rules de membros e pedidos; nenhuma tela o usa ainda); `hasMinistry` e `canUploadSong` não são lidos por nada ainda.
 - Leitura exige membro ou admin (Rules e gate do app): um logado sem papel não lê nada. Só o provedor Google fica ativo no Auth (sem e-mail/senha nem anônimo).
 - Segurança vale no backend (Rules e Functions), não só na interface. Pad e compartilhamento são locais ao aparelho e liberados a membro e admin; o pad não sincroniza entre pessoas.
 
@@ -113,7 +113,7 @@ Leitura: membro e admin, exceto `users` (cada um lê o próprio; admin lê todos
 | `ministries/{mid}/members/{uid}` | `uid`, `role` (`member`/`admin` do ministério), campos de exibição | nenhuma; lê o próprio uid, o admin do ministério e o admin da app |
 | `ministries/{mid}/requests/{uid}` | `uid`, `status` (`pending`/`rejected`…), campos de exibição | nenhuma; lê como `members` |
 | `ministries/{mid}/setlists/{id}` | espelho da raiz `setlists` (`mirrorSetlists`); a interface ainda lê a raiz | só admin do ministério; membro lê |
-| `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt`, `ministryId` (preenchido onde falta, pela migração) | nenhuma; só Admin SDK (negado por padrão) |
+| `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt`, `ministryId` (gravado pela contagem nova; a migração preenche os antigos) | nenhuma; só Admin SDK (negado por padrão) |
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
 | `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
 | `avisosEnviados/{setlistId}_novo` | `setlistId`, `tipo` (`novo`), `createdAt`, `expiresAt` (o maior valor entre agora + 60 dias e o `expiresAt` do repertório; marca do aviso de repertório novo) | nenhuma; só Functions |
@@ -126,8 +126,8 @@ Leitura: membro e admin, exceto `users` (cada um lê o próprio; admin lê todos
 - `setlists.items[].id` é um UUID do item (não da música). As Rules não validam o conteúdo de cada item nem se a música existe; o cliente tolera itens inválidos.
 - `songs`, `arrangements` e `songLyrics` são imutáveis para o cliente; edição e exclusão passam por Functions.
 - `pushDevices`, `avisosEnviados` e `config/*` são fechados ao cliente (deny-all); só Functions leem e gravam.
-- TTL do Firestore em `setlists.expiresAt` (com índice ascendente) e em `avisosEnviados.expiresAt` (maior valor entre agora + 60 dias e o `expiresAt` do repertório). `setlistUsage` não pode ter TTL.
-- Índices de grupo para o admin da app: `members.uid`, `requests.uid` e `requests.status`.
+- TTL do Firestore em `setlists.expiresAt` (com índice ascendente) e em `avisosEnviados.expiresAt`. `setlistUsage` não pode ter TTL.
+- Índices de grupo: `members.uid` (recálculo de claims), `requests.uid` e `requests.status` (pedidos).
 - `expiresAt` (fim do dia da data + 30 dias, fuso `America/Sao_Paulo`) é calculado pelo cliente (`apps/web/src/setlists/dates.ts`); `firestore.rules` só confere que é um timestamp. Nada no servidor impede um valor errado.
 - Contrato de `rehearsalAt` (#100): limpar é `deleteField()` (ou omitir o campo num `setDoc`); `null` é negado. Trocar `date` exige um `rehearsalAt` novo ou `deleteField()` na mesma gravação, pois o antigo é revalidado contra a nova janela. O instante é montado em UTC-3, não no fuso do aparelho.
 
@@ -137,12 +137,12 @@ Todas exportadas por `apps/functions/src/index.ts` (algumas definidas em submód
 
 | Função | Gatilho | Papel | Faz |
 | --- | --- | --- | --- |
-| `onUserCreated` | Auth (criação de usuário) | automático | Cria `users/{uid}` como `viewer` (ou `admin` se o e-mail verificado estiver em `ADMIN_EMAILS`) e define os claims; `appAdmin` também vai para o admin |
+| `onUserCreated` | Auth (criação de usuário) | automático | Cria `users/{uid}` como `viewer` (ou `admin` se o e-mail verificado estiver em `ADMIN_EMAILS`) e define os claims; `appAdmin` só para e-mail de `ADMIN_EMAILS` no primeiro login |
 | `setUserRole` | callable | admin | Altera o papel no documento e no claim; grava o vínculo com a Haja Luz (no-op enquanto `ministries/hajaluz` não existir) |
 | `requestMinistryAccess`, `cancelMinistryRequest` | callable | logado (cancela só o próprio pedido) | Pede entrada num ministério; cancela o pedido |
-| `approveMinistryRequest`, `rejectMinistryRequest`, `setMinistryMemberRole`, `removeMinistryMember` | callable | admin do ministério | Aprova ou recusa pedidos; muda papel ou remove membro; não deixa o ministério sem admin |
+| `approveMinistryRequest`, `rejectMinistryRequest`, `setMinistryMemberRole`, `removeMinistryMember` | callable | admin do ministério ou da app | Aprova ou recusa pedidos; muda papel ou remove membro; não deixa o ministério sem admin |
 | `createMinistry`, `updateMinistry`, `setAppAdmin` | callable | admin da app | Cria e edita ministério; promove ou rebaixa admin da app |
-| `mirrorSetlists` | Firestore (`setlists/{id}`) | automático | Copia a raiz para `ministries/hajaluz/setlists` numa transação, inclusive apagamentos; copia o estado atual, não o evento |
+| `mirrorSetlists` | Firestore (`setlists/{id}`) | automático | Copia a raiz para `ministries/hajaluz/setlists` (transação, inclusive apagamentos), pelo estado atual |
 | `onArrangementWritten` | Firestore | automático | Mantém `songs.keys` e `handmadeKeys` sincronizados |
 | `replaceArrangement` | callable | membro, admin | Troca um tom gerado por um feito à mão recém-enviado; recusa se o existente é feito à mão |
 | `discardUpload` | callable | membro, admin | Apaga arquivo enviado e ainda não referenciado; só o autor do upload |
