@@ -63,12 +63,12 @@ export function createPushService(deps: PushServiceDeps): PushService {
     ]);
   };
 
-  // Sem registro, não toca no servidor nem no SDK. Lê e limpa o registro de forma síncrona,
-  // antes de qualquer await: uma gravação feita durante a espera do servidor não é apagada.
   // Época de soltura: sobe, de forma síncrona, a cada release. Um enable ou revalidate que começou
   // antes e termina depois (o register estava pendente) vê a época mudada e não grava.
   let epoch = 0;
 
+  // Sem registro, não toca no servidor nem no SDK. Lê e limpa o registro de forma síncrona,
+  // antes de qualquer await: uma gravação feita durante a espera do servidor não é apagada.
   const release = async (): Promise<void> => {
     epoch += 1;
     const record = deps.store.read();
