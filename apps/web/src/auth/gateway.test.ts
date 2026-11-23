@@ -160,8 +160,12 @@ describe('createAuthGateway', () => {
         throw new Error('offline');
       },
     });
-    await gateway.signOut();
-    expect(order).toEqual(['signOut', 'reload']);
-    warn.mockRestore();
+    try {
+      await gateway.signOut();
+      expect(order).toEqual(['signOut', 'reload']);
+      expect(warn).toHaveBeenCalledWith('Falha ao desativar os avisos ao sair', expect.any(Error));
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

@@ -130,6 +130,26 @@ describe('AvisosRow', () => {
     expect(screen.getByRole('status')).toHaveClass('push-status');
   });
 
+  it('the status region is mounted and empty in the active state too', async () => {
+    row(service('active'));
+    await screen.findByText('Ativados');
+    expect(screen.getByRole('status')).toHaveTextContent('');
+    expect(screen.getByRole('status')).toHaveClass('push-status');
+  });
+
+  it('a new action resets the test feedback: after sent, Desativar empties the status region', async () => {
+    row(service('active'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar aviso de teste' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Aviso de teste enviado. Ele chega em instantes.',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Desativar avisos neste aparelho' }));
+    await screen.findByText('Receba repertório novo e lembrete do ensaio neste aparelho');
+    expect(screen.getByRole('status')).toHaveTextContent('');
+  });
+
   it('disables the Desativar pill while the test is sending', async () => {
     row(service('active', { sendTest: vi.fn(() => new Promise<'sent'>(() => {})) }));
     fireEvent.click(await screen.findByRole('button', { name: 'Enviar aviso de teste' }));

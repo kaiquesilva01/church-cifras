@@ -148,6 +148,18 @@ describe('pushService.enable', () => {
     expect(store.value).toEqual({ token: 'tok-1', registeredAt: 1000 });
   });
 
+  it('unregister do antigo nunca resolve → enable não espera e resolve active', async () => {
+    const api = fakeApi({ unregister: vi.fn(() => new Promise<void>(() => {})) });
+    const { svc, store } = build({ api, store: memoryStore(RECORD) });
+    const result = await Promise.race([
+      svc.enable(),
+      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 20)),
+    ]);
+    expect(result).toBe('active');
+    expect(api.unregister).toHaveBeenCalledWith('tok-old');
+    expect(store.value).toEqual({ token: 'tok-1', registeredAt: 1000 });
+  });
+
   it('mesmo token do registro → não chama unregister', async () => {
     const port = fakePort({ getToken: vi.fn(async () => 'tok-old') });
     const { svc, api } = build({ port, store: memoryStore(RECORD) });
@@ -271,6 +283,13 @@ describe('pushService.forgetDevice', () => {
     expect(api.unregister).toHaveBeenCalledWith('tok-old');
     expect(store.value).toBeNull();
   });
+
+  it('unregister nunca resolve → forgetDevice resolve no teto e limpa o registro', async () => {
+    const api = fakeApi({ unregister: vi.fn(() => new Promise<void>(() => {})) });
+    const { svc, store } = build({ api, store: memoryStore(RECORD) });
+    await expect(svc.forgetDevice()).resolves.toBeUndefined();
+    expect(store.value).toBeNull();
+  });
 });
 
 describe('pushService.sendTest', () => {
@@ -390,6 +409,40 @@ describe('pushService.revalidate', () => {
     resolveToken('tok-1');
     await pending;
     expect(api.register).not.toHaveBeenCalled();
+    expect(store.value).toEqual(other);
+  });
+
+  it('desativado enquanto register está pendente → desfaz o registro novo e não regrava', async () => {
+    let resolveRegister: () => void = () => {};
+    const api = fakeApi({
+      register: vi.fn(() => new Promise<void>((resolve) => (resolveRegister = resolve))),
+    });
+    const store = memoryStore(RECORD);
+    const { svc } = build({ api, store });
+    const pending = svc.revalidate();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(api.register).toHaveBeenCalledWith('tok-1', 'producao');
+    store.clear();
+    resolveRegister();
+    await pending;
+    expect(api.unregister).toHaveBeenCalledWith('tok-1');
+    expect(store.value).toBeNull();
+  });
+
+  it('trocado por outro token enquanto register está pendente → não regrava nem remove o novo', async () => {
+    let resolveRegister: () => void = () => {};
+    const api = fakeApi({
+      register: vi.fn(() => new Promise<void>((resolve) => (resolveRegister = resolve))),
+    });
+    const store = memoryStore(RECORD);
+    const { svc } = build({ api, store });
+    const pending = svc.revalidate();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const other: PushRecord = { token: 'tok-outro', registeredAt: 5_000 };
+    store.write(other);
+    resolveRegister();
+    await pending;
+    expect(api.unregister).not.toHaveBeenCalled();
     expect(store.value).toEqual(other);
   });
 });

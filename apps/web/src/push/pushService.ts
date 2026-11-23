@@ -126,13 +126,10 @@ export function createPushService(deps: PushServiceDeps): PushService {
       const previous = deps.store.read();
       deps.store.write({ token, registeredAt: now() });
       if (previous && previous.token !== token) {
-        // Best-effort: o token antigo sai do servidor, sem derrubar o enable.
-        await within(
-          deps.api
-            .unregister(previous.token)
-            .catch((error: unknown) => warn('Falha ao remover o token antigo', error)),
-          limit,
-        );
+        // Best-effort e sem await: o token antigo sai do servidor sem segurar a linha em "Ativando…".
+        void deps.api
+          .unregister(previous.token)
+          .catch((error: unknown) => warn('Falha ao remover o token antigo', error));
       }
       return 'active';
     },
@@ -167,12 +164,21 @@ export function createPushService(deps: PushServiceDeps): PushService {
       try {
         // Com a permissão concedida, getToken não pergunta de novo.
         const token = await deps.port.getToken(deps.vapidKey);
-        // Desativado ou trocado enquanto o SDK respondia: não regrava nem registra.
+        // Desativado ou trocado enquanto o SDK respondia: não registra.
         const latest = deps.store.read();
         if (!latest || latest.token !== record.token) return;
         const stale = now() - record.registeredAt > REGISTER_MAX_AGE_MS;
         if (token === record.token && !stale) return;
         await deps.api.register(token, origin);
+        // Desativado ou trocado durante o register: não regrava. Se foi desativado, desfaz o registro novo.
+        const after = deps.store.read();
+        if (!after) {
+          await deps.api
+            .unregister(token)
+            .catch((error: unknown) => warn('Falha ao remover o aparelho dos avisos', error));
+          return;
+        }
+        if (after.token !== record.token) return;
         if (token !== record.token) {
           await deps.api
             .unregister(record.token)
@@ -185,7 +191,7 @@ export function createPushService(deps: PushServiceDeps): PushService {
     },
 
     async forgetDevice() {
-      await release(deps.store.read(), FORGET_TIMEOUT_MS);
+      await release(deps.store.read(), deps.releaseTimeoutMs ?? FORGET_TIMEOUT_MS);
     },
   };
 }
