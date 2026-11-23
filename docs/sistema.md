@@ -258,8 +258,6 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 
 ### Limites aceitos
 
-- Repertórios: desde o PR #124 só admin escreve; os specs de repertórios (2026-11-16) e o principal (2026-11-13) ainda dizem "membro/admin". Vale o código.
-
 - Avisos (#99): sem horário de silêncio na v1; com o modo foco do aparelho ligado, o aviso fica silenciado; a descoberta é só pela aba Mais.
 - Avisos (#99): Desativar apaga o registro local antes da resposta do servidor. Se o app fecha nesses até 5 s com rede ruim, o aparelho pode seguir recebendo avisos; recuperação: Ativar e depois Desativar, ou bloquear as notificações do site. Corridas muito estreitas entre Ativar, Desativar, a revalidação ao abrir e o teste (sub-segundo, em rede lenta) podem deixar servidor e aparelho fora de sincronia; a próxima revalidação ou a poda da #98 corrige.
 - Avisos (#99): "Tentar de novo" recarrega a linha e volta a "Ativar" (o pedido de permissão no Safari exige novo toque): um toque a mais depois de falha. "Enviar aviso de teste" vale para todos os aparelhos da conta; com outro aparelho ativo, este pode mostrar "enviado" mesmo tendo sido podado.
