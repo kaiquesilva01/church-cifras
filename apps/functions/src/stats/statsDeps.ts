@@ -28,11 +28,11 @@ export function createStatsDeps(): StatsDeps {
         };
       });
     },
-    recordUsage: async ({ setlistId, date, songIds }) => {
+    recordUsage: async ({ setlistId, date, songIds, ministryId }) => {
       try {
         await getFirestore()
           .doc(`setlistUsage/${setlistId}`)
-          .create({ date, songIds, countedAt: FieldValue.serverTimestamp() });
+          .create({ date, songIds, ministryId, countedAt: FieldValue.serverTimestamp() });
         return 'created';
       } catch (error) {
         if ((error as { code?: unknown }).code === ALREADY_EXISTS) return 'exists';
