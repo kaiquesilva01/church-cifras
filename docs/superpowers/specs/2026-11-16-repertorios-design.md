@@ -146,11 +146,11 @@ Esboço; as condições exatas ficam para o plano.
 ```
 match /setlists/{setlistId} {
   allow read:   if signedIn();
-  allow create: if isEditor() && validSetlist(request.resource.data) && createdBy/updatedBy == auth.uid
+  allow create: if isAdmin() && validSetlist(request.resource.data) && createdBy/updatedBy == auth.uid
                    && createdAt/updatedAt == request.time;
-  allow update: if isEditor() && validSetlist(request.resource.data)
+  allow update: if isAdmin() && validSetlist(request.resource.data)
                    && createdBy e createdAt inalterados && updatedBy == auth.uid && updatedAt == request.time;
-  allow delete: if isEditor();
+  allow delete: if isAdmin();
 }
 ```
 
@@ -244,7 +244,7 @@ itens copiados (ids novos) e data/rótulo para o novo culto.
 
 - `≡` arrasta (alça própria, para não brigar com a rolagem); ▲ ▼ movem uma posição; `✕` remove; tocar no **tom** abre a
   escolha entre os tons salvos da música; tocar no **título** abre a cifra (§6.7).
-- Visitante vê só título e tom, sem controles.
+- Visitante e membro veem só título e tom, sem controles.
 - **＋ Adicionar** abre uma folha de busca (mesma busca em memória de `filterSongs`); tocar numa música a acrescenta **ao
   fim** no seu **tom feito à mão** (o primeiro, em ordem de tons; se não houver, o primeiro tom salvo, como o visualizador já faz) e a folha continua aberta para acrescentar mais.
   Músicas sem PDF aparecem desabilitadas; músicas já no repertório ganham o selo "já está" [decisão nossa].
