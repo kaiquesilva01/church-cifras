@@ -91,11 +91,14 @@ const existing = (db: Db) => doc(db, 'setlists/existing');
 describe('setlists rules', () => {
   describe('read', () => {
     it.each([
-      ['viewer', viewerDb],
       ['member', memberDb],
       ['admin', adminDb],
     ])('allows %s', async (_name, get) => {
       await assertSucceeds(getDoc(existing(get())));
+    });
+
+    it('denies viewer', async () => {
+      await assertFails(getDoc(existing(viewerDb())));
     });
 
     it('denies anonymous', async () => {

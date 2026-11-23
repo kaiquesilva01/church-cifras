@@ -7,7 +7,7 @@ service firebase.storage {
     }
 
     match /songs/{allPaths=**} {
-      allow read: if request.auth != null;
+      allow read: if isEditor();
       allow update, delete: if false;
     }
 
@@ -21,9 +21,9 @@ service firebase.storage {
         && fileName.matches('[A-Za-z]+-[A-Za-z0-9_-]+[.]pdf');
     }
 
-    // Loops do pad ambiente: leitura para autenticados; escrita só via script admin (fora das rules).
+    // Loops do pad ambiente: leitura para membro e admin; escrita só via script admin (fora das rules).
     match /pads/{version}/{fileName} {
-      allow read: if request.auth != null;
+      allow read: if isEditor();
       allow write: if false;
     }
 

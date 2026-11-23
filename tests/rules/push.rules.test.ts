@@ -62,9 +62,13 @@ const dbFor = (who: Who) =>
 
 // Controle positivo: prova que o contexto autenticado e o papel funcionam.
 // Sem isso, um assertFails poderia passar por um contexto quebrado.
-describe('controle positivo: contexto autenticado lê songs', () => {
-  it.each(['viewer', 'member', 'admin'] as const)('permite leitura para %s', async (who) => {
+describe('controle positivo: membro e admin leem songs', () => {
+  it.each(['member', 'admin'] as const)('permite leitura para %s', async (who) => {
     await assertSucceeds(getDoc(doc(dbFor(who), 'songs/s1')));
+  });
+
+  it('nega leitura de songs para viewer', async () => {
+    await assertFails(getDoc(doc(dbFor('viewer'), 'songs/s1')));
   });
 
   it('nega leitura para anônimo', async () => {
