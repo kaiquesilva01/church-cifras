@@ -92,6 +92,7 @@ Papel em `users/{uid}.role` e no custom claim `role`; lido nas Rules por `reques
 
 - Primeiro admin: e-mails em `ADMIN_EMAILS` (variável do deploy), só no primeiro login de cada pessoa e só com e-mail verificado. Depois, o papel muda pela tela Pessoas.
 - Mudança de papel só vale para escritas depois do refresh do token; o cliente observa `users/{uid}` e chama `getIdToken(true)`.
+- Claims `role`, `appAdmin`, `hasMinistry` e `canUploadSong` são gravados sempre os quatro juntos (`setCustomUserClaims` troca o objeto inteiro). Só `role` tem efeito hoje; os outros ainda não mudam nada visível (#135, preparação).
 - Leitura exige membro ou admin (Rules e gate do app): um logado sem papel não lê nada. Só o provedor Google fica ativo no Auth (sem e-mail/senha nem anônimo).
 - Segurança vale no backend (Rules e Functions), não só na interface. Pad e compartilhamento são locais ao aparelho e liberados a membro e admin; o pad não sincroniza entre pessoas.
 
@@ -103,12 +104,16 @@ Leitura: membro e admin, exceto `users` (cada um lê o próprio; admin lê todos
 
 | Coleção | Campos principais | Escrita pelo cliente |
 | --- | --- | --- |
-| `users/{uid}` | `displayName`, `email`, `photoURL`, `role` (`viewer`/`member`/`admin`), `createdAt` | nenhuma (só Functions) |
+| `users/{uid}` | `displayName`, `email`, `photoURL`, `role` (`viewer`/`member`/`admin`), `appAdmin` (booleano; admin da app, #135), `createdAt` | nenhuma (só Functions) |
 | `songs/{songId}` | `title`, `titleNormalized`, `artistId` (slug), `artistName`, `keys` (tons salvos, mantido por função), `handmadeKeys`, `createdBy`, `createdAt`, `updatedAt` | só `create` por membro/admin; sem update nem delete |
 | `songs/{songId}/arrangements/{slug}` | `key` (um dos 24 tons), `storagePath`, `source` (`handmade`/`generated`), `derivedFromKey` (só gerado), `writer` (`upload`/`overlay`), `chordCount`, `collisions`, `createdBy`, `createdAt` | só `create` por membro/admin; sem update nem delete |
 | `songLyrics/{songId}` | `text` (1–20.000 caracteres), `createdBy`, `createdAt` | só `create` por membro/admin, com a música existindo na mesma operação |
 | `setlists/{setlistId}` | `date` (`YYYY-MM-DD`), `label`, `items[]` (`id`, `songId`, `key`), `expiresAt`, `createdBy/At`, `updatedBy/At`, `rehearsalAt` (opcional: hora do ensaio, dentro da janela do culto: de 00:00 de 7 dias antes do dia até 00:00 do dia seguinte, exclusivo; `null` é negado), `origin` (opcional: `producao`/`teste`) | só admin: create, update e delete (membro só lê; visitante não lê) |
-| `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt` | nenhuma; só Admin SDK (negado por padrão) |
+| `ministries/{mid}` | `name`, `nameNormalized`, `city`, `createdBy/At` (`hajaluz` é a Haja Luz) | nenhuma; leitura para logado |
+| `ministries/{mid}/members/{uid}` | `uid`, `role` (`member`/`admin` do ministério), campos de exibição | nenhuma; lê o próprio uid, o admin do ministério e o admin da app |
+| `ministries/{mid}/requests/{uid}` | `uid`, `status` (`pending`/`rejected`…), campos de exibição | nenhuma; lê como `members` |
+| `ministries/{mid}/setlists/{id}` | espelho da raiz `setlists` (`mirrorSetlists`); a interface ainda lê a raiz | só admin do ministério; membro lê |
+| `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt`, `ministryId` (preenchido onde falta, pela migração) | nenhuma; só Admin SDK (negado por padrão) |
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
 | `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
 | `avisosEnviados/{setlistId}_novo` | `setlistId`, `tipo` (`novo`), `createdAt`, `expiresAt` (o maior valor entre agora + 60 dias e o `expiresAt` do repertório; marca do aviso de repertório novo) | nenhuma; só Functions |
@@ -121,10 +126,10 @@ Leitura: membro e admin, exceto `users` (cada um lê o próprio; admin lê todos
 - `setlists.items[].id` é um UUID do item (não da música). As Rules não validam o conteúdo de cada item nem se a música existe; o cliente tolera itens inválidos.
 - `songs`, `arrangements` e `songLyrics` são imutáveis para o cliente; edição e exclusão passam por Functions.
 - `pushDevices`, `avisosEnviados` e `config/*` são fechados ao cliente (deny-all); só Functions leem e gravam.
-- TTL do Firestore em `setlists.expiresAt`, com índice ascendente mantido. `setlistUsage` não pode ter TTL.
-- TTL do Firestore em `avisosEnviados.expiresAt` (o maior valor entre agora + 60 dias e o `expiresAt` do repertório, para a marca não vencer antes dele), sem índice de campo.
+- TTL do Firestore em `setlists.expiresAt` (com índice ascendente) e em `avisosEnviados.expiresAt` (maior valor entre agora + 60 dias e o `expiresAt` do repertório). `setlistUsage` não pode ter TTL.
+- Índices de grupo para o admin da app: `members.uid`, `requests.uid` e `requests.status`.
 - `expiresAt` (fim do dia da data + 30 dias, fuso `America/Sao_Paulo`) é calculado pelo cliente (`apps/web/src/setlists/dates.ts`); `firestore.rules` só confere que é um timestamp. Nada no servidor impede um valor errado.
-- Contrato do cliente para `rehearsalAt` (#100): limpar o ensaio é `deleteField()` num `updateDoc` (ou omitir o campo num `setDoc` completo); `rehearsalAt: null` é negado. Trocar `date` revalida o `rehearsalAt` gravado contra a nova janela: se ele cair fora, a gravação é negada. Por isso o cliente manda um `rehearsalAt` novo ou `deleteField()` na mesma gravação. O cliente monta o instante em UTC-3 (`America/Sao_Paulo`, sem horário de verão), não no fuso do aparelho.
+- Contrato de `rehearsalAt` (#100): limpar é `deleteField()` (ou omitir o campo num `setDoc`); `null` é negado. Trocar `date` exige um `rehearsalAt` novo ou `deleteField()` na mesma gravação, pois o antigo é revalidado contra a nova janela. O instante é montado em UTC-3, não no fuso do aparelho.
 
 ## Functions e jobs
 
@@ -132,8 +137,12 @@ Todas exportadas por `apps/functions/src/index.ts` (algumas definidas em submód
 
 | Função | Gatilho | Papel | Faz |
 | --- | --- | --- | --- |
-| `onUserCreated` | Auth (criação de usuário) | automático | Cria `users/{uid}` como `viewer` (ou `admin` se o e-mail verificado estiver em `ADMIN_EMAILS`) e define o claim |
-| `setUserRole` | callable | admin | Altera o papel no documento e no claim |
+| `onUserCreated` | Auth (criação de usuário) | automático | Cria `users/{uid}` como `viewer` (ou `admin` se o e-mail verificado estiver em `ADMIN_EMAILS`) e define os claims; `appAdmin` também vai para o admin |
+| `setUserRole` | callable | admin | Altera o papel no documento e no claim; grava o vínculo com a Haja Luz (no-op enquanto `ministries/hajaluz` não existir) |
+| `requestMinistryAccess`, `cancelMinistryRequest` | callable | logado (cancela só o próprio pedido) | Pede entrada num ministério; cancela o pedido |
+| `approveMinistryRequest`, `rejectMinistryRequest`, `setMinistryMemberRole`, `removeMinistryMember` | callable | admin do ministério | Aprova ou recusa pedidos; muda papel ou remove membro; não deixa o ministério sem admin |
+| `createMinistry`, `updateMinistry`, `setAppAdmin` | callable | admin da app | Cria e edita ministério; promove ou rebaixa admin da app |
+| `mirrorSetlists` | Firestore (`setlists/{id}`) | automático | Copia a raiz para `ministries/hajaluz/setlists` numa transação, inclusive apagamentos; copia o estado atual, não o evento |
 | `onArrangementWritten` | Firestore | automático | Mantém `songs.keys` e `handmadeKeys` sincronizados |
 | `replaceArrangement` | callable | membro, admin | Troca um tom gerado por um feito à mão recém-enviado; recusa se o existente é feito à mão |
 | `discardUpload` | callable | membro, admin | Apaga arquivo enviado e ainda não referenciado; só o autor do upload |
@@ -285,6 +294,7 @@ Anti-objetivos que valem em qualquer entrega (falham mesmo que "funcione"):
 
 - Aprovação de ouvido dos 12 loops do pad pelo dono do produto (spec do pad §9). O envio dos loops ao Storage de produção é feito por script, por quem tem a credencial.
 - Preenchimento das letras das músicas enviadas antes da busca por letra: `npm run lyrics:backfill` (`deploy.md` §12), rodado pelo dono do produto depois do deploy. Até lá só as músicas novas são achadas por letra.
+- Preparação invisível (#135): a interface ainda usa a raiz `setlists` e o `role` global. O cliente passa para `ministries/` no Pacote #136; a raiz e o `role` saem na #137.
 - Pessoas (músicos, vocais, instrumentos, disponibilidade) aparece como "Em breve" na aba Mais; não existe.
 - O Paper não mostra o chip Harpa nas telas 03b e 03c da busca por letra (spec da busca por letra).
 - Avisos (push, #85): a tela fica na aba Mais (#99) e só aparece com `VITE_FIREBASE_MESSAGING_SENDER_ID` e `VITE_FIREBASE_VAPID_KEY` no build (`apps/web/src/lib/env.ts`).
