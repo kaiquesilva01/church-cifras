@@ -68,7 +68,7 @@ const deps: UserDeps = {
     return ROLES.find((r) => r === role);
   },
   applyHajaLuzRole: (uid, role, caller) => applyHajaLuzRole(ministryDeps, uid, role, caller),
-  recalcClaims: (uid) => recalcClaims(ministryDeps, uid),
+  recalcClaims: (uid, next) => recalcClaims(ministryDeps, uid, next),
   now: () => new Date(),
 };
 

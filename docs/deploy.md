@@ -240,7 +240,7 @@ Esta entrega não muda o que as pessoas veem: a interface segue na raiz `setlist
 
 - Em Firestore > Índices, os três índices de grupo (`members.uid`, `requests.uid` e `requests.status`) devem estar "Ativado" antes da migração.
 - Em Firestore > TTL e índices, a política de `setlists` (campo `expiresAt`) cobre também `ministries/*/setlists`, porque o TTL é por nome de grupo. Confira que continua ativa.
-- **Enquanto os três índices não estiverem "Ativado", não mude papéis em Pessoas.** O papel é gravado, mas o recálculo dos claims falha. Se aconteceu, refaça a mudança depois que os índices estiverem ativos.
+- **Enquanto os três índices não estiverem "Ativado", não mude papéis em Pessoas.** A troca de papel falha: o recálculo das claims faz consultas de grupo, que sem índice dão erro, e o papel em `users` não é gravado (a ordem é: vínculo da Haja Luz, claims, papel). O vínculo da Haja Luz pode já ter sido ajustado antes do erro. Se aparecer erro ao mudar um papel, espere os três índices ficarem "Ativado" e refaça a mudança: repetir é seguro e corrige o que faltou.
 
 **Migração no Cloud Shell**, a partir da raiz do repositório (com `npm ci` já feito, como na seção 12). Primeiro a simulação:
 

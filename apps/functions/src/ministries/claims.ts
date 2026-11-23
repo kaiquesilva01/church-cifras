@@ -22,9 +22,12 @@ export function buildClaims(input: {
 }
 
 // Recalcula os quatro campos a partir do documento. Sem usuário: não grava nada.
+// `next` informa o papel novo quando a troca ainda não foi gravada em users/{uid}
+// (a Pessoas grava as claims antes do documento, para o cliente ver a mudança já com elas).
 export async function recalcClaims(
   deps: Pick<MinistryDeps, 'readUser' | 'listMembershipsOfUser' | 'setClaims'>,
   uid: string,
+  next?: { role: Role },
 ): Promise<void> {
   const user = await deps.readUser(uid);
   if (!user) return;
@@ -32,7 +35,7 @@ export async function recalcClaims(
   await deps.setClaims(
     uid,
     buildClaims({
-      role: user.role ?? 'viewer',
+      role: next?.role ?? user.role ?? 'viewer',
       appAdmin: user.appAdmin,
       memberRoles: memberships.map((m) => m.role),
     }),

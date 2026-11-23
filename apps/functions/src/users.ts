@@ -8,7 +8,7 @@ export type UserDeps = {
   userExists(uid: string): Promise<boolean>;
   getUserRole(uid: string): Promise<Role | undefined>;
   applyHajaLuzRole(uid: string, role: Role, callerUid: string): Promise<void>;
-  recalcClaims(uid: string): Promise<void>;
+  recalcClaims(uid: string, next: { role: Role }): Promise<void>;
   now(): Date;
 };
 
@@ -69,7 +69,9 @@ export async function changeUserRole(
     throw new HttpsError('not-found', 'User not found.');
   }
   await deps.applyHajaLuzRole(result.targetUid, result.newRole, input.callerUid ?? '');
+  // Claims antes do documento: o cliente atualiza o token uma vez, quando users/{uid}.role muda.
+  // Se as claims falharem, users/{uid} fica como estava; repetir a chamada é seguro.
+  await deps.recalcClaims(result.targetUid, { role: result.newRole });
   await deps.writeUser(result.targetUid, { role: result.newRole, roleUpdatedAt: deps.now() }, true);
-  await deps.recalcClaims(result.targetUid);
   return { uid: result.targetUid, role: result.newRole };
 }

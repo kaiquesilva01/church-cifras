@@ -51,3 +51,33 @@ describe('recalcClaims', () => {
     ]);
   });
 });
+
+describe('recalcClaims com papel explícito', () => {
+  it('override de papel vence o do documento (ainda não gravado) e mantém os demais campos', async () => {
+    const { deps, claimCalls } = createFakeMinistryDeps({
+      'users/u1': { role: 'viewer', appAdmin: false },
+      'ministries/hajaluz/members/u1': { uid: 'u1', role: 'member' },
+    });
+    await recalcClaims(deps, 'u1', { role: 'member' });
+    expect(claimCalls).toEqual([
+      ['u1', { role: 'member', appAdmin: false, hasMinistry: true, canUploadSong: false }],
+    ]);
+  });
+
+  it('override admin: canUploadSong vem do papel informado', async () => {
+    const { deps, claimCalls } = createFakeMinistryDeps({
+      'users/u1': { role: 'viewer', appAdmin: false },
+      'ministries/hajaluz/members/u1': { uid: 'u1', role: 'admin' },
+    });
+    await recalcClaims(deps, 'u1', { role: 'admin' });
+    expect(claimCalls).toEqual([
+      ['u1', { role: 'admin', appAdmin: false, hasMinistry: true, canUploadSong: true }],
+    ]);
+  });
+
+  it('override sem usuário: não grava claims', async () => {
+    const { deps, claimCalls } = createFakeMinistryDeps({});
+    await recalcClaims(deps, 'ghost', { role: 'member' });
+    expect(claimCalls).toEqual([]);
+  });
+});

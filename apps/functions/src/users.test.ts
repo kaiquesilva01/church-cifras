@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Claims } from './ministries/claims';
+import { recalcClaims, type Claims } from './ministries/claims';
+import { createFakeMinistryDeps } from './ministries/fakeDeps';
 import type { Role } from './roles';
 import { changeUserRole, createUserProfile, type UserDeps } from './users';
 
@@ -134,21 +135,95 @@ describe('createUserProfile retries', () => {
   });
 });
 
+// Ponte real de claims (recalcClaims sobre o fake do ministério). Registra a ordem das
+// gravações e o papel que users/{uid} tinha no momento em que as claims foram gravadas.
+function changeDeps(seed: Record<string, Record<string, unknown>>, exists = true) {
+  const ministry = createFakeMinistryDeps(seed);
+  const calls: string[] = [];
+  const writes: Array<[string, Record<string, unknown>, boolean]> = [];
+  const docRoles: Array<string | undefined> = [];
+  const recordClaims = ministry.deps.setClaims;
+  ministry.deps.setClaims = async (uid, claims) => {
+    calls.push(`setClaims:${uid}:${claims.role}`);
+    docRoles.push(ministry.docs.get(`users/${uid}`)?.role as string | undefined);
+    await recordClaims(uid, claims);
+  };
+  const deps: UserDeps = {
+    setClaims: async () => undefined,
+    writeUser: async (uid, data, merge) => {
+      calls.push(`writeUser:${uid}`);
+      writes.push([uid, data, merge]);
+    },
+    userExists: async () => exists,
+    getUserRole: async () => undefined,
+    applyHajaLuzRole: async (uid, role, caller) => {
+      calls.push(`applyHajaLuzRole:${uid}:${role}:${caller}`);
+    },
+    recalcClaims: (uid, next) => recalcClaims(ministry.deps, uid, next),
+    now: () => NOW,
+  };
+  return { deps, calls, writes, docRoles, ministry };
+}
+
+const SEED_MEMBER = {
+  'users/u1': { role: 'viewer', appAdmin: false },
+  'ministries/hajaluz/members/u1': { uid: 'u1', role: 'member' },
+};
+
 describe('changeUserRole', () => {
-  it('ordem: applyHajaLuzRole -> writeUser -> recalcClaims; setClaims não é chamado', async () => {
-    const { deps, calls } = fakeDeps(true, 'viewer');
+  it('ordem: applyHajaLuzRole -> claims do papel novo (quatro campos) -> writeUser', async () => {
+    const { deps, calls, writes, docRoles, ministry } = changeDeps(SEED_MEMBER);
     await changeUserRole(deps, INPUT_MEMBER);
-    expect(calls).toEqual(['applyHajaLuzRole:u1:member', 'writeUser:u1', 'recalcClaims:u1']);
-    expect(calls).not.toContain('setClaims');
+    expect(calls).toEqual([
+      'applyHajaLuzRole:u1:member:adm',
+      'setClaims:u1:member',
+      'writeUser:u1',
+    ]);
+    // users/u1 ainda tinha o papel antigo quando as claims saíram: o cliente só vê a troca depois.
+    expect(docRoles).toEqual(['viewer']);
+    expect(ministry.claimCalls).toEqual([
+      ['u1', { role: 'member', appAdmin: false, hasMinistry: true, canUploadSong: false }],
+    ]);
+    expect(writes).toEqual([['u1', { role: 'member', roleUpdatedAt: NOW }, true]]);
   });
 
-  it('sem ministério Haja Luz (ponte no-op): papel gravado e claims recalculados', async () => {
-    const { deps, writes, calls } = fakeDeps(true, 'viewer');
+  it('papel admin: claims com canUploadSong', async () => {
+    const { deps, ministry } = changeDeps({
+      'users/u1': { role: 'member', appAdmin: false },
+      'ministries/hajaluz/members/u1': { uid: 'u1', role: 'admin' },
+    });
+    await changeUserRole(deps, { ...INPUT_MEMBER, newRole: 'admin' });
+    expect(ministry.claimCalls).toEqual([
+      ['u1', { role: 'admin', appAdmin: false, hasMinistry: true, canUploadSong: true }],
+    ]);
+  });
+
+  it('sem ministério Haja Luz (ponte no-op): claims do papel novo e papel gravado', async () => {
+    const { deps, writes, calls, ministry } = changeDeps({
+      'users/u1': { role: 'viewer', appAdmin: false },
+    });
     deps.applyHajaLuzRole = async () => undefined; // ponte sem ministries/hajaluz não grava nada
     const result = await changeUserRole(deps, INPUT_MEMBER);
     expect(result).toEqual({ uid: 'u1', role: 'member' });
+    expect(calls).toEqual(['setClaims:u1:member', 'writeUser:u1']);
+    expect(ministry.claimCalls).toEqual([
+      ['u1', { role: 'member', appAdmin: false, hasMinistry: false, canUploadSong: false }],
+    ]);
     expect(writes).toEqual([['u1', { role: 'member', roleUpdatedAt: NOW }, true]]);
-    expect(calls).toEqual(['writeUser:u1', 'recalcClaims:u1']);
+  });
+
+  it('falha ao gravar claims: users/{uid} não é gravado; nova tentativa grava uma vez', async () => {
+    const { deps, writes, ministry } = changeDeps(SEED_MEMBER);
+    const recordClaims = ministry.deps.setClaims;
+    ministry.deps.setClaims = async () => {
+      throw new Error('boom');
+    };
+    await expect(changeUserRole(deps, INPUT_MEMBER)).rejects.toThrow('boom');
+    expect(writes).toEqual([]);
+
+    ministry.deps.setClaims = recordClaims;
+    await changeUserRole(deps, INPUT_MEMBER);
+    expect(writes).toEqual([['u1', { role: 'member', roleUpdatedAt: NOW }, true]]);
   });
 
   it('se applyHajaLuzRole lança, writeUser não é chamado', async () => {
