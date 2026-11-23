@@ -67,11 +67,38 @@ describe('createPushDeps.sendBatch', () => {
         token: 'tok-1',
         notification: { title: 'Novo repertório', body: 'Domingo' },
         webpush: {
-          notification: { tag: 'rep-r1' },
+          notification: {
+            tag: 'rep-r1',
+            icon: 'https://louvor-hajaluz.web.app/icons/icon-192.png',
+            badge: 'https://louvor-hajaluz.web.app/icons/badge-96.png',
+          },
           fcmOptions: { link: 'https://louvor-hajaluz.web.app/repertorios/r1' },
         },
       },
     ]);
+  });
+
+  it('takes icon and badge from the origin of the link (test site uses its own icons)', async () => {
+    msg.sendEach.mockResolvedValue({ responses: [{ success: true }] });
+
+    await createPushDeps().sendBatch([
+      {
+        token: 'tok-t',
+        message: {
+          title: 'Teste',
+          body: 'Aviso de teste',
+          link: 'https://louvor-hajaluz-teste.web.app/repertorios/s1',
+          tag: 'teste-1',
+        },
+      },
+    ]);
+
+    const sent = msg.sendEach.mock.calls[0]?.[0] as Array<{ webpush: { notification: unknown } }>;
+    expect(sent[0]?.webpush.notification).toEqual({
+      tag: 'teste-1',
+      icon: 'https://louvor-hajaluz-teste.web.app/icons/icon-192.png',
+      badge: 'https://louvor-hajaluz-teste.web.app/icons/badge-96.png',
+    });
   });
 
   it('maps success to ok, error code to code, and a missing code to unknown', async () => {

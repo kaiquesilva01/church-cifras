@@ -26,3 +26,16 @@ export function readWebEnv(raw: Record<string, string | undefined>): WebEnv {
     VITE_EMULATOR_HOST: raw.VITE_EMULATOR_HOST ?? '',
   };
 }
+
+export interface PushConfig {
+  vapidKey: string;
+  messagingSenderId: string;
+}
+
+/** Avisos só existem com as duas variáveis. Sem elas, a linha "Avisos" não aparece. */
+export function readPushConfig(raw: Record<string, string | undefined>): PushConfig | null {
+  const vapidKey = raw.VITE_FIREBASE_VAPID_KEY;
+  const messagingSenderId = raw.VITE_FIREBASE_MESSAGING_SENDER_ID;
+  if (!vapidKey || !messagingSenderId) return null;
+  return { vapidKey, messagingSenderId };
+}

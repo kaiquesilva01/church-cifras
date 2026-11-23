@@ -37,13 +37,18 @@ export interface FirebaseServices {
 
 export const FUNCTIONS_REGION = 'southamerica-east1';
 
-export function createFirebase(env: WebEnv): FirebaseServices {
+export function createFirebase(
+  env: WebEnv,
+  options: { messagingSenderId?: string } = {},
+): FirebaseServices {
   const app = initializeApp({
     apiKey: env.VITE_FIREBASE_API_KEY,
     authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
     projectId: env.VITE_FIREBASE_PROJECT_ID,
     storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
     appId: env.VITE_FIREBASE_APP_ID,
+    // O SDK de mensagens lê o sender id da config do app; sem ele a chave da chamada não existe.
+    ...(options.messagingSenderId ? { messagingSenderId: options.messagingSenderId } : {}),
   });
   // No popupRedirectResolver here: getAuth wires it in and loads the Google API iframe (apis.google.com)
   // at startup, which delays the first auth state. signInWithPopup receives the resolver explicitly.

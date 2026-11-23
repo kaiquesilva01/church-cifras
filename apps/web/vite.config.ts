@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config';
 import { preloadHints } from './build/preloadHints';
 import { appVersionPlugin } from './build/appVersion';
 import { createPwaOptions, cacheEmulatorStorage } from './build/pwaConfig';
+import { messagingSwPlugin } from './build/messagingSw';
+import { lazyChunks } from './build/lazyChunks';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
@@ -16,6 +18,8 @@ export default defineConfig(({ mode }) => {
       VitePWA(
         createPwaOptions(cacheEmulatorStorage(mode, env), env.VITE_EMULATOR_HOST || 'localhost'),
       ),
+      messagingSwPlugin(env),
+      lazyChunks(['messaging']),
     ],
     build: {
       rolldownOptions: {
@@ -33,6 +37,12 @@ export default defineConfig(({ mode }) => {
                 name: 'firebase-core',
                 test: /node_modules\/(firebase\/(app|auth|firestore)|@firebase\/(app|auth|firestore|util|component|logger|webchannel-wrapper))\//,
               },
+              {
+                // Só a aba Mais (avisos) usa; fora do app shell e do precache. Vem depois do firebase-core:
+                // senão este grupo captura @firebase/app e util, que o app shell importa.
+                name: 'messaging',
+                test: /node_modules\/(firebase\/messaging|@firebase\/messaging)\//,
+              },
             ],
           },
         },
@@ -46,7 +56,7 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
-      include: ['src/**/*.test.{ts,tsx}', 'build/**/*.test.ts'],
+      include: ['src/**/*.test.{ts,tsx}', 'build/**/*.test.ts', 'scripts/**/*.test.mjs'],
       // Run afterEach hooks in registration order so the RTL cleanup in setup.ts unmounts before a
       // file's afterEach unstubs globals (ResizeObserver...). The default 'stack' order unstubbed first,
       // and a pending passive effect (PdfPages) could flush in between and throw under load.

@@ -62,8 +62,13 @@ describe('pwa options', () => {
         '**/assets/UploadRoute-*',
         '**/assets/ImportRoute-*',
         '**/assets/ViewerRoute-*',
+        '**/assets/messaging-*',
       ]),
     );
+  });
+
+  it('keeps the Workbox precache globs unchanged (the app SW does not change)', () => {
+    expect(pwaOptions.workbox!.globPatterns).toEqual(['index.html', 'assets/*.{js,css}']);
   });
 });
 
