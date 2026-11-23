@@ -7,6 +7,30 @@
       "ttl": true,
       "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
     },
-    { "collectionGroup": "avisosEnviados", "fieldPath": "expiresAt", "ttl": true, "indexes": [] }
+    { "collectionGroup": "avisosEnviados", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
+    {
+      "collectionGroup": "members",
+      "fieldPath": "uid",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
+      "collectionGroup": "requests",
+      "fieldPath": "uid",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
+      "collectionGroup": "requests",
+      "fieldPath": "status",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    }
   ]
 }

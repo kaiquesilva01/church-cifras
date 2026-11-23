@@ -18,6 +18,20 @@ service cloud.firestore {
       return signedIn() && role() == 'admin';
     }
 
+    function isAppAdminClaim() {
+      return signedIn() && request.auth.token.get('appAdmin', false) == true;
+    }
+
+    function isMemberOf(mid) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/ministries/$(mid)/members/$(request.auth.uid));
+    }
+
+    function isMinistryAdmin(mid) {
+      return isMemberOf(mid)
+        && get(/databases/$(database)/documents/ministries/$(mid)/members/$(request.auth.uid)).data.role == 'admin';
+    }
+
     // Mantenha igual a KEY_OPTIONS (packages/chords/src/keys.ts): maiores e depois menores.
     function keyNames() {
       return [
@@ -180,6 +194,43 @@ service cloud.firestore {
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if isAdmin();
+    }
+
+    match /ministries/{mid} {
+      allow read: if signedIn();
+      allow write: if false;
+
+      match /members/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || isMinistryAdmin(mid) || isAppAdminClaim());
+        allow write: if false;
+      }
+
+      match /requests/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || isMinistryAdmin(mid) || isAppAdminClaim());
+        allow write: if false;
+      }
+
+      match /setlists/{setlistId} {
+        allow read: if isMemberOf(mid);
+        allow create: if isMinistryAdmin(mid)
+          && validSetlist(request.resource.data, setlistId)
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time;
+        allow update: if isMinistryAdmin(mid)
+          && validSetlist(request.resource.data, setlistId)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isMinistryAdmin(mid);
+      }
+    }
+
+    // Admin da app: todos os vínculos e pedidos (consulta de grupo). Não lê repertórios.
+    match /{path=**}/members/{uid} {
+      allow read: if isAppAdminClaim();
+    }
+
+    match /{path=**}/requests/{uid} {
+      allow read: if isAppAdminClaim();
     }
 
     // setlistUsage é acessado só pelo Admin SDK (Cloud Functions): sem regra, fica negado por padrão.
