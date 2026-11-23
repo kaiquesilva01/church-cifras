@@ -234,7 +234,7 @@ chama `getIdToken(true)`.
   sem sobrescrever arquivo existente.
 - Regras cobertas por testes com `@firebase/rules-unit-testing` no emulador.
 
-> **Repertórios (Fase 8):** as regras de `setlists` (leitura autenticada; escrita `member|admin`) estão em
+> **Repertórios (Fase 8):** as regras de `setlists` (leitura autenticada; escrita `admin` desde 23/11/2026, PR #127) estão em
 > [2026-11-16-repertorios-design.md](2026-11-16-repertorios-design.md) §6.3.
 
 **Riscos aceitos** (conhecidos e tolerados nesta versão):
