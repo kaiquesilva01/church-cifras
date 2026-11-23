@@ -1,39 +1,26 @@
 import { failureCode, markerExpiresAt } from './announce';
 import {
-  NOW_MS,
-  planRehearsalReminder,
+  buildRehearsalReminder,
+  dueRehearsalNotice,
+  lastRehearsalAt,
+  LOOKAHEAD_MS,
   readRehearsalSetlist,
-  SOON_MS,
   type RehearsalSetlist,
 } from './rehearsal';
 import type { MarkerDeps } from './markers';
-import { toDate } from './newSetlist';
 import { sendToDevices } from './send';
 import type { PushDeps } from './types';
 
 export type ReminderDeps = PushDeps &
   MarkerDeps & {
     listRehearsalSetlists(
-      from: Date,
-      to: Date,
+      after: Date,
+      until: Date,
     ): Promise<Array<{ id: string; data: Record<string, unknown> }>>;
     listRehearsalMarkers(setlistId: string): Promise<Array<Record<string, unknown>>>;
   };
 
 export type ReminderRun = { sent: number; already: number; blocked: number; failed: number };
-
-// Horários dos avisos "perto" já enviados para o repertório. Marcas "agora" não entram:
-// elas nunca indicam mudança de horário.
-async function earlierSoonTimes(deps: ReminderDeps, setlistId: string): Promise<number[]> {
-  const markers = await deps.listRehearsalMarkers(setlistId);
-  const times: number[] = [];
-  for (const marker of markers) {
-    if (marker.tipo !== 'perto') continue;
-    const at = toDate(marker.rehearsalAt);
-    if (at !== undefined) times.push(at.getTime());
-  }
-  return times;
-}
 
 async function remind(
   deps: ReminderDeps,
@@ -41,13 +28,18 @@ async function remind(
   now: Date,
   run: ReminderRun,
 ): Promise<void> {
-  const plan = planRehearsalReminder(now, setlist, await earlierSoonTimes(deps, setlist.id));
-  if (plan === null) return;
+  const tipo = dueRehearsalNotice(now, setlist.rehearsalAt);
+  if (tipo === null) return;
 
-  const claim = await deps.claimMarker(`${setlist.id}_${plan.tipo}_${plan.rehearsalAtMs}`, {
+  // Só com aviso devido: a leitura das marcas fica antes do claim.
+  const previous = lastRehearsalAt(await deps.listRehearsalMarkers(setlist.id), now);
+  const input = buildRehearsalReminder(now, setlist, tipo, previous);
+
+  const rehearsalAtMs = setlist.rehearsalAt.getTime();
+  const claim = await deps.claimMarker(`${setlist.id}_${tipo}_${rehearsalAtMs}`, {
     setlistId: setlist.id,
-    tipo: plan.tipo,
-    rehearsalAt: new Date(plan.rehearsalAtMs),
+    tipo,
+    rehearsalAt: new Date(rehearsalAtMs),
     createdAt: now,
     expiresAt: markerExpiresAt(now, setlist.expiresAt),
   });
@@ -56,7 +48,7 @@ async function remind(
     return;
   }
 
-  const outcome = await sendToDevices(deps, plan.input);
+  const outcome = await sendToDevices(deps, input);
   if (outcome.blocked) {
     run.blocked += 1;
     return;
@@ -65,15 +57,12 @@ async function remind(
   run.failed += outcome.failed;
 }
 
-/** Avisa o ensaio que cai na janela de 5 min antes até 30 min depois de agora. */
+/** Avisa os ensaios com horário em (agora, agora + 24 h]: véspera, no dia e 1 hora antes. */
 export async function runRehearsalReminders(deps: ReminderDeps): Promise<ReminderRun> {
   const now = deps.now();
   const run: ReminderRun = { sent: 0, already: 0, blocked: 0, failed: 0 };
 
-  const docs = await deps.listRehearsalSetlists(
-    new Date(now.getTime() - NOW_MS),
-    new Date(now.getTime() + SOON_MS),
-  );
+  const docs = await deps.listRehearsalSetlists(now, new Date(now.getTime() + LOOKAHEAD_MS));
   for (const doc of docs) {
     const setlist = readRehearsalSetlist(doc.id, doc.data);
     if (setlist === undefined) continue;
@@ -88,8 +77,8 @@ export async function runRehearsalReminders(deps: ReminderDeps): Promise<Reminde
     }
   }
 
-  // Roda a cada minuto: só loga quando houve algo além de nada a fazer.
-  if (run.sent + run.already + run.blocked + run.failed > 0) {
+  // Roda a cada minuto: só loga quando houve envio, bloqueio ou falha.
+  if (run.sent + run.blocked + run.failed > 0) {
     console.info('push: lembretes do ensaio', { ...run });
   }
   return run;

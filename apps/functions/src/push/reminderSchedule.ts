@@ -5,7 +5,7 @@ import { runRehearsalReminders } from './reminders';
 
 const deps = createReminderDeps();
 
-// Cron de 1 minuto. A janela de 5 min para trás cobre um atraso curto do job; a marca impede duplicata.
+// Cron de 1 minuto. O aviso do ensaio tem janelas próprias (véspera, no dia e 1 hora), em `rehearsal.ts`; a marca impede duplicata.
 // Nunca relança: a função não reexecuta o lote, e a mensagem de erro pode conter dados sensíveis.
 export const sendRehearsalReminders = onSchedule(
   {

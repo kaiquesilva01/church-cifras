@@ -217,7 +217,7 @@ export function SetlistFormDialog({
             )}
           </div>
           <p id="setlist-rehearsal-help" className="field-help">
-            Quem ativou os avisos é lembrado 30 min antes e na hora.
+            Quem ativou os avisos é lembrado na véspera, no dia e 1 hora antes.
           </p>
           {/*
             Sempre montada: a região de status precisa existir antes de o aviso entrar.

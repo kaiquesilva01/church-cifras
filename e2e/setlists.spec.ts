@@ -617,7 +617,7 @@ test.describe('rehearsal time (390 px)', () => {
     await expect(page.getByRole('dialog', { name: 'Novo repertório' })).toBeVisible();
     await expect(page.getByText('Hora do ensaio (opcional)')).toBeVisible();
     await expect(
-      page.getByText('Quem ativou os avisos é lembrado 30 min antes e na hora.'),
+      page.getByText('Quem ativou os avisos é lembrado na véspera, no dia e 1 hora antes.'),
     ).toBeVisible();
     await page.getByLabel('Rótulo').fill('Domingo');
     await hourField(page).fill('18:30');
