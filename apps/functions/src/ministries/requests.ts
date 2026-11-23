@@ -72,10 +72,12 @@ export async function approveRequest(
   await assertCanManageMinistry(deps, caller, ministryId);
   await deps.runTransaction(async (tx: MinistryTx) => {
     const request = await tx.readRequest(ministryId, uid);
+    const membership = await tx.readMembership(ministryId, uid);
+    // Aprovação repetida (ex.: a recálculo de claims falhou depois do commit): já é membro, só recalcula.
+    if (!request && membership) return;
     if (!request) throw new HttpsError('not-found', 'Pedido não encontrado.');
     if (request.status !== 'pending')
       throw new HttpsError('failed-precondition', 'Este pedido não está pendente.');
-    const membership = await tx.readMembership(ministryId, uid);
     const now = deps.now();
     tx.write({ op: 'delete', path: paths.request(ministryId, uid) });
     if (!membership) {

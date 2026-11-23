@@ -175,3 +175,84 @@ describe('cancelRequest', () => {
     });
   });
 });
+
+describe('approveRequest: recuperação e casos de borda', () => {
+  it('aprovar duas vezes: a segunda é ok e recalcula claims', async () => {
+    const { deps, docs, claimCalls } = setup(pedidoU1);
+    await approveRequest(deps, 'adm', { ministryId: 'hajaluz', uid: 'u1' });
+    const primeira = claimCalls.length;
+    await expect(
+      approveRequest(deps, 'adm', { ministryId: 'hajaluz', uid: 'u1' }),
+    ).resolves.toEqual({ ok: true });
+    expect(claimCalls.length).toBe(primeira + 1);
+    expect(claimCalls.at(-1)).toEqual(['u1', expect.objectContaining({ hasMinistry: true })]);
+    expect(docs.get('ministries/hajaluz/members/u1')).toMatchObject({
+      role: 'member',
+      updatedBy: 'adm',
+    });
+  });
+
+  it('sem pedido e sem vínculo: not-found', async () => {
+    const { deps } = setup();
+    await expect(
+      approveRequest(deps, 'adm', { ministryId: 'hajaluz', uid: 'u1' }),
+    ).rejects.toMatchObject({ code: 'not-found' });
+  });
+
+  it('com vínculo já existente, não sobrescreve o membro', async () => {
+    const membro = {
+      uid: 'u1',
+      role: 'member',
+      displayName: 'Original',
+      email: null,
+      photoURL: null,
+      joinedAt: NOW,
+      updatedAt: NOW,
+      updatedBy: 'seed',
+    };
+    const { deps, docs } = setup({ ...pedidoU1, 'ministries/hajaluz/members/u1': membro });
+    await approveRequest(deps, 'adm', { ministryId: 'hajaluz', uid: 'u1' });
+    expect(docs.has('ministries/hajaluz/requests/u1')).toBe(false);
+    expect(docs.get('ministries/hajaluz/members/u1')).toEqual(membro);
+  });
+});
+
+describe('rejectRequest: autorização e estados', () => {
+  it('membro comum não recusa: permission-denied', async () => {
+    const { deps, docs } = setup({
+      ...pedidoU1,
+      'ministries/hajaluz/members/u2': { uid: 'u2', role: 'member' },
+    });
+    await expect(
+      rejectRequest(deps, 'u2', { ministryId: 'hajaluz', uid: 'u1' }),
+    ).rejects.toMatchObject({ code: 'permission-denied' });
+    expect(docs.get('ministries/hajaluz/requests/u1')).toMatchObject({ status: 'pending' });
+  });
+
+  it('recusar pedido que não está pendente: failed-precondition', async () => {
+    const { deps } = setup({
+      'ministries/hajaluz/requests/u1': {
+        uid: 'u1',
+        status: 'rejected',
+        displayName: 'Ana',
+        email: null,
+        photoURL: null,
+      },
+    });
+    await expect(
+      rejectRequest(deps, 'adm', { ministryId: 'hajaluz', uid: 'u1' }),
+    ).rejects.toMatchObject({
+      code: 'failed-precondition',
+      message: 'Este pedido não está pendente.',
+    });
+  });
+});
+
+describe('requestAccess: usuário sem documento', () => {
+  it('caller sem users/{uid}: not-found', async () => {
+    const { deps } = setup();
+    await expect(requestAccess(deps, 'ghost', { ministryId: 'hajaluz' })).rejects.toMatchObject({
+      code: 'not-found',
+    });
+  });
+});
