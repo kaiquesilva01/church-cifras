@@ -20,6 +20,11 @@ const br = (day: string, t: string) => new Date(`${day}T${t.length === 5 ? `${t}
 const NOW = new Date('2026-11-21T20:00:00Z');
 const at = (ms: number) => new Date(NOW.getTime() + ms);
 
+it('guarda do helper br: interpreta hh:mm e hh:mm:ss em Brasília', () => {
+  expect(br('2026-11-21', '08:09:59').getTime()).not.toBeNaN();
+  expect(br('2026-11-21', '17:00')).toEqual(NOW);
+});
+
 const setlist = (rehearsalAt: Date, extra: Partial<RehearsalSetlist> = {}): RehearsalSetlist => ({
   id: 'r1',
   label: 'Culto de domingo',
@@ -173,11 +178,11 @@ describe('planRehearsalReminder: textos e envio', () => {
 
 describe('planRehearsalReminder: título com os minutos que faltam', () => {
   it.each([
-    ['30 min exatos', 30 * MIN, 'Ensaio em 30 min'],
-    ['10 min', 10 * MIN, 'Ensaio em 10 min'],
-    ['1 ms', 1, 'Ensaio em 1 min'],
-    ['29 min 30 s', 29 * MIN + 30 * 1000, 'Ensaio em 30 min'],
-  ])('%s: título "%s"', (_name, offset, title) => {
+    { name: '30 min exatos', offset: 30 * MIN, title: 'Ensaio em 30 min' },
+    { name: '10 min', offset: 10 * MIN, title: 'Ensaio em 10 min' },
+    { name: '1 ms', offset: 1, title: 'Ensaio em 1 min' },
+    { name: '29 min 30 s', offset: 29 * MIN + 30 * 1000, title: 'Ensaio em 30 min' },
+  ])('$name: título "$title"', ({ offset, title }) => {
     expect(planRehearsalReminder(NOW, setlist(at(offset)), [])?.input.title).toBe(title);
   });
 });
@@ -200,13 +205,6 @@ describe('planRehearsalReminder: mudança de horário', () => {
   it('a mudança não altera o "agora"', () => {
     const earlier = [at(25 * MIN).getTime()];
     expect(planRehearsalReminder(NOW, setlist(NOW), earlier)?.input.title).toBe('Ensaio agora');
-  });
-});
-
-describe('guarda do helper br', () => {
-  it('interpreta hh:mm e hh:mm:ss em Brasília', () => {
-    expect(br('2026-11-21', '08:09:59').getTime()).not.toBeNaN();
-    expect(br('2026-11-21', '17:00')).toEqual(NOW);
   });
 });
 
@@ -346,17 +344,33 @@ describe('lastRehearsalAt', () => {
     expect(lastRehearsalAt(markers, now)).toEqual(br('2026-11-21', '18:30'));
   });
 
-  it('aceita Timestamp do Admin SDK e Date nos dois campos', () => {
+  it('aceita Timestamp do Admin SDK nos dois campos (a marca Timestamp vence)', () => {
     const markers = [
       {
         tipo: 'vespera',
-        createdAt: ts(br('2026-11-19', '10:00')),
-        rehearsalAt: ts(br('2026-11-21', '18:30')),
+        createdAt: br('2026-11-19', '10:00'),
+        rehearsalAt: br('2026-11-21', '18:30'),
+      },
+      {
+        tipo: 'perto',
+        createdAt: ts(br('2026-11-20', '10:00')),
+        rehearsalAt: ts(br('2026-11-22', '18:30')),
+      },
+    ];
+    expect(lastRehearsalAt(markers, now)).toEqual(br('2026-11-22', '18:30'));
+  });
+
+  it('aceita Timestamp só no rehearsalAt (a marca Timestamp vence)', () => {
+    const markers = [
+      {
+        tipo: 'vespera',
+        createdAt: br('2026-11-19', '10:00'),
+        rehearsalAt: br('2026-11-21', '18:30'),
       },
       {
         tipo: 'perto',
         createdAt: br('2026-11-20', '10:00'),
-        rehearsalAt: br('2026-11-22', '18:30'),
+        rehearsalAt: ts(br('2026-11-22', '18:30')),
       },
     ];
     expect(lastRehearsalAt(markers, now)).toEqual(br('2026-11-22', '18:30'));
@@ -424,13 +438,13 @@ describe('buildRehearsalReminder: textos exatos', () => {
   });
 
   it.each([
-    ['60 min', 60 * MIN, 'Ensaio em 1 hora'],
-    ['59 min 30 s', 59 * MIN + 30_000, 'Ensaio em 1 hora'],
-    ['58 min 30 s', 58 * MIN + 30_000, 'Ensaio em 1 hora'],
-    ['58 min', 58 * MIN, 'Ensaio em 58 min'],
-    ['20 min', 20 * MIN, 'Ensaio em 20 min'],
-    ['1 ms', 1, 'Ensaio em 1 min'],
-  ])('1 hora com ensaio em %s: "%s"', (_name, offset, title) => {
+    { name: '60 min', offset: 60 * MIN, title: 'Ensaio em 1 hora' },
+    { name: '59 min 30 s', offset: 59 * MIN + 30_000, title: 'Ensaio em 1 hora' },
+    { name: '58 min 30 s', offset: 58 * MIN + 30_000, title: 'Ensaio em 1 hora' },
+    { name: '58 min', offset: 58 * MIN, title: 'Ensaio em 58 min' },
+    { name: '20 min', offset: 20 * MIN, title: 'Ensaio em 20 min' },
+    { name: '1 ms', offset: 1, title: 'Ensaio em 1 min' },
+  ])('1 hora com ensaio em $name: "$title"', ({ offset, title }) => {
     const at = new Date(NOW.getTime() + offset);
     expect(
       buildRehearsalReminder(NOW, { ...base, rehearsalAt: at }, 'perto', undefined).title,
@@ -490,5 +504,37 @@ describe('buildRehearsalReminder: textos exatos', () => {
         undefined,
       ).origin,
     ).toBe('teste');
+  });
+
+  it('véspera de ensaio às 21h de domingo (= 00h UTC de segunda): dia de Brasília', () => {
+    // Domingo 21h de Brasília é segunda 00h UTC; o dia do aviso segue sendo domingo.
+    const sunday = br('2026-11-22', '21:00');
+    expect(
+      buildRehearsalReminder(
+        br('2026-11-21', '21:00'),
+        { ...base, rehearsalAt: sunday },
+        'vespera',
+        undefined,
+      ),
+    ).toEqual({
+      ...common,
+      title: 'Ensaio amanhã às 21h00',
+      body: 'Culto de domingo · dom 22/11. Toque para ver os louvores.',
+    });
+  });
+
+  it('mudou entre 18h30 e 21h30 de domingo (cruza a meia-noite UTC): mesmo dia de Brasília', () => {
+    expect(
+      buildRehearsalReminder(
+        br('2026-11-22', '20:45'),
+        { ...base, rehearsalAt: br('2026-11-22', '21:30') },
+        'perto',
+        br('2026-11-22', '18:30'),
+      ),
+    ).toEqual({
+      ...common,
+      title: 'Ensaio mudou para 21h30',
+      body: 'Culto de domingo · dom 22/11. Toque para ver os louvores.',
+    });
   });
 });
