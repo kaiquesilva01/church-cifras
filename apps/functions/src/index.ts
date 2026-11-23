@@ -17,7 +17,24 @@ import {
   unregisterDevice as unregisterDeviceLogic,
 } from './push/devices';
 import { buildHealth } from './health';
-import { buildClaims } from './ministries/claims';
+import { applyHajaLuzRole } from './ministries/bridge';
+import { createMinistryDeps } from './ministries/adminDeps';
+import {
+  createMinistry as createMinistryLogic,
+  setAppAdmin as setAppAdminLogic,
+  updateMinistry as updateMinistryLogic,
+} from './ministries/admin';
+import { recalcClaims } from './ministries/claims';
+import {
+  removeMember as removeMemberLogic,
+  setMemberRole as setMemberRoleLogic,
+} from './ministries/members';
+import {
+  approveRequest as approveRequestLogic,
+  cancelRequest as cancelRequestLogic,
+  rejectRequest as rejectRequestLogic,
+  requestAccess as requestAccessLogic,
+} from './ministries/requests';
 import { parseAdminEmails, ROLES } from './roles';
 import {
   deleteArrangement as deleteArrangementLogic,
@@ -38,6 +55,8 @@ if (getApps().length === 0) initializeApp();
 const REGION = 'southamerica-east1';
 const adminEmails = defineString('ADMIN_EMAILS');
 
+const ministryDeps = createMinistryDeps();
+
 const deps: UserDeps = {
   setClaims: (uid, claims) => getAuth().setCustomUserClaims(uid, claims),
   writeUser: async (uid, data, merge) => {
@@ -48,16 +67,8 @@ const deps: UserDeps = {
     const role = (await getFirestore().doc(`users/${uid}`).get()).data()?.role;
     return ROLES.find((r) => r === role);
   },
-  // Stub até a Tarefa 12 ligar a ponte da Haja Luz: não grava vínculo nenhum.
-  applyHajaLuzRole: async () => undefined,
-  recalcClaims: async (uid) => {
-    const data = (await getFirestore().doc(`users/${uid}`).get()).data();
-    const role = ROLES.find((r) => r === data?.role) ?? 'viewer';
-    await getAuth().setCustomUserClaims(
-      uid,
-      buildClaims({ role, appAdmin: data?.appAdmin === true, memberRoles: [] }),
-    );
-  },
+  applyHajaLuzRole: (uid, role, caller) => applyHajaLuzRole(ministryDeps, uid, role, caller),
+  recalcClaims: (uid) => recalcClaims(ministryDeps, uid),
   now: () => new Date(),
 };
 
@@ -83,6 +94,7 @@ export const onUserCreated = functionsV1
 export { onArrangementWritten } from './songs/keys';
 export { onSetlistWritten } from './push/setlistTrigger';
 export { sendRehearsalReminders } from './push/reminderSchedule';
+export { mirrorSetlists } from './ministries/mirrorTrigger';
 
 const replaceDeps: ReplaceDeps = {
   replaceIfGenerated: (songId, slug, data) => {
@@ -264,4 +276,40 @@ export const unregisterDevice = onCall({ region: REGION }, (request) =>
 
 export const sendTestPush = onCall({ region: REGION }, (request) =>
   sendTestPushLogic({ ...pushDeps, ...deps }, request.auth?.uid),
+);
+
+export const requestMinistryAccess = onCall({ region: REGION }, (request) =>
+  requestAccessLogic(ministryDeps, request.auth?.uid, request.data),
+);
+
+export const cancelMinistryRequest = onCall({ region: REGION }, (request) =>
+  cancelRequestLogic(ministryDeps, request.auth?.uid, request.data),
+);
+
+export const approveMinistryRequest = onCall({ region: REGION }, (request) =>
+  approveRequestLogic(ministryDeps, request.auth?.uid, request.data),
+);
+
+export const rejectMinistryRequest = onCall({ region: REGION }, (request) =>
+  rejectRequestLogic(ministryDeps, request.auth?.uid, request.data),
+);
+
+export const setMinistryMemberRole = onCall({ region: REGION }, (request) =>
+  setMemberRoleLogic(ministryDeps, request.auth?.uid, request.data),
+);
+
+export const removeMinistryMember = onCall({ region: REGION }, (request) =>
+  removeMemberLogic(ministryDeps, request.auth?.uid, request.data),
+);
+
+export const createMinistry = onCall({ region: REGION }, (request) =>
+  createMinistryLogic(ministryDeps, request.auth?.uid, request.data),
+);
+
+export const updateMinistry = onCall({ region: REGION }, (request) =>
+  updateMinistryLogic(ministryDeps, request.auth?.uid, request.data),
+);
+
+export const setAppAdmin = onCall({ region: REGION }, (request) =>
+  setAppAdminLogic(ministryDeps, request.auth?.uid, request.data),
 );
