@@ -89,9 +89,7 @@ test('visitor on a setlist link lands on the access screen, not the setlist', as
 }, testInfo) => {
   const tag = lettersTag();
   const song = await seedSong(`Aurora ${tag}`, `Cantor Teste ${tag}`, [{ key: 'C' }]);
-  const id = await seedSetlist(todayInSaoPaulo(), 'Culto', [
-    { songId: song.id, key: 'C' },
-  ]);
+  const id = await seedSetlist(todayInSaoPaulo(), 'Culto', [{ songId: song.id, key: 'C' }]);
   const person = await registerVisitor(`visitante-rep-${tag.toLowerCase()}`);
 
   await signInToAccessScreen(page, person);
