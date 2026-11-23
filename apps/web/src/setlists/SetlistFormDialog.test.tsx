@@ -290,7 +290,7 @@ describe('SetlistFormDialog', () => {
     it('mostra a ajuda do grupo', () => {
       setup();
       expect(
-        screen.getByText('Quem ativou os avisos é lembrado 30 min antes e na hora.'),
+        screen.getByText('Quem ativou os avisos é lembrado na véspera, no dia e 1 hora antes.'),
       ).toBeInTheDocument();
     });
 
