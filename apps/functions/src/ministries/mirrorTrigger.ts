@@ -9,7 +9,6 @@ import { syncSetlistMirror } from './mirror';
 const rootRef = (id: string) => getFirestore().doc(`setlists/${id}`);
 const targetRef = (id: string) => getFirestore().doc(`ministries/${HAJALUZ_ID}/setlists/${id}`);
 
-// Não exportado ainda: a Task 12 liga no index.ts.
 // Escreve só no caminho do ministério, então não dispara o aviso de push (que ouve `setlists/{id}`).
 export const mirrorSetlists = onDocumentWritten(
   { document: 'setlists/{setlistId}', region: 'southamerica-east1', retry: true },

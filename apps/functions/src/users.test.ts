@@ -142,6 +142,15 @@ describe('changeUserRole', () => {
     expect(calls).not.toContain('setClaims');
   });
 
+  it('sem ministério Haja Luz (ponte no-op): papel gravado e claims recalculados', async () => {
+    const { deps, writes, calls } = fakeDeps(true, 'viewer');
+    deps.applyHajaLuzRole = async () => undefined; // ponte sem ministries/hajaluz não grava nada
+    const result = await changeUserRole(deps, INPUT_MEMBER);
+    expect(result).toEqual({ uid: 'u1', role: 'member' });
+    expect(writes).toEqual([['u1', { role: 'member', roleUpdatedAt: NOW }, true]]);
+    expect(calls).toEqual(['writeUser:u1', 'recalcClaims:u1']);
+  });
+
   it('se applyHajaLuzRole lança, writeUser não é chamado', async () => {
     const { deps, writes } = fakeDeps(true, 'viewer');
     deps.applyHajaLuzRole = async () => {

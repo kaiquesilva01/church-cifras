@@ -1,4 +1,3 @@
-import { HttpsError } from 'firebase-functions/v2/https';
 import type { Role } from '../roles';
 import type { MembershipRole, MinistryDeps } from './deps';
 import { HAJALUZ_ID, paths } from './model';
@@ -11,13 +10,9 @@ export async function applyHajaLuzRole(
   callerUid: string,
 ): Promise<void> {
   await deps.runTransaction(async (tx) => {
+    // Antes da migração não há ministério: a Pessoas segue gravando só o papel legado (users.role).
     const ministry = await tx.readMinistry(HAJALUZ_ID);
-    if (!ministry) {
-      throw new HttpsError(
-        'failed-precondition',
-        'Ministério Haja Luz ainda não existe. Rode a migração antes.',
-      );
-    }
+    if (!ministry) return;
     const user = await tx.readUser(uid);
     const membership = await tx.readMembership(HAJALUZ_ID, uid);
     const request = await tx.readRequest(HAJALUZ_ID, uid);

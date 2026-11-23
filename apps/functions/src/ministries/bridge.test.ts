@@ -66,13 +66,11 @@ describe('applyHajaLuzRole', () => {
     expect(docs.has('ministries/hajaluz/requests/u1')).toBe(true);
   });
 
-  it('sem ministries/hajaluz: failed-precondition e nada gravado', async () => {
-    const { deps, docs } = createFakeMinistryDeps({ ...ana, ...pedido });
-    const antes = docs.size;
-    await expect(applyHajaLuzRole(deps, 'u1', 'member', 'adm')).rejects.toMatchObject({
-      code: 'failed-precondition',
-    });
-    expect(docs.size).toBe(antes);
+  it('sem ministries/hajaluz: no-op, nada lido nem gravado no vínculo ou pedido', async () => {
+    const { deps, docs } = createFakeMinistryDeps({ ...ana, ...pedido, ...vinculo });
+    const antes = new Map(docs);
+    await expect(applyHajaLuzRole(deps, 'u1', 'admin', 'adm')).resolves.toBeUndefined();
+    expect(docs).toEqual(antes);
   });
 
   it('vínculo existente preserva joinedAt', async () => {
