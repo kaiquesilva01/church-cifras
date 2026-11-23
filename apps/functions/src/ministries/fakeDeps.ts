@@ -68,27 +68,59 @@ export function createFakeMinistryDeps(seed: Record<string, Record<string, unkno
     },
   };
 
-  // Aplica a escrita na hora (o fake não tem commit). Os callers leem antes de escrever.
-  function applyWrite(op: WriteOp): void {
-    const current = docs.get(op.path);
+  // Aplica uma escrita sobre um mapa de documentos (o do commit, ou um rascunho).
+  function applyWrite(target: Map<string, Record<string, unknown>>, op: WriteOp): void {
+    const current = target.get(op.path);
     if (op.op === 'create') {
-      if (current) throw new Error('ALREADY_EXISTS');
-      docs.set(op.path, { ...op.data });
+      if (current) {
+        throw Object.assign(new Error('ALREADY_EXISTS'), { code: 6 });
+      }
+      target.set(op.path, { ...op.data });
     } else if (op.op === 'set') {
-      docs.set(op.path, { ...op.data });
+      target.set(op.path, { ...op.data });
     } else if (op.op === 'merge') {
-      docs.set(op.path, { ...current, ...op.data });
+      target.set(op.path, { ...current, ...op.data });
     } else {
-      docs.delete(op.path);
+      target.delete(op.path);
     }
+  }
+
+  // Transação como no Firestore: leituras antes das escritas, escritas só no fim e tudo ou nada.
+  async function runTransaction<T>(fn: (tx: MinistryTx) => Promise<T>): Promise<T> {
+    const buffered: WriteOp[] = [];
+    const guard =
+      <A extends unknown[], R>(read: (...args: A) => Promise<R>) =>
+      (...args: A): Promise<R> => {
+        if (buffered.length > 0) {
+          throw new Error('Leitura depois de escrita na mesma transação');
+        }
+        return read(...args);
+      };
+    const txReads: MinistryReads = {
+      readUser: guard(reads.readUser),
+      readMinistry: guard(reads.readMinistry),
+      readMembership: guard(reads.readMembership),
+      readRequest: guard(reads.readRequest),
+      listAdminUids: guard(reads.listAdminUids),
+    };
+    const result = await fn({
+      ...txReads,
+      write(op) {
+        buffered.push(op);
+      },
+    });
+    // Commit num rascunho: se uma escrita falhar, nenhuma é aplicada.
+    const draft = new Map([...docs.entries()].map(([path, data]) => [path, { ...data }] as const));
+    for (const op of buffered) applyWrite(draft, op);
+    docs.clear();
+    for (const [path, data] of draft) docs.set(path, data);
+    return result;
   }
 
   const deps: MinistryDeps = {
     ...reads,
     now: () => NOW,
-    async runTransaction<T>(fn: (tx: MinistryTx) => Promise<T>): Promise<T> {
-      return fn({ ...reads, write: applyWrite });
-    },
+    runTransaction,
     async listMembershipsOfUser(uid) {
       return [...docs.entries()]
         .filter(([k, d]) => /^ministries\/[^/]+\/members\/[^/]+$/.test(k) && d.uid === uid)
