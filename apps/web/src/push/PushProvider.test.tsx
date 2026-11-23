@@ -9,13 +9,13 @@ import { PushContext, type PushService } from './types';
 
 function fakeService(): PushService {
   return {
-    load: vi.fn(),
-    enable: vi.fn(),
-    disable: vi.fn(),
-    sendTest: vi.fn(),
-    revalidate: vi.fn(async () => {}),
-    forgetDevice: vi.fn(),
-  } as unknown as PushService;
+    load: vi.fn<PushService['load']>(async () => 'available'),
+    enable: vi.fn<PushService['enable']>(async () => 'active'),
+    disable: vi.fn<PushService['disable']>(async () => 'available'),
+    sendTest: vi.fn<PushService['sendTest']>(async () => 'sent'),
+    revalidate: vi.fn<PushService['revalidate']>(async () => {}),
+    forgetDevice: vi.fn<PushService['forgetDevice']>(async () => {}),
+  };
 }
 
 function authOf(status: AuthState['status'], role: Role): AuthState {

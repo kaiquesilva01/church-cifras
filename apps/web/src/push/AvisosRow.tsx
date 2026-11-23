@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { AvisosStatus, PushService } from './types';
-import { usePushAvisos } from './usePushAvisos';
+import { type AvisosView, usePushAvisos } from './usePushAvisos';
 
 const BELL = 'M6 8a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 14 6 8M10 20a2 2 0 0 0 4 0';
 const MUTED_AVAILABLE = 'Receba repertório novo e lembrete do ensaio neste aparelho';
@@ -13,7 +13,7 @@ interface Copy {
     aria?: string;
     kind: 'primary' | 'secondary';
     disabled: boolean;
-    run: 'enable' | 'disable';
+    run: 'enable' | 'disable' | 'retry';
   };
 }
 
@@ -75,8 +75,19 @@ function copyFor(status: AvisosStatus): Copy {
     case 'error':
       return {
         text: MUTED_AVAILABLE,
-        action: { label: 'Tentar de novo', kind: 'primary', disabled: false, run: 'enable' },
+        action: { label: 'Tentar de novo', kind: 'primary', disabled: false, run: 'retry' },
       };
+  }
+}
+
+function handlerFor(run: NonNullable<Copy['action']>['run'], view: AvisosView): () => void {
+  switch (run) {
+    case 'enable':
+      return view.enable;
+    case 'disable':
+      return view.disable;
+    case 'retry':
+      return view.retry;
   }
 }
 
@@ -118,8 +129,8 @@ export function AvisosRow({ service }: { service: PushService }) {
                 : 'push-action push-action--secondary'
             }
             aria-label={action.aria}
-            disabled={action.disabled}
-            onClick={action.run === 'enable' ? view.enable : view.disable}
+            disabled={action.disabled || (active && view.test === 'sending')}
+            onClick={handlerFor(action.run, view)}
           >
             {action.label}
           </button>
@@ -137,19 +148,20 @@ export function AvisosRow({ service }: { service: PushService }) {
           </button>
         </div>
       )}
-      {/* Feedback do teste fora do bloco "active": sobrevive quando a poda devolve a linha a "available". */}
-      {view.test === 'sent' && (
-        <p role="status" className="notice">
-          Aviso de teste enviado. Ele chega em instantes.
-        </p>
-      )}
+      {/* Feedback do teste fora do bloco "active": sobrevive quando a poda devolve a linha a "available".
+          A região de status fica sempre montada; só o texto de sucesso entra nela. */}
+      <div role="status" className="push-status">
+        {view.test === 'sent' && (
+          <p className="notice">Aviso de teste enviado. Ele chega em instantes.</p>
+        )}
+      </div>
       {view.test === 'failed' && (
-        <p role="alert" className="notice">
+        <p role="alert" className="push-alert">
           Não foi possível enviar o teste.
         </p>
       )}
       {view.status === 'error' && (
-        <p role="alert" className="notice">
+        <p role="alert" className="push-alert">
           Não foi possível ativar os avisos. Tente de novo.
         </p>
       )}

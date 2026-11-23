@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { AvisosStatus, PushService } from './types';
 import { AvisosRow } from './AvisosRow';
@@ -91,28 +91,53 @@ describe('AvisosRow', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('error: role=alert, and Tentar de novo calls enable', async () => {
+  it('error: role=alert, and Tentar de novo reloads the status without calling enable', async () => {
     const s = service('error');
     row(s);
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Não foi possível ativar os avisos. Tente de novo.',
-    );
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Não foi possível ativar os avisos. Tente de novo.');
+    expect(alert).toHaveClass('push-alert');
     fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
-    expect(s.enable).toHaveBeenCalledTimes(1);
+    expect(s.enable).not.toHaveBeenCalled();
+    expect(s.load).toHaveBeenCalledTimes(2);
   });
 
-  it('test success goes to role=status', async () => {
+  it('test success goes to role=status with the success notice', async () => {
     row(service('active'));
     fireEvent.click(await screen.findByRole('button', { name: 'Enviar aviso de teste' }));
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Aviso de teste enviado. Ele chega em instantes.',
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Aviso de teste enviado. Ele chega em instantes.',
+      ),
+    );
+    expect(screen.getByText('Aviso de teste enviado. Ele chega em instantes.')).toHaveClass(
+      'notice',
     );
   });
 
-  it('test failure goes to role=alert', async () => {
+  it('test failure goes to role=alert with the push-alert class', async () => {
     row(service('active', { sendTest: vi.fn(async () => 'failed' as const) }));
     fireEvent.click(await screen.findByRole('button', { name: 'Enviar aviso de teste' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível enviar o teste.');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Não foi possível enviar o teste.');
+    expect(alert).toHaveClass('push-alert');
+  });
+
+  it('the status region is always mounted and empty until a test succeeds', async () => {
+    row(service('available'));
+    await screen.findByText('Receba repertório novo e lembrete do ensaio neste aparelho');
+    expect(screen.getByRole('status')).toHaveTextContent('');
+    expect(screen.getByRole('status')).toHaveClass('push-status');
+  });
+
+  it('disables the Desativar pill while the test is sending', async () => {
+    row(service('active', { sendTest: vi.fn(() => new Promise<'sent'>(() => {})) }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar aviso de teste' }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Desativar avisos neste aparelho' }),
+      ).toBeDisabled(),
+    );
   });
 
   it('keeps the test feedback when the server pruned the device (status goes back to available)', async () => {

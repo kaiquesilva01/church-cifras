@@ -140,6 +140,28 @@ describe('pushService.enable', () => {
     expect(store.value).toEqual({ token: 'tok-1', registeredAt: 1000 });
   });
 
+  it('token novo com registro de outro token → register, unregister do antigo e grava o novo', async () => {
+    const { svc, api, store } = build({ store: memoryStore(RECORD) });
+    expect(await svc.enable()).toBe('active');
+    expect(api.register).toHaveBeenCalledWith('tok-1', 'producao');
+    expect(api.unregister).toHaveBeenCalledWith('tok-old');
+    expect(store.value).toEqual({ token: 'tok-1', registeredAt: 1000 });
+  });
+
+  it('mesmo token do registro → não chama unregister', async () => {
+    const port = fakePort({ getToken: vi.fn(async () => 'tok-old') });
+    const { svc, api } = build({ port, store: memoryStore(RECORD) });
+    expect(await svc.enable()).toBe('active');
+    expect(api.unregister).not.toHaveBeenCalled();
+  });
+
+  it('unregister do antigo rejeita → enable continua como active', async () => {
+    const api = fakeApi({ unregister: vi.fn(() => Promise.reject(new Error('offline'))) });
+    const { svc, store } = build({ api, store: memoryStore(RECORD) });
+    expect(await svc.enable()).toBe('active');
+    expect(store.value).toEqual({ token: 'tok-1', registeredAt: 1000 });
+  });
+
   it('sucesso no site de teste → registra com origem teste', async () => {
     const { svc, api, store } = build({ hostname: 'louvor-hajaluz-teste.web.app' });
     expect(await svc.enable()).toBe('active');
@@ -277,6 +299,14 @@ describe('pushService.sendTest', () => {
     const { svc } = build({ api });
     expect(await svc.sendTest()).toBe('failed');
   });
+
+  it('pruned > 0 com failed > 0 (sent 0) → failed, mantém o registro e não apaga o token', async () => {
+    const api = fakeApi({ sendTest: vi.fn(async () => ({ sent: 0, failed: 1, pruned: 1 })) });
+    const { svc, port, store } = build({ api, store: memoryStore(RECORD) });
+    expect(await svc.sendTest()).toBe('failed');
+    expect(port.deleteToken).not.toHaveBeenCalled();
+    expect(store.value).toEqual(RECORD);
+  });
 });
 
 describe('pushService.revalidate', () => {
@@ -329,6 +359,38 @@ describe('pushService.revalidate', () => {
     const { svc, store } = build({ port, store: memoryStore(RECORD) });
     await expect(svc.revalidate()).resolves.toBeUndefined();
     expect(store.value).toEqual(RECORD);
+  });
+
+  it('registro apagado enquanto getToken está pendente → não registra nem grava', async () => {
+    let resolveToken: (token: string) => void = () => {};
+    const port = fakePort({
+      getToken: vi.fn(() => new Promise<string>((resolve) => (resolveToken = resolve))),
+    });
+    const store = memoryStore(RECORD);
+    const { svc, api } = build({ port, store });
+    const pending = svc.revalidate();
+    store.clear();
+    resolveToken('tok-1');
+    await pending;
+    expect(api.register).not.toHaveBeenCalled();
+    expect(api.unregister).not.toHaveBeenCalled();
+    expect(store.value).toBeNull();
+  });
+
+  it('registro trocado enquanto getToken está pendente → não sobrescreve o novo', async () => {
+    let resolveToken: (token: string) => void = () => {};
+    const port = fakePort({
+      getToken: vi.fn(() => new Promise<string>((resolve) => (resolveToken = resolve))),
+    });
+    const store = memoryStore(RECORD);
+    const { svc, api } = build({ port, store });
+    const pending = svc.revalidate();
+    const other: PushRecord = { token: 'tok-outro', registeredAt: 5_000 };
+    store.write(other);
+    resolveToken('tok-1');
+    await pending;
+    expect(api.register).not.toHaveBeenCalled();
+    expect(store.value).toEqual(other);
   });
 });
 

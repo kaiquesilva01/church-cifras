@@ -122,7 +122,18 @@ export function createPushService(deps: PushServiceDeps): PushService {
         warn('Falha ao gravar o aparelho nos avisos', error);
         return 'error';
       }
+      // Lê o registro depois do getToken: pode ter mudado enquanto o SDK respondia.
+      const previous = deps.store.read();
       deps.store.write({ token, registeredAt: now() });
+      if (previous && previous.token !== token) {
+        // Best-effort: o token antigo sai do servidor, sem derrubar o enable.
+        await within(
+          deps.api
+            .unregister(previous.token)
+            .catch((error: unknown) => warn('Falha ao remover o token antigo', error)),
+          limit,
+        );
+      }
       return 'active';
     },
 
@@ -134,7 +145,7 @@ export function createPushService(deps: PushServiceDeps): PushService {
     async sendTest(): Promise<TestStatus> {
       try {
         const result = await deps.api.sendTest();
-        if (result.sent === 0 && result.pruned > 0) {
+        if (result.sent === 0 && result.pruned > 0 && result.failed === 0) {
           // O servidor apagou o aparelho (token morto): libera o local também.
           await deps.port
             .deleteToken()
@@ -156,6 +167,9 @@ export function createPushService(deps: PushServiceDeps): PushService {
       try {
         // Com a permissão concedida, getToken não pergunta de novo.
         const token = await deps.port.getToken(deps.vapidKey);
+        // Desativado ou trocado enquanto o SDK respondia: não regrava nem registra.
+        const latest = deps.store.read();
+        if (!latest || latest.token !== record.token) return;
         const stale = now() - record.registeredAt > REGISTER_MAX_AGE_MS;
         if (token === record.token && !stale) return;
         await deps.api.register(token, origin);
