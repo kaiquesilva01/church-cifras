@@ -206,7 +206,7 @@ describe('ministerios: edição e exclusão do setlist', () => {
   const S1 = 'ministries/hajaluz/setlists/s1';
   // withSecurityRulesDisabled não devolve o resultado do callback: guarda numa variável.
   const s1Atual = async () => {
-    let dados: { createdBy: string; createdAt: Timestamp } | undefined;
+    let dados = undefined as { createdBy: string; createdAt: Timestamp } | undefined;
     await env.withSecurityRulesDisabled(async (ctx) => {
       const snap = await getDoc(doc(ctx.firestore(), S1));
       dados = snap.data() as { createdBy: string; createdAt: Timestamp };
@@ -258,10 +258,11 @@ describe('ministerios: edição e exclusão do setlist', () => {
   });
 
   it('edição do adminHaja não troca createdAt: negado', async () => {
+    const atual = await s1Atual();
     await assertFails(
       setDoc(
         doc(CTX.adminHaja(), S1),
-        setlistData({ createdBy: 'm1', createdAt: serverTimestamp(), updatedBy: 'm1' }),
+        setlistData({ createdBy: atual.createdBy, createdAt: serverTimestamp(), updatedBy: 'm1' }),
       ),
     );
   });
