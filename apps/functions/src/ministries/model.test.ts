@@ -87,6 +87,13 @@ describe('readUid', () => {
 
   it('rejeita vazio ou longo demais com invalid-argument', () => {
     expect(errorOf(() => readUid({ uid: '' }))).toMatchObject({ code: 'invalid-argument' });
+  });
+
+  it('rejeita uid com barra (quebraria o caminho do documento) com invalid-argument', () => {
+    expect(errorOf(() => readUid({ uid: 'a/b' }))).toMatchObject({ code: 'invalid-argument' });
+    expect(errorOf(() => readUid({ uid: '../users/x' }))).toMatchObject({
+      code: 'invalid-argument',
+    });
     expect(errorOf(() => readUid({ uid: 'x'.repeat(129) }))).toMatchObject({
       code: 'invalid-argument',
     });

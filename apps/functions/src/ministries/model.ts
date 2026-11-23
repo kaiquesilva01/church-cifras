@@ -63,7 +63,8 @@ export function readMinistryId(data: unknown): string {
 
 export function readUid(data: unknown, key = 'uid'): string {
   const uid = readRecord(data)[key];
-  if (typeof uid !== 'string' || uid.length < 1 || uid.length > MAX_UID) {
+  // '/' não cabe num id de documento: montaria caminhos como users/a/b.
+  if (typeof uid !== 'string' || uid.length < 1 || uid.length > MAX_UID || uid.includes('/')) {
     throw invalid('Identificador de usuário inválido.');
   }
   return uid;

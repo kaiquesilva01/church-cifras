@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { logger } from 'firebase-functions/logger';
+import { describe, expect, it, vi } from 'vitest';
 import { applyHajaLuzRole } from './bridge';
 import { createFakeMinistryDeps, NOW } from './fakeDeps';
+
+vi.mock('firebase-functions/logger', () => ({ logger: { warn: vi.fn() } }));
 
 const OLD = new Date('2026-01-01T00:00:00Z');
 const haja = {
@@ -71,6 +74,24 @@ describe('applyHajaLuzRole', () => {
     const antes = new Map(docs);
     await expect(applyHajaLuzRole(deps, 'u1', 'admin', 'adm')).resolves.toBeUndefined();
     expect(docs).toEqual(antes);
+  });
+
+  it('sem ministries/hajaluz: avisa no log, sem dados pessoais', async () => {
+    vi.mocked(logger.warn).mockClear();
+    const { deps } = createFakeMinistryDeps({ ...ana });
+    await applyHajaLuzRole(deps, 'u1', 'admin', 'adm');
+    const calls = vi.mocked(logger.warn).mock.calls;
+    expect(calls).toHaveLength(1);
+    const [message] = calls[0] ?? [];
+    expect(typeof message).toBe('string');
+    expect(message).not.toMatch(/u1|ana@|example\.com|adm/);
+  });
+
+  it('com ministries/hajaluz: não avisa', async () => {
+    vi.mocked(logger.warn).mockClear();
+    const { deps } = createFakeMinistryDeps({ ...haja, ...ana });
+    await applyHajaLuzRole(deps, 'u1', 'admin', 'adm');
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it('vínculo existente preserva joinedAt', async () => {

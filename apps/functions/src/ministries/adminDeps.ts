@@ -74,7 +74,8 @@ function readersWith(
   };
 }
 
-// O write aplica na hora. Os callers leem tudo antes de escrever, então isso basta.
+// O write só é enfileirado: o Admin SDK grava tudo no commit, no fim do callback da transação.
+// Por isso os callers leem tudo antes de escrever (no SDK real, ler depois de escrever falha).
 function applyWrite(t: Transaction, op: WriteOp): void {
   const ref = getFirestore().doc(op.path);
   if (op.op === 'create') t.create(ref, op.data ?? {});

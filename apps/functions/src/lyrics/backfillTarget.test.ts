@@ -17,6 +17,16 @@ describe('describeTarget', () => {
     expect(canProceed).toBe(true);
   });
 
+  it('mostra o emulador do Auth quando definido (o CLI de migração usa getAuth)', () => {
+    const { lines } = describeTarget({
+      projectId: 'p',
+      bucket: 'b',
+      dryRun: true,
+      env: { FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099' },
+    });
+    expect(lines).toContain('FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099');
+  });
+
   it('sem bucket não imprime a linha bucket', () => {
     const { lines } = describeTarget({ projectId: 'p', dryRun: true, env: {} });
     expect(lines.join('\n')).not.toContain('bucket:');

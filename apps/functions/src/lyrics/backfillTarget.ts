@@ -7,7 +7,12 @@ export type TargetInfo = {
   env: Record<string, string | undefined>;
 };
 
-const EMULATOR_VARS = ['FIRESTORE_EMULATOR_HOST', 'FIREBASE_STORAGE_EMULATOR_HOST'] as const;
+// Emuladores que mudam o alvo: Firestore, Storage e Auth (o CLI de migração dos ministérios usa getAuth).
+const EMULATOR_VARS = [
+  'FIRESTORE_EMULATOR_HOST',
+  'FIREBASE_STORAGE_EMULATOR_HOST',
+  'FIREBASE_AUTH_EMULATOR_HOST',
+] as const;
 
 export function describeTarget({ projectId, bucket, dryRun, env }: TargetInfo): {
   lines: string[];

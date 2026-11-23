@@ -1,3 +1,4 @@
+import { logger } from 'firebase-functions/logger';
 import type { Role } from '../roles';
 import type { MembershipRole, MinistryDeps } from './deps';
 import { HAJALUZ_ID, paths } from './model';
@@ -12,7 +13,13 @@ export async function applyHajaLuzRole(
   await deps.runTransaction(async (tx) => {
     // Antes da migração não há ministério: a Pessoas segue gravando só o papel legado (users.role).
     const ministry = await tx.readMinistry(HAJALUZ_ID);
-    if (!ministry) return;
+    if (!ministry) {
+      // Sem dados pessoais: o log diz só o que falta.
+      logger.warn(
+        'Ministério Haja Luz ausente: papel gravado só em users.role (migração pendente).',
+      );
+      return;
+    }
     const user = await tx.readUser(uid);
     const membership = await tx.readMembership(HAJALUZ_ID, uid);
     const request = await tx.readRequest(HAJALUZ_ID, uid);
