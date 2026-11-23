@@ -113,7 +113,7 @@ Leitura: qualquer logado, exceto `users` (cada um lê o próprio; admin lê todo
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
 | `config/push` | `enabled` (interruptor dos avisos; sem o doc, liga; só o booleano `false` desliga, a string `"false"` não) | nenhuma; só Admin SDK e console |
 | `avisosEnviados/{setlistId}_novo` | `setlistId`, `tipo` (`novo`), `createdAt`, `expiresAt` (o maior valor entre agora + 60 dias e o `expiresAt` do repertório; marca do aviso de repertório novo) | nenhuma; só Functions |
-| `avisosEnviados/{setlistId}_{vespera\|dia\|perto}_{rehearsalAtMs}` | `setlistId`, `tipo` (`vespera`/`dia`/`perto`), `rehearsalAt`, `createdAt`, `expiresAt` (mesma regra do repertório novo); marca dos lembretes do ensaio (#102, #121) |
+| `avisosEnviados/{setlistId}_{vespera\|dia\|perto}_{rehearsalAtMs}` | `setlistId`, `tipo` (`vespera`/`dia`/`perto`), `rehearsalAt`, `createdAt`, `expiresAt` (mesma regra do repertório novo); marca dos lembretes do ensaio (#102, #121) | nenhuma; só Functions |
 | `artists/*` | não existe de fato | negada |
 
 - `slug` do tom = tom com `#` trocado por `s` (id do documento). Um tom existe uma vez por música; quem gerar o mesmo tom depois recebe "já existe" e o sistema abre o existente.
@@ -170,7 +170,7 @@ Regra do aviso de repertório novo:
 Regra dos lembretes do ensaio:
 
 - Agendada a cada minuto; consulta `setlists` com `rehearsalAt` em (agora, agora + 24 h]. Marcas só são lidas quando há aviso devido.
-- Três avisos, cada um numa faixa: véspera (ensaio em (agora + 24 h − 10 min, agora + 24 h]); no dia (agora entre 08h00 e 08h10 de Brasília, ensaio no mesmo dia às 11h00 ou depois); 1 hora (ensaio em (agora, agora + 60 min]; é o único retroativo). Todos com a tag `setlist-{id}-ensaio`, que substitui o aviso anterior no aparelho.
+- Três avisos, cada um numa faixa: véspera (ensaio em (agora + 24 h − 10 min, agora + 24 h]); no dia (agora entre 08h00 e 08h10 de Brasília, ensaio no mesmo dia às 11h00 ou depois); 1 hora (ensaio em (agora, agora + 60 min]; é o único retroativo). Todos com a tag `setlist-{id}-ensaio`, que substitui o aviso anterior no aparelho e alerta de novo (`renotify`).
 - Uma vez por horário: `avisosEnviados/{setlistId}_{tipo}_{rehearsalAtMs}` é criada antes do envio. Marca antiga `perto` vale para o aviso de 1 hora.
 - Horário mudou: se a marca de maior `createdAt` entre as marcas de ensaios ainda futuros (véspera, dia e 1 hora; marcas `agora` e de repertório novo não contam) é de outro horário, o título vira `Ensaio mudou para HHhMM` (mesmo dia) ou `Ensaio mudou para dom 22/11 às HHhMM`. Horas e datas em Brasília (UTC−3, sem horário de verão); sem `rehearsalAt`, ou com a hora passada, não avisa.
 
