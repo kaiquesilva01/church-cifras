@@ -237,6 +237,7 @@ Depois que as entregas estão na develop:
 
 - **Regra:** o merge do release é bloqueado nas **quintas e domingos, das 16h30 às 23h59** (America/Sao_Paulo), para o deploy terminar antes das 17h, quando começa o culto. O hook bloqueia o caminho normal; a regra vale mesmo onde o hook não enxerga (ex.: outro interpretador).
 - Hora de Brasília, sem depender do fuso da máquina. No bash: `TZ=America/Sao_Paulo date '+%u %H:%M'`: 4 é quinta, 7 é domingo (`%u` não depende do idioma do sistema). No PowerShell: `$t = [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId((Get-Date), 'E. South America Standard Time'); "$($t.DayOfWeek) $($t.ToString('HH:mm'))"`, que mostra o dia em inglês (`Thursday` é quinta, `Sunday` é domingo).
+- No Git Bash do Windows, sem a base de fusos, o `TZ=America/Sao_Paulo date` devolve a hora UTC sem aviso (aconteceu em 22/11, na #85). Ali, use `date -u -d '-3 hours' '+%u %H:%M'` (Brasília não tem horário de verão desde 2019) ou o PowerShell.
 - Se a pessoa precisar publicar nessa janela, ela mesma faz o merge.
 - A volta automática de incidente (§ Produção e incidente) vale em qualquer horário.
 
