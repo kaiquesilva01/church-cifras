@@ -205,20 +205,22 @@ describe('migrateMinistries', () => {
 
     expect(s.targets.get('hajaluz/s1')).toEqual({ title: 'Editada no espelho', version: 9 });
     expect(s.targets.get('hajaluz/s2')).toEqual({ title: 'Raiz 2', version: 1 });
-    expect(report.setlists).toEqual({ copied: 1, kept: 1, removedOrphans: 0 });
+    expect(report.setlists).toEqual({ copied: 1, kept: 1 });
   });
 
-  it('apaga destino órfão (sem raiz) na execução real', async () => {
-    const s = emptyState();
-    s.roots.set('s1', { title: 'Raiz 1' });
-    s.targets.set('hajaluz/s1', { title: 'Raiz 1' });
-    s.targets.set('hajaluz/morta', { title: 'Apagada na raiz' });
+  it('não apaga destino sem raiz, nem na execução real nem no dry-run', async () => {
+    for (const dryRun of [false, true]) {
+      const s = emptyState();
+      s.roots.set('s1', { title: 'Raiz 1' });
+      s.targets.set('hajaluz/s1', { title: 'Raiz 1' });
+      s.targets.set('hajaluz/sem-raiz', { title: 'Só no espelho' });
 
-    const report = await migrateMinistries(fakeDeps(s), REAL);
+      const report = await migrateMinistries(fakeDeps(s), { dryRun });
 
-    expect(s.targets.has('hajaluz/morta')).toBe(false);
-    expect(s.targets.has('hajaluz/s1')).toBe(true);
-    expect(report.setlists.removedOrphans).toBe(1);
+      expect(s.targets.get('hajaluz/sem-raiz')).toEqual({ title: 'Só no espelho' });
+      expect(s.writes.some((w) => w.startsWith('deleteTargetSetlist'))).toBe(false);
+      expect(report.setlists).toEqual({ copied: 0, kept: 1 });
+    }
   });
 
   it('preenche ministryId só em setlistUsage sem ministryId', async () => {
@@ -244,6 +246,36 @@ describe('migrateMinistries', () => {
     ).rejects.toThrow();
     expect(s.writes).toEqual([]);
     expect(s.ministries.size).toBe(0);
+  });
+
+  it('--app-admin é case-insensitive: Dono@Example.test resolve o usuário dono@example.test', async () => {
+    const s = emptyState();
+    s.emails.set('dono@example.test', 'dono');
+    s.users = [user('dono', 'member')];
+
+    const report = await migrateMinistries(fakeDeps(s), {
+      dryRun: false,
+      appAdminEmail: '  Dono@Example.test ',
+    });
+
+    expect(report.appAdmin).toBe('dono');
+    expect(s.appAdmins).toEqual(['dono']);
+  });
+
+  it('setAppAdmin roda antes de recalcClaims do admin da app', async () => {
+    const s = emptyState();
+    s.emails.set('dono@example.test', 'dono');
+    s.users = [user('dono', 'member')];
+
+    await migrateMinistries(fakeDeps(s), {
+      dryRun: false,
+      appAdminEmail: 'dono@example.test',
+    });
+
+    const marca = s.writes.indexOf('setAppAdmin:dono');
+    const recalc = s.writes.indexOf('recalcClaims:dono');
+    expect(marca).toBeGreaterThanOrEqual(0);
+    expect(recalc).toBeGreaterThan(marca);
   });
 
   it('--app-admin marca só esse uid como appAdmin', async () => {
@@ -287,7 +319,7 @@ describe('migrateMinistries', () => {
       ministryCreated: true,
       members: { created: 1, kept: 0, skippedNoRole: ['edu'] },
       requests: { created: 1, kept: 0 },
-      setlists: { copied: 1, kept: 0, removedOrphans: 1 },
+      setlists: { copied: 1, kept: 0 },
       usage: { updated: 1 },
       appAdmin: 'dono',
       claims: { ok: 3, failed: [] },
@@ -325,7 +357,7 @@ describe('migrateMinistries', () => {
     expect(second.ministryCreated).toBe(false);
     expect(second.members).toEqual({ created: 0, kept: 2, skippedNoRole: [] });
     expect(second.requests).toEqual({ created: 0, kept: 1 });
-    expect(second.setlists).toEqual({ copied: 0, kept: 1, removedOrphans: 0 });
+    expect(second.setlists).toEqual({ copied: 0, kept: 1 });
     expect(second.usage).toEqual({ updated: 0 });
     expect(s.members).toEqual(membersAfterFirst);
     expect(s.requests).toEqual(requestsAfterFirst);

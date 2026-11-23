@@ -1,5 +1,5 @@
 import type { MembershipRole } from './deps';
-import { HAJALUZ_CITY, HAJALUZ_ID, HAJALUZ_NAME } from './model';
+import { HAJALUZ_CITY, HAJALUZ_ID, HAJALUZ_NAME, normalizeForSearch } from './model';
 
 // Migração idempotente da Haja Luz (spec §4.6, passo 1). Lógica pura: as escritas e leituras
 // do Firestore/Auth chegam por `MigrationDeps`; o CLI (tarefa 11) faz a ligação real.
@@ -12,6 +12,8 @@ export type MigrationUser = {
   role: unknown;
 };
 
+// Contrato das escritas: `create*` nunca sobrescreve. Se o documento já existe, devolvem `false`
+// e não gravam nada (como `createMinistry`). Assim um destino editado no espelho não regride.
 export interface MigrationDeps {
   now(): Date;
   listUsers(): Promise<MigrationUser[]>;
@@ -19,23 +21,28 @@ export interface MigrationDeps {
   createMinistry(id: string, data: Record<string, unknown>): Promise<boolean>; // false se já existe
   memberUids(ministryId: string): Promise<Set<string>>;
   requestUids(ministryId: string): Promise<Set<string>>;
+  // create-only: false se o vínculo já existe
   createMembership(
     ministryId: string,
     uid: string,
     data: Record<string, unknown>,
   ): Promise<boolean>;
+  // create-only: false se o pedido já existe
   createRequest(ministryId: string, uid: string, data: Record<string, unknown>): Promise<boolean>;
   listRootSetlists(): Promise<Array<{ id: string; data: Record<string, unknown> }>>;
   targetSetlistIds(ministryId: string): Promise<Set<string>>;
+  // create-only: false se o destino já existe (preserva edições feitas no espelho)
   createTargetSetlist(
     ministryId: string,
     id: string,
     data: Record<string, unknown>,
   ): Promise<boolean>;
+  // Declarado pelo contrato, mas a migração nunca o chama: remoções vêm do espelho.
   deleteTargetSetlist(ministryId: string, id: string): Promise<void>;
   usageIdsWithoutMinistry(): Promise<string[]>;
   setUsageMinistry(setlistId: string, ministryId: string): Promise<void>;
-  resolveUidByEmail(email: string): Promise<string>; // lança se não existir
+  // Recebe o e-mail já normalizado (trim + minúsculas). Lança se não existir.
+  resolveUidByEmail(email: string): Promise<string>;
   setAppAdmin(uid: string): Promise<void>;
   recalcClaims(uid: string): Promise<void>; // lança em falha
 }
@@ -45,7 +52,7 @@ export type MigrationReport = {
   ministryCreated: boolean;
   members: { created: number; kept: number; skippedNoRole: string[] };
   requests: { created: number; kept: number };
-  setlists: { copied: number; kept: number; removedOrphans: number };
+  setlists: { copied: number; kept: number };
   usage: { updated: number };
   appAdmin: string | null; // uid
   claims: { ok: number; failed: string[] };
@@ -62,7 +69,7 @@ export async function migrateMinistries(
 
   // (1) Resolve o admin da app antes de qualquer escrita: falha aborta sem escrever.
   const appAdmin = options.appAdminEmail
-    ? await deps.resolveUidByEmail(options.appAdminEmail)
+    ? await deps.resolveUidByEmail(options.appAdminEmail.trim().toLowerCase())
     : null;
   const users = await deps.listUsers();
 
@@ -106,11 +113,11 @@ export async function migrateMinistries(
     }
   }
 
-  // (4) Setlists: copia as que faltam (sem sobrescrever) e apaga destinos sem raiz.
+  // (4) Setlists: copia as que faltam (create-only). Destinos sem raiz ficam como estão:
+  // a migração nunca apaga; remoções na raiz são propagadas pelo espelho.
   const roots = await deps.listRootSetlists();
   const targetIds = await deps.targetSetlistIds(HAJALUZ_ID);
-  const rootIds = new Set(roots.map((root) => root.id));
-  const setlists = { copied: 0, kept: 0, removedOrphans: 0 };
+  const setlists = { copied: 0, kept: 0 };
 
   for (const root of roots) {
     if (targetIds.has(root.id)) {
@@ -120,11 +127,6 @@ export async function migrateMinistries(
     } else {
       setlists.kept++;
     }
-  }
-  for (const id of targetIds) {
-    if (rootIds.has(id)) continue;
-    if (!dryRun) await deps.deleteTargetSetlist(HAJALUZ_ID, id);
-    setlists.removedOrphans++;
   }
 
   // (5) Uso de repertório sem ministryId recebe a Haja Luz.
@@ -172,7 +174,7 @@ function isMembershipRole(role: unknown): role is MembershipRole {
 function ministryDoc(now: Date): Record<string, unknown> {
   return {
     name: HAJALUZ_NAME,
-    nameNormalized: 'haja luz',
+    nameNormalized: normalizeForSearch(HAJALUZ_NAME),
     city: HAJALUZ_CITY,
     createdBy: MIGRATION_BY,
     createdAt: now,
