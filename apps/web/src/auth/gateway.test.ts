@@ -132,4 +132,36 @@ describe('createAuthGateway', () => {
     await createAuthGateway(services, { reload }).signOut();
     expect(reload).toHaveBeenCalledTimes(1);
   });
+
+  it('runs beforeSignOut before signOut, then reloads', async () => {
+    const order: string[] = [];
+    vi.mocked(signOut).mockImplementationOnce(async () => {
+      order.push('signOut');
+    });
+    const gateway = createAuthGateway(services, {
+      reload: () => order.push('reload'),
+      beforeSignOut: async () => {
+        order.push('before');
+      },
+    });
+    await gateway.signOut();
+    expect(order).toEqual(['before', 'signOut', 'reload']);
+  });
+
+  it('still signs out and reloads when beforeSignOut rejects', async () => {
+    const order: string[] = [];
+    vi.mocked(signOut).mockImplementationOnce(async () => {
+      order.push('signOut');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const gateway = createAuthGateway(services, {
+      reload: () => order.push('reload'),
+      beforeSignOut: async () => {
+        throw new Error('offline');
+      },
+    });
+    await gateway.signOut();
+    expect(order).toEqual(['signOut', 'reload']);
+    warn.mockRestore();
+  });
 });
