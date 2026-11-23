@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, expectTypeOf, it, vi } from 'vitest';
 import { syncSetlistMirror, type MirrorDeps } from './mirror';
 
 const deps: MirrorDeps = {
@@ -18,11 +18,14 @@ it('copia o estado atual da raiz', async () => {
 });
 
 it('copia o estado atual, não o evento (raiz editada depois)', async () => {
-  vi.mocked(deps.readRoot).mockResolvedValue({ label: 'Novo' });
+  vi.mocked(deps.readRoot)
+    .mockResolvedValueOnce({ label: 'Primeiro', items: [] })
+    .mockResolvedValueOnce({ label: 'Editado', items: ['x'] });
   await syncSetlistMirror(deps, 's1');
   await syncSetlistMirror(deps, 's1');
   expect(deps.readRoot).toHaveBeenCalledTimes(2);
-  expect(deps.writeTarget).toHaveBeenNthCalledWith(2, 's1', { label: 'Novo' });
+  expect(deps.writeTarget).toHaveBeenNthCalledWith(1, 's1', { label: 'Primeiro', items: [] });
+  expect(deps.writeTarget).toHaveBeenNthCalledWith(2, 's1', { label: 'Editado', items: ['x'] });
 });
 
 it('apaga o destino quando a raiz não existe', async () => {
@@ -33,5 +36,5 @@ it('apaga o destino quando a raiz não existe', async () => {
 });
 
 it('MirrorDeps não tem método de escrita na raiz', () => {
-  expect(Object.keys(deps).sort()).toEqual(['deleteTarget', 'readRoot', 'writeTarget']);
+  expectTypeOf<keyof MirrorDeps>().toEqualTypeOf<'readRoot' | 'writeTarget' | 'deleteTarget'>();
 });
