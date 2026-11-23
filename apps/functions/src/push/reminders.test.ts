@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { device, fakeDeps, sentTokens, type FakeOptions } from './fakeDeps';
 import { runRehearsalReminders, type ReminderDeps } from './reminders';
+import { deviceId } from './token';
 
 // Horário de Brasília (UTC−3 fixo), independente do fuso da máquina.
 const br = (day: string, t: string) => new Date(`${day}T${t.length === 5 ? `${t}:00` : t}-03:00`);
@@ -436,7 +437,7 @@ describe('runRehearsalReminders: mudança de horário', () => {
     expect(calls.flat()[0]?.message.title).toBe('Ensaio amanhã às 19h00');
   });
 
-  it('perto da meia-noite UTC: véspera e 1 hora usam o dia de Brasília', async () => {
+  it('perto da meia-noite UTC: a véspera usa o dia de Brasília', async () => {
     const { reminderDeps, calls, clock } = setup([doc('r1', new Date('2026-11-23T02:35:00Z'))], {
       ...members,
       devices: [device('t1', 'm1')],
@@ -452,6 +453,19 @@ describe('runRehearsalReminders: mudança de horário', () => {
 });
 
 describe('runRehearsalReminders: interruptor, origem e falhas', () => {
+  it('viewer: aviso de 1 hora vai só ao membro, e o aparelho do viewer é removido', async () => {
+    const { reminderDeps, calls, clock } = setup([doc('r1', br('2026-11-21', '17:20'))], {
+      roles: { m1: 'member', v1: 'viewer' },
+      devices: [device('t1', 'm1'), device('t-viewer', 'v1')],
+    });
+    const deleteDevices = vi.spyOn(reminderDeps, 'deleteDevices');
+    clock.now = br('2026-11-21', '17:00');
+
+    await runRehearsalReminders(reminderDeps);
+    expect(sentTokens(calls)).toEqual(['t1']);
+    expect(deleteDevices).toHaveBeenCalledWith([deviceId('t-viewer')]);
+  });
+
   it('config/push desligado: marca criada, nenhum envio', async () => {
     const { reminderDeps, calls, store, clock } = setup([doc('r1', br('2026-11-21', '18:30'))], {
       ...members,
@@ -600,6 +614,44 @@ describe('runRehearsalReminders: interruptor, origem e falhas', () => {
       failed: 0,
     });
     expect(calls).toEqual([]);
+  });
+
+  it('runner ignora o que a consulta não deixaria passar (hora em texto, hora passada)', async () => {
+    const { reminderDeps, calls, store, clock } = setup([], {
+      ...members,
+      devices: [device('t1', 'm1')],
+    });
+    clock.now = br('2026-11-21', '17:00');
+    // Sem o filtro da consulta: o próprio runner precisa recusar os dois.
+    reminderDeps.listRehearsalSetlists = async () => [
+      {
+        id: 'texto',
+        data: {
+          date: '2026-11-21',
+          label: 'Culto',
+          items: [],
+          rehearsalAt: '2026-11-21T18:00:00-03:00',
+        },
+      },
+      {
+        id: 'passado',
+        data: {
+          date: '2026-11-21',
+          label: 'Culto',
+          items: [],
+          rehearsalAt: br('2026-11-21', '16:55'),
+        },
+      },
+    ];
+
+    expect(await runRehearsalReminders(reminderDeps)).toEqual({
+      sent: 0,
+      already: 0,
+      blocked: 0,
+      failed: 0,
+    });
+    expect(calls).toEqual([]);
+    expect(store.size).toBe(0);
   });
 });
 
