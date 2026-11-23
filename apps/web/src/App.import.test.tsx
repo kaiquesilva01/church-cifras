@@ -29,6 +29,7 @@ function setup(role: Role) {
       initialPath="/importar"
     />,
   );
+  gateway.claimRole = role;
   act(() => gateway.emitUser(testUser));
   act(() => gateway.emitRole(role));
 }
@@ -39,9 +40,17 @@ describe('/importar route', () => {
     expect(await screen.findByText('Importar (marker)')).toBeInTheDocument();
   });
 
-  it.each(['member', 'viewer'] as const)('redirects %s to the home page', async (role) => {
-    setup(role);
+  it('redirects member to the home page', async () => {
+    setup('member');
     expect(await screen.findByRole('searchbox')).toBeInTheDocument();
+    expect(screen.queryByText('Importar (marker)')).not.toBeInTheDocument();
+  });
+
+  it('shows only the access screen to visitors', async () => {
+    setup('viewer');
+    expect(
+      await screen.findByRole('heading', { name: 'Acesso ainda não liberado' }),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Importar (marker)')).not.toBeInTheDocument();
   });
 });
