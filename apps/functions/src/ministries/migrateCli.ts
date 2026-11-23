@@ -2,6 +2,8 @@
 //   npm run ministries:migrate -- [--dry-run] [--app-admin <e-mail>]
 // Credenciais: Application Default Credentials (no Cloud Shell, a conta da pessoa).
 // Com FIRESTORE_EMULATOR_HOST definido, fala com o emulador do Firestore.
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
@@ -176,7 +178,20 @@ async function main(): Promise<void> {
   if (report.claims.failed.length > 0) process.exitCode = 1;
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+// Verdadeiro só quando o arquivo executado é este módulo (ex.: `node lib/migrateCli.mjs`).
+// Importar o módulo (testes, outros scripts) não roda a migração.
+export function isDirectRun(entry: string | undefined, moduleUrl: string): boolean {
+  if (!entry) return false;
+  try {
+    return realpathSync.native(entry) === realpathSync.native(fileURLToPath(moduleUrl));
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectRun(process.argv[1], import.meta.url)) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}

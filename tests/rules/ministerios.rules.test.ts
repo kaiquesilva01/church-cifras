@@ -148,6 +148,13 @@ describe('ministerios: consulta de grupo', () => {
   }
 });
 
+describe('ministerios: repertórios fora do ministério', () => {
+  // Admin da app vê vínculos e pedidos, nunca repertórios de ministério (sem regra de grupo).
+  it('consulta de grupo de setlists (adminApp, sem vínculo): negada', async () => {
+    await assertFails(getDocs(collectionGroup(CTX.adminApp(), 'setlists')));
+  });
+});
+
 describe('ministerios: escrita', () => {
   for (const nome of TODOS) {
     it(`cria setlist do ministério (${nome}): ${nome === 'adminHaja' ? 'permite' : 'nega'}`, async () => {

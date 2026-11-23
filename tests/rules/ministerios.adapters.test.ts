@@ -4,17 +4,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type CollectionReference, type Firestore } from 'firebase-admin/firestore';
 import { createMinistryDeps } from '../../apps/functions/src/ministries/adminDeps';
-import type { MigrationDeps } from '../../apps/functions/src/ministries/migration';
+import { realMigrationDeps } from '../../apps/functions/src/ministries/migrateCli';
+import {
+  migrateMinistries,
+  type MigrationDeps,
+} from '../../apps/functions/src/ministries/migration';
 
 const PROJECT_ID = 'demo-church-cifras';
 
-type RealMigrationDeps = (db: Firestore) => MigrationDeps;
-type MigrateMinistries =
-  typeof import('../../apps/functions/src/ministries/migration').migrateMinistries;
-
 let db: Firestore;
-let realMigrationDeps: RealMigrationDeps;
-let migrateMinistries: MigrateMinistries;
 
 // Só o emulador: sem FIRESTORE_EMULATOR_HOST o Admin SDK usaria o projeto real via ADC.
 function emulatorHost(): string {
@@ -65,20 +63,6 @@ beforeAll(async () => {
   emulatorHost();
   if (getApps().length === 0) initializeApp({ projectId: PROJECT_ID });
   db = getFirestore();
-  // migrateCli.ts chama main() ao ser importado. Com um argumento desconhecido, o parse falha
-  // antes de initializeApp e de qualquer leitura ou escrita. O exitCode é zerado logo depois.
-  const savedArgv = process.argv;
-  process.argv = [savedArgv[0] ?? 'node', 'migrateCli-import-guard', '--qa-import-guard'];
-  try {
-    const cli = await import('../../apps/functions/src/ministries/migrateCli');
-    realMigrationDeps = cli.realMigrationDeps;
-    migrateMinistries = (await import('../../apps/functions/src/ministries/migration'))
-      .migrateMinistries;
-  } finally {
-    process.argv = savedArgv;
-  }
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  process.exitCode = undefined;
 });
 
 beforeEach(async () => {
