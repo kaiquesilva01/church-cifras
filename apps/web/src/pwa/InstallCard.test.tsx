@@ -42,6 +42,12 @@ describe('InstallCard', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('usa o cartão compartilhado (.convite)', () => {
+    const { container } = render(<InstallCard useInstall={fakeHook('prompt').useInstall} />);
+    expect(container.querySelector('section.convite')).not.toBeNull();
+    expect(container.querySelector('[class*="install-card"]')).toBeNull();
+  });
+
   it('uses the app icon as a decorative image', () => {
     const { container } = render(<InstallCard useInstall={fakeHook('prompt').useInstall} />);
     const logo = container.querySelector('img');

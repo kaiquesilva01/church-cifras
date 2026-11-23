@@ -1,7 +1,5 @@
 /* Convites do topo da aba Músicas (instalar e avisos). Só tokens; tudo escopado em .convite. */
 
-/* Legado: o InstallCard ainda usa .install-card* até a troca para ConviteCard. Remover com ela. */
-.install-card,
 .convite {
   position: fixed;
   top: calc(12px + env(safe-area-inset-top));
@@ -22,7 +20,6 @@
   box-shadow: var(--shadow-pop);
 }
 
-.install-card__logo,
 .convite__icon {
   grid-column: 1;
   grid-row: 1 / span 2;
@@ -40,14 +37,12 @@
   color: var(--color-accent-text);
 }
 
-.install-card__text,
 .convite__text {
   grid-column: 2;
   grid-row: 1;
   min-width: 0;
 }
 
-.install-card__title,
 .convite__title {
   margin: 0;
   font-size: 15px;
@@ -56,7 +51,6 @@
   color: var(--color-text);
 }
 
-.install-card__hint,
 .convite__hint {
   margin: 2px 0 0;
   font-size: 13px;
@@ -64,7 +58,6 @@
   color: var(--color-muted);
 }
 
-.install-card__close,
 .convite__close {
   grid-column: 3;
   grid-row: 1;
@@ -79,7 +72,6 @@
   cursor: pointer;
 }
 
-.install-card__close span,
 .convite__close span {
   display: grid;
   place-items: center;
@@ -92,7 +84,6 @@
   line-height: 1;
 }
 
-.install-card__add,
 .convite__action {
   grid-column: 2 / 4;
   grid-row: 2;
@@ -107,7 +98,6 @@
   cursor: pointer;
 }
 
-.install-card__add span,
 .convite__action span {
   display: inline-flex;
   align-items: center;
@@ -129,7 +119,6 @@
   opacity: 0.6;
 }
 
-.install-card button:focus-visible,
 .convite button:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;

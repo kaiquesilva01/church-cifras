@@ -80,4 +80,9 @@ describe('theme tokens', () => {
     expect(install).toMatch(/\.convite__close span \{[^}]*width: 28px;[^}]*height: 28px;/);
     expect(install).toMatch(/\.convite__tile \{[^}]*background: var\(--color-accent-soft\);/);
   });
+
+  it('drops the legacy install-card styles now that the install card uses .convite', () => {
+    const install = readFileSync(resolve(import.meta.dirname, 'redesign-install.css'), 'utf8');
+    expect(install).not.toMatch(/install-card/);
+  });
 });
