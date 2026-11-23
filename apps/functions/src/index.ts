@@ -17,6 +17,7 @@ import {
   unregisterDevice as unregisterDeviceLogic,
 } from './push/devices';
 import { buildHealth } from './health';
+import { buildClaims } from './ministries/claims';
 import { parseAdminEmails, ROLES } from './roles';
 import {
   deleteArrangement as deleteArrangementLogic,
@@ -46,6 +47,16 @@ const deps: UserDeps = {
   getUserRole: async (uid) => {
     const role = (await getFirestore().doc(`users/${uid}`).get()).data()?.role;
     return ROLES.find((r) => r === role);
+  },
+  // Stub até a Tarefa 12 ligar a ponte da Haja Luz: não grava vínculo nenhum.
+  applyHajaLuzRole: async () => undefined,
+  recalcClaims: async (uid) => {
+    const data = (await getFirestore().doc(`users/${uid}`).get()).data();
+    const role = ROLES.find((r) => r === data?.role) ?? 'viewer';
+    await getAuth().setCustomUserClaims(
+      uid,
+      buildClaims({ role, appAdmin: data?.appAdmin === true, memberRoles: [] }),
+    );
   },
   now: () => new Date(),
 };

@@ -1,21 +1,24 @@
 import { HttpsError } from 'firebase-functions/v2/https';
+import { buildClaims, type Claims } from './ministries/claims';
 import { roleForNewUser, validateRoleChange, type Role } from './roles';
 
 export type UserDeps = {
-  setClaims(uid: string, claims: { role: Role }): Promise<void>;
+  setClaims(uid: string, claims: Claims): Promise<void>;
   writeUser(uid: string, data: Record<string, unknown>, merge: boolean): Promise<void>;
   userExists(uid: string): Promise<boolean>;
   getUserRole(uid: string): Promise<Role | undefined>;
+  applyHajaLuzRole(uid: string, role: Role, callerUid: string): Promise<void>;
+  recalcClaims(uid: string): Promise<void>;
   now(): Date;
 };
 
 const CLAIM_ATTEMPTS = 3;
 
-async function setClaimsWithRetry(deps: UserDeps, uid: string, role: Role): Promise<void> {
+async function setClaimsWithRetry(deps: UserDeps, uid: string, claims: Claims): Promise<void> {
   let lastError: unknown;
   for (let attempt = 0; attempt < CLAIM_ATTEMPTS; attempt += 1) {
     try {
-      await deps.setClaims(uid, { role });
+      await deps.setClaims(uid, claims);
       return;
     } catch (error) {
       lastError = error;
@@ -39,7 +42,8 @@ export async function createUserProfile(
   const existing = await deps.getUserRole(user.uid);
   if (existing) return existing;
   const role = roleForNewUser(user.email, user.emailVerified === true, adminEmails);
-  await setClaimsWithRetry(deps, user.uid, role);
+  const appAdmin = role === 'admin'; // só vem de ADMIN_EMAILS
+  await setClaimsWithRetry(deps, user.uid, buildClaims({ role, appAdmin, memberRoles: [] }));
   await deps.writeUser(
     user.uid,
     {
@@ -47,6 +51,7 @@ export async function createUserProfile(
       email: user.email ?? null,
       photoURL: user.photoURL ?? null,
       role,
+      appAdmin,
       createdAt: deps.now(),
     },
     false,
@@ -63,7 +68,8 @@ export async function changeUserRole(
   if (!(await deps.userExists(result.targetUid))) {
     throw new HttpsError('not-found', 'User not found.');
   }
-  await deps.setClaims(result.targetUid, { role: result.newRole });
+  await deps.applyHajaLuzRole(result.targetUid, result.newRole, input.callerUid ?? '');
   await deps.writeUser(result.targetUid, { role: result.newRole, roleUpdatedAt: deps.now() }, true);
+  await deps.recalcClaims(result.targetUid);
   return { uid: result.targetUid, role: result.newRole };
 }
