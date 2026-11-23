@@ -17,8 +17,20 @@ const IPHONE_SAFARI_UA =
 
 const MUTED_AVAILABLE = 'Receba repertório novo e lembrete do ensaio neste aparelho';
 
+/**
+ * Espelho de `FakePushControl` (`apps/web/src/push/fakeMessaging.ts`). O e2e não importa o app:
+ * manter as chaves iguais aqui faz um erro de digitação quebrar o `tsc`.
+ */
+type PushFakeControl = {
+  supported?: boolean;
+  permission?: 'default' | 'granted' | 'denied';
+  answer?: 'granted' | 'denied';
+  failEnable?: boolean;
+  token?: string;
+};
+
 /** Controle do fake de mensagens (`apps/web/src/push/fakeMessaging.ts`), antes de a página carregar. */
-async function withPushFake(page: Page, control: Record<string, unknown>) {
+async function withPushFake(page: Page, control: PushFakeControl) {
   await page.addInitScript((c) => {
     (window as unknown as { __CIFRAS_PUSH_FAKE__?: unknown }).__CIFRAS_PUSH_FAKE__ = c;
   }, control);
@@ -49,6 +61,8 @@ test('membro vê "Avisos" antes de "Pessoas" na aba Mais', async ({ page, browse
   await expect(page.getByRole('heading', { name: 'Pessoas' })).toBeVisible();
   const select = page.getByLabel(`Papel de ${person.name}`);
   await select.selectOption({ label: 'Membro' });
+  // O select atualiza na hora (otimista): espera a confirmação do servidor, como em people.spec.ts.
+  await expect(page.getByRole('status').filter({ hasText: 'Papel atualizado' })).toBeVisible();
   await expect(select).toHaveValue('member');
 
   // A pessoa entra em outra sessão isolada e vê a linha.
@@ -84,6 +98,8 @@ test('visitante não vê "Avisos" na aba Mais', async ({ page }) => {
   await signInAs(page, newAccount('visitante-avisos'), 'Visitante');
   await abrirMais(page);
 
+  // Âncora positiva: "Pessoas" aparece para todos os papéis, então a Mais já carregou antes das negativas.
+  await expect(page.getByText('Pessoas', { exact: true })).toBeVisible();
   await expect(linhaAvisos(page)).toHaveCount(0);
   await expect(page.getByText('Avisos', { exact: true })).toHaveCount(0);
 });
