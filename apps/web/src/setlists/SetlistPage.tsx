@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { canEdit } from '../auth/roles';
+import { canEditSetlists } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import type { SongSummary } from '../catalog/types';
 import { useSongsContext } from '../catalog/SongsProvider';
@@ -113,7 +113,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
     );
   }
 
-  const editable = canEdit(role) && !active.removed;
+  const editable = canEditSetlists(role) && !active.removed;
   const items = shown.items;
   // Edição parte do estado mais novo: um ensaio gravado em outro aparelho (ainda não aceito
   // no banner) não pode ser apagado ao salvar só o rótulo.
@@ -282,7 +282,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
       )}
       {!editable && (
         <p className="setlist-readonly-note">
-          Somente leitura · só membros e admins editam o repertório
+          Somente leitura · só admins editam o repertório
         </p>
       )}
       {editable && (

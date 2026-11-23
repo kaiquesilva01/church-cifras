@@ -12,4 +12,6 @@ export const ROLE_LABELS: Record<Role, string> = {
 };
 
 export const canEdit = (role: Role): boolean => role === 'member' || role === 'admin';
+/** Só admin cria, edita, duplica e apaga repertórios (membro só lê). */
+export const canEditSetlists = (role: Role): boolean => role === 'admin';
 export const isAdmin = (role: Role): boolean => role === 'admin';
