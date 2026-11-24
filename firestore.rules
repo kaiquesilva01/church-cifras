@@ -14,10 +14,6 @@ service cloud.firestore {
       return signedIn() && role() in ['member', 'admin'];
     }
 
-    function isAdmin() {
-      return signedIn() && role() == 'admin';
-    }
-
     function isAppAdminClaim() {
       return signedIn() && request.auth.token.get('appAdmin', false) == true;
     }
@@ -152,7 +148,7 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if signedIn() && (request.auth.uid == uid || isAppAdminClaim() || role() == 'admin');
+      allow read: if signedIn() && (request.auth.uid == uid || isAppAdminClaim());
       allow write: if false;
     }
 
@@ -183,17 +179,11 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Raiz congelada: só leitura, e só para quem é da Haja Luz (documento de membro, nunca o role).
+    // O espelho é desligado neste pacote; a cópia em ministries/hajaluz/setlists passa a ser a fonte.
     match /setlists/{setlistId} {
-      allow read: if isEditor();
-      allow create: if isAdmin()
-        && validSetlist(request.resource.data, setlistId)
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.createdAt == request.time;
-      allow update: if isAdmin()
-        && validSetlist(request.resource.data, setlistId)
-        && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.createdAt == resource.data.createdAt;
-      allow delete: if isAdmin();
+      allow read: if isMemberOf('hajaluz');
+      allow create, update, delete: if false;
     }
 
     match /ministries/{mid} {

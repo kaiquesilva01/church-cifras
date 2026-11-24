@@ -93,7 +93,7 @@ describe('firestore.rules', () => {
   });
 
   it('allows admin to read any users doc', async () => {
-    const db = env.authenticatedContext('a1', { role: 'admin' }).firestore();
+    const db = env.authenticatedContext('a1', { appAdmin: true }).firestore();
     await assertSucceeds(getDoc(doc(db, 'users/u2')));
   });
 
@@ -122,7 +122,7 @@ describe('firestore.rules', () => {
   });
 
   it('allows admin to list users', async () => {
-    const db = env.authenticatedContext('a1', { role: 'admin' }).firestore();
+    const db = env.authenticatedContext('a1', { appAdmin: true }).firestore();
     await assertSucceeds(getDocs(query(collection(db, 'users'), orderBy('displayName'))));
   });
 

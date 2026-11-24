@@ -36,6 +36,9 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, 'users/vis'), { role: 'viewer' });
+    // A raiz setlists lê por vínculo na Haja Luz (documento de membro), não pelo role do token.
+    await setDoc(doc(db, 'ministries/hajaluz/members/m1'), { uid: 'm1', role: 'member' });
+    await setDoc(doc(db, 'ministries/hajaluz/members/a1'), { uid: 'a1', role: 'admin' });
     await setDoc(doc(db, 'songs/s1'), { title: 'Musica' });
     await setDoc(doc(db, 'songs/s1/arrangements/a1'), { key: 'G' });
     await setDoc(doc(db, 'songLyrics/s1'), { text: 'letra' });
