@@ -1,5 +1,6 @@
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import { ministryIdOf } from '../ministries/model';
 import type { StatsDeps } from './getStats';
 
 // Código gRPC ALREADY_EXISTS: o documento de setlistUsage já foi criado.
@@ -15,17 +16,26 @@ function stringIds(value: unknown): string[] {
 export function createStatsDeps(): StatsDeps {
   return {
     listSettledSetlists: async (cutoff) => {
-      const snap = await getFirestore().collection('setlists').where('date', '<=', cutoff).get();
-      return snap.docs.map((d) => {
+      // O grupo traz também a raiz setlists/{sid} (congelada): ela não tem ministério e não conta.
+      const snap = await getFirestore()
+        .collectionGroup('setlists')
+        .where('date', '<=', cutoff)
+        .get();
+      return snap.docs.flatMap((d) => {
+        const ministryId = ministryIdOf(d.ref);
+        if (!ministryId) return [];
         const items: unknown = d.data().items;
         const list = Array.isArray(items) ? items : [];
-        return {
-          id: d.id,
-          date: String(d.data().date ?? ''),
-          songIds: list
-            .map((item) => (item as { songId?: unknown } | null)?.songId)
-            .filter((id): id is string => typeof id === 'string'),
-        };
+        return [
+          {
+            id: d.id,
+            ministryId,
+            date: String(d.data().date ?? ''),
+            songIds: list
+              .map((item) => (item as { songId?: unknown } | null)?.songId)
+              .filter((id): id is string => typeof id === 'string'),
+          },
+        ];
       });
     },
     recordUsage: async ({ setlistId, date, songIds, ministryId }) => {
@@ -49,10 +59,12 @@ export function createStatsDeps(): StatsDeps {
       const [files] = await getStorage().bucket().getFiles({ prefix: 'songs/' });
       return files.filter((f) => f.name.endsWith('.pdf')).map((f) => Number(f.metadata.size) || 0);
     },
+    // Sem where de propósito: a coleção é pequena e o ministryId filtra em memória (evita índice composto).
     listUsage: async () =>
       (await getFirestore().collection('setlistUsage').get()).docs.map((d) => ({
         date: String(d.data().date ?? ''),
         songIds: stringIds(d.data().songIds),
+        ministryId: String(d.data().ministryId ?? ''),
       })),
     getSongs: async (ids) => {
       const songs = new Map<string, { title: string; artistName: string }>();

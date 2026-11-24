@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getStats, getStatsForAdmin, type StatsDeps } from './getStats';
+import { getStats, getStatsForCaller, type CallerDeps, type StatsDeps } from './getStats';
 
 const NOW = new Date('2026-11-22T15:00:00Z');
 
 type Song = { title: string; artistName: string };
-type Usage = { date: string; songIds: string[] };
+type Usage = { date: string; songIds: string[]; ministryId: string };
 
 type Opts = {
   sources?: string[];
@@ -13,6 +13,7 @@ type Opts = {
   usage?: Usage[];
   songs?: Record<string, Song>;
   failSettled?: boolean;
+  missingMinistries?: string[];
 };
 
 function setup(opts: Opts = {}) {
@@ -41,9 +42,30 @@ function setup(opts: Opts = {}) {
   return { deps, log, getSongsCalls };
 }
 
+/**
+ * Deps do chamador: `users` é uid -> { appAdmin }, `memberships` é 'uid|mid' -> papel.
+ * Ministérios existem por padrão, exceto os listados em `missingMinistries`.
+ */
+function deps(
+  users: Record<string, { appAdmin: boolean }>,
+  memberships: Record<string, 'member' | 'admin'> = {},
+  opts: Opts = {},
+): CallerDeps {
+  const missing = new Set(opts.missingMinistries ?? []);
+  return {
+    ...setup(opts).deps,
+    readUser: async (uid) => users[uid] ?? null,
+    readMembership: async (mid, uid) => {
+      const role = memberships[`${uid}|${mid}`];
+      return role ? { role } : null;
+    },
+    readMinistry: async (mid) => (missing.has(mid) ? null : { name: `Ministério ${mid}` }),
+  };
+}
+
 /** Repete um uso da música `songId` `count` vezes na mesma data. */
-function uses(songId: string, count: number, date = '2026-11-20'): Usage[] {
-  return Array.from({ length: count }, () => ({ date, songIds: [songId] }));
+function uses(songId: string, count: number, date = '2026-11-20', ministryId = 'hajaluz'): Usage[] {
+  return Array.from({ length: count }, () => ({ date, songIds: [songId], ministryId }));
 }
 
 afterEach(() => {
@@ -95,8 +117,8 @@ describe('getStats rankings', () => {
   it('includes only usages from the last 30 days in topLast30Days', async () => {
     const { deps } = setup({
       usage: [
-        { date: '2026-10-24', songIds: ['s1'] },
-        { date: '2026-10-23', songIds: ['s2'] },
+        { date: '2026-10-24', songIds: ['s1'], ministryId: 'hajaluz' },
+        { date: '2026-10-23', songIds: ['s2'], ministryId: 'hajaluz' },
       ],
       songs: {
         s1: { title: 'Recente', artistName: 'Ana' },
@@ -142,8 +164,8 @@ describe('getStats rankings', () => {
   it('ignores stored invalid song ids: getSongs only receives valid ids and nothing throws', async () => {
     const { deps, getSongsCalls } = setup({
       usage: [
-        { date: '2026-11-20', songIds: ['ok', 'a/b', '', '__x__'] },
-        { date: '2026-11-21', songIds: ['ok'] },
+        { date: '2026-11-20', songIds: ['ok', 'a/b', '', '__x__'], ministryId: 'hajaluz' },
+        { date: '2026-11-21', songIds: ['ok'], ministryId: 'hajaluz' },
       ],
       songs: { ok: { title: 'Boa', artistName: 'Artista' } },
     });
@@ -186,36 +208,105 @@ describe('getStats settled counting', () => {
   });
 });
 
-describe('getStatsForAdmin', () => {
-  const withRole = (role: unknown) => {
-    const { deps, log } = setup({ sources: ['generated'], songCount: 1 });
-    return { deps: { ...deps, getUserRole: async () => role }, log };
-  };
+describe('getStatsForCaller', () => {
+  it('admin da app recebe cartões (general) e o ranking do ministério escolhido', async () => {
+    const res = await getStatsForCaller(deps({ chefe: { appAdmin: true } }), 'chefe', 'outro');
+    expect(res.general).not.toBeNull();
+    expect(res.general?.songCount).toBeTypeOf('number');
+    expect(res.ministry?.id).toBe('outro');
+  });
 
-  it('returns stats for admin', async () => {
-    const { deps } = withRole('admin');
-    await expect(getStatsForAdmin(deps, 'u1')).resolves.toMatchObject({
-      songCount: 1,
-      pdfCount: 1,
-      generatedCount: 1,
+  it('admin da app sem ministério escolhido recebe só o geral', async () => {
+    const res = await getStatsForCaller(deps({ chefe: { appAdmin: true } }), 'chefe', undefined);
+    expect(res.general).not.toBeNull();
+    expect(res.ministry).toBeNull();
+  });
+
+  it('admin do ministério recebe só o ranking dele, sem cartões gerais', async () => {
+    const res = await getStatsForCaller(
+      deps({ adm: { appAdmin: false } }, { 'adm|hajaluz': 'admin' }),
+      'adm',
+      'hajaluz',
+    );
+    expect(res.general).toBeNull();
+    expect(res.ministry?.id).toBe('hajaluz');
+  });
+
+  it('admin do ministério sem ministryId é negado (não há visão geral)', async () => {
+    await expect(
+      getStatsForCaller(
+        deps({ adm: { appAdmin: false } }, { 'adm|hajaluz': 'admin' }),
+        'adm',
+        undefined,
+      ),
+    ).rejects.toMatchObject({ code: 'permission-denied' });
+  });
+
+  it('membro comum e admin de outro ministério são negados', async () => {
+    await expect(
+      getStatsForCaller(
+        deps({ ana: { appAdmin: false } }, { 'ana|hajaluz': 'member' }),
+        'ana',
+        'hajaluz',
+      ),
+    ).rejects.toMatchObject({ code: 'permission-denied' });
+    await expect(
+      getStatsForCaller(
+        deps({ adm: { appAdmin: false } }, { 'adm|outro': 'admin' }),
+        'adm',
+        'hajaluz',
+      ),
+    ).rejects.toMatchObject({ code: 'permission-denied' });
+  });
+
+  it('uso de um ministério não entra no ranking de outro', async () => {
+    const res = await getStatsForCaller(
+      deps(
+        { chefe: { appAdmin: true } },
+        {},
+        {
+          usage: [{ date: '2026-11-20', songIds: ['a'], ministryId: 'outro' }],
+        },
+      ),
+      'chefe',
+      'hajaluz',
+    );
+    expect(res.ministry?.topAllTime).toEqual([]);
+  });
+
+  it('ranking do ministério conta só os usos dele, com o nome do ministério', async () => {
+    const res = await getStatsForCaller(
+      deps(
+        { chefe: { appAdmin: true } },
+        {},
+        {
+          usage: [...uses('a', 2, '2026-11-20', 'hajaluz'), ...uses('a', 5, '2026-11-20', 'outro')],
+          songs: { a: { title: 'Alfa', artistName: 'Ana' } },
+        },
+      ),
+      'chefe',
+      'hajaluz',
+    );
+    expect(res.ministry).toMatchObject({
+      id: 'hajaluz',
+      name: 'Ministério hajaluz',
+      topAllTime: [{ songId: 'a', uses: 2 }],
     });
   });
 
-  it('rejects member, viewer and unknown roles with permission-denied', async () => {
-    for (const role of ['member', 'viewer', 'root', undefined]) {
-      const { deps, log } = withRole(role);
-      await expect(getStatsForAdmin(deps, 'u1')).rejects.toMatchObject({
-        code: 'permission-denied',
-      });
-      expect(log).toEqual([]);
-    }
+  it('ministério escolhido que não existe é não encontrado', async () => {
+    await expect(
+      getStatsForCaller(
+        deps({ chefe: { appAdmin: true } }, {}, { missingMinistries: ['fantasma'] }),
+        'chefe',
+        'fantasma',
+      ),
+    ).rejects.toMatchObject({ code: 'not-found' });
   });
 
-  it('rejects a missing uid with unauthenticated', async () => {
-    const { deps, log } = withRole('admin');
-    await expect(getStatsForAdmin(deps, undefined)).rejects.toMatchObject({
-      code: 'unauthenticated',
-    });
-    expect(log).toEqual([]);
+  it('sem login é negado com unauthenticated', async () => {
+    await expect(
+      getStatsForCaller(deps({ chefe: { appAdmin: true } }), undefined, undefined),
+    ).rejects.toMatchObject({ code: 'unauthenticated' });
   });
 });

@@ -1,4 +1,4 @@
-import { requireRole, type RoleDeps } from '../auth/requireRole';
+import { HttpsError } from 'firebase-functions/v2/https';
 import { countSettledSetlists, type UsageDeps } from './countUsage';
 import { addDays, todayInSaoPaulo } from './dates';
 import { isSongId } from './songId';
@@ -19,11 +19,30 @@ export type StatsDeps = UsageDeps & {
   countSongs(): Promise<number>;
   listArrangementSources(): Promise<string[]>;
   listPdfSizes(): Promise<number[]>;
-  listUsage(): Promise<Array<{ date: string; songIds: string[] }>>;
+  listUsage(): Promise<Array<{ date: string; songIds: string[]; ministryId: string }>>;
   getSongs(ids: string[]): Promise<Map<string, { title: string; artistName: string }>>;
 };
 
-type Usage = { date: string; songIds: string[] };
+type Usage = { date: string; songIds: string[]; ministryId: string };
+
+export type MinistryRanking = {
+  id: string;
+  name: string;
+  topAllTime: TopSong[];
+  topLast30Days: TopSong[];
+};
+
+/** Resposta de `getStatsForCaller`: cartões gerais (só admin da app) e ranking de um ministério. */
+export type StatsCallerResult = {
+  general: StatsResult | null;
+  ministry: MinistryRanking | null;
+};
+
+export type CallerDeps = StatsDeps & {
+  readUser(uid: string): Promise<{ appAdmin: boolean } | null>;
+  readMembership(mid: string, uid: string): Promise<{ role: 'member' | 'admin' } | null>;
+  readMinistry(mid: string): Promise<{ name: string } | null>;
+};
 
 const TOP_SIZE = 10;
 /** Janela "últimos 30 dias": hoje e os 29 dias anteriores. */
@@ -84,10 +103,44 @@ export async function getStats(deps: StatsDeps): Promise<StatsResult> {
   };
 }
 
-export async function getStatsForAdmin(
-  deps: StatsDeps & RoleDeps,
+/** Ranking de um ministério: só os usos com esse ministryId. Mesmas regras de tally/rank do geral. */
+async function rankingOf(deps: CallerDeps, mid: string): Promise<MinistryRanking> {
+  const ministry = await deps.readMinistry(mid);
+  if (!ministry) throw new HttpsError('not-found', 'Ministério não encontrado.');
+  const usage = (await deps.listUsage()).filter((u) => u.ministryId === mid);
+  const since = addDays(todayInSaoPaulo(deps.now()), -(WINDOW_DAYS - 1));
+  const allTime = tally(usage);
+  const recent = tally(usage.filter((u) => u.date >= since));
+  const ids = [...new Set([...allTime.keys(), ...recent.keys()])];
+  const songs = await deps.getSongs(ids);
+  return {
+    id: mid,
+    name: ministry.name,
+    topAllTime: rank(allTime, songs),
+    topLast30Days: rank(recent, songs),
+  };
+}
+
+export async function getStatsForCaller(
+  deps: CallerDeps,
   uid: string | undefined,
-): Promise<StatsResult> {
-  await requireRole(deps, uid, ['admin']);
-  return getStats(deps);
+  ministryId: unknown,
+): Promise<StatsCallerResult> {
+  if (!uid) throw new HttpsError('unauthenticated', 'Entre para continuar.');
+  const mid = typeof ministryId === 'string' && ministryId !== '' ? ministryId : undefined;
+  const caller = await deps.readUser(uid);
+  if (caller?.appAdmin === true) {
+    return {
+      general: await getStats(deps),
+      ministry: mid ? await rankingOf(deps, mid) : null,
+    };
+  }
+  if (!mid) {
+    throw new HttpsError('permission-denied', 'Só o admin da app vê as estatísticas gerais.');
+  }
+  const membership = await deps.readMembership(mid, uid);
+  if (membership?.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Só o admin do ministério vê este ranking.');
+  }
+  return { general: null, ministry: await rankingOf(deps, mid) };
 }
