@@ -21,27 +21,36 @@ interface Options {
 }
 
 function renderMais(options: Options = {}) {
-  const base = authStateFor(options.ministry === undefined ? 'member' : options.ministry);
-  const signOut = options.signOut ?? vi.fn(() => Promise.resolve());
-  const auth: AuthState = {
-    ...base,
-    appAdmin: options.appAdmin ?? false,
-    canUploadSong: options.canUploadSong ?? base.canUploadSong,
-    ministryPending: options.ministryPending ?? false,
-    ministryFailed: options.ministryFailed ?? false,
-    signOut,
-  };
   const api = options.api ?? createFakeMinistriesApi();
-  const view = render(
-    <MemoryRouter>
-      <AuthContext.Provider value={auth}>
-        <PushContext.Provider value={options.push ?? null}>
-          <MaisPage api={api} />
-        </PushContext.Provider>
-      </AuthContext.Provider>
-    </MemoryRouter>,
-  );
-  return { api, signOut, container: view.container };
+  const signOut = options.signOut ?? vi.fn(() => Promise.resolve());
+  const ui = (o: Options) => {
+    const base = authStateFor(o.ministry === undefined ? 'member' : o.ministry);
+    const auth: AuthState = {
+      ...base,
+      appAdmin: o.appAdmin ?? false,
+      canUploadSong: o.canUploadSong ?? base.canUploadSong,
+      ministryPending: o.ministryPending ?? false,
+      ministryFailed: o.ministryFailed ?? false,
+      signOut,
+    };
+    return (
+      <MemoryRouter>
+        <AuthContext.Provider value={auth}>
+          <PushContext.Provider value={o.push ?? null}>
+            <MaisPage api={api} />
+          </PushContext.Provider>
+        </AuthContext.Provider>
+      </MemoryRouter>
+    );
+  };
+  const view = render(ui(options));
+  // Troca o estado (ex.: ministério carregou) sem desmontar a tela: o quadro é o mesmo nó.
+  return {
+    api,
+    signOut,
+    container: view.container,
+    rerender: (o: Options) => view.rerender(ui(o)),
+  };
 }
 
 const pushService = (): PushService => ({
@@ -201,7 +210,7 @@ describe('MaisPage contadores de pedidos', () => {
       countPending: vi.fn(() => Promise.reject(new Error('rede'))),
     });
     const { container } = renderMais({ ministry: 'admin', api });
-    await waitFor(() => expect(api.countPending).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(api.countPending).toHaveBeenCalledTimes(2), { timeout: 3000 });
     await act(async () => {});
     expect(container.querySelector('.count-badge')).toBeNull();
     expect(screen.queryByText('0')).not.toBeInTheDocument();
@@ -219,7 +228,7 @@ describe('MaisPage contadores de pedidos', () => {
       .mockResolvedValueOnce(2);
     const api = createFakeMinistriesApi({ countPending });
     renderMais({ ministry: 'admin', api });
-    expect(await screen.findByText('2')).toHaveClass('count-badge');
+    expect(await screen.findByText('2', {}, { timeout: 3000 })).toHaveClass('count-badge');
     expect(countPending).toHaveBeenCalledTimes(2);
   });
 
@@ -228,7 +237,7 @@ describe('MaisPage contadores de pedidos', () => {
       countPendingAll: vi.fn(() => Promise.reject(new Error('rede'))),
     });
     const { container } = renderMais({ ministry: null, appAdmin: true, api });
-    await waitFor(() => expect(api.countPendingAll).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(api.countPendingAll).toHaveBeenCalledTimes(2), { timeout: 3000 });
     await act(async () => {});
     expect(container.querySelector('.count-badge')).toBeNull();
     expect(screen.getByRole('link', { name: /^Gestão/ })).toBeInTheDocument();
@@ -272,10 +281,41 @@ describe('MaisPage carregamento do ministério', () => {
     expect(screen.getByRole('button', { name: /Sair/ })).toBeInTheDocument();
   });
 
-  it('o admin da app mantém a moldura de duas visões enquanto carrega', () => {
-    renderMais({ ministry: null, ministryPending: true, appAdmin: true });
+  it('admin da app: carregando → sem ministério mantém Aplicativo, Gestão e Sair', () => {
+    const { rerender, container } = renderMais({
+      ministry: null,
+      ministryPending: true,
+      appAdmin: true,
+      push: pushService(),
+    });
     expect(screen.getByText('Aplicativo')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /^Gestão/ })).toBeInTheDocument();
+    const gestao = screen.getByRole('link', { name: /^Gestão/ });
     expect(screen.getByRole('status')).toHaveTextContent('Carregando…');
+    expect(container.querySelector('.mn-skeleton-eyebrow')).not.toBeNull();
+
+    rerender({ ministry: null, appAdmin: true, push: pushService() });
+    expect(screen.getByText('Aplicativo')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Gestão/ })).toBe(gestao);
+    expect(screen.getByRole('button', { name: /Sair/ })).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(container.querySelector('.mn-skeleton-eyebrow')).toBeNull();
+    expect(screen.queryByText('Avisos')).not.toBeInTheDocument();
+  });
+
+  it('admin da app: carregando → ministério carregado põe o eyebrow sem mover a Gestão', () => {
+    const { rerender, container } = renderMais({
+      ministry: null,
+      ministryPending: true,
+      appAdmin: true,
+    });
+    const gestao = screen.getByRole('link', { name: /^Gestão/ });
+    expect(container.querySelector('.mn-skeleton-eyebrow')).not.toBeNull();
+
+    rerender({ ministry: 'admin', appAdmin: true, canUploadSong: true });
+    expect(screen.getByRole('link', { name: /^Gestão/ })).toBe(gestao);
+    expect(screen.getByText('Aplicativo')).toBeInTheDocument();
+    expect(screen.getByText('Haja Luz')).toHaveClass('section-eyebrow');
+    expect(screen.getByRole('link', { name: /^Pessoas do ministério/ })).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });

@@ -688,6 +688,14 @@
   min-width: 0;
 }
 
+/* Eyebrow do ministério reservado enquanto carrega: mesma altura da linha de 14px do eyebrow */
+.mn-skeleton-eyebrow {
+  display: block;
+  width: 96px;
+  height: 10px;
+  margin-block: 2px;
+}
+
 .mn-skeleton-text {
   display: flex;
   flex: 1;

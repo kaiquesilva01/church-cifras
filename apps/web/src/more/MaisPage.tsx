@@ -85,6 +85,34 @@ interface Counted {
 }
 
 const APP_KEY = 'app';
+/** Espera antes da segunda tentativa de contar (falha transitória de rede). */
+const RETRY_DELAY_MS = 1500;
+
+/**
+ * Conta com uma nova tentativa depois de `RETRY_DELAY_MS`. Falha de novo: `done(null)`, desconhecido.
+ * Devolve o cancelamento (desmontagem ou troca de chave).
+ */
+function countWithRetry(load: () => Promise<number>, done: (n: number | null) => void): () => void {
+  let live = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const ask = (retry: boolean) => {
+    load().then(
+      (n) => {
+        if (live) done(n);
+      },
+      () => {
+        if (!live) return;
+        if (retry) timer = setTimeout(() => ask(false), RETRY_DELAY_MS);
+        else done(null);
+      },
+    );
+  };
+  ask(true);
+  return () => {
+    live = false;
+    clearTimeout(timer);
+  };
+}
 
 /**
  * Contadores de pedidos, só para quem vê a linha correspondente. Falha tenta de novo uma vez; se
@@ -103,44 +131,18 @@ function usePendingCounts(
 
   useEffect(() => {
     if (!showMinistry || !ministryId) return;
-    let live = true;
-    const ask = (retry: boolean) => {
-      api.countPending(ministryId).then(
-        (n) => {
-          if (live) setMinistry({ key: ministryId, n });
-        },
-        () => {
-          if (!live) return;
-          if (retry) ask(false);
-          else setMinistry({ key: ministryId, n: null });
-        },
-      );
-    };
-    ask(true);
-    return () => {
-      live = false;
-    };
+    return countWithRetry(
+      () => api.countPending(ministryId),
+      (n) => setMinistry({ key: ministryId, n }),
+    );
   }, [api, ministryId, showMinistry]);
 
   useEffect(() => {
     if (!showApp) return;
-    let live = true;
-    const ask = (retry: boolean) => {
-      api.countPendingAll().then(
-        (n) => {
-          if (live) setApp({ key: APP_KEY, n });
-        },
-        () => {
-          if (!live) return;
-          if (retry) ask(false);
-          else setApp({ key: APP_KEY, n: null });
-        },
-      );
-    };
-    ask(true);
-    return () => {
-      live = false;
-    };
+    return countWithRetry(
+      () => api.countPendingAll(),
+      (n) => setApp({ key: APP_KEY, n }),
+    );
   }, [api, showApp]);
 
   return {
@@ -149,10 +151,24 @@ function usePendingCounts(
   };
 }
 
-function MenuCard({ eyebrow, children }: { eyebrow?: string; children: ReactNode }) {
+function MenuCard({
+  eyebrow,
+  placeholder = false,
+  children,
+}: {
+  eyebrow?: string;
+  /** Eyebrow ainda não conhecido (ministério carregando): reserva a mesma altura, sem texto. */
+  placeholder?: boolean;
+  children: ReactNode;
+}) {
   return (
     <>
       {eyebrow && <p className="section-eyebrow">{eyebrow}</p>}
+      {placeholder && (
+        <div className="section-eyebrow" aria-hidden="true">
+          <span className="skeleton mn-skeleton-eyebrow" />
+        </div>
+      )}
       <ul className="menu-card">{children}</ul>
     </>
   );
@@ -184,9 +200,9 @@ export function MaisPage({ api }: { api: MinistriesApi }) {
   const ministryAdmin = isMinistryAdmin(auth);
   const { ministryCount, appCount } = usePendingCounts(api, ministry?.id, ministryAdmin, appAdmin);
   const name = user?.displayName ?? user?.email ?? '';
-  // Com as duas visões (app e ministério), cada grupo ganha o seu eyebrow, como no Paper (tela 40).
-  // Enquanto o ministério carrega, o layout já é o de duas visões para o admin da app não pular.
-  const splitViews = appAdmin && (loading || ministry !== null);
+  // Admin da app sempre tem a moldura de duas visões (eyebrow "Aplicativo" e cartão da Gestão), com
+  // ou sem ministério, para o quadro não pular ao carregar (Paper, tela 40).
+  const splitViews = appAdmin;
 
   const pills: ReactNode[] = [];
   if (appAdmin) {
@@ -289,7 +305,7 @@ export function MaisPage({ api }: { api: MinistriesApi }) {
       {loading ? (
         splitViews ? (
           <>
-            <MenuCard>
+            <MenuCard placeholder>
               <MinistrySkeleton />
             </MenuCard>
             <MenuCard>{commonRows}</MenuCard>
