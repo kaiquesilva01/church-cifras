@@ -1,14 +1,10 @@
-import { HttpsError } from 'firebase-functions/v2/https';
 import { buildClaims, type Claims } from './ministries/claims';
-import { roleForNewUser, validateRoleChange, type Role } from './roles';
+import { roleForNewUser, type Role } from './roles';
 
 export type UserDeps = {
   setClaims(uid: string, claims: Claims): Promise<void>;
   writeUser(uid: string, data: Record<string, unknown>, merge: boolean): Promise<void>;
-  userExists(uid: string): Promise<boolean>;
   getUserRole(uid: string): Promise<Role | undefined>;
-  applyHajaLuzRole(uid: string, role: Role, callerUid: string): Promise<void>;
-  recalcClaims(uid: string, next: { role: Role }): Promise<void>;
   now(): Date;
 };
 
@@ -57,21 +53,4 @@ export async function createUserProfile(
     false,
   );
   return role;
-}
-
-export async function changeUserRole(
-  deps: UserDeps,
-  input: Parameters<typeof validateRoleChange>[0],
-): Promise<{ uid: string; role: Role }> {
-  const result = validateRoleChange(input);
-  if (!result.ok) throw new HttpsError(result.code, result.message);
-  if (!(await deps.userExists(result.targetUid))) {
-    throw new HttpsError('not-found', 'User not found.');
-  }
-  await deps.applyHajaLuzRole(result.targetUid, result.newRole, input.callerUid ?? '');
-  // Claims antes do documento: o cliente atualiza o token uma vez, quando users/{uid}.role muda.
-  // Se as claims falharem, users/{uid} fica como estava; repetir a chamada é seguro.
-  await deps.recalcClaims(result.targetUid, { role: result.newRole });
-  await deps.writeUser(result.targetUid, { role: result.newRole, roleUpdatedAt: deps.now() }, true);
-  return { uid: result.targetUid, role: result.newRole };
 }
