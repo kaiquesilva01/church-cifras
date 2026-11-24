@@ -932,11 +932,8 @@
 .person-menu-anchor {
   position: relative;
 }
-.people-dialog-text {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 15px;
-  line-height: 22px;
+.people-screen .confirm-actions > .btn {
+  flex: 1;
 }
 .people-note {
   margin: 0;

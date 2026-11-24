@@ -9,6 +9,8 @@ export interface ConfirmDialogProps {
   error: string | null;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Element to return focus to on close; omitted means the focused element at mount. */
+  opener?: HTMLElement | null;
 }
 
 /** Two buttons: Cancelar (left, neutral, focused first) and the confirm action (right, solid red). */
@@ -20,13 +22,14 @@ export function ConfirmDialog({
   error,
   onConfirm,
   onCancel,
+  opener,
 }: ConfirmDialogProps) {
   const cancel = useRef<HTMLButtonElement>(null);
   // Runs after Dialog has moved focus to its container, so the safe choice wins.
   useEffect(() => cancel.current?.focus(), []);
 
   return (
-    <Dialog titleId="confirm-title" onClose={onCancel} busy={busy}>
+    <Dialog titleId="confirm-title" onClose={onCancel} busy={busy} opener={opener}>
       <h2 id="confirm-title" className="dialog-title">
         {title}
       </h2>

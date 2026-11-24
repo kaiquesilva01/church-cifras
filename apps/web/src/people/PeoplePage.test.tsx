@@ -79,7 +79,7 @@ describe('PeoplePage: pedidos', () => {
       await screen.findByText('✓ Camila Moreira agora é membro de Haja Luz'),
     ).toBeInTheDocument();
     expect(api.callable.approve).toHaveBeenCalledWith('hajaluz', 'camila');
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await waitFor(() => expect(api.listRequests).toHaveBeenCalledTimes(2));
   });
 
@@ -88,7 +88,7 @@ describe('PeoplePage: pedidos', () => {
     await screen.findByText('Tiago Ferreira');
     fireEvent.click(screen.getByRole('button', { name: 'Recusar Tiago Ferreira' }));
     await waitFor(() => expect(api.callable.reject).toHaveBeenCalledWith('hajaluz', 'tiago'));
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('mostra o vazio quando não há pedidos', async () => {
@@ -224,7 +224,7 @@ describe('PeoplePage: membros', () => {
     await screen.findByText('Pedro Lima');
     fireEvent.click(roleButton('Pedro Lima'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Remover do ministério' }));
-    const dialog = screen.getByRole('alertdialog', { name: 'Remover Pedro Lima de Haja Luz?' });
+    const dialog = screen.getByRole('dialog', { name: 'Remover Pedro Lima de Haja Luz?' });
     expect(
       within(dialog).getByText(
         'Ele deixa de ver os repertórios e de receber os avisos da Haja Luz. Para voltar, precisa pedir de novo.',
@@ -233,7 +233,7 @@ describe('PeoplePage: membros', () => {
     const cancel = within(dialog).getByRole('button', { name: 'Cancelar' });
     expect(cancel).toHaveFocus();
     fireEvent.click(cancel);
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(api.callable.removeMember).not.toHaveBeenCalled();
   });
 
@@ -242,7 +242,7 @@ describe('PeoplePage: membros', () => {
     await screen.findByText('Pedro Lima');
     fireEvent.click(roleButton('Pedro Lima'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Remover do ministério' }));
-    const dialog = screen.getByRole('alertdialog', { name: 'Remover Pedro Lima de Haja Luz?' });
+    const dialog = screen.getByRole('dialog', { name: 'Remover Pedro Lima de Haja Luz?' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remover' }));
     await waitFor(() => expect(api.callable.removeMember).toHaveBeenCalledWith('hajaluz', 'pedro'));
   });
@@ -265,5 +265,127 @@ describe('PeoplePage: carregamento e erro', () => {
     expect(alert).toHaveTextContent('Não foi possível carregar. Tente de novo.');
     fireEvent.click(within(alert).getByRole('button', { name: 'Tentar de novo' }));
     expect(await screen.findByText('Camila Moreira')).toBeInTheDocument();
+  });
+});
+
+describe('PeoplePage: revisão (ordem, troca de ministério, foco e bloqueios)', () => {
+  function tree(api: MinistriesApi, ministryId: string, selfUid?: string, appAdminView = false) {
+    return (
+      <MemoryRouter>
+        <PeoplePage
+          api={api}
+          ministryId={ministryId}
+          ministryName={ministryId === 'hajaluz' ? 'Haja Luz' : 'Videira'}
+          selfUid={selfUid}
+          appAdminView={appAdminView}
+        />
+      </MemoryRouter>
+    );
+  }
+
+  function memberNames(): string[] {
+    return screen
+      .getAllByRole('button', { name: /^Papel de / })
+      .map((b) => b.getAttribute('aria-label')!.replace(/^Papel de (.*): .*$/, '$1'));
+  }
+
+  it('põe a própria pessoa no topo e as demais por nome', async () => {
+    renderPage({}, { selfUid: 'marina' });
+    await screen.findByText('Marina Souza');
+    expect(memberNames()).toEqual(['Marina Souza', 'Ana Costa', 'Lucas Andrade', 'Pedro Lima']);
+  });
+
+  it('troca de ministério no mesmo mount zera o estado e relê as listas', async () => {
+    const api: MinistriesApi = createFakeMinistriesApi({
+      listRequests: vi.fn((mid: string) => Promise.resolve(mid === 'hajaluz' ? requests : [])),
+      listMembers: vi.fn(() => Promise.resolve(members)),
+    });
+    const view = render(tree(api, 'hajaluz', 'lucas'));
+    await screen.findByText('Camila Moreira');
+    fireEvent.click(screen.getByRole('button', { name: 'Aprovar Camila Moreira' }));
+    expect(
+      await screen.findByText('✓ Camila Moreira agora é membro de Haja Luz'),
+    ).toBeInTheDocument();
+
+    view.rerender(tree(api, 'videira', 'lucas'));
+    expect(await screen.findByText('Nenhum pedido pendente')).toBeInTheDocument();
+    expect(
+      screen.queryByText('✓ Camila Moreira agora é membro de Haja Luz'),
+    ).not.toBeInTheDocument();
+    expect(api.listRequests).toHaveBeenLastCalledWith('videira');
+  });
+
+  it('o último admin não fica bloqueado na visão do admin da app, e o menu abre', async () => {
+    const onlyAdmin = [
+      person('lucas', 'Lucas Andrade', 'lucas@cifras.local', 'admin'),
+      members[1]!,
+    ];
+    renderPage(
+      { listMembers: () => Promise.resolve(onlyAdmin) },
+      { selfUid: undefined, appAdminView: true },
+    );
+    await screen.findByText('Lucas Andrade');
+    const button = roleButton('Lucas Andrade');
+    expect(button).not.toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(button);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('a própria linha é bloqueada e não abre menu', async () => {
+    renderPage();
+    await screen.findByText('Lucas Andrade');
+    fireEvent.click(roleButton('Lucas Andrade'));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('recusar com falha mostra o texto do pedido', async () => {
+    renderPage({ callable: { reject: () => Promise.reject(new Error('rede')) } });
+    await screen.findByText('Tiago Ferreira');
+    fireEvent.click(screen.getByRole('button', { name: 'Recusar Tiago Ferreira' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível atualizar. O pedido continua pendente.',
+    );
+  });
+
+  it('"Tentar de novo" depois de falha ao remover chama removeMember de novo', async () => {
+    const removeMember = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('rede'))
+      .mockResolvedValueOnce(undefined);
+    const { api } = renderPage({ callable: { removeMember } });
+    await screen.findByText('Pedro Lima');
+    fireEvent.click(roleButton('Pedro Lima'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remover do ministério' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remover' }));
+    const alert = await screen.findByRole('alert');
+    fireEvent.click(within(alert).getByRole('button', { name: 'Tentar de novo' }));
+    await waitFor(() => expect(api.callable.removeMember).toHaveBeenCalledTimes(2));
+    expect(api.callable.removeMember).toHaveBeenLastCalledWith('hajaluz', 'pedro');
+  });
+
+  it('foco volta para o seletor da linha depois de Tornar admin', async () => {
+    renderPage();
+    await screen.findByText('Marina Souza');
+    fireEvent.click(roleButton('Marina Souza'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Tornar admin' }));
+    await waitFor(() => expect(roleButton('Marina Souza')).toHaveFocus());
+  });
+
+  it('foco volta para o seletor quando o diálogo de remover é cancelado', async () => {
+    renderPage();
+    await screen.findByText('Pedro Lima');
+    fireEvent.click(roleButton('Pedro Lima'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remover do ministério' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(roleButton('Pedro Lima')).toHaveFocus();
+  });
+
+  it('depois de remover confirmado, o foco vai para o título "Membros"', async () => {
+    renderPage();
+    await screen.findByText('Pedro Lima');
+    fireEvent.click(roleButton('Pedro Lima'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remover do ministério' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remover' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Membros' })).toHaveFocus());
   });
 });

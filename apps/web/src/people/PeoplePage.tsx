@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import type { MinistryRole } from '../auth/useAuth';
 import { messageFor } from '../ministries/callable';
 import type { MinistriesApi, PersonRow } from '../ministries/ministriesApi';
+import { ConfirmDialog } from '../viewer/ConfirmDialog';
 import { initialsOf } from '../ui/initials';
-import { useFocusTrap } from '../viewer/useFocusTrap';
 
 export interface PeoplePageProps {
   api: MinistriesApi;
   ministryId: string;
   ministryName: string;
-  /** Visão do admin do ministério: a própria linha vira "(você)" e não pode ser alterada. */
+  /** Visão do admin do ministério: a própria linha vira "(você)", vai para o topo e não pode ser alterada. */
   selfUid?: string;
   /** Visão do admin da app (Gestão): sem "(você)"; o último admin pode ser alterado. */
   appAdminView: boolean;
@@ -55,89 +55,32 @@ function Skeleton() {
   );
 }
 
-function RemoveDialog({
-  person,
-  ministryName,
-  opener,
-  onCancel,
-  onConfirm,
-}: {
-  person: PersonRow;
-  ministryName: string;
-  opener: HTMLElement | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const titleId = useId();
-  const textId = useId();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  useFocusTrap(rootRef, { onEscape: onCancel, opener });
-
-  useEffect(() => {
-    cancelRef.current?.focus();
-  }, []);
-
-  const name = nameOf(person);
-  return (
-    <div
-      className="dialog-backdrop"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
-    >
-      <div
-        ref={rootRef}
-        tabIndex={-1}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={textId}
-        className="dialog"
-      >
-        <h3 id={titleId} className="dialog-title">
-          Remover {name} de {ministryName}?
-        </h3>
-        <p id={textId} className="people-dialog-text">
-          Ele deixa de ver os repertórios e de receber os avisos da {ministryName}. Para voltar,
-          precisa pedir de novo.
-        </p>
-        <div className="sheet-actions">
-          <button ref={cancelRef} type="button" className="btn" onClick={onCancel}>
-            Cancelar
-          </button>
-          <button type="button" className="btn btn-danger" onClick={onConfirm}>
-            Remover
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+/**
+ * Pessoas do ministério (tela 41): pedidos pendentes e membros, com as ações do admin.
+ * Ao trocar de `ministryId` a tela remonta (chave), então nenhum estado local vaza para outro ministério.
+ */
+export function PeoplePage(props: PeoplePageProps) {
+  return <PeopleScreen key={props.ministryId} {...props} />;
 }
 
-/** Pessoas do ministério (tela 41): pedidos pendentes e membros, com as ações do admin. */
-export function PeoplePage({
-  api,
-  ministryId,
-  ministryName,
-  selfUid,
-  appAdminView,
-}: PeoplePageProps) {
+function PeopleScreen({ api, ministryId, ministryName, selfUid, appAdminView }: PeoplePageProps) {
   const [data, setData] = useState<{ requests: PersonRow[]; members: PersonRow[] } | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [actionError, setActionError] = useState<{ message: string; retry: Action } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [pendingUid, setPendingUid] = useState<string | null>(null);
+  const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
   const [menuUid, setMenuUid] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{
     person: PersonRow;
     opener: HTMLElement | null;
   } | null>(null);
-  const triggers = useRef(new Map<string, HTMLButtonElement>());
-  const openAnchor = useRef<HTMLLIElement | null>(null);
-
   // `attempt` sobe para reler as listas (depois de uma ação ou em "Tentar de novo").
   const [attempt, setAttempt] = useState(0);
+  const triggers = useRef(new Map<string, HTMLButtonElement>());
+  const openAnchor = useRef<HTMLLIElement | null>(null);
+  const membersHeading = useRef<HTMLHeadingElement>(null);
+  const focusMembersOnLoad = useRef(false);
+
   const reload = useCallback(() => {
     setLoadError(false);
     setAttempt((n) => n + 1);
@@ -157,21 +100,31 @@ export function PeoplePage({
     };
   }, [api, ministryId, attempt]);
 
+  // Depois de remover, o foco vai para o título "Membros" (a linha removida sumiu).
+  useEffect(() => {
+    if (data && focusMembersOnLoad.current) {
+      focusMembersOnLoad.current = false;
+      membersHeading.current?.focus();
+    }
+  }, [data]);
+
   const run = useCallback(
     async (action: Action) => {
-      setPendingUid(action.person.uid);
+      const uid = action.person.uid;
+      setPending((s) => new Set(s).add(uid));
       setActionError(null);
       setNotice(null);
       try {
         if (action.kind === 'approve') {
-          await api.callable.approve(ministryId, action.person.uid);
+          await api.callable.approve(ministryId, uid);
           setNotice(`✓ ${nameOf(action.person)} agora é membro de ${ministryName}`);
         } else if (action.kind === 'reject') {
-          await api.callable.reject(ministryId, action.person.uid);
+          await api.callable.reject(ministryId, uid);
         } else if (action.kind === 'role') {
-          await api.callable.setRole(ministryId, action.person.uid, action.role ?? 'member');
+          await api.callable.setRole(ministryId, uid, action.role ?? 'member');
         } else {
-          await api.callable.removeMember(ministryId, action.person.uid);
+          await api.callable.removeMember(ministryId, uid);
+          focusMembersOnLoad.current = true;
         }
         reload();
       } catch (error) {
@@ -181,7 +134,11 @@ export function PeoplePage({
             : 'Não foi possível atualizar. Tente de novo.';
         setActionError({ message: messageFor(error, fallback), retry: action });
       } finally {
-        setPendingUid(null);
+        setPending((s) => {
+          const next = new Set(s);
+          next.delete(uid);
+          return next;
+        });
       }
     },
     [api, ministryId, ministryName, reload],
@@ -191,15 +148,15 @@ export function PeoplePage({
   useEffect(() => {
     if (menuUid === null) return;
     openAnchor.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-    const closeTo = (focusTrigger: boolean) => {
+    const close = (focusTrigger: boolean) => {
       if (focusTrigger) triggers.current.get(menuUid)?.focus();
       setMenuUid(null);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeTo(true);
+      if (event.key === 'Escape') close(true);
     };
     const onPointer = (event: PointerEvent) => {
-      if (!openAnchor.current?.contains(event.target as Node)) closeTo(false);
+      if (!openAnchor.current?.contains(event.target as Node)) close(false);
     };
     document.addEventListener('keydown', onKey);
     document.addEventListener('pointerdown', onPointer);
@@ -226,7 +183,12 @@ export function PeoplePage({
   }
 
   const requests = data?.requests ?? [];
-  const members = data?.members ?? [];
+  // A própria pessoa primeiro; as demais por nome (pt-BR).
+  const members = [...(data?.members ?? [])].sort(
+    (a, b) =>
+      Number(b.uid === selfUid) - Number(a.uid === selfUid) ||
+      nameOf(a).localeCompare(nameOf(b), 'pt-BR'),
+  );
   const adminCount = members.filter((m) => m.role === 'admin').length;
 
   return (
@@ -276,7 +238,7 @@ export function PeoplePage({
         <ul className="request-list">
           {requests.map((person) => {
             const name = nameOf(person);
-            const busy = pendingUid === person.uid;
+            const busy = pending.has(person.uid);
             const when = requestedOn(person.createdAt);
             return (
               <li key={person.uid} className="request-card">
@@ -305,7 +267,6 @@ export function PeoplePage({
                     className="btn btn-primary request-card-approve"
                     aria-label={`Aprovar ${name}`}
                     disabled={busy}
-                    aria-busy={busy}
                     onClick={() => void run({ kind: 'approve', person })}
                   >
                     Aprovar
@@ -320,7 +281,9 @@ export function PeoplePage({
       {data && (
         <>
           <div className="people-section-head">
-            <h3 className="mn-section-title">Membros</h3>
+            <h3 className="mn-section-title" ref={membersHeading} tabIndex={-1}>
+              Membros
+            </h3>
             <span className="section-count">{members.length}</span>
           </div>
           <ul className="person-list">
@@ -330,8 +293,8 @@ export function PeoplePage({
               const lastAdmin = person.role === 'admin' && adminCount === 1;
               const locked = isSelf || (lastAdmin && !appAdminView);
               const admin = person.role === 'admin';
-              const busy = pendingUid === person.uid;
-              const open = menuUid === person.uid;
+              const busy = pending.has(person.uid);
+              const open = menuUid === person.uid && !locked;
               const roleLabel = ROLE_LABEL[person.role ?? 'member'];
               return (
                 <li
@@ -395,12 +358,10 @@ export function PeoplePage({
                         role="menuitem"
                         className="action-menu-item"
                         onClick={() => {
+                          // O menu some: o foco volta para o seletor desta linha.
+                          triggers.current.get(person.uid)?.focus();
                           setMenuUid(null);
-                          void run({
-                            kind: 'role',
-                            person,
-                            role: admin ? 'member' : 'admin',
-                          });
+                          void run({ kind: 'role', person, role: admin ? 'member' : 'admin' });
                         }}
                       >
                         {admin ? 'Tornar membro' : 'Tornar admin'}
@@ -428,9 +389,11 @@ export function PeoplePage({
       )}
 
       {confirmRemove && (
-        <RemoveDialog
-          person={confirmRemove.person}
-          ministryName={ministryName}
+        <ConfirmDialog
+          title={`Remover ${nameOf(confirmRemove.person)} de ${ministryName}?`}
+          confirmLabel="Remover"
+          busy={false}
+          error={null}
           opener={confirmRemove.opener}
           onCancel={() => setConfirmRemove(null)}
           onConfirm={() => {
@@ -438,7 +401,10 @@ export function PeoplePage({
             setConfirmRemove(null);
             void run({ kind: 'remove', person });
           }}
-        />
+        >
+          Ele deixa de ver os repertórios e de receber os avisos da {ministryName}. Para voltar,
+          precisa pedir de novo.
+        </ConfirmDialog>
       )}
     </section>
   );
