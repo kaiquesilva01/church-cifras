@@ -1,6 +1,27 @@
 import { act } from '@testing-library/react';
-import type { MinistryRole } from '../auth/useAuth';
+import type { AuthState, MinistryRole } from '../auth/useAuth';
 import { testUser, type FakeGateway } from './fakeGateway';
+
+/** Estado de autenticação pronto para `AuthContext.Provider`, com o vínculo do ministério (ou nenhum). */
+export function authStateFor(ministryRole: MinistryRole | null = 'admin'): AuthState {
+  return {
+    status: 'signed-in',
+    user: testUser,
+    access: 'granted',
+    appAdmin: false,
+    canUploadSong: ministryRole === 'admin',
+    ministry:
+      ministryRole === null
+        ? null
+        : { id: 'hajaluz', name: 'Haja Luz', city: 'São Paulo', role: ministryRole },
+    ministryFailed: false,
+    ministryMissing: false,
+    accessFailed: false,
+    prepareSignIn: () => Promise.resolve(),
+    signIn: () => Promise.resolve(),
+    signOut: () => Promise.resolve(),
+  };
+}
 
 export type Scenario = {
   appAdmin?: boolean;

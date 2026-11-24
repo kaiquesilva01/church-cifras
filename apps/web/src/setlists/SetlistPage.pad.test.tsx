@@ -2,11 +2,11 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
-import { AuthContext, type AuthState } from '../auth/useAuth';
+import { AuthContext } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { PadContext, type PadContextValue } from '../pad/usePad';
 import { fakeCatalogApi, sampleSongs } from '../test/fakeCatalogApi';
-import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import { ActiveSetlistProvider } from './ActiveSetlistProvider';
 import { SetlistPage } from './SetlistPage';
@@ -26,15 +26,7 @@ const pad: PadContextValue = {
 
 function mount(padValue: PadContextValue | null) {
   const api = fakeSetlistApi([makeSetlist({ id: 'r1', label: 'Culto de domingo', items: [] })]);
-  const auth: AuthState = {
-    status: 'signed-in',
-    user: testUser,
-    role: 'admin',
-    access: 'granted',
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
-  };
+  const auth = authStateFor('admin');
   const Pad = ({ children }: { children: ReactNode }) => (
     <PadContext.Provider value={padValue}>{children}</PadContext.Provider>
   );

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { canEditSetlists } from '../auth/roles';
+import { canEditSetlist } from '../auth/permissions';
 import { useAuth } from '../auth/useAuth';
 import type { SongSummary } from '../catalog/types';
 import { useSongsContext } from '../catalog/SongsProvider';
@@ -15,6 +15,7 @@ import { buildShareMessage, resolveShareLines } from './shareMessage';
 import { shareText } from './shareText';
 import { RehearsalLine } from './RehearsalLine';
 import { SetlistFormDialog, type SetlistFormValue } from './SetlistFormDialog';
+import { SetlistNotFound } from './SetlistNotFound';
 import { SetlistItemRow } from './SetlistItemRow';
 import { SortableItems } from './SortableItems';
 import type { SetlistApi } from './setlistApi';
@@ -39,7 +40,7 @@ type Dialogs = 'none' | 'add' | 'edit' | 'duplicate' | 'delete';
 
 export function SetlistPage({ api }: { api: SetlistApi }) {
   const active = useActiveSetlist();
-  const { role } = useAuth();
+  const auth = useAuth();
   const { songs, status: songsStatus } = useSongsContext();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<Dialogs>('none');
@@ -68,16 +69,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
 
   const songsById = useMemo(() => new Map(songs.map((s) => [s.id, s])), [songs]);
 
-  if (!active || active.status === 'not-found') {
-    return (
-      <section>
-        <p className="status">Repertório não encontrado.</p>
-        <Link to={BACK} className="back">
-          Voltar aos repertórios
-        </Link>
-      </section>
-    );
-  }
+  if (!active || active.status === 'not-found') return <SetlistNotFound />;
   if (active.status === 'error') {
     return (
       <section>
@@ -113,7 +105,7 @@ export function SetlistPage({ api }: { api: SetlistApi }) {
     );
   }
 
-  const editable = canEditSetlists(role) && !active.removed;
+  const editable = canEditSetlist(auth) && !active.removed;
   const items = shown.items;
   // Edição parte do estado mais novo: um ensaio gravado em outro aparelho (ainda não aceito
   // no banner) não pode ser apagado ao salvar só o rótulo.

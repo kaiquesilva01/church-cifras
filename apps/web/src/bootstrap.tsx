@@ -46,7 +46,8 @@ export function renderApp(root: Root): void {
     const peopleApi = createPeopleApi(services);
     const statsApi = createStatsApi(services);
     const catalogApi = createCatalogApi(services);
-    const setlistApi = createSetlistApi(services);
+    // Ponte até a Tarefa 25 (MinistryScope): o ministério atual vem do provedor, não daqui.
+    const setlistApi = createSetlistApi(services, { ministryId: 'hajaluz' });
     const ministriesApi = createMinistriesApi(services);
     root.render(
       <StrictMode>

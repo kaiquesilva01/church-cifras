@@ -1,11 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Role } from '../auth/roles';
-import { AuthContext, type AuthState } from '../auth/useAuth';
+import type { MinistryRole } from '../auth/useAuth';
+import { AuthContext } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi, makeSong, sampleSongs } from '../test/fakeCatalogApi';
-import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import { stubShare, unstubShare } from '../test/shareStub';
 import { ActiveSetlistProvider } from './ActiveSetlistProvider';
@@ -33,21 +33,13 @@ function Probe() {
 function mount(
   api: ReturnType<typeof fakeSetlistApi>,
   {
-    role = 'admin',
+    ministryRole = 'admin',
     path = '/repertorios/r1',
     songs = sampleSongs,
     catalog,
-  }: Record<string, unknown> = {},
+  }: { ministryRole?: MinistryRole | null; path?: string; songs?: unknown; catalog?: unknown } = {},
 ) {
-  const auth: AuthState = {
-    status: 'signed-in',
-    user: testUser,
-    role: role as Role,
-    access: 'granted',
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
-  };
+  const auth = authStateFor(ministryRole);
   return render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[path as string]}>
@@ -61,6 +53,7 @@ function mount(
             <Probe />
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/busca" element={<Home />} />
               <Route path="/repertorios/:id" element={<SetlistPage api={api} />} />
             </Routes>
           </ActiveSetlistProvider>
@@ -95,13 +88,23 @@ describe('SetlistPage read', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Carregando…');
   });
 
-  it('shows not found with a link back', () => {
+  it('shows screen 49 when the id is not in the current ministry', () => {
     mount(fakeSetlistApi());
-    expect(screen.getByText('Repertório não encontrado.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Voltar|repertórios/ })).toHaveAttribute(
-      'href',
-      '/?aba=repertorios',
-    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Repertório não encontrado' }),
+    ).toHaveFocus();
+    expect(
+      screen.getByText(
+        'Esse repertório não existe no seu ministério ou foi removido. Confira o link com quem compartilhou.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Repertório não encontrado.')).not.toBeInTheDocument();
+  });
+
+  it('screen 49 button goes to the repertory tab of the search', () => {
+    mount(fakeSetlistApi());
+    fireEvent.click(screen.getByRole('button', { name: 'Ver repertórios' }));
+    expect(screen.getByTestId('home')).toHaveTextContent('?aba=repertorios');
   });
 
   it('shows a removed song without link', () => {
@@ -166,9 +169,23 @@ describe('SetlistPage catalog error', () => {
   });
 });
 
-describe('SetlistPage visitor', () => {
-  it('has no editing controls and the key is not a button', () => {
-    mount(withItems([a, b]), { role: 'viewer' });
+describe('SetlistPage member', () => {
+  it('editable only for the ministry admin: member sees no Editar nor Excluir', () => {
+    mount(withItems([a, b]), { ministryRole: 'member' });
+    expect(screen.queryByRole('button', { name: 'Menu do repertório' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Editar data, rótulo e ensaio')).not.toBeInTheDocument();
+    expect(screen.queryByText('Apagar')).not.toBeInTheDocument();
+  });
+
+  it('the ministry admin sees the menu with Editar and Apagar', () => {
+    mount(withItems([a, b]), { ministryRole: 'admin' });
+    fireEvent.click(screen.getByRole('button', { name: 'Menu do repertório' }));
+    expect(screen.getByRole('menuitem', { name: /Editar data/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Apagar' })).toBeInTheDocument();
+  });
+
+  it('member has no editing controls and the key is not a button', () => {
+    mount(withItems([a, b]), { ministryRole: 'member' });
     // O único botão para visitante é o de compartilhar.
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Compartilhar repertório' })).toBeInTheDocument();
@@ -300,7 +317,7 @@ describe('SetlistPage menu', () => {
       screen.getByRole('button', { name: 'Tom D (indisponível), alterar' }),
     ).toBeInTheDocument();
     cleanup();
-    mount(withItems([{ id: 'a', songId: 's1', key: 'D' }]), { role: 'viewer' });
+    mount(withItems([{ id: 'a', songId: 's1', key: 'D' }]), { ministryRole: 'member' });
     expect(screen.getByText('(tom indisponível)')).toBeInTheDocument();
   });
 
@@ -348,7 +365,7 @@ describe('SetlistPage menu', () => {
   });
 
   it('is hidden for visitors', () => {
-    mount(withItems([a]), { role: 'viewer' });
+    mount(withItems([a]), { ministryRole: 'member' });
     expect(screen.queryByRole('button', { name: 'Menu do repertório' })).not.toBeInTheDocument();
   });
 
@@ -415,7 +432,7 @@ describe('SetlistPage ensaio', () => {
   });
 
   it('shows the rehearsal line to visitors too', () => {
-    mount(withItems([a], { date: '2026-11-22', rehearsalAt: at }), { role: 'viewer' });
+    mount(withItems([a], { date: '2026-11-22', rehearsalAt: at }), { ministryRole: 'member' });
     expect(screen.getByText('Ensaio dom · 22/11 às 18h30')).toBeInTheDocument();
   });
 
@@ -542,8 +559,8 @@ describe('SetlistPage share button', () => {
     delete (navigator as { clipboard?: unknown }).clipboard;
   });
 
-  it.each(['viewer', 'member', 'admin'] as const)('shows it for %s', (role) => {
-    mount(withItems([a]), { role });
+  it.each(['member', 'admin'] as const)('shows it for %s', (ministryRole) => {
+    mount(withItems([a]), { ministryRole });
     expect(shareButton()).toBeInTheDocument();
   });
 
@@ -557,7 +574,7 @@ describe('SetlistPage share button', () => {
   it('shares the message through Web Share, with the link inside the text only', async () => {
     const share = vi.fn<(data: ShareData) => Promise<void>>(async () => {});
     stubShare({ share });
-    mount(withMissing(), { role: 'viewer' });
+    mount(withMissing(), { ministryRole: 'member' });
     fireEvent.click(shareButton()!);
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
     const arg = share.mock.calls[0]?.[0];
@@ -669,18 +686,18 @@ describe('SetlistPage read-only view (Paper 13)', () => {
   const NOTE = 'Somente leitura · só admins editam o repertório';
 
   it('shows the song count under the title', () => {
-    mount(withItems([a, b]), { role: 'viewer' });
+    mount(withItems([a, b]), { ministryRole: 'member' });
     const title = screen.getByRole('heading', { level: 1, name: 'Culto de domingo' });
     expect(title.nextElementSibling).toHaveTextContent('2 louvores');
   });
 
   it('uses the singular for a single louvor', () => {
-    mount(withItems([a]), { role: 'viewer' });
+    mount(withItems([a]), { ministryRole: 'member' });
     expect(screen.getByText('1 louvor')).toBeInTheDocument();
   });
 
   it('keeps the name as the link without the chevron inside it', () => {
-    mount(withItems([a]), { role: 'viewer' });
+    mount(withItems([a]), { ministryRole: 'member' });
     const link = screen.getByRole('link', { name: 'Sonda-me' });
     expect(link).toHaveAttribute('href', '/musicas/s1?tom=G&repertorio=r1&item=a');
     expect(link.querySelector('svg')).toBeNull();
@@ -690,14 +707,14 @@ describe('SetlistPage read-only view (Paper 13)', () => {
   });
 
   it('shows the key as a read-only pill, not a button', () => {
-    mount(withItems([a]), { role: 'viewer' });
+    mount(withItems([a]), { ministryRole: 'member' });
     const row = screen.getByRole('listitem');
     expect(within(row).queryByRole('button')).not.toBeInTheDocument();
     expect(row.querySelector('.setlist-item-key')).toHaveTextContent('G');
   });
 
   it('keeps a removed song dashed and without link or chevron', () => {
-    mount(withItems([{ id: 'x', songId: 'gone', key: 'C' }]), { role: 'viewer' });
+    mount(withItems([{ id: 'x', songId: 'gone', key: 'C' }]), { ministryRole: 'member' });
     const row = screen.getByRole('listitem');
     expect(row).toHaveClass('setlist-item-missing');
     expect(within(row).queryByRole('link')).not.toBeInTheDocument();
@@ -705,19 +722,19 @@ describe('SetlistPage read-only view (Paper 13)', () => {
   });
 
   it('ends the list with the read-only note for visitors', () => {
-    mount(withItems([a]), { role: 'viewer' });
+    mount(withItems([a]), { ministryRole: 'member' });
     expect(screen.getByText(NOTE)).toBeInTheDocument();
   });
 
   it('keeps members read-only too: only admins edit', () => {
-    mount(withItems([a]), { role: 'member' });
+    mount(withItems([a]), { ministryRole: 'member' });
     expect(screen.getByText(NOTE)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Adicionar/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Menu do repertório' })).not.toBeInTheDocument();
   });
 
   it('keeps the edit screen as it is: no count line and no read-only note for editors', () => {
-    mount(withItems([a, b]), { role: 'admin' });
+    mount(withItems([a, b]), { ministryRole: 'admin' });
     expect(screen.queryByText('2 louvores')).not.toBeInTheDocument();
     expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sonda-me' }).querySelector('svg')).not.toBeNull();
