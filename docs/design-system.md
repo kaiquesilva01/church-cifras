@@ -37,7 +37,7 @@ sombras pretas neutras (`rgb(0 0 0 / x%)`).
 | `--color-accent` | `#d97706` | `#f5a623` | **preenchimento** âmbar: botão de ação, FAB, tom escolhido |
 | `--color-accent-text` | `#b45309` | `#f5a623` | âmbar como **texto/ícone pequeno** (contraste) |
 | `--color-accent-soft` | âmbar 14% | âmbar 14% | fundo suave de destaque (tom padrão, banner, pad tocando) |
-| `--color-accent-border` | `rgb(217 119 6 / 40%)` | `rgb(245 166 35 / 40%)` | borda âmbar 40%: pílula de papel admin, pílula Aguardando, contador, Sim, campo em foco |
+| `--color-accent-border` | `rgb(217 119 6 / 40%)` | `rgb(245 166 35 / 40%)` | borda âmbar 40%: pílula de papel admin, pílula Aguardando, Sim, campo em foco |
 | `--color-on-accent` | `#15120a` | `#15120a` | texto sobre `--color-accent` |
 | `--color-primary`, `--color-on-primary` | `#111318` / `#fff` | `#fff` / `#0a0b0d` | ação neutra: avatar, chip ativo, botão do login |
 | `--color-success`, `--color-success-soft` | `#15803d` | `#34d399` | verde: tom já salvo, "Próximo", ok |
