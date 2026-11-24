@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createPushDeps } from './adminDeps';
+import { createPushDeps, ministriesOfUids } from './adminDeps';
 
 // Doc ref falso: o Firestore real recusa caminhos com segmento vazio ou número ímpar de segmentos.
 const fs = vi.hoisted(() => ({
   users: new Map<string, Record<string, unknown>>(),
   getAllCalls: [] as string[][],
   commits: [] as string[][],
+  // vínculos em ministries/{ministryId}/members/{uid}
+  members: [] as Array<{ ministryId: string; uid: string }>,
+  inQueries: [] as string[][],
 }));
 
 vi.mock('firebase-admin/firestore', () => {
@@ -32,6 +35,25 @@ vi.mock('firebase-admin/firestore', () => {
       };
     },
     collection: () => ({ get: async () => ({ docs: [] }) }),
+    collectionGroup: (name: string) => ({
+      where: (field: string, op: string, values: string[]) => ({
+        get: async () => {
+          if (name !== 'members' || field !== 'uid' || op !== 'in') {
+            throw new Error(`consulta inesperada: ${name} ${field} ${op}`);
+          }
+          // O Firestore recusa `in` com mais de 30 valores.
+          if (values.length > 30) throw new Error('in com mais de 30 valores');
+          fs.inQueries.push([...values]);
+          const docs = fs.members
+            .filter((m) => values.includes(m.uid))
+            .map((m) => ({
+              data: () => ({ uid: m.uid }),
+              ref: { parent: { parent: { id: m.ministryId } } },
+            }));
+          return { docs };
+        },
+      }),
+    }),
   };
   return { getFirestore: () => db };
 });
@@ -41,6 +63,8 @@ vi.mock('firebase-admin/messaging', () => ({ getMessaging: () => msg }));
 
 beforeEach(() => {
   fs.users.clear();
+  fs.members.length = 0;
+  fs.inQueries.length = 0;
   fs.getAllCalls.length = 0;
   fs.commits.length = 0;
   msg.sendEach.mockReset();
@@ -127,39 +151,47 @@ describe('createPushDeps.sendBatch', () => {
   });
 });
 
-describe('createPushDeps.getUserRoles', () => {
-  it('never calls getAll without uids', async () => {
-    const roles = await createPushDeps().getUserRoles([]);
+describe('ministriesOfUids', () => {
+  it('never queries without uids', async () => {
+    const out = await ministriesOfUids([]);
 
-    expect(roles.size).toBe(0);
-    expect(fs.getAllCalls).toEqual([]);
+    expect(out.size).toBe(0);
+    expect(fs.inQueries).toEqual([]);
   });
 
-  it('reads 301 uids in two getAll blocks of 300 and 1', async () => {
+  it('reads 301 uids in 11 queries of at most 30 values, one entry per uid', async () => {
     const uids = Array.from({ length: 301 }, (_, i) => `u${i}`);
-    for (const uid of uids) fs.users.set(uid, { role: 'member' });
+    for (const uid of uids) fs.members.push({ ministryId: 'hajaluz', uid });
 
-    const roles = await createPushDeps().getUserRoles(uids);
+    const out = await ministriesOfUids(uids);
 
-    expect(fs.getAllCalls.map((c) => c.length)).toEqual([300, 1]);
-    expect(roles.size).toBe(301);
+    expect(fs.inQueries.map((q) => q.length)).toEqual([...Array(10).fill(30), 1]);
+    expect(out.size).toBe(301);
+    expect(out.get('u300')).toEqual(new Set(['hajaluz']));
   });
 
-  it('skips invalid uids (empty or containing "/") instead of failing the whole read', async () => {
-    fs.users.set('m1', { role: 'admin' });
+  it('collects every ministry of a user', async () => {
+    fs.members.push({ ministryId: 'hajaluz', uid: 'm1' }, { ministryId: 'outro', uid: 'm1' });
 
-    const roles = await createPushDeps().getUserRoles(['', 'a/b', 'm1']);
+    const out = await ministriesOfUids(['m1']);
 
-    expect(fs.getAllCalls).toEqual([['users/m1']]);
-    expect([...roles]).toEqual([['m1', 'admin']]);
+    expect(out.get('m1')).toEqual(new Set(['hajaluz', 'outro']));
   });
 
-  it('returns no role for a user without a valid role field', async () => {
-    fs.users.set('v1', { role: 'superuser' });
+  it('skips invalid uids (empty, containing "/", duplicated) before querying', async () => {
+    fs.members.push({ ministryId: 'hajaluz', uid: 'm1' });
 
-    const roles = await createPushDeps().getUserRoles(['v1', 'ausente']);
+    await ministriesOfUids(['', 'a/b', 'm1', 'm1']);
 
-    expect(roles.size).toBe(0);
+    expect(fs.inQueries).toEqual([['m1']]);
+  });
+
+  it('leaves out a user without membership', async () => {
+    fs.members.push({ ministryId: 'hajaluz', uid: 'm1' });
+
+    const out = await ministriesOfUids(['m1', 'ausente']);
+
+    expect([...out.keys()]).toEqual(['m1']);
   });
 });
 

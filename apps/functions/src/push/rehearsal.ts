@@ -1,6 +1,6 @@
 import { todayInSaoPaulo } from '../stats/dates';
 import { formatCultoDate, readSetlist, toDate } from './newSetlist';
-import type { SendInput } from './send';
+import type { RepertorioSend } from './send';
 import type { Origin } from './token';
 
 // Brasília é UTC-3 o ano todo (sem horário de verão desde 2019).
@@ -24,6 +24,7 @@ export type RehearsalTipo = 'vespera' | 'dia' | 'perto';
 
 export type RehearsalSetlist = {
   id: string;
+  ministryId: string;
   label: string;
   origin: Origin;
   rehearsalAt: Date;
@@ -44,6 +45,7 @@ export function formatSaoPauloDay(rehearsalAt: Date, now: Date): 'hoje' | 'amanh
 
 export function readRehearsalSetlist(
   id: string,
+  ministryId: string,
   data: Record<string, unknown> | undefined,
 ): RehearsalSetlist | undefined {
   const setlist = readSetlist(data);
@@ -51,6 +53,7 @@ export function readRehearsalSetlist(
   if (setlist === undefined || rehearsalAt === undefined) return undefined;
   return {
     id,
+    ministryId,
     label: setlist.label,
     origin: setlist.origin,
     rehearsalAt,
@@ -111,11 +114,12 @@ export function buildRehearsalReminder(
   setlist: RehearsalSetlist,
   tipo: RehearsalTipo,
   previous: Date | undefined,
-): SendInput {
+): RepertorioSend {
   const at = setlist.rehearsalAt;
   const hour = formatSaoPauloHour(at);
   const weekdayDate = formatCultoDate(todayInSaoPaulo(at)) ?? '';
   const common = {
+    ministryId: setlist.ministryId,
     link: `/repertorios/${setlist.id}`,
     tag: `setlist-${setlist.id}-ensaio`,
     origin: setlist.origin,

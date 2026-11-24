@@ -1,9 +1,9 @@
-import type { Role } from '../roles';
 import { deviceId } from './token';
 import type { DeviceRecord, PushDeps, PushMessage, SendResult } from './types';
 
 export type FakeOptions = {
-  roles?: Record<string, Role>;
+  /** uid -> ministryIds. Quem não está aqui não tem ministério. */
+  ministries?: Record<string, string[]>;
   devices?: DeviceRecord[];
   config?: { enabled?: unknown } | null;
   /** token -> código de erro que o envio devolve para ele */
@@ -29,12 +29,15 @@ export function fakeDeps(opts: FakeOptions = {}) {
   const devices = new Map<string, Record<string, unknown>>(
     (opts.devices ?? []).map((d) => [d.id, { uid: d.uid, token: d.token, origin: d.origin }]),
   );
-  const roles = new Map<string, Role>(Object.entries(opts.roles ?? {}));
+  const ministries = new Map<string, string[]>(Object.entries(opts.ministries ?? {}));
   const clock = { now: FAKE_NOW };
   const calls: SentCall[] = [];
 
   const deps: PushDeps = {
-    getUserRole: async (uid) => roles.get(uid),
+    // A guarda de ministério não lê users/: só o vínculo conta.
+    readUser: async () => null,
+    listMembershipsOfUser: async (uid) =>
+      (ministries.get(uid) ?? []).map((ministryId) => ({ ministryId, role: 'member' as const })),
     getDeviceOwner: async (id) => {
       const owner = devices.get(id)?.uid;
       return typeof owner === 'string' ? owner : null;
@@ -52,8 +55,12 @@ export function fakeDeps(opts: FakeOptions = {}) {
         token: String(d.token),
         origin: d.origin,
       })),
-    getUserRoles: async (uids) =>
-      new Map(uids.filter((uid) => roles.has(uid)).map((uid) => [uid, roles.get(uid) as Role])),
+    getUserMinistries: async (uids) =>
+      new Map(
+        uids
+          .filter((uid) => ministries.has(uid))
+          .map((uid) => [uid, new Set(ministries.get(uid))] as const),
+      ),
     sendBatch: async (messages) => {
       calls.push(messages);
       return messages.map(({ token }): SendResult => {

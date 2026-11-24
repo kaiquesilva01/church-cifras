@@ -145,8 +145,14 @@ describe('formatCultoDate: dia da semana independe do fuso', () => {
 describe('buildNewSetlistMessage', () => {
   it('criação: exclui createdBy (não updatedBy); texto, link, tag e origem', () => {
     expect(
-      buildNewSetlistMessage('r1', snap(4, { createdBy: 'a1', updatedBy: 'm1' }), undefined),
+      buildNewSetlistMessage(
+        'r1',
+        'hajaluz',
+        snap(4, { createdBy: 'a1', updatedBy: 'm1' }),
+        undefined,
+      ),
     ).toEqual({
+      ministryId: 'hajaluz',
       title: 'Novo repertório',
       body: 'Culto de domingo · dom 22/11',
       link: '/repertorios/r1',
@@ -160,6 +166,7 @@ describe('buildNewSetlistMessage', () => {
   it('atualização: exclui updatedBy, não createdBy', () => {
     const msg = buildNewSetlistMessage(
       'r1',
+      'hajaluz',
       snap(4, { createdBy: 'a1', updatedBy: 'm1' }),
       snap(3),
     );
@@ -167,12 +174,14 @@ describe('buildNewSetlistMessage', () => {
   });
 
   it('repassa a origem teste', () => {
-    expect(buildNewSetlistMessage('r1', snap(4, { origin: 'teste' }), snap(3))?.origin).toBe(
-      'teste',
-    );
+    expect(
+      buildNewSetlistMessage('r1', 'hajaluz', snap(4, { origin: 'teste' }), snap(3))?.origin,
+    ).toBe('teste');
   });
 
   it('data inválida não monta mensagem', () => {
-    expect(buildNewSetlistMessage('r1', snap(4, { date: '2026-02-31' }), snap(3))).toBeNull();
+    expect(
+      buildNewSetlistMessage('r1', 'hajaluz', snap(4, { date: '2026-02-31' }), snap(3)),
+    ).toBeNull();
   });
 });

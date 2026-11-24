@@ -40,7 +40,20 @@ function setup(fake: FakeOptions = {}, existing: string[] = []) {
   return { annDeps, calls, markers, claims };
 }
 
-const members = { roles: { m1: 'member', a1: 'admin' } } satisfies FakeOptions;
+const members = { ministries: { m1: ['hajaluz'], a1: ['hajaluz'] } } satisfies FakeOptions;
+
+describe('announceNewSetlist: ministério', () => {
+  it('envia o aviso de repertório novo só ao ministério do repertório', async () => {
+    const { annDeps, calls } = setup({
+      devices: [device('t-a', 'ana'), device('t-b', 'bia')],
+      ministries: { ana: ['hajaluz'], bia: ['outro'] },
+    });
+
+    await announceNewSetlist(annDeps, 's1', 'hajaluz', undefined, setlist(4));
+
+    expect(sentTokens(calls)).toEqual(['t-a']);
+  });
+});
 
 describe('announceNewSetlist: envio e marca', () => {
   it('cria a marca com os campos exatos e avisa quem não gravou', async () => {
@@ -53,6 +66,7 @@ describe('announceNewSetlist: envio e marca', () => {
     const result = await announceNewSetlist(
       annDeps,
       'r1',
+      'hajaluz',
       undefined,
       setlist(4, { updatedBy: 'm1' }),
     );
@@ -76,7 +90,7 @@ describe('announceNewSetlist: envio e marca', () => {
   it('marca de envio anterior: 3 → 4 não envia de novo', async () => {
     const { annDeps, calls } = setup({ ...members, devices: [device('t1', 'm1')] }, ['r1_novo']);
 
-    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe(
+    expect(await announceNewSetlist(annDeps, 'r1', 'hajaluz', setlist(3), setlist(4))).toBe(
       'already-announced',
     );
     expect(calls).toEqual([]);
@@ -85,8 +99,8 @@ describe('announceNewSetlist: envio e marca', () => {
   it('reentrega do mesmo evento não duplica', async () => {
     const { annDeps, calls } = setup({ ...members, devices: [device('t1', 'm1')] });
 
-    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('sent');
-    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe(
+    expect(await announceNewSetlist(annDeps, 'r1', 'hajaluz', setlist(3), setlist(4))).toBe('sent');
+    expect(await announceNewSetlist(annDeps, 'r1', 'hajaluz', setlist(3), setlist(4))).toBe(
       'already-announced',
     );
     expect(sentTokens(calls)).toEqual(['t1']);
@@ -95,9 +109,11 @@ describe('announceNewSetlist: envio e marca', () => {
   it('sequência 3 → 4 → 3 → 4: avisa uma vez só, mesmo caindo abaixo de 4', async () => {
     const { annDeps, calls, markers } = setup({ ...members, devices: [device('t1', 'm1')] });
 
-    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('sent');
-    expect(await announceNewSetlist(annDeps, 'r1', setlist(4), setlist(3))).toBe('not-due');
-    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe(
+    expect(await announceNewSetlist(annDeps, 'r1', 'hajaluz', setlist(3), setlist(4))).toBe('sent');
+    expect(await announceNewSetlist(annDeps, 'r1', 'hajaluz', setlist(4), setlist(3))).toBe(
+      'not-due',
+    );
+    expect(await announceNewSetlist(annDeps, 'r1', 'hajaluz', setlist(3), setlist(4))).toBe(
       'already-announced',
     );
     expect(sentTokens(calls)).toEqual(['t1']);
@@ -111,7 +127,13 @@ describe('announceNewSetlist: envio e marca', () => {
     });
 
     expect(
-      await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4, { updatedBy: 'm1' })),
+      await announceNewSetlist(
+        annDeps,
+        'r1',
+        'hajaluz',
+        setlist(3),
+        setlist(4, { updatedBy: 'm1' }),
+      ),
     ).toBe('sent');
     expect(sentTokens(calls)).toEqual(['t2']);
   });
@@ -119,7 +141,13 @@ describe('announceNewSetlist: envio e marca', () => {
   it('marca não vence antes de um repertório com data futura', async () => {
     const { annDeps, markers } = setup({ ...members, devices: [] });
 
-    await announceNewSetlist(annDeps, 'r1', undefined, setlist(4, { expiresAt: plus(200) }));
+    await announceNewSetlist(
+      annDeps,
+      'r1',
+      'hajaluz',
+      undefined,
+      setlist(4, { expiresAt: plus(200) }),
+    );
 
     expect(markers.get('r1_novo')?.expiresAt).toEqual(plus(200));
   });
@@ -131,7 +159,9 @@ describe('announceNewSetlist: envio e marca', () => {
       devices: [device('t1', 'm1')],
     });
 
-    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('blocked');
+    expect(await announceNewSetlist(annDeps, 'r1', 'hajaluz', setlist(3), setlist(4))).toBe(
+      'blocked',
+    );
     expect(calls).toEqual([]);
     expect(markers.has('r1_novo')).toBe(true);
   });
@@ -143,7 +173,13 @@ describe('announceNewSetlist: envio e marca', () => {
     });
 
     expect(
-      await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4, { origin: 'teste' })),
+      await announceNewSetlist(
+        annDeps,
+        'r1',
+        'hajaluz',
+        setlist(3),
+        setlist(4, { origin: 'teste' }),
+      ),
     ).toBe('sent');
     expect(sentTokens(calls)).toEqual(['t2']);
   });
@@ -156,7 +192,9 @@ describe('announceNewSetlist: envio e marca', () => {
       throw Object.assign(new Error('fcm fora'), { code: 'unavailable' });
     };
 
-    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('failed');
+    expect(await announceNewSetlist(annDeps, 'r1', 'hajaluz', setlist(3), setlist(4))).toBe(
+      'failed',
+    );
     expect(markers.has('r1_novo')).toBe(true);
     expect(errorSpy).toHaveBeenCalledWith('push: falha ao avisar repertório novo', {
       setlistId: 'r1',
@@ -172,7 +210,9 @@ describe('announceNewSetlist: envio e marca', () => {
       throw Object.assign(new Error('fcm fora'), { code: { detalhe: 'token-xyz' } });
     };
 
-    expect(await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).toBe('failed');
+    expect(await announceNewSetlist(annDeps, 'r1', 'hajaluz', setlist(3), setlist(4))).toBe(
+      'failed',
+    );
     expect(errorSpy).toHaveBeenCalledWith('push: falha ao avisar repertório novo', {
       setlistId: 'r1',
       code: 'error',
@@ -185,9 +225,9 @@ describe('announceNewSetlist: envio e marca', () => {
       throw Object.assign(new Error('unavailable'), { code: 14 });
     };
 
-    await expect(announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4))).rejects.toThrow(
-      'unavailable',
-    );
+    await expect(
+      announceNewSetlist(annDeps, 'r1', 'hajaluz', setlist(3), setlist(4)),
+    ).rejects.toThrow('unavailable');
     expect(calls).toEqual([]);
   });
 
@@ -195,7 +235,13 @@ describe('announceNewSetlist: envio e marca', () => {
     const { annDeps, claims, calls } = setup({ ...members, devices: [device('t1', 'm1')] });
 
     expect(
-      await announceNewSetlist(annDeps, 'r1', setlist(3), setlist(4, { date: '2026-02-31' })),
+      await announceNewSetlist(
+        annDeps,
+        'r1',
+        'hajaluz',
+        setlist(3),
+        setlist(4, { date: '2026-02-31' }),
+      ),
     ).toBe('invalid');
     expect(claims).toEqual([]);
     expect(calls).toEqual([]);
@@ -231,7 +277,7 @@ describe('announceNewSetlist: quando não avisa', () => {
   ])('%s: "not-due", sem marca e sem envio', async (_name, before, after) => {
     const { annDeps, claims, calls } = setup({ ...members, devices: [device('t1', 'm1')] });
 
-    expect(await announceNewSetlist(annDeps, 'r1', before, after)).toBe('not-due');
+    expect(await announceNewSetlist(annDeps, 'r1', 'hajaluz', before, after)).toBe('not-due');
     expect(claims).toEqual([]);
     expect(calls).toEqual([]);
   });

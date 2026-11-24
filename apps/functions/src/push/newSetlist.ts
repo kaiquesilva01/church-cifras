@@ -1,4 +1,4 @@
-import type { SendInput } from './send';
+import type { RepertorioSend } from './send';
 import { parseOrigin, type Origin } from './token';
 
 /** Quantidade de louvores em que o repertório passa a valer o aviso. */
@@ -89,14 +89,16 @@ export function formatCultoDate(date: string): string | null {
 /** Mensagem do aviso. Não envia nada: quem chama passa o resultado a `sendToDevices`. */
 export function buildNewSetlistMessage(
   setlistId: string,
+  ministryId: string,
   setlist: SetlistSnapshot,
   before: SetlistSnapshot | undefined,
-): SendInput | null {
+): RepertorioSend | null {
   const when = formatCultoDate(setlist.date);
   if (when === null) return null;
   // Quem fez a mudança não recebe o aviso: o criador na criação, quem editou na atualização.
   const actor = before ? setlist.updatedBy : setlist.createdBy;
   return {
+    ministryId,
     title: 'Novo repertório',
     body: `${setlist.label} · ${when}`,
     link: `/repertorios/${setlistId}`,

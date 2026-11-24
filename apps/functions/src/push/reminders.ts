@@ -16,7 +16,7 @@ export type ReminderDeps = PushDeps &
     listRehearsalSetlists(
       after: Date,
       until: Date,
-    ): Promise<Array<{ id: string; data: Record<string, unknown> }>>;
+    ): Promise<Array<{ id: string; ministryId: string; data: Record<string, unknown> }>>;
     listRehearsalMarkers(setlistId: string): Promise<Array<Record<string, unknown>>>;
   };
 
@@ -64,7 +64,7 @@ export async function runRehearsalReminders(deps: ReminderDeps): Promise<Reminde
 
   const docs = await deps.listRehearsalSetlists(now, new Date(now.getTime() + LOOKAHEAD_MS));
   for (const doc of docs) {
-    const setlist = readRehearsalSetlist(doc.id, doc.data);
+    const setlist = readRehearsalSetlist(doc.id, doc.ministryId, doc.data);
     if (setlist === undefined) continue;
     try {
       await remind(deps, setlist, now, run);

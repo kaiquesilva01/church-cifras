@@ -92,7 +92,7 @@ export const onUserCreated = functionsV1
   });
 
 export { onArrangementWritten } from './songs/keys';
-export { onSetlistWritten } from './push/setlistTrigger';
+export { onMinistrySetlistWritten } from './push/setlistTrigger';
 export { sendRehearsalReminders } from './push/reminderSchedule';
 export { mirrorSetlists } from './ministries/mirrorTrigger';
 
