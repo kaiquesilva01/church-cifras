@@ -1,4 +1,4 @@
-import { useRef, useState, type MouseEvent } from 'react';
+import { useState } from 'react';
 import { SearchInput } from '../../ui/SearchInput';
 import { initialsOf } from '../../ui/initials';
 import { normalizeForSearch } from '../normalize';
@@ -12,6 +12,36 @@ const SKELETON_WIDTHS = [
   { title: 96, line: 64 },
   { title: 136, line: 80 },
 ] as const;
+
+/** Esqueleto da tela 50 (carregando): três linhas de esqueleto dentro do cartão de lista. */
+export function EntryListSkeleton() {
+  return (
+    <div className="entry-card" aria-busy="true">
+      <span role="status" className="sr-only">
+        Carregando…
+      </span>
+      {SKELETON_WIDTHS.map((w, i) => (
+        <div key={i} className="entry-row" aria-hidden="true">
+          <span className="skeleton skeleton-tile" />
+          <span className="entry-row-text">
+            <span className="skeleton skeleton-title" style={{ width: w.title }} />
+            <span className="skeleton skeleton-line" style={{ width: w.line }} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Caixa informativa da tela 50 ("Removido do ministério"), usada na escolha e no pedido enviado. */
+export function RemovedNotice({ ministryName }: { ministryName: string }) {
+  return (
+    <div className="entry-notice">
+      <p className="entry-notice-title">Você não faz mais parte de {ministryName}.</p>
+      <p className="entry-alert-text">Escolha um ministério para continuar.</p>
+    </div>
+  );
+}
 
 /** Tela 34 (escolha) com as caixas de 37 (recusado) e de 50 (removido). Quem lê o catálogo é a EntryPage. */
 export function EntryChoose({
@@ -37,25 +67,15 @@ export function EntryChoose({
 }) {
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<MinistryItem | null>(null);
-  const returnFocus = useRef<HTMLElement | null>(null);
 
   const needle = normalizeForSearch(query);
   const shown = catalog.list.filter((m) =>
     normalizeForSearch(`${m.name} ${m.city}`).includes(needle),
   );
+  // Sem o catálogo carregado o nome é desconhecido: a caixa usa o texto genérico (inferido).
   const rejectedName = rejectedId
     ? (catalog.list.find((m) => m.id === rejectedId)?.name ?? 'o ministério')
     : null;
-
-  function pick(ministry: MinistryItem, event: MouseEvent<HTMLButtonElement>) {
-    returnFocus.current = event.currentTarget;
-    setPicked(ministry);
-  }
-
-  function close() {
-    setPicked(null);
-    returnFocus.current?.focus();
-  }
 
   return (
     <main className="entry-screen">
@@ -78,12 +98,7 @@ export function EntryChoose({
         </div>
       )}
 
-      {removedFrom && (
-        <div className="entry-notice">
-          <p className="entry-notice-title">Você não faz mais parte de {removedFrom}.</p>
-          <p className="entry-alert-text">Escolha um ministério para continuar.</p>
-        </div>
-      )}
+      {removedFrom && <RemovedNotice ministryName={removedFrom} />}
 
       <SearchInput
         value={query}
@@ -92,22 +107,7 @@ export function EntryChoose({
         placeholder="Buscar ministério…"
       />
 
-      {catalog.status === 'loading' && (
-        <div className="entry-card" aria-busy="true">
-          <span role="status" className="sr-only">
-            Carregando…
-          </span>
-          {SKELETON_WIDTHS.map((w, i) => (
-            <div key={i} className="entry-row" aria-hidden="true">
-              <span className="skeleton skeleton-tile" />
-              <span className="entry-row-text">
-                <span className="skeleton skeleton-title" style={{ width: w.title }} />
-                <span className="skeleton skeleton-line" style={{ width: w.line }} />
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      {catalog.status === 'loading' && <EntryListSkeleton />}
 
       {catalog.status === 'error' && (
         <div className="error-box">
@@ -135,7 +135,7 @@ export function EntryChoose({
               type="button"
               className="entry-row"
               aria-label={`Pedir para entrar em ${m.name}, ${m.city}`}
-              onClick={(event) => pick(m, event)}
+              onClick={() => setPicked(m)}
             >
               <span className="min-tile" aria-hidden="true">
                 {initialsOf(m.name)}
@@ -167,7 +167,7 @@ export function EntryChoose({
         </p>
       )}
 
-      {picked && <EntryConfirm api={api} ministry={picked} onClose={close} />}
+      {picked && <EntryConfirm api={api} ministry={picked} onClose={() => setPicked(null)} />}
     </main>
   );
 }

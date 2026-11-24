@@ -176,6 +176,47 @@ describe('EntryPage', () => {
     expect(listMinistries).toHaveBeenCalledTimes(2);
   });
 
+  it('o aviso de remoção não é apagado antes de aparecer (pedidos ainda carregando)', () => {
+    setRemovedNotice('Haja Luz');
+    const api = createFakeMinistriesApi({
+      listMinistries: vi.fn(() => Promise.resolve([haja])),
+      subscribeMyRequests: vi.fn(() => () => {}),
+    });
+    renderEntry({ api });
+    expect(sessionStorage.getItem('cifras:removido')).toBe('Haja Luz');
+  });
+
+  it('o aviso de remoção aparece no pedido enviado', async () => {
+    setRemovedNotice('Vida Nova');
+    const api = createFakeMinistriesApi({
+      listMinistries: vi.fn(() => Promise.resolve([haja])),
+      subscribeMyRequests: fakeSubscribe([{ ministryId: 'hajaluz', status: 'pending' }]),
+    });
+    renderEntry({ api });
+    expect(await screen.findByText('Você não faz mais parte de Vida Nova.')).toBeInTheDocument();
+    expect(sessionStorage.getItem('cifras:removido')).toBeNull();
+  });
+
+  it('depois de enviar o pedido, o foco vai para o título de Pedido enviado', async () => {
+    let emit!: (r: Request[]) => void;
+    const api = createFakeMinistriesApi({
+      listMinistries: vi.fn(() => Promise.resolve([haja])),
+      subscribeMyRequests: vi.fn((_uid, cb) => {
+        emit = cb;
+        cb([]);
+        return () => {};
+      }),
+    });
+    renderEntry({ api });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Pedir para entrar em Haja Luz, São Paulo' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Pedir para entrar' }));
+    await waitFor(() => expect(api.callable.requestAccess).toHaveBeenCalledWith('hajaluz'));
+    act(() => emit([{ ministryId: 'hajaluz', status: 'pending' }]));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Pedido enviado' })).toHaveFocus();
+  });
+
   it('Sair chama signOut', async () => {
     const { signOut } = renderEntry({
       api: createFakeMinistriesApi({ subscribeMyRequests: fakeSubscribe([]) }),

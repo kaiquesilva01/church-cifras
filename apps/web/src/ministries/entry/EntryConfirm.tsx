@@ -1,11 +1,16 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
+import { useFocusTrap } from '../../viewer/useFocusTrap';
 import { initialsOf } from '../../ui/initials';
 import { messageFor } from '../callable';
 import type { MinistriesApi, MinistryItem } from '../ministriesApi';
 
 const FALLBACK = 'Não foi possível enviar o pedido. Tente de novo.';
 
-/** Diálogo 35: confirma o pedido de entrada num ministério. Esc e toque no scrim cancelam. */
+/**
+ * Diálogo 35: confirma o pedido de entrada num ministério. Esc, Cancelar e toque no scrim fecham;
+ * Tab fica preso no diálogo. Em sucesso o diálogo continua ocupado: a assinatura de pedidos troca a
+ * tela inteira (EntrySent), então não há linha para devolver o foco.
+ */
 export function EntryConfirm({
   api,
   ministry,
@@ -16,17 +21,16 @@ export function EntryConfirm({
   onClose: () => void;
 }) {
   const titleId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useFocusTrap(rootRef, { onEscape: onClose, busy });
+
   useEffect(() => {
     cancelRef.current?.focus();
   }, []);
-
-  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Escape' && !busy) onClose();
-  }
 
   function onScrimClick(event: MouseEvent<HTMLDivElement>) {
     if (event.target === event.currentTarget && !busy) onClose();
@@ -37,8 +41,9 @@ export function EntryConfirm({
     setError(null);
     try {
       await api.callable.requestAccess(ministry.id);
-      onClose();
     } catch (err) {
+      // Código conhecido do servidor: a mensagem em pt-BR dele é a que a pessoa vê (decisão do
+      // orquestrador); o texto da especificação é só o fallback (ver messageFor em callable.ts).
       setError(messageFor(err, FALLBACK));
       setBusy(false);
     }
@@ -47,11 +52,12 @@ export function EntryConfirm({
   return (
     <div className="dialog-backdrop" onClick={onScrimClick}>
       <div
+        ref={rootRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className="dialog entry-dialog"
-        onKeyDown={onKeyDown}
       >
         <div className="entry-dialog-head">
           <span className="min-tile min-tile--dialog" aria-hidden="true">

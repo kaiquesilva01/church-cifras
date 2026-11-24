@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { clearRemovedNotice, peekRemovedNotice } from '../../auth/removedNotice';
 import { useAuth } from '../../auth/useAuth';
 import type { MinistriesApi } from '../ministriesApi';
-import { EntryChoose, type Catalog } from './EntryChoose';
+import { EntryChoose, EntryListSkeleton, type Catalog } from './EntryChoose';
 import { EntrySent } from './EntrySent';
 
 type Requests = {
@@ -32,9 +32,11 @@ export function EntryPage({ api }: { api: MinistriesApi }) {
   const [busy, setBusy] = useState(false);
   const [exitFailed, setExitFailed] = useState(false);
 
+  // Só apaga depois de mostrar: a caixa aparece na escolha e no pedido enviado, que só existem com a
+  // leitura de pedidos pronta (antes disso a tela é o esqueleto).
   useEffect(() => {
-    clearRemovedNotice();
-  }, []);
+    if (requests.loaded && removed) clearRemovedNotice();
+  }, [requests.loaded, removed]);
 
   useEffect(() => {
     let active = true;
@@ -74,10 +76,8 @@ export function EntryPage({ api }: { api: MinistriesApi }) {
 
   if (!requests.loaded && !requests.failed)
     return (
-      <main className="entry-screen" aria-busy="true">
-        <p role="status" className="sr-only">
-          Carregando…
-        </p>
+      <main className="entry-screen">
+        <EntryListSkeleton />
       </main>
     );
 
@@ -97,6 +97,7 @@ export function EntryPage({ api }: { api: MinistriesApi }) {
           }
         }}
         onExit={exit}
+        removedFrom={removed}
         exitFailed={exitFailed}
         busy={busy}
       />

@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { createFakeMinistriesApi } from '../../test/fakeMinistriesApi';
 import type { MinistryItem } from '../ministriesApi';
+import { CallableError } from '../callable';
 import { EntryConfirm } from './EntryConfirm';
 
 const haja: MinistryItem = {
@@ -60,8 +61,41 @@ describe('EntryConfirm', () => {
     const busy = screen.getByRole('button', { name: 'Pedir para entrar' });
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute('aria-busy', 'true');
-    resolve();
-    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    await act(async () => resolve());
+    // Sucesso: a assinatura de pedidos troca a tela; o diálogo não fecha sozinho nem devolve foco.
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('Tab fica preso no diálogo', () => {
+    render(<EntryConfirm api={createFakeMinistriesApi()} ministry={haja} onClose={vi.fn()} />);
+    const cancel = screen.getByRole('button', { name: 'Cancelar' });
+    const confirm = screen.getByRole('button', { name: 'Pedir para entrar' });
+    confirm.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(cancel).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(confirm).toHaveFocus();
+  });
+
+  it('erro com código conhecido mostra a mensagem do servidor', async () => {
+    const api = createFakeMinistriesApi({
+      callable: {
+        requestAccess: vi.fn(() =>
+          Promise.reject(
+            new CallableError(
+              'failed-precondition',
+              'Você já tem um pedido pendente em outro ministério.',
+            ),
+          ),
+        ),
+      },
+    });
+    render(<EntryConfirm api={api} ministry={haja} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pedir para entrar' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Você já tem um pedido pendente em outro ministério.',
+    );
   });
 
   it('erro mostra a mensagem dentro do diálogo e libera o botão', async () => {
