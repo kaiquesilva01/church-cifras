@@ -9,7 +9,7 @@ export type GuardDeps = {
 };
 
 function signedIn(uid: string | undefined): string {
-  if (!uid) throw new HttpsError('unauthenticated', 'Login required.');
+  if (!uid) throw new HttpsError('unauthenticated', 'Faça login para continuar.');
   return uid;
 }
 

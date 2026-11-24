@@ -85,3 +85,37 @@ describe('requireCatalogContributor (tom gerado, descarte de upload)', () => {
     });
   });
 });
+
+describe('sem uid: unauthenticated em todos os guards', () => {
+  it.each([
+    ['requireAppAdmin', requireAppAdmin],
+    ['requireMinistryMember', requireMinistryMember],
+    ['requireUploader', requireUploader],
+    ['requireCatalogContributor', requireCatalogContributor],
+  ])('%s', async (_name, guard) => {
+    await expect(guard(d, undefined)).rejects.toMatchObject({
+      code: 'unauthenticated',
+      message: 'Faça login para continuar.',
+    });
+  });
+});
+
+describe('falha fechada', () => {
+  it('users/{uid} ausente nega o admin da app', async () => {
+    const semDoc = deps({}, {});
+    await expect(requireAppAdmin(semDoc, 'fantasma')).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+    await expect(requireUploader(semDoc, 'fantasma')).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+  });
+  it("appAdmin como string 'true' não vale como admin", async () => {
+    const str: GuardDeps = {
+      readUser: async () => ({ appAdmin: 'true' as unknown as boolean }),
+      listMembershipsOfUser: async () => [],
+    };
+    await expect(requireAppAdmin(str, 'x')).rejects.toMatchObject({ code: 'permission-denied' });
+    await expect(requireUploader(str, 'x')).rejects.toMatchObject({ code: 'permission-denied' });
+  });
+});
