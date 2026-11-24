@@ -53,7 +53,10 @@ afterAll(async () => {
 
 type Db = ReturnType<ReturnType<RulesTestEnvironment['authenticatedContext']>['firestore']>;
 
-const memberDb = (): Db => env.authenticatedContext('m1', { role: 'member' }).firestore();
+const memberDb = (): Db =>
+  env
+    .authenticatedContext('m1', { role: 'member', hasMinistry: true, canUploadSong: true })
+    .firestore();
 
 const songData = (over: Record<string, unknown> = {}) => ({
   title: 'Sonda-me',
@@ -412,6 +415,109 @@ describe('firestore.rules', () => {
     const db = env.authenticatedContext('a1', { role: 'admin' }).firestore();
     await assertFails(getDoc(doc(db, 'secret/x')));
     await assertFails(setDoc(doc(db, 'secret/y'), { a: 1 }));
+  });
+
+  describe('catálogo por claims (pacote)', () => {
+    const lyricsData = (over: Record<string, unknown> = {}) => ({
+      text: 'Letra de teste',
+      createdBy: 'm',
+      createdAt: serverTimestamp(),
+      ...over,
+    });
+    const membro = () =>
+      env
+        .authenticatedContext('m', { role: 'member', hasMinistry: true, canUploadSong: false })
+        .firestore();
+
+    beforeEach(async () => {
+      await env.clearFirestore();
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'songs/s1'), songData({ createdBy: 'm' }));
+      });
+    });
+
+    it('sem claim novo e com role viewer, não lê o catálogo', async () => {
+      const db = env.authenticatedContext('v', { role: 'viewer' }).firestore();
+      await assertFails(getDoc(doc(db, 'songs/s1')));
+    });
+
+    it('hasMinistry verdadeiro lê o catálogo', async () => {
+      await assertSucceeds(getDoc(doc(membro(), 'songs/s1')));
+    });
+
+    it('hasMinistry falso não lê, mesmo com role member (removido com token antigo)', async () => {
+      const db = env
+        .authenticatedContext('r', { role: 'member', hasMinistry: false, canUploadSong: false })
+        .firestore();
+      await assertFails(getDoc(doc(db, 'songs/s1')));
+    });
+
+    it('token antigo sem claim novo lê pelo role legado', async () => {
+      const db = env.authenticatedContext('old', { role: 'member' }).firestore();
+      await assertSucceeds(getDoc(doc(db, 'songs/s1')));
+    });
+
+    it('membro sem canUploadSong não cria música nova nem letra', async () => {
+      await assertFails(setDoc(doc(membro(), 'songs/s2'), songData({ createdBy: 'm' })));
+      await assertFails(setDoc(doc(membro(), 'songLyrics/s1'), lyricsData()));
+    });
+
+    it('admin de ministério (canUploadSong) cria música nova', async () => {
+      const db = env
+        .authenticatedContext('a', { role: 'member', hasMinistry: true, canUploadSong: true })
+        .firestore();
+      await assertSucceeds(setDoc(doc(db, 'songs/s2'), songData({ createdBy: 'a' })));
+    });
+
+    it('membro cria tom gerado a partir de tom feito à mão (slug = tom, sensível a caixa)', async () => {
+      await seedArrangement('C', { key: 'C', source: 'handmade' });
+      await assertSucceeds(
+        setDoc(
+          doc(membro(), 'songs/s1/arrangements/D'),
+          arrData({
+            key: 'D',
+            storagePath: 'songs/s1/D-abc.pdf',
+            source: 'generated',
+            derivedFromKey: 'C',
+            writer: 'overlay',
+            createdBy: 'm',
+          }),
+        ),
+      );
+    });
+
+    it('admin da app sem ministério também cria tom gerado', async () => {
+      await seedArrangement('C', { key: 'C', source: 'handmade' });
+      const db = env.authenticatedContext('chefe', { appAdmin: true }).firestore();
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'songs/s1/arrangements/D'),
+          arrData({
+            key: 'D',
+            storagePath: 'songs/s1/D-abc.pdf',
+            source: 'generated',
+            derivedFromKey: 'C',
+            writer: 'overlay',
+            createdBy: 'chefe',
+          }),
+        ),
+      );
+    });
+
+    it('membro não cria tom feito à mão', async () => {
+      await assertFails(
+        setDoc(
+          doc(membro(), 'songs/s1/arrangements/D'),
+          arrData({ key: 'D', storagePath: 'songs/s1/D-abc.pdf', createdBy: 'm' }),
+        ),
+      );
+    });
+
+    it('admin da app lê e cria música sem ministério', async () => {
+      const db = env.authenticatedContext('chefe', { appAdmin: true, role: 'viewer' }).firestore();
+      await assertSucceeds(getDoc(doc(db, 'songs/s1')));
+      await assertSucceeds(setDoc(doc(db, 'songs/s3'), songData({ createdBy: 'chefe' })));
+    });
   });
 });
 
