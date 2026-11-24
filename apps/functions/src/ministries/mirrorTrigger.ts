@@ -9,7 +9,9 @@ import { syncSetlistMirror } from './mirror';
 const rootRef = (id: string) => getFirestore().doc(`setlists/${id}`);
 const targetRef = (id: string) => getFirestore().doc(`ministries/${HAJALUZ_ID}/setlists/${id}`);
 
-// Escreve só no caminho do ministério, então não dispara o aviso de push (que ouve `setlists/{id}`).
+// A escrita no caminho do ministério dispara `onMinistrySetlistWritten`, então o aviso de novo repertório
+// sai também para o espelho. Não há duplicata: a marca `${setlistId}_novo` bloqueia o segundo envio, e o
+// destino é sempre `ministries/hajaluz`. O espelho sai na Tarefa 12.
 export const mirrorSetlists = onDocumentWritten(
   { document: 'setlists/{setlistId}', region: 'southamerica-east1', retry: true },
   (event) => {

@@ -466,6 +466,19 @@ describe('runRehearsalReminders: interruptor, origem e falhas', () => {
     expect(sentTokens(calls)).toEqual(['t-a']);
   });
 
+  it('lembrete de repertório de outro ministério: só o outro recebe, hajaluz não', async () => {
+    const outro: Doc = { ...doc('r9', br('2026-11-21', '17:20')), ministryId: 'outro' };
+    const { reminderDeps, calls, clock } = setup([outro], {
+      devices: [device('t-hajaluz', 'ana'), device('t-outro', 'bia')],
+      ministries: { ana: ['hajaluz'], bia: ['outro'] },
+    });
+    clock.now = br('2026-11-21', '17:00');
+
+    await runRehearsalReminders(reminderDeps);
+
+    expect(sentTokens(calls)).toEqual(['t-outro']);
+  });
+
   it('viewer: aviso de 1 hora vai só ao membro, e o aparelho do viewer é removido', async () => {
     const { reminderDeps, calls, clock } = setup([doc('r1', br('2026-11-21', '17:20'))], {
       ministries: { m1: ['hajaluz'] },

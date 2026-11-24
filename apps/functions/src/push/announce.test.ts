@@ -53,6 +53,17 @@ describe('announceNewSetlist: ministério', () => {
 
     expect(sentTokens(calls)).toEqual(['t-a']);
   });
+
+  it('repertório de outro ministério: só membros dele recebem; hajaluz não recebe nada', async () => {
+    const { annDeps, calls } = setup({
+      devices: [device('t-hajaluz', 'ana'), device('t-outro', 'bia')],
+      ministries: { ana: ['hajaluz'], bia: ['outro'] },
+    });
+
+    await announceNewSetlist(annDeps, 's9', 'outro', undefined, setlist(4));
+
+    expect(sentTokens(calls)).toEqual(['t-outro']);
+  });
 });
 
 describe('announceNewSetlist: envio e marca', () => {

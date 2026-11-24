@@ -59,6 +59,20 @@ describe('createReminderDeps.listRehearsalSetlists', () => {
   });
 });
 
+describe('createReminderDeps.listRehearsalSetlists: outro ministério', () => {
+  it('o ministryId vem do caminho do documento, nunca de hajaluz por padrão', async () => {
+    fs.docs.push({
+      id: 's9',
+      data: () => ({ label: 'Outro' }),
+      ref: { parent: { parent: { id: 'outro' } } },
+    });
+
+    const found = await createReminderDeps().listRehearsalSetlists(new Date(0), new Date());
+
+    expect(found.map((s) => [s.id, s.ministryId])).toEqual([['s9', 'outro']]);
+  });
+});
+
 describe('createReminderDeps.listRehearsalMarkers', () => {
   it('consulta avisosEnviados pelo setlistId', async () => {
     fs.docs.push({ id: 'r1_perto_1', data: () => ({ setlistId: 'r1', tipo: 'perto' }) });

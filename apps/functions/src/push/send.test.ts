@@ -260,7 +260,43 @@ describe('sendToDevices: aviso só para o ministério do repertório', () => {
   });
 });
 
+describe('sendToDevices: falha ao ler vínculos', () => {
+  it('nada é enviado nem apagado quando getUserMinistries falha', async () => {
+    const {
+      deps: base,
+      devices,
+      calls,
+    } = fakeDeps({
+      devices: [device('t-a', 'ana'), device('t-x', 'saiu')],
+      ministries: { ana: ['hajaluz'] },
+    });
+    const deps = {
+      ...base,
+      getUserMinistries: async () => {
+        throw new Error('firestore indisponível');
+      },
+    };
+
+    await expect(sendToDevices(deps, REP)).rejects.toThrow('firestore indisponível');
+
+    expect(calls).toEqual([]);
+    expect(devices.size).toBe(2);
+  });
+});
+
 describe('RepertorioSend: ministryId é obrigatório', () => {
+  it('não compila sem a propriedade ministryId', () => {
+    // @ts-expect-error ministryId ausente: o aviso de repertório precisa do campo
+    const semCampo: RepertorioSend = {
+      title: 't',
+      body: 'x',
+      link: '/r',
+      tag: 't',
+      respectSwitch: true,
+    };
+    void semCampo;
+  });
+
   it('não compila sem ministério', () => {
     // O @ts-expect-error falha se o erro sumir (ex.: se alguém tornar ministryId opcional).
     const semMinisterio: RepertorioSend = {
