@@ -15,7 +15,7 @@ export function SetlistNotFound() {
         <BackChevronIcon />
         Voltar
       </Link>
-      <div className="setlist-not-found-body">
+      <div className="empty-card empty-card--search setlist-not-found-body">
         <span className="setlist-not-found-icon" aria-hidden="true">
           <LayersIcon />
         </span>
@@ -26,11 +26,7 @@ export function SetlistNotFound() {
           Esse repertório não existe no seu ministério ou foi removido. Confira o link com quem
           compartilhou.
         </p>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => navigate('/busca?aba=repertorios')}
-        >
+        <button type="button" className="btn-primary" onClick={() => navigate('/?aba=repertorios')}>
           Ver repertórios
         </button>
       </div>

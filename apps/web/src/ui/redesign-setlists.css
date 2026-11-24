@@ -13,11 +13,10 @@
 
 .setlist-not-found-body {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
   gap: 28px;
+  border: 0;
+  background: none;
   text-align: center;
 }
 
@@ -26,7 +25,7 @@
   place-items: center;
   width: 64px;
   height: 64px;
-  border-radius: 20px;
+  border-radius: 18px;
   background: var(--color-elevated);
   border: 1px solid var(--color-border-strong);
   color: var(--color-muted);

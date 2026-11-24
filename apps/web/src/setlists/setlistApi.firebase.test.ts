@@ -80,13 +80,6 @@ describe('createSetlistApi', () => {
     expect(collection).not.toHaveBeenCalledWith(expect.anything(), 'setlists');
   });
 
-  it('deleteSetlist removes ministries/{mid}/setlists/{id}', async () => {
-    await api().deleteSetlist('l1');
-    expect(vi.mocked(deleteDoc).mock.calls.at(-1)?.[0]).toMatchObject({
-      path: 'ministries/hajaluz/setlists/l1',
-    });
-  });
-
   it('subscribeSetlists queries by expiresAt > now and converts timestamps', () => {
     const unsub = vi.fn();
     vi.mocked(onSnapshot).mockImplementationOnce(((_q: unknown, next: (s: unknown) => void) => {

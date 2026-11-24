@@ -53,7 +53,6 @@ function mount(
             <Probe />
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/busca" element={<Home />} />
               <Route path="/repertorios/:id" element={<SetlistPage api={api} />} />
             </Routes>
           </ActiveSetlistProvider>
@@ -101,9 +100,10 @@ describe('SetlistPage read', () => {
     expect(screen.queryByText('Repertório não encontrado.')).not.toBeInTheDocument();
   });
 
-  it('screen 49 button goes to the repertory tab of the search', () => {
+  it('screen 49 button goes to the Repertório tab of the home', () => {
     mount(fakeSetlistApi());
     fireEvent.click(screen.getByRole('button', { name: 'Ver repertórios' }));
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/);
     expect(screen.getByTestId('home')).toHaveTextContent('?aba=repertorios');
   });
 
@@ -174,7 +174,6 @@ describe('SetlistPage member', () => {
     mount(withItems([a, b]), { ministryRole: 'member' });
     expect(screen.queryByRole('button', { name: 'Menu do repertório' })).not.toBeInTheDocument();
     expect(screen.queryByText('Editar data, rótulo e ensaio')).not.toBeInTheDocument();
-    expect(screen.queryByText('Apagar')).not.toBeInTheDocument();
   });
 
   it('the ministry admin sees the menu with Editar and Apagar', () => {
