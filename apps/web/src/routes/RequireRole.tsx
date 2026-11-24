@@ -1,5 +1,11 @@
 import { Navigate, Outlet } from 'react-router';
-import { canListSetlists, canUpload, isAppAdmin, isMinistryAdmin } from '../auth/permissions';
+import {
+  canListSetlists,
+  canUpload,
+  isAppAdmin,
+  isMinistryAdmin,
+  isMinistryLoading,
+} from '../auth/permissions';
 import { type AuthState, useAuth } from '../auth/useAuth';
 import { MinistryLoadError } from './MinistryLoadError';
 
@@ -15,9 +21,17 @@ const PERMISSIONS: Record<RoutePermission, (auth: AuthState) => boolean> = {
 
 export function RequireRole({ when }: { when: RoutePermission }) {
   const auth = useAuth();
-  // Vínculo confirmado (claim) e documento do ministério sem carregar: espera, sem redirecionar.
+  // Vínculo confirmado e documento do ministério ainda carregando: espera, sem redirecionar.
+  if (isMinistryLoading(auth)) {
+    return (
+      <p role="status" className="status">
+        Carregando…
+      </p>
+    );
+  }
+  // Sem ministério e sem carga pendente, só resta a falha do documento.
   if (auth.access === 'granted' && !auth.appAdmin && !auth.ministry) {
-    return auth.ministryFailed ? <MinistryLoadError missing={auth.ministryMissing} /> : null;
+    return <MinistryLoadError missing={auth.ministryMissing} />;
   }
   return PERMISSIONS[when](auth) ? <Outlet /> : <Navigate to="/" replace />;
 }

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
-import { canEditSetlist, canListSetlists, canUpload } from '../auth/permissions';
+import {
+  canEditSetlist,
+  canShowRepertorios,
+  canUpload,
+  isMinistryLoading,
+} from '../auth/permissions';
 import { useAuth } from '../auth/useAuth';
 import {
   compareTitles,
@@ -71,9 +76,8 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
   const query = params.get('q') ?? '';
   const abaParam = params.get('aba');
   // Vínculo ainda carregando: o Repertórios segue resolvível (não cai na Músicas) e mostra "Carregando…".
-  const ministryLoading =
-    auth.access === 'granted' && !auth.appAdmin && auth.ministry === null && !auth.ministryFailed;
-  const repertoriosVisible = canListSetlists(auth) || ministryLoading;
+  const ministryLoading = isMinistryLoading(auth);
+  const repertoriosVisible = canShowRepertorios(auth);
   const visibleTabs = useMemo(
     () => TABS.filter((t) => t.id !== 'repertorios' || repertoriosVisible),
     [repertoriosVisible],
