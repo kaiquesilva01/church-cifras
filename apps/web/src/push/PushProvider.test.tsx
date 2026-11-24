@@ -1,9 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { useContext } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { Role } from '../auth/roles';
-import { AuthContext, type AuthState } from '../auth/useAuth';
-import { testUser } from '../test/fakeGateway';
+import { AuthContext, type AuthState, type MinistryRole } from '../auth/useAuth';
+import { authStateFor } from '../test/authState';
 import { PushProvider } from './PushProvider';
 import { PushContext, type PushService } from './types';
 
@@ -18,20 +17,15 @@ function fakeService(): PushService {
   };
 }
 
+/** Elegível: acesso liberado e vínculo no ministério (membro ou admin do ministério). */
 function authOf(
   status: AuthState['status'],
-  role: Role,
+  ministry: MinistryRole | null,
   access: AuthState['access'] = 'granted',
+  appAdmin = false,
 ): AuthState {
-  return {
-    status,
-    user: status === 'signed-in' ? testUser : null,
-    role,
-    access,
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
-  };
+  const base = authStateFor(ministry);
+  return { ...base, status, user: status === 'signed-in' ? base.user : null, access, appAdmin };
 }
 
 function Probe() {
@@ -54,15 +48,21 @@ describe('PushProvider', () => {
     expect(service.revalidate).toHaveBeenCalledTimes(1);
   });
 
-  it('revalida uma vez para admin', () => {
+  it('revalida uma vez para admin do ministério', () => {
     const service = fakeService();
     renderWith(service, authOf('signed-in', 'admin'));
     expect(service.revalidate).toHaveBeenCalledTimes(1);
   });
 
-  it('não revalida para visitante', () => {
+  it('não revalida para quem não tem ministério', () => {
     const service = fakeService();
-    renderWith(service, authOf('signed-in', 'viewer'));
+    renderWith(service, authOf('signed-in', null));
+    expect(service.revalidate).not.toHaveBeenCalled();
+  });
+
+  it('não revalida para admin da app sem ministério (sem avisos para ele)', () => {
+    const service = fakeService();
+    renderWith(service, authOf('signed-in', null, 'granted', true));
     expect(service.revalidate).not.toHaveBeenCalled();
   });
 
@@ -72,7 +72,7 @@ describe('PushProvider', () => {
     expect(service.revalidate).not.toHaveBeenCalled();
   });
 
-  it('revalidates with access granted and member role', () => {
+  it('revalidates with access granted and ministry membership', () => {
     const service = fakeService();
     renderWith(service, authOf('signed-in', 'member', 'granted'));
     expect(service.revalidate).toHaveBeenCalledTimes(1);

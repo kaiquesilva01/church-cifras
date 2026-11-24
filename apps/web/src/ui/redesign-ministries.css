@@ -648,6 +648,38 @@
   background: var(--color-surface);
 }
 
+.mn-profile-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mn-profile-name {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.mn-profile-email {
+  margin: 0;
+  font-size: 13px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* Pílulas de papel lado a lado (admin da app que também é admin do ministério) */
+.mn-role-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
 .mn-profile-avatar {
   display: grid;
   flex-shrink: 0;

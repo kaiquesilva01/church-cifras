@@ -121,12 +121,15 @@ describe('routes', () => {
     expect(screen.queryByRole('link', { name: 'Pessoas' })).not.toBeInTheDocument();
   });
 
-  it('shows the Admin link (to Pessoas) in Mais for admin only', async () => {
+  it('shows Pessoas do ministério (to Pessoas) in Mais for ministry admin only', async () => {
     await setup('/mais', 'admin');
-    expect(screen.getByRole('link', { name: /Admin/ })).toHaveAttribute('href', '/pessoas');
+    expect(screen.getByRole('link', { name: /^Pessoas do ministério/ })).toHaveAttribute(
+      'href',
+      '/pessoas',
+    );
     cleanup();
     await setup('/mais', 'member');
-    expect(screen.queryByRole('link', { name: /Admin/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Pessoas do ministério/ })).not.toBeInTheDocument();
   });
 
   it('redirects non-admin away from /pessoas', async () => {
@@ -304,7 +307,7 @@ describe('routes', () => {
 
   it('Mais shows the role label and Sair', async () => {
     const gateway = await setup('/mais', 'member');
-    expect(screen.getByText('Membro')).toBeInTheDocument();
+    expect(screen.getByText('Haja Luz · Membro')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Sair/ }));
     expect(gateway.signOut).toHaveBeenCalledTimes(1);
   });

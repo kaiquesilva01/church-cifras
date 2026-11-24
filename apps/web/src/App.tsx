@@ -88,7 +88,7 @@ function AppRoutes({
             <Route index element={<HomePage setlistApi={setlistApi} />} />
             <Route path="/busca" element={<BuscaPage />} />
             <Route path="/pad" element={<PadPage />} />
-            <Route path="/mais" element={<MaisPage />} />
+            <Route path="/mais" element={<MaisPage api={ministriesApi} />} />
             <Route path="/cantores/:artistId" element={<ArtistPage />} />
             <Route
               path="/musicas/:songId"

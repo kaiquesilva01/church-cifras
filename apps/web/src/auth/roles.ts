@@ -10,8 +10,3 @@ export const ROLE_LABELS: Record<Role, string> = {
   member: 'Membro',
   admin: 'Admin',
 };
-
-// Pontes temporárias até as Tarefas 21 e 25: canEdit e isAdmin ainda são usados por MaisPage,
-// PushProvider e AvisosCard. Saem junto com cada consumidor.
-export const canEdit = (role: Role): boolean => role === 'member' || role === 'admin';
-export const isAdmin = (role: Role): boolean => role === 'admin';

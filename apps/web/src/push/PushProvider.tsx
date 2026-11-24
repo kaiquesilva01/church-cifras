@@ -1,5 +1,4 @@
 import { useEffect, type ReactNode } from 'react';
-import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import { PushContext, type PushService } from './types';
 
@@ -14,9 +13,9 @@ export function PushProvider({
   service: PushService | null;
   children: ReactNode;
 }) {
-  const { status, user, role, access } = useAuth();
+  const { status, user, access, ministry } = useAuth();
   const uid = status === 'signed-in' ? user?.uid : undefined;
-  const eligible = access === 'granted' && canEdit(role);
+  const eligible = access === 'granted' && ministry !== null;
 
   useEffect(() => {
     if (!service || !uid || !eligible) return;
