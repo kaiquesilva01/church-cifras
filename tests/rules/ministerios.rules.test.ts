@@ -356,3 +356,42 @@ describe('consulta de grupo por uid (P1)', () => {
     await assertSucceeds(getDoc(doc(chefe, 'users/bia')));
   });
 });
+
+describe('matriz de acesso (§4.4): lacunas', () => {
+  // Token com hasMinistry e canUploadSong, mas sem documento de membro (removido ou nunca entrou).
+  const tokenSemDoc = () =>
+    env
+      .authenticatedContext('x2', { role: 'admin', hasMinistry: true, canUploadSong: true })
+      .firestore();
+
+  it.each([['ministries/hajaluz/setlists/s1'], ['setlists/s1']])(
+    'token com hasMinistry sem documento não lê %s',
+    async (path) => {
+      await assertFails(getDoc(doc(tokenSemDoc(), path)));
+    },
+  );
+
+  it('token com hasMinistry sem documento não grava repertório', async () => {
+    await assertFails(
+      setDoc(
+        doc(tokenSemDoc(), 'ministries/hajaluz/setlists/n9'),
+        setlistData({ createdBy: 'x2', updatedBy: 'x2' }),
+      ),
+    );
+  });
+
+  it('deslogado não lê o catálogo nem a raiz de repertórios', async () => {
+    const anon = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anon, 'songs/s1')));
+    await assertFails(getDoc(doc(anon, 'setlists/s1')));
+  });
+
+  it('admin de A não grava repertório de B', async () => {
+    await assertFails(
+      setDoc(
+        doc(CTX.adminHaja(), 'ministries/outro/setlists/x1'),
+        setlistData({ createdBy: 'm1', updatedBy: 'm1' }),
+      ),
+    );
+  });
+});
