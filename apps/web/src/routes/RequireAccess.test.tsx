@@ -29,6 +29,7 @@ function renderAt(access: AccessState, path: string, overrides: Partial<AuthStat
     ministry: null,
     ministryFailed: false,
     ministryMissing: false,
+    ministryPending: false,
     accessFailed: false,
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),

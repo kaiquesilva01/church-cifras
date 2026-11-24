@@ -66,6 +66,8 @@ function renderHome(
     ministry?: MinistryRole | null;
     canUploadSong?: boolean;
     appAdmin?: boolean;
+    /** Vínculo com o documento do ministério ainda carregando. */
+    ministryPending?: boolean;
     path?: string;
     songs?: SongSummary[];
     state?: unknown;
@@ -82,6 +84,7 @@ function renderHome(
     ...base,
     appAdmin: options.appAdmin ?? false,
     canUploadSong: options.canUploadSong ?? base.canUploadSong,
+    ministryPending: options.ministryPending ?? false,
   };
   return render(
     <AuthContext.Provider value={auth}>
@@ -449,10 +452,33 @@ describe('HomePage', () => {
     });
 
     it('waits for the ministry before deciding on the Repertórios tab', () => {
-      renderHome({ ministry: null, path: '/?aba=repertorios' });
+      renderHome({ ministry: null, ministryPending: true, path: '/?aba=repertorios' });
       expect(screen.getByRole('heading', { level: 1, name: 'Repertório' })).toBeInTheDocument();
       expect(screen.getByText('Carregando…')).toHaveAttribute('role', 'status');
       expect(screen.queryByRole('button', { name: /Novo repertório/ })).not.toBeInTheDocument();
+    });
+
+    it('keeps the Repertórios tab for an app admin who is a member while the ministry loads', () => {
+      renderHome({
+        ministry: null,
+        appAdmin: true,
+        ministryPending: true,
+        path: '/?aba=repertorios',
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'Repertório' })).toBeInTheDocument();
+      expect(screen.getByText('Carregando…')).toHaveAttribute('role', 'status');
+    });
+
+    it('shows the list for that app admin once the ministry resolves', () => {
+      renderHome({
+        ministry: 'admin',
+        appAdmin: true,
+        canUploadSong: true,
+        path: '/?aba=repertorios',
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'Repertório' })).toBeInTheDocument();
+      expect(screen.getByText('Nenhum repertório ainda.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '＋ Novo repertório' })).toBeInTheDocument();
     });
 
     it('creates a setlist and navigates to it', async () => {

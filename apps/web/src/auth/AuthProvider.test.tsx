@@ -16,6 +16,7 @@ function Probe() {
     ministryFailed: a.ministryFailed,
     accessFailed: a.accessFailed,
     ministryMissing: a.ministryMissing,
+    ministryPending: a.ministryPending,
     status: a.status,
     keys: Object.keys(a),
   });
@@ -308,6 +309,35 @@ describe('AuthProvider', () => {
       expect(read().accessFailed).toBe(false);
       expect(read().ministryFailed).toBe(false);
       expect(read().access).toBe('granted');
+    });
+
+    it('admin da app que é membro: ministryPending até o documento chegar, e ministry depois', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: true, hasMinistry: true, canUploadSong: true };
+      await enter(gateway, true);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'admin' }]));
+      expect(read().ministryPending).toBe(true);
+      expect(read().ministry).toBeNull();
+      expect(read().ministryFailed).toBe(false);
+      act(() => gateway.emitMinistry({ name: 'Haja Luz', city: 'São Paulo' }));
+      expect(read().ministryPending).toBe(false);
+      expect(read().ministry).toEqual({
+        id: 'hajaluz',
+        name: 'Haja Luz',
+        city: 'São Paulo',
+        role: 'admin',
+      });
+    });
+
+    it('vínculo com falha no documento: ministryPending falso', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+      expect(read().ministryPending).toBe(true);
+      act(() => gateway.failMinistry());
+      expect(read().ministryPending).toBe(false);
+      expect(read().ministryFailed).toBe(true);
     });
 
     it('erro ao ler o ministério: ministryFailed; carregando não é falha', async () => {

@@ -2,11 +2,11 @@ import type { AuthState } from './useAuth';
 
 export const canListSetlists = (s: AuthState) => s.access === 'granted' && s.ministry !== null;
 /**
- * Vínculo ainda carregando: acesso liberado, sem admin da app, sem ministério e sem falha. O admin
- * da app sem ministério não entra aqui (ele nunca recebe um vínculo para carregar).
+ * Vínculo ainda carregando: acesso liberado e o documento do ministério pendente (vínculo sem
+ * documento, sem falha). O admin da app que é membro entra aqui como qualquer membro; o admin da
+ * app sem vínculo não, porque não tem nada para carregar.
  */
-export const isMinistryLoading = (s: AuthState) =>
-  s.access === 'granted' && !s.appAdmin && s.ministry === null && !s.ministryFailed;
+export const isMinistryLoading = (s: AuthState) => s.access === 'granted' && s.ministryPending;
 /** Aba e item Repertórios: com ministério, ou enquanto o ministério carrega (evita piscar). */
 export const canShowRepertorios = (s: AuthState) => canListSetlists(s) || isMinistryLoading(s);
 /** Mudar tom: todo membro. */

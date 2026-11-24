@@ -48,6 +48,7 @@ function renderEntry({
     ministry: null,
     ministryFailed: false,
     ministryMissing: false,
+    ministryPending: false,
     accessFailed: false,
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),

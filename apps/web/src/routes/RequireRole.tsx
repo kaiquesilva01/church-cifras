@@ -29,8 +29,8 @@ export function RequireRole({ when }: { when: RoutePermission }) {
       </p>
     );
   }
-  // Sem ministério e sem carga pendente, só resta a falha do documento.
-  if (auth.access === 'granted' && !auth.appAdmin && !auth.ministry) {
+  // Falha ao carregar o documento do ministério: erro com retry, sem redirecionar.
+  if (auth.access === 'granted' && auth.ministryFailed) {
     return <MinistryLoadError missing={auth.ministryMissing} />;
   }
   return PERMISSIONS[when](auth) ? <Outlet /> : <Navigate to="/" replace />;

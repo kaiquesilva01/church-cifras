@@ -70,7 +70,7 @@ describe('RequireRole', () => {
   });
 
   it('mostra "Carregando…", sem redirecionar, enquanto o ministério carrega', () => {
-    renderAt('/nova', authStateFor(null), 'upload');
+    renderAt('/nova', { ...authStateFor(null), ministryPending: true }, 'upload');
     expect(screen.getByRole('status')).toHaveTextContent('Carregando…');
     expect(screen.queryByText('Início')).not.toBeInTheDocument();
     expect(screen.queryByText('Página protegida')).not.toBeInTheDocument();

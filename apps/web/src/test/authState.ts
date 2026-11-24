@@ -16,6 +16,7 @@ export function authStateFor(ministryRole: MinistryRole | null = 'admin'): AuthS
         : { id: 'hajaluz', name: 'Haja Luz', city: 'São Paulo', role: ministryRole },
     ministryFailed: false,
     ministryMissing: false,
+    ministryPending: false,
     accessFailed: false,
     prepareSignIn: () => Promise.resolve(),
     signIn: () => Promise.resolve(),
