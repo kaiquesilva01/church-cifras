@@ -260,6 +260,33 @@ describe('sendToDevices: aviso só para o ministério do repertório', () => {
   });
 });
 
+describe('sendToDevices: ministryId vazio falha fechado', () => {
+  it('ministryId vazio sem onlyUid é recusado', async () => {
+    const { deps, calls } = fakeDeps({
+      devices: [device('t-a', 'ana')],
+      ministries: { ana: ['hajaluz'] },
+    });
+
+    await expect(
+      sendToDevices(deps, { ...BASE, ministryId: '' } as unknown as SendInput),
+    ).rejects.toThrow('ministryId vazio');
+    expect(calls).toEqual([]);
+  });
+
+  it('ministryId vazio com onlyUid não envia a ninguém (não cai no envio por aparelho)', async () => {
+    const { deps, calls, devices } = fakeDeps({
+      devices: [device('t-b', 'bia')],
+      ministries: { bia: ['outro'] },
+    });
+
+    await expect(
+      sendToDevices(deps, { ...BASE, ministryId: '', onlyUid: 'bia' } as unknown as SendInput),
+    ).rejects.toThrow('ministryId vazio');
+    expect(calls).toEqual([]);
+    expect(devices.has(deviceId('t-b'))).toBe(true);
+  });
+});
+
 describe('sendToDevices: falha ao ler vínculos', () => {
   it('nada é enviado nem apagado quando getUserMinistries falha', async () => {
     const {
@@ -286,6 +313,7 @@ describe('sendToDevices: falha ao ler vínculos', () => {
 
 describe('RepertorioSend: ministryId é obrigatório', () => {
   it('não compila sem a propriedade ministryId', () => {
+    // Imposto pelo typecheck (@ts-expect-error): sem o campo, não compila.
     // @ts-expect-error ministryId ausente: o aviso de repertório precisa do campo
     const semCampo: RepertorioSend = {
       title: 't',
@@ -298,7 +326,7 @@ describe('RepertorioSend: ministryId é obrigatório', () => {
   });
 
   it('não compila sem ministério', () => {
-    // O @ts-expect-error falha se o erro sumir (ex.: se alguém tornar ministryId opcional).
+    // Imposto pelo typecheck: o @ts-expect-error falha se o erro sumir (ex.: ministryId opcional).
     const semMinisterio: RepertorioSend = {
       title: 'Novo repertório',
       body: 'x',

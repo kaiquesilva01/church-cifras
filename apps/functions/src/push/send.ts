@@ -42,10 +42,15 @@ function matches(d: DeviceRecord, input: SendInput): boolean {
 }
 
 export async function sendToDevices(deps: PushDeps, input: SendInput): Promise<SendOutcome> {
-  // Um só predicado: sem ministryId (vazio conta como ausente), o envio é por aparelho.
-  const ministryId = input.ministryId || undefined;
+  // Sem ministryId, o ministério não filtra; só onlyUid restringe. Com ministryId presente, o filtro é
+  // do ministério. Presente e vazio/em branco é inválido e falha fechado: nunca cai no envio por aparelho.
+  const scoped = input.ministryId !== undefined;
+  const ministryId = input.ministryId;
+  if (scoped && (typeof ministryId !== 'string' || ministryId.trim() === '')) {
+    throw new Error('push: ministryId vazio');
+  }
   // Aviso sem ministério nem aparelho seria um envio a todos: recusado.
-  if (!ministryId && !input.onlyUid) {
+  if (!scoped && !input.onlyUid) {
     throw new Error('push: aviso sem ministério nem aparelho');
   }
   if (!input.link.startsWith('/') || input.link.startsWith('//')) {
@@ -67,7 +72,7 @@ export async function sendToDevices(deps: PushDeps, input: SendInput): Promise<S
     const mine = ministries.get(d.uid);
     // Sem ministério nenhum: aparelho órfão, apagado. Outro ministério: não recebe, mas não é apagado.
     if (!mine || mine.size === 0) stale.push(d);
-    else if (!ministryId || mine.has(ministryId)) senders.push(d);
+    else if (ministryId === undefined || mine.has(ministryId)) senders.push(d);
   }
   if (stale.length > 0) await deps.deleteDevices(stale.map((d) => d.id));
 
