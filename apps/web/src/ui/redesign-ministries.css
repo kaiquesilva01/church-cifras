@@ -54,7 +54,6 @@
   height: 24px;
   min-width: 24px;
   padding-inline: 7px;
-  border: 1px solid var(--color-accent-border);
   border-radius: 999px;
   background: var(--color-accent);
   color: var(--color-on-accent);
@@ -99,7 +98,7 @@
 }
 
 /* 3.4 Pílula de estado (pedidos) */
-.status-pill {
+.mn-status-pill {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
@@ -117,7 +116,7 @@
 }
 
 /* 3.5 Seletor de papel (Membro/Admin, Sim/Não). Alvo de 44 px pelo ::before, visual de 36 px */
-.role-select {
+.mn-role-select {
   position: relative;
   display: inline-flex;
   flex-shrink: 0;
@@ -138,7 +137,7 @@
   cursor: pointer;
 }
 
-.role-select::before {
+.mn-role-select::before {
   content: '';
   position: absolute;
   top: 50%;
@@ -148,26 +147,31 @@
   transform: translate(-50%, -50%);
 }
 
-.role-select:focus-visible {
+.mn-role-select:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
-.role-select--active {
+.mn-role-select--active {
   border-color: var(--color-accent-border);
   background: var(--color-accent-soft);
   color: var(--color-accent-text);
 }
 
-.role-select--disabled {
+.mn-role-select--disabled {
   border-color: var(--color-border);
   color: var(--color-muted);
   opacity: 0.7;
   cursor: default;
 }
 
-.role-select--disabled::before {
+.mn-role-select--disabled::before {
   display: none;
+}
+
+/* Sim/Não (tela 48): sem chevron, padding de 14 px */
+.mn-role-select--yesno {
+  padding-inline: 14px;
 }
 
 /* 3.6 Linha de pessoa */
@@ -291,7 +295,7 @@
   color: var(--color-text);
 }
 
-.request-card-approve {
+.request-card-actions > .request-card-approve {
   font-weight: 800;
 }
 
@@ -371,7 +375,7 @@
   color: var(--color-error);
 }
 
-/* 3.9 Scrim e folha inferior (o diálogo usa .dialog) */
+/* 3.9 Scrim e folha inferior (o diálogo reaproveita a classe de diálogo do app) */
 .sheet-scrim {
   position: fixed;
   inset: 0;
@@ -483,13 +487,18 @@
 .empty-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 4px;
   box-sizing: border-box;
   padding: 22px 20px;
   border: 1px solid var(--color-border);
   border-radius: 18px;
   background: var(--color-surface);
+}
+
+.empty-card--search {
+  align-items: center;
+  padding: 28px 20px;
+  border-radius: 24px;
   text-align: center;
 }
 
@@ -627,7 +636,7 @@
 }
 
 /* Mais e Gestão */
-.profile-card {
+.mn-profile-card {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -639,7 +648,7 @@
   background: var(--color-surface);
 }
 
-.profile-avatar {
+.mn-profile-avatar {
   display: grid;
   flex-shrink: 0;
   place-items: center;
@@ -664,7 +673,7 @@
   text-transform: uppercase;
 }
 
-.section-title {
+.mn-section-title {
   margin: 0;
   color: var(--color-text);
   font-size: 18px;
