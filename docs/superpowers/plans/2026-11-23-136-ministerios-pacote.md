@@ -1674,7 +1674,7 @@ Arquivos: os listados no Passo 3, mais os testes. Mensagem sugerida: `feat(push)
 
 ### Task 11: Estatísticas por ministério (`stats/*`)
 
-**Por quê:** `countSettledSetlists` e `getStats` leem o grupo `setlists` e gravam `ministryId` (hoje `'hajaluz'` fixo, da #135). O admin da app vê os cartões, o ranking geral e um ministério opcional; o admin de um ministério vê só o ranking dele. O formato de retorno é o C8 (`StatsCallerResult`), compatível com `StatsResult`.
+**Por quê:** `countSettledSetlists` e `getStats` leem o grupo `setlists` e gravam `ministryId` (hoje `'hajaluz'` fixo, da #135). O admin da app vê os cartões, o ranking geral e um ministério opcional; o admin de um ministério vê só o ranking dele. O formato de retorno é o C8 (`StatsCallerResult`). O formato muda em relação ao `StatsResult` plano de hoje: o cliente (Tarefa 24) precisa mudar no mesmo PR.
 
 **Arquivos:**
 - Modificar: `apps/functions/src/stats/countUsage.ts`, `statsDeps.ts`, `getStats.ts`
@@ -3274,7 +3274,7 @@ Fechadas em 23/11 pelo orquestrador (substituem a antiga seção "Pontos em aber
 11. **Tarefa 8**: `createFakeMinistryDeps` devolve `log`; o teste desestrutura `{ deps, log }`; `runTransaction` do `adminDeps` ganha as duas leituras de grupo; o guard do fake cobre as leituras novas. Pedido `pending` do mesmo ministério devolve sem gravar.
 12. **Tarefa 9**: migração **completa** do `roles` em `push/` (sem alias). `getUserRole`, `getUserRoles` e `RoleDeps` saem; entram `getUserMinistries` (bulk, `in` de 30) e `listMembershipsOfUser` (guards). `adminDeps.test.ts` ganha o caso de `ministriesOfUids` (301 uids, 11 consultas).
 13. **Tarefa 10 (crítica)**: `ministryId` é obrigatório no aviso de repertório (tipo `RepertorioSend`, com `@ts-expect-error` de teste) e `sendToDevices` recusa entrada sem `ministryId` nem aparelho. O gatilho **não** troca o filtro no lugar: vira `onMinistrySetlistWritten` e a antiga `onSetlistWritten` sai do export (o deploy `--force` apaga). O mock de `reminderDeps.test.ts` ganha `collectionGroup` e `ref.parent.parent`. Teste com fake real (`push/fakeDeps.ts`).
-14. **Tarefa 11**: formato de retorno `StatsCallerResult = { general, ministry }` (C8), compatível com `StatsResult` (o geral não muda); `ministryIdOf(ref)` é função pura em `ministries/model.ts`, testada, e exclui a raiz; `rankingOf` e os fakes estão em código.
+14. **Tarefa 11**: formato de retorno `StatsCallerResult = { general, ministry }` (C8), o campo `general` tem o formato do `StatsResult` antigo, mas a resposta muda (o cliente muda na Tarefa 24, no mesmo PR); `ministryIdOf(ref)` é função pura em `ministries/model.ts`, testada, e exclui a raiz; `rankingOf` e os fakes estão em código.
 15. **Tarefa 12**: a remoção do export de `mirrorTrigger` em `index.ts` acontece na própria Tarefa 12.
 16. **Tarefa 13**: depende das Tarefas 7, 9 e 11. `changeUserRole` sai junto com `setUserRole` (sem uso, e o `noUnusedLocals` do typecheck não deixaria ficar).
 
