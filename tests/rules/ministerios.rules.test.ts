@@ -294,7 +294,9 @@ describe('consulta de grupo por uid (P1)', () => {
       const db = ctx.firestore();
       await setDoc(doc(db, 'ministries/hajaluz/members/ana'), { uid: 'ana', role: 'member' });
       await setDoc(doc(db, 'ministries/outro/members/bia'), { uid: 'bia', role: 'admin' });
+      await setDoc(doc(db, 'ministries/outro/members/o1'), { uid: 'o1', role: 'member' });
       await setDoc(doc(db, 'ministries/outro/requests/ana'), { uid: 'ana', status: 'pending' });
+      await setDoc(doc(db, 'ministries/outro/requests/bia'), { uid: 'bia', status: 'pending' });
       await setDoc(doc(db, 'users/ana'), { appAdmin: false, role: 'viewer' });
       await setDoc(doc(db, 'users/bia'), { appAdmin: false, role: 'viewer' });
     });
@@ -317,6 +319,17 @@ describe('consulta de grupo por uid (P1)', () => {
     const db = env.authenticatedContext('ana', {}).firestore();
     await assertFails(getDocs(query(collectionGroup(db, 'members'), where('uid', '==', 'bia'))));
     await assertFails(getDocs(query(collectionGroup(db, 'requests'), where('uid', '==', 'bia'))));
+  });
+
+  it('admin do ministério não lê vínculo de outro ministério por consulta de grupo', async () => {
+    const db = env.authenticatedContext('m1', {}).firestore();
+    await assertFails(getDocs(query(collectionGroup(db, 'members'), where('uid', '==', 'o1'))));
+  });
+
+  it('deslogado não lê vínculo nem pedido por consulta de grupo', async () => {
+    const db = env.unauthenticatedContext().firestore();
+    await assertFails(getDocs(query(collectionGroup(db, 'members'), where('uid', '==', 'ana'))));
+    await assertFails(getDocs(query(collectionGroup(db, 'requests'), where('uid', '==', 'ana'))));
   });
 
   it('a pessoa lê o próprio pedido por consulta de grupo', async () => {

@@ -92,7 +92,7 @@ Papel em `users/{uid}.role` e no custom claim `role`; lido nas Rules por `reques
 
 - Primeiro admin: e-mails em `ADMIN_EMAILS` (variável do deploy), só no primeiro login de cada pessoa e só com e-mail verificado. Depois, o papel muda pela tela Pessoas.
 - Mudança de papel só vale para escritas depois do refresh do token; o cliente observa `users/{uid}` e chama `getIdToken(true)`.
-- Claims `role`, `appAdmin`, `hasMinistry` e `canUploadSong` são gravados sempre os quatro juntos (`setCustomUserClaims` troca o objeto inteiro). `role` e `appAdmin` têm efeito (`appAdmin` só nas Rules de membros e pedidos; nenhuma tela o usa ainda); `hasMinistry` e `canUploadSong` não são lidos por nada ainda.
+- Claims `role`, `appAdmin`, `hasMinistry` e `canUploadSong` são gravados sempre os quatro juntos (`setCustomUserClaims` troca o objeto inteiro). `role` e `appAdmin` têm efeito (`appAdmin` nas Rules de `users` (lê todos), de membros e de pedidos; nenhuma tela o usa ainda); `hasMinistry` e `canUploadSong` não são lidos por nada ainda.
 - Leitura exige membro ou admin (Rules e gate do app): um logado sem papel não lê nada. Só o provedor Google fica ativo no Auth (sem e-mail/senha nem anônimo).
 - Segurança vale no backend (Rules e Functions), não só na interface. Pad e compartilhamento são locais ao aparelho e liberados a membro e admin; o pad não sincroniza entre pessoas.
 
@@ -110,8 +110,8 @@ Leitura: membro e admin, exceto `users` (cada um lê o próprio; admin lê todos
 | `songLyrics/{songId}` | `text` (1–20.000 caracteres), `createdBy`, `createdAt` | só `create` por membro/admin, com a música existindo na mesma operação |
 | `setlists/{setlistId}` | `date` (`YYYY-MM-DD`), `label`, `items[]` (`id`, `songId`, `key`), `expiresAt`, `createdBy/At`, `updatedBy/At`, `rehearsalAt` (opcional: hora do ensaio, dentro da janela do culto: de 00:00 de 7 dias antes do dia até 00:00 do dia seguinte, exclusivo; `null` é negado), `origin` (opcional: `producao`/`teste`) | só admin: create, update e delete (membro só lê; visitante não lê) |
 | `ministries/{mid}` | `name`, `nameNormalized`, `city`, `createdBy/At` (`hajaluz` é a Haja Luz) | nenhuma; leitura para logado |
-| `ministries/{mid}/members/{uid}` | `uid`, `role` (`member`/`admin` do ministério), campos de exibição | nenhuma; lê o próprio uid, o admin do ministério e o admin da app |
-| `ministries/{mid}/requests/{uid}` | `uid`, `status` (`pending`/`rejected`…), campos de exibição | nenhuma; lê como `members` |
+| `ministries/{mid}/members/{uid}` | `uid`, `role` (`member`/`admin` do ministério), campos de exibição | nenhuma; lê o próprio uid, o admin do ministério e o admin da app. Consulta de grupo: a pessoa lista os próprios vínculos filtrando por `uid` |
+| `ministries/{mid}/requests/{uid}` | `uid`, `status` (`pending`/`rejected`…), campos de exibição | nenhuma; lê como `members`, inclusive a consulta de grupo filtrada pelo próprio `uid` |
 | `ministries/{mid}/setlists/{id}` | espelho da raiz `setlists` (`mirrorSetlists`); a interface ainda lê a raiz | só admin do ministério; membro lê |
 | `setlistUsage/{setlistId}` | `date`, `songIds`, `countedAt`, `ministryId` (gravado pela contagem nova; a migração preenche os antigos) | nenhuma; só Admin SDK (negado por padrão) |
 | `pushDevices/{sha256(token)}` | `uid`, `token`, `origin` (`producao`/`teste`), `createdAt`, `lastSeenAt` | nenhuma; cliente não lê (só Functions) |
@@ -127,7 +127,7 @@ Leitura: membro e admin, exceto `users` (cada um lê o próprio; admin lê todos
 - `songs`, `arrangements` e `songLyrics` são imutáveis para o cliente; edição e exclusão passam por Functions.
 - `pushDevices`, `avisosEnviados` e `config/*` são fechados ao cliente (deny-all); só Functions leem e gravam.
 - TTL do Firestore em `setlists.expiresAt` (com índice ascendente) e em `avisosEnviados.expiresAt`. `setlistUsage` não pode ter TTL.
-- Índices de grupo: `members.uid` (recálculo de claims), `requests.uid` e `requests.status` (pedidos).
+- Índices de grupo: `members.uid` (recálculo de claims), `requests.uid` e `requests.status` (pedidos), `setlists.date` (estatísticas) e `setlists.rehearsalAt` (lembretes de ensaio).
 - `expiresAt` (fim do dia da data + 30 dias, fuso `America/Sao_Paulo`) é calculado pelo cliente (`apps/web/src/setlists/dates.ts`); `firestore.rules` só confere que é um timestamp. Nada no servidor impede um valor errado.
 - Contrato de `rehearsalAt` (#100): limpar é `deleteField()` (ou omitir o campo num `setDoc`); `null` é negado. Trocar `date` exige um `rehearsalAt` novo ou `deleteField()` na mesma gravação, pois o antigo é revalidado contra a nova janela. O instante é montado em UTC-3, não no fuso do aparelho.
 
