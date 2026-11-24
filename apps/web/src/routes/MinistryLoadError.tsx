@@ -1,10 +1,17 @@
 import { reloadPage } from '../lib/reloadPage';
 
 /**
- * Falha ao carregar o ministério: caixa de erro do design system com "Tentar de novo".
- * `missing`: o documento não existe; mensagem própria e sem retry (tentar de novo não resolve).
+ * Erro de carregamento do acesso ou do ministério: caixa de erro do design system com "Tentar de novo".
+ * `missing`: o documento do ministério não existe; mensagem própria e sem retry (tentar de novo não resolve).
+ * `access`: o claim não acompanhou o vínculo (texto de liberação de acesso).
  */
-export function MinistryLoadError({ missing = false }: { missing?: boolean }) {
+export function MinistryLoadError({
+  missing = false,
+  access = false,
+}: {
+  missing?: boolean;
+  access?: boolean;
+}) {
   if (missing) {
     return (
       <div role="alert" className="error-box">
@@ -12,9 +19,12 @@ export function MinistryLoadError({ missing = false }: { missing?: boolean }) {
       </div>
     );
   }
+  const text = access
+    ? 'Não foi possível liberar o seu acesso. Tente de novo.'
+    : 'Não foi possível carregar o ministério. Tente de novo.';
   return (
     <div role="alert" className="error-box">
-      <span>Não foi possível carregar o ministério. Tente de novo.</span>
+      <span>{text}</span>
       <button type="button" className="btn-primary" onClick={reloadPage}>
         Tentar de novo
       </button>

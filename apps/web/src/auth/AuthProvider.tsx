@@ -166,11 +166,20 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     void (async () => {
+      // Ciclo novo: limpa o erro anterior (a chave só vale enquanto o mesmo ciclo falha).
+      if (active) setSyncFailedKey(null);
+      // Erro de acesso só quando há vínculo e o claim hasMinistry continua falso; appAdmin e
+      // canUploadSong nunca mostram erro de ministério (só a releitura limitada).
+      let last: Claims | undefined;
+      const fail = () => {
+        if (active && hasMinistry && last?.hasMinistry !== true) setSyncFailedKey(syncKey);
+      };
       for (let attempt = 0; ; attempt += 1) {
         try {
           await gateway.refreshToken();
           const value = await gateway.getClaims();
           if (!active) return;
+          last = value;
           setClaims({ loaded: true, value });
           if (
             value.hasMinistry === hasMinistry &&
@@ -180,12 +189,12 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
             return;
         } catch (error) {
           console.warn('Falha ao atualizar o token de sessão', error);
-          if (active) setSyncFailedKey(syncKey);
+          fail();
           return;
         }
         if (attempt >= RETRY_DELAYS_MS.length) {
-          // Esgotou as releituras sem o claim bater: vira estado de erro, não espera infinita.
-          if (active) setSyncFailedKey(syncKey);
+          // Esgotou as releituras sem o claim bater: vira erro, não espera infinita.
+          fail();
           return;
         }
         await new Promise<void>((resolve) => {
@@ -201,8 +210,8 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
   }, [gateway, uid, mismatch, hasMinistry, appAdminDoc, canUploadDoc, syncKey]);
 
   // Sem o claim refletir o vínculo depois das releituras: erro com "Tentar de novo" (não tela vazia).
-  const syncFailed = mismatch && syncFailedKey === syncKey;
-  const ministryFailed = (ministryCurrent && ministryLoad.failed) || syncFailed;
+  const accessFailed = mismatch && syncFailedKey === syncKey;
+  const ministryFailed = ministryCurrent && ministryLoad.failed;
   const ministryMissing = ministryCurrent && ministryLoad.missing;
 
   // Estável entre mudanças de sessão: a tela de entrada aquece o popup uma vez só.
@@ -216,12 +225,18 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
         : user
           ? 'signed-in'
           : 'signed-out';
+    // Liberado: admin da app, ou claim hasMinistry com vínculo carregado. O vínculo é a fonte de
+    // verdade: claim antigo sem vínculo (pessoa removida) é bloqueio, nunca erro de carregamento.
     const access: AuthState['access'] =
       status !== 'signed-in' || !claims.loaded
         ? 'checking'
-        : claims.value.hasMinistry || claims.value.appAdmin
+        : claims.value.appAdmin
           ? 'granted'
-          : 'blocked';
+          : !memberships.loaded
+            ? 'checking'
+            : !memberships.failed && memberships.list.length > 0 && claims.value.hasMinistry
+              ? 'granted'
+              : 'blocked';
     const ministry: CurrentMinistry | null =
       first && ministryInfo
         ? {
@@ -240,6 +255,7 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
       ministry,
       ministryFailed,
       ministryMissing,
+      accessFailed,
       prepareSignIn,
       signIn: () => gateway.signIn(),
       signOut: () => gateway.signOut(),
@@ -248,10 +264,12 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     session,
     profile.loaded,
     claims,
+    memberships,
     first,
     ministryInfo,
     ministryFailed,
     ministryMissing,
+    accessFailed,
     gateway,
     prepareSignIn,
   ]);

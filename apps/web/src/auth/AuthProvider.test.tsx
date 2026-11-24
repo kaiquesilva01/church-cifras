@@ -14,6 +14,7 @@ function Probe() {
     canUploadSong: a.canUploadSong,
     ministry: a.ministry,
     ministryFailed: a.ministryFailed,
+    accessFailed: a.accessFailed,
     ministryMissing: a.ministryMissing,
     status: a.status,
     keys: Object.keys(a),
@@ -158,7 +159,8 @@ describe('AuthProvider', () => {
     await enter(gateway);
     await act(async () => undefined);
     expect(gateway.refreshToken).not.toHaveBeenCalled();
-    expect(read().access).toBe('granted');
+    // Vínculo não lido não libera acesso: a fonte de verdade é o documento de vínculo.
+    expect(read().access).toBe('blocked');
     expect(warn).toHaveBeenCalledWith('Falha ao ler os vínculos', expect.any(Error));
     warn.mockRestore();
   });
@@ -197,15 +199,62 @@ describe('AuthProvider', () => {
       expect(read().ministryMissing).toBe(false);
     });
 
-    it('zerar o vínculo ao sair: ministryLoad não vaza para a próxima sessão', async () => {
+    it('outro usuário com o mesmo ministério: ministryFailed falso até o documento chegar', async () => {
       const gateway = setup();
       gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
       await enter(gateway);
       await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
       act(() => gateway.failMinistry());
       expect(read().ministryFailed).toBe(true);
+      // Sai e entra outra pessoa com o mesmo ministério: o erro anterior não pode aparecer.
       act(() => gateway.emitUser(null));
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await act(async () => gateway.emitUser({ ...testUser, uid: 'u2' }));
+      await act(async () => gateway.emitProfile({ appAdmin: false }));
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
       expect(read().ministryFailed).toBe(false);
+      act(() => gateway.emitMinistry({ name: 'Haja Luz', city: 'São Paulo' }));
+      expect(read().ministryFailed).toBe(false);
+      expect(read().ministry).toEqual(expect.objectContaining({ id: 'hajaluz', name: 'Haja Luz' }));
+    });
+
+    it('removida com claim antigo: bloqueada, sem erro, e apaga o cache uma vez', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      gateway.nextClaims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+      act(() => gateway.emitMinistry({ name: 'Haja Luz', city: 'São Paulo' }));
+      await act(async () => gateway.emitMemberships([]));
+      await act(async () => undefined);
+      expect(read().access).toBe('blocked');
+      expect(read().accessFailed).toBe(false);
+      expect(read().ministryFailed).toBe(false);
+      expect(gateway.forgetLocalData).toHaveBeenCalledTimes(1);
+      expect(gateway.forgetLocalData).toHaveBeenCalledWith('Haja Luz');
+    });
+
+    it('admin da app sem vínculo com claim divergente: sem erro, libera depois do refresh', async () => {
+      const gateway = setup();
+      gateway.claims = NONE;
+      gateway.nextClaims = { appAdmin: true, hasMinistry: false, canUploadSong: true };
+      await enter(gateway, true);
+      await act(async () => gateway.emitMemberships([]));
+      expect(gateway.refreshToken).toHaveBeenCalledTimes(1);
+      expect(read().access).toBe('granted');
+      expect(read().accessFailed).toBe(false);
+      expect(read().ministryFailed).toBe(false);
+    });
+
+    it('promovido a admin sem o claim canUploadSong: sem erro de ministério', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      gateway.nextClaims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'admin' }]));
+      expect(read().accessFailed).toBe(false);
+      expect(read().ministryFailed).toBe(false);
+      expect(read().access).toBe('granted');
     });
 
     it('erro ao ler o ministério: ministryFailed; carregando não é falha', async () => {
@@ -255,20 +304,46 @@ describe('AuthProvider', () => {
       expect(gateway.refreshToken).toHaveBeenCalledTimes(6);
     });
 
-    it('A. claim hasMinistry sem vínculo depois de esgotar as releituras: ministryFailed', async () => {
+    it('aprovado cujo claim nunca chega: erro de acesso depois de 6 leituras', async () => {
       const gateway = setup();
-      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
-      gateway.nextClaims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      gateway.claims = NONE;
+      gateway.nextClaims = NONE;
       await enter(gateway);
-      await act(async () => gateway.emitMemberships([]));
-      expect(read().ministryFailed).toBe(false);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
       await act(async () => {
         await vi.advanceTimersByTimeAsync(31000);
       });
       expect(gateway.refreshToken).toHaveBeenCalledTimes(6);
-      expect(read().ministryFailed).toBe(true);
-      expect(read().ministryMissing).toBe(false);
-      expect(read().access).toBe('granted');
+      expect(read().accessFailed).toBe(true);
+      expect(read().access).toBe('blocked');
+      expect(read().ministryFailed).toBe(false);
+    });
+
+    it('refreshToken que lança com vínculo: mesmo erro de acesso', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const gateway = setup();
+      gateway.claims = NONE;
+      gateway.refreshToken = vi.fn(() => Promise.reject(new Error('rede')));
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+      await act(async () => undefined);
+      expect(read().accessFailed).toBe(true);
+      expect(read().access).toBe('blocked');
+      warn.mockRestore();
+    });
+
+    it('claim de appAdmin que não chega: bounded, sem erro de acesso', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      gateway.nextClaims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await enter(gateway, true);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31000);
+      });
+      expect(gateway.refreshToken).toHaveBeenCalledTimes(6);
+      expect(read().accessFailed).toBe(false);
+      expect(read().ministryFailed).toBe(false);
     });
   });
 });
