@@ -14,12 +14,19 @@ service cloud.firestore {
       return signedIn() && request.auth.token.get('appAdmin', false) == true;
     }
 
-    // Claim do token manda quando existe. Token sem o claim (emitido antes da Preparação)
-    // usa o role legado até a limpeza (#137). Assim a remoção vale no refresh do token.
+    // Fallback decidido por token: se o token traz algum claim novo, o role é ignorado.
+    // Só token antigo (sem nenhum claim novo, emitido antes da Preparação) usa o role legado,
+    // até a limpeza (#137). Assim a remoção vale no refresh do token.
+    function hasNewClaims() {
+      return 'hasMinistry' in request.auth.token
+        || 'canUploadSong' in request.auth.token
+        || 'appAdmin' in request.auth.token;
+    }
+
     function claimOrLegacy(claim, legacyRoles) {
       return signedIn()
         && (request.auth.token.get(claim, false) == true
-          || (!(claim in request.auth.token) && role() in legacyRoles));
+          || (!hasNewClaims() && role() in legacyRoles));
     }
 
     function hasMinistryClaim() {

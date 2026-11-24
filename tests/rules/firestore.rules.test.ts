@@ -469,7 +469,7 @@ describe('firestore.rules', () => {
       await assertSucceeds(setDoc(doc(db, 'songs/s2'), songData({ createdBy: 'a' })));
     });
 
-    it('membro cria tom gerado a partir de tom feito à mão (slug = tom, sensível a caixa)', async () => {
+    it('membro cria tom gerado a partir de tom feito à mão', async () => {
       await seedArrangement('C', { key: 'C', source: 'handmade' });
       await assertSucceeds(
         setDoc(
@@ -517,6 +517,94 @@ describe('firestore.rules', () => {
       const db = env.authenticatedContext('chefe', { appAdmin: true, role: 'viewer' }).firestore();
       await assertSucceeds(getDoc(doc(db, 'songs/s1')));
       await assertSucceeds(setDoc(doc(db, 'songs/s3'), songData({ createdBy: 'chefe' })));
+    });
+
+    const handmadeE = (uid: string) =>
+      arrData({ key: 'E', storagePath: 'songs/s1/E-abc.pdf', createdBy: uid });
+    const generatedD = (uid: string) =>
+      arrData({
+        key: 'D',
+        storagePath: 'songs/s1/D-abc.pdf',
+        source: 'generated',
+        derivedFromKey: 'C',
+        writer: 'overlay',
+        createdBy: uid,
+      });
+
+    it('admin de ministério e admin da app também sobem tom feito à mão e letra', async () => {
+      const ministerio = env
+        .authenticatedContext('a', { role: 'member', hasMinistry: true, canUploadSong: true })
+        .firestore();
+      await assertSucceeds(setDoc(doc(ministerio, 'songs/s1/arrangements/E'), handmadeE('a')));
+      await assertSucceeds(
+        setDoc(doc(ministerio, 'songLyrics/s1'), lyricsData({ createdBy: 'a' })),
+      );
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'songs/s4'), songData({ createdBy: 'm' }));
+      });
+      const chefe = env.authenticatedContext('chefe', { appAdmin: true }).firestore();
+      await assertSucceeds(
+        setDoc(
+          doc(chefe, 'songs/s1/arrangements/F'),
+          arrData({ key: 'F', storagePath: 'songs/s1/F-abc.pdf', createdBy: 'chefe' }),
+        ),
+      );
+      await assertSucceeds(setDoc(doc(chefe, 'songLyrics/s4'), lyricsData({ createdBy: 'chefe' })));
+    });
+
+    it('slug com caixa trocada é negado (tom D gravado como d)', async () => {
+      await seedArrangement('C', { key: 'C', source: 'handmade' });
+      await assertFails(
+        setDoc(
+          doc(membro(), 'songs/s1/arrangements/d'),
+          arrData({
+            key: 'D',
+            storagePath: 'songs/s1/d-abc.pdf',
+            source: 'generated',
+            derivedFromKey: 'C',
+            writer: 'overlay',
+            createdBy: 'm',
+          }),
+        ),
+      );
+    });
+
+    it('admin com role admin e sem claims novos não sobe nada, nem tom gerado', async () => {
+      await seedArrangement('C', { key: 'C', source: 'handmade' });
+      const db = env
+        .authenticatedContext('r', { role: 'admin', hasMinistry: false, canUploadSong: false })
+        .firestore();
+      await assertFails(setDoc(doc(db, 'songs/s2'), songData({ createdBy: 'r' })));
+      await assertFails(setDoc(doc(db, 'songs/s1/arrangements/E'), handmadeE('r')));
+      await assertFails(setDoc(doc(db, 'songLyrics/s1'), lyricsData({ createdBy: 'r' })));
+      await assertFails(setDoc(doc(db, 'songs/s1/arrangements/D'), generatedD('r')));
+    });
+
+    it('membro com role member e sem claims novos não cria tom gerado', async () => {
+      await seedArrangement('C', { key: 'C', source: 'handmade' });
+      const db = env
+        .authenticatedContext('r', { role: 'member', hasMinistry: false, canUploadSong: false })
+        .firestore();
+      await assertFails(setDoc(doc(db, 'songs/s1/arrangements/D'), generatedD('r')));
+    });
+
+    it('token com role admin e hasMinistry sem claim canUploadSong não sobe música (fallback por token)', async () => {
+      await seedArrangement('C', { key: 'C', source: 'handmade' });
+      const db = env.authenticatedContext('h', { role: 'admin', hasMinistry: true }).firestore();
+      await assertFails(setDoc(doc(db, 'songs/s2'), songData({ createdBy: 'h' })));
+      await assertFails(setDoc(doc(db, 'songs/s1/arrangements/E'), handmadeE('h')));
+      await assertFails(setDoc(doc(db, 'songLyrics/s1'), lyricsData({ createdBy: 'h' })));
+      await assertSucceeds(setDoc(doc(db, 'songs/s1/arrangements/D'), generatedD('h')));
+    });
+
+    it('token antigo só com role member não sobe música, tom feito à mão nem letra, mas lê e cria tom gerado', async () => {
+      await seedArrangement('C', { key: 'C', source: 'handmade' });
+      const db = env.authenticatedContext('old', { role: 'member' }).firestore();
+      await assertSucceeds(getDoc(doc(db, 'songs/s1')));
+      await assertFails(setDoc(doc(db, 'songs/s2'), songData({ createdBy: 'old' })));
+      await assertFails(setDoc(doc(db, 'songs/s1/arrangements/E'), handmadeE('old')));
+      await assertFails(setDoc(doc(db, 'songLyrics/s1'), lyricsData({ createdBy: 'old' })));
+      await assertSucceeds(setDoc(doc(db, 'songs/s1/arrangements/D'), generatedD('old')));
     });
   });
 });
