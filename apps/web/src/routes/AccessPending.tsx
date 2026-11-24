@@ -1,20 +1,9 @@
-import { useState } from 'react';
 import { useAuth } from '../auth/useAuth';
+import { SignOutButton } from './SignOutButton';
 
 /** Tela única de quem está logado mas ainda não foi liberado por um admin (#126). */
 export function AccessPending() {
-  const { user, signOut } = useAuth();
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  function exit() {
-    setBusy(true);
-    setFailed(false);
-    signOut().catch(() => {
-      setBusy(false);
-      setFailed(true);
-    });
-  }
+  const { user } = useAuth();
 
   return (
     <main className="access-screen">
@@ -42,14 +31,7 @@ export function AccessPending() {
         <span className="access-card-label">Conta</span>
         <span className="access-card-email">{user?.email ?? ''}</span>
       </div>
-      <button type="button" className="access-exit" onClick={exit} disabled={busy}>
-        Sair
-      </button>
-      {failed && (
-        <p role="alert" className="error">
-          Não foi possível sair. Tente de novo.
-        </p>
-      )}
+      <SignOutButton />
     </main>
   );
 }

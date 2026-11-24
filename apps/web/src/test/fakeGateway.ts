@@ -36,6 +36,7 @@ export function createFakeGateway(): FakeGateway {
   let membershipsCb: ((m: Membership[]) => void) | undefined;
   let ministryCb: ((m: MinistryInfo | null) => void) | undefined;
   let ministryErrCb: ((e: unknown) => void) | undefined;
+  let ministryLast: { doc: MinistryInfo | null; error: boolean } | undefined;
   const gateway: FakeGateway = {
     claims: NONE,
     nextClaims: NONE,
@@ -60,9 +61,14 @@ export function createFakeGateway(): FakeGateway {
     onMinistry: (_id, cb, onError) => {
       ministryCb = cb;
       ministryErrCb = onError;
+      // Como o Firestore: quem assina depois recebe o último estado emitido (o provedor só assina
+      // com o acesso liberado, depois de os claims serem lidos).
+      if (ministryLast?.error) onError(new Error('rede'));
+      else if (ministryLast) cb(ministryLast.doc);
       return () => {
         ministryCb = undefined;
         ministryErrCb = undefined;
+        ministryLast = undefined;
       };
     },
     getClaims: () => Promise.resolve(gateway.claims),
@@ -77,8 +83,14 @@ export function createFakeGateway(): FakeGateway {
     emitUser: (u) => userCb?.(u),
     emitProfile: (p) => profileCb?.(p),
     emitMemberships: (m) => membershipsCb?.(m),
-    emitMinistry: (m) => ministryCb?.(m),
-    failMinistry: () => ministryErrCb?.(new Error('rede')),
+    emitMinistry: (m) => {
+      ministryLast = { doc: m, error: false };
+      ministryCb?.(m);
+    },
+    failMinistry: () => {
+      ministryLast = { doc: null, error: true };
+      ministryErrCb?.(new Error('rede'));
+    },
   };
   return gateway;
 }

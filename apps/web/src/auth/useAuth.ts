@@ -21,7 +21,10 @@ export interface AuthState {
   ministryFailed: boolean;
   /** O documento do ministério não existe (distinto de erro de leitura, que aceita tentar de novo). */
   ministryMissing: boolean;
-  /** Há vínculo, mas o claim hasMinistry não acompanhou depois das releituras (ou o refresh falhou). */
+  /**
+   * Bloqueado por falha, não por falta de liberação: a leitura dos vínculos falhou, ou há vínculo e
+   * o claim hasMinistry não acompanhou depois das releituras (ou o refresh falhou). Tem retry e Sair.
+   */
   accessFailed: boolean;
   prepareSignIn(): Promise<void>;
   signIn(): Promise<void>;

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeGateway, testUser, type FakeGateway } from '../test/fakeGateway';
-import { AuthProvider } from './AuthProvider';
+import { AuthProvider, type Membership } from './AuthProvider';
 import { useAuth } from './useAuth';
 
 const NONE = { appAdmin: false, hasMinistry: false, canUploadSong: false };
@@ -98,7 +98,7 @@ describe('AuthProvider', () => {
 
   it('3. claim hasMinistry verdadeiro: ministry com name e city do documento', async () => {
     const gateway = setup();
-    gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: true };
     await enter(gateway);
     await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'admin' }]));
     act(() => gateway.emitMinistry({ name: 'Haja Luz', city: 'São Paulo' }));
@@ -148,7 +148,7 @@ describe('AuthProvider', () => {
     expect(read().access).toBe('granted');
   });
 
-  it('falha ao ler os vínculos: não tenta renovar o token e avisa', async () => {
+  it('falha ao ler os vínculos: erro de acesso com retry, sem renovar o token nem apagar o cache', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const gateway = setup();
     gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
@@ -159,10 +159,63 @@ describe('AuthProvider', () => {
     await enter(gateway);
     await act(async () => undefined);
     expect(gateway.refreshToken).not.toHaveBeenCalled();
-    // Vínculo não lido não libera acesso: a fonte de verdade é o documento de vínculo.
+    // Vínculo não lido não libera acesso (privacidade), mas também não é "acesso pendente".
     expect(read().access).toBe('blocked');
+    expect(read().accessFailed).toBe(true);
+    expect(gateway.forgetLocalData).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith('Falha ao ler os vínculos', expect.any(Error));
     warn.mockRestore();
+  });
+
+  it('falha ao ler os vínculos depois de lê-los: erro de acesso, sem apagar o cache', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const gateway = setup();
+    gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    let fail: (e: unknown) => void = () => undefined;
+    let emit: (m: Membership[]) => void = () => undefined;
+    gateway.onMemberships = (_uid, cb, onError) => {
+      fail = onError;
+      emit = cb;
+      return () => undefined;
+    };
+    await enter(gateway);
+    await act(async () => emit([{ ministryId: 'hajaluz', role: 'member' }]));
+    expect(read().access).toBe('granted');
+    await act(async () => fail(new Error('rede')));
+    expect(read().access).toBe('blocked');
+    expect(read().accessFailed).toBe(true);
+    expect(gateway.forgetLocalData).not.toHaveBeenCalled();
+    // Uma leitura boa depois limpa o erro.
+    await act(async () => emit([{ ministryId: 'hajaluz', role: 'member' }]));
+    expect(read().access).toBe('granted');
+    expect(read().accessFailed).toBe(false);
+    warn.mockRestore();
+  });
+
+  it('admin da app com falha nos vínculos continua liberado, sem erro de acesso', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const gateway = setup();
+    gateway.claims = { appAdmin: true, hasMinistry: false, canUploadSong: true };
+    gateway.onMemberships = (_uid, _cb, onError) => {
+      onError(new Error('rede'));
+      return () => undefined;
+    };
+    await enter(gateway, true);
+    await act(async () => undefined);
+    expect(read().access).toBe('granted');
+    expect(read().accessFailed).toBe(false);
+    warn.mockRestore();
+  });
+
+  it('não assina o documento do ministério enquanto o acesso está bloqueado', async () => {
+    const gateway = setup();
+    gateway.claims = NONE;
+    gateway.refreshToken = vi.fn(() => new Promise<void>(() => undefined));
+    const onMinistry = vi.spyOn(gateway, 'onMinistry');
+    await enter(gateway);
+    await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+    expect(read().access).toBe('blocked');
+    expect(onMinistry).not.toHaveBeenCalled();
   });
 
   describe('promoção, ministério e saída', () => {

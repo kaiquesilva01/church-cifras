@@ -70,6 +70,11 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
   const uid = session.resolved ? session.user?.uid : undefined;
   const hadMinistry = useRef(false);
   const lastMinistryName = useRef<string | undefined>(undefined);
+  const claimsRef = useRef<Claims>(NO_CLAIMS);
+
+  useEffect(() => {
+    claimsRef.current = claims.value;
+  }, [claims.value]);
 
   useEffect(() => gateway.onUser((user) => setSession({ resolved: true, user })), [gateway]);
 
@@ -114,13 +119,31 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     };
   }, [gateway, uid]);
 
+  const user = session.resolved ? session.user : null;
+  const status: AuthState['status'] =
+    !session.resolved || (user && !profile.loaded) ? 'loading' : user ? 'signed-in' : 'signed-out';
+  // Liberado: admin da app, ou claim hasMinistry com vínculo carregado. O vínculo é a fonte de
+  // verdade: claim antigo sem vínculo (pessoa removida) é bloqueio, nunca erro de carregamento.
+  const access: AuthState['access'] =
+    status !== 'signed-in' || !claims.loaded
+      ? 'checking'
+      : claims.value.appAdmin
+        ? 'granted'
+        : !memberships.loaded
+          ? 'checking'
+          : !memberships.failed && memberships.list.length > 0 && claims.value.hasMinistry
+            ? 'granted'
+            : 'blocked';
+
   // Ministério atual: o primeiro vínculo (a interface aceita um só).
   const first = memberships.list[0];
   const ministryId = first?.ministryId;
   const ministryCurrent = ministryId !== undefined && ministryLoad.id === ministryId;
   const ministryInfo = ministryCurrent ? ministryLoad.info : null;
+  // Só lê o documento do ministério com o acesso liberado: bloqueado, nada é assinado.
+  const granted = access === 'granted';
   useEffect(() => {
-    if (!ministryId) return;
+    if (!ministryId || !granted) return;
     return gateway.onMinistry(
       ministryId,
       (info) =>
@@ -135,7 +158,7 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
         setMinistryLoad({ id: ministryId, info: null, failed: true, missing: false });
       },
     );
-  }, [gateway, ministryId]);
+  }, [gateway, ministryId, granted]);
   useEffect(() => {
     if (ministryInfo) lastMinistryName.current = ministryInfo.name;
   }, [ministryInfo]);
@@ -166,13 +189,13 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     void (async () => {
-      // Ciclo novo: limpa o erro anterior (a chave só vale enquanto o mesmo ciclo falha).
-      if (active) setSyncFailedKey(null);
-      // Erro de acesso só quando há vínculo e o claim hasMinistry continua falso; appAdmin e
-      // canUploadSong nunca mostram erro de ministério (só a releitura limitada).
+      // Erro de acesso só quando há vínculo e o claim hasMinistry continua falso (o último lido
+      // neste ciclo, ou o de agora se nenhum foi lido); appAdmin e canUploadSong nunca mostram
+      // erro de ministério (só a releitura limitada).
       let last: Claims | undefined;
       const fail = () => {
-        if (active && hasMinistry && last?.hasMinistry !== true) setSyncFailedKey(syncKey);
+        if (active && hasMinistry && (last ?? claimsRef.current).hasMinistry !== true)
+          setSyncFailedKey(syncKey);
       };
       for (let attempt = 0; ; attempt += 1) {
         try {
@@ -206,11 +229,15 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     return () => {
       active = false;
       clearTimeout(timer);
+      // O erro vale só para o ciclo que falhou: uma chave igual que volte depois começa limpa.
+      setSyncFailedKey(null);
     };
   }, [gateway, uid, mismatch, hasMinistry, appAdminDoc, canUploadDoc, syncKey]);
 
-  // Sem o claim refletir o vínculo depois das releituras: erro com "Tentar de novo" (não tela vazia).
-  const accessFailed = mismatch && syncFailedKey === syncKey;
+  // Bloqueado por falha, não por falta de liberação: a leitura dos vínculos falhou, ou o claim não
+  // refletiu o vínculo depois das releituras. Erro com "Tentar de novo" e "Sair", não "acesso pendente".
+  const accessFailed =
+    access === 'blocked' && (memberships.failed || (mismatch && syncFailedKey === syncKey));
   const ministryFailed = ministryCurrent && ministryLoad.failed;
   const ministryMissing = ministryCurrent && ministryLoad.missing;
 
@@ -218,25 +245,6 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
   const prepareSignIn = useCallback(() => gateway.prepareSignIn(), [gateway]);
 
   const value = useMemo<AuthState>(() => {
-    const user = session.resolved ? session.user : null;
-    const status: AuthState['status'] =
-      !session.resolved || (user && !profile.loaded)
-        ? 'loading'
-        : user
-          ? 'signed-in'
-          : 'signed-out';
-    // Liberado: admin da app, ou claim hasMinistry com vínculo carregado. O vínculo é a fonte de
-    // verdade: claim antigo sem vínculo (pessoa removida) é bloqueio, nunca erro de carregamento.
-    const access: AuthState['access'] =
-      status !== 'signed-in' || !claims.loaded
-        ? 'checking'
-        : claims.value.appAdmin
-          ? 'granted'
-          : !memberships.loaded
-            ? 'checking'
-            : !memberships.failed && memberships.list.length > 0 && claims.value.hasMinistry
-              ? 'granted'
-              : 'blocked';
     const ministry: CurrentMinistry | null =
       first && ministryInfo
         ? {
@@ -261,10 +269,10 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
       signOut: () => gateway.signOut(),
     };
   }, [
-    session,
-    profile.loaded,
-    claims,
-    memberships,
+    status,
+    user,
+    access,
+    claims.value,
     first,
     ministryInfo,
     ministryFailed,
