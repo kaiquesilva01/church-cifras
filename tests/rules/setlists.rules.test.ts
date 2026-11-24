@@ -181,7 +181,7 @@ describe('setlists rules', () => {
       );
     });
     it('denies 101-char id', async () => {
-      await assertFails(setDoc(doc(editorDb(), SL(`${'x'.repeat(101)}`)), setlistData()));
+      await assertFails(setDoc(doc(editorDb(), SL('x'.repeat(101))), setlistData()));
     });
   });
 
@@ -387,13 +387,19 @@ describe('raiz setlists congelada (pacote)', () => {
   });
 
   it('membro de outro ministério não lê a raiz', async () => {
-    await assertFails(getDoc(doc(env.authenticatedContext('bia', {}).firestore(), 'setlists/s1')));
+    await assertFails(
+      getDoc(doc(env.authenticatedContext('bia', { role: 'member' }).firestore(), 'setlists/s1')),
+    );
   });
 
   it('token com role admin legado, sem vínculo na Haja Luz, não lê a raiz', async () => {
     await assertFails(
       getDoc(doc(env.authenticatedContext('x', { role: 'admin' }).firestore(), 'setlists/s1')),
     );
+  });
+
+  it('deslogado não lê a raiz', async () => {
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'setlists/s1')));
   });
 
   it('ninguém grava na raiz, nem admin da Haja Luz', async () => {
