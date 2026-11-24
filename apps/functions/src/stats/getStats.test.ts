@@ -304,6 +304,37 @@ describe('getStatsForCaller', () => {
     ).rejects.toMatchObject({ code: 'not-found' });
   });
 
+  it('ministryId inválido é invalid-argument, para app admin e para admin de ministério', async () => {
+    await expect(
+      getStatsForCaller(deps({ chefe: { appAdmin: true } }), 'chefe', 'a/b'),
+    ).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(
+      getStatsForCaller(deps({ adm: { appAdmin: false } }, { 'adm|a/b': 'admin' }), 'adm', 'a/b'),
+    ).rejects.toMatchObject({ code: 'invalid-argument' });
+  });
+
+  it('app admin com ministério inexistente é not-found antes de calcular o geral', async () => {
+    const base = deps({ chefe: { appAdmin: true } }, {}, { missingMinistries: ['fantasma'] });
+    const countSongs = vi.fn(async () => 0);
+    await expect(
+      getStatsForCaller({ ...base, countSongs }, 'chefe', 'fantasma'),
+    ).rejects.toMatchObject({ code: 'not-found' });
+    expect(countSongs).not.toHaveBeenCalled();
+  });
+
+  it('admin do ministério sem ministryId recebe a mensagem para informar o ministério', async () => {
+    await expect(
+      getStatsForCaller(
+        deps({ adm: { appAdmin: false } }, { 'adm|hajaluz': 'admin' }),
+        'adm',
+        undefined,
+      ),
+    ).rejects.toMatchObject({
+      code: 'permission-denied',
+      message: 'Informe o ministério para ver o ranking.',
+    });
+  });
+
   it('sem login é negado com unauthenticated', async () => {
     await expect(
       getStatsForCaller(deps({ chefe: { appAdmin: true } }), undefined, undefined),

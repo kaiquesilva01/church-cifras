@@ -1,6 +1,7 @@
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { ministryIdOf } from '../ministries/model';
+import type { SettledSetlist } from './countUsage';
 import type { StatsDeps } from './getStats';
 
 // Código gRPC ALREADY_EXISTS: o documento de setlistUsage já foi criado.
@@ -13,6 +14,41 @@ function stringIds(value: unknown): string[] {
   return value.filter((id): id is string => typeof id === 'string');
 }
 
+type SetlistRef = { id: string; parent: { parent: { id: string } | null } };
+
+/**
+ * Mapeia um repertório do grupo `setlists`. Raiz `setlists/{sid}` (sem ministério) vira null:
+ * é congelada e não conta. O ministryId vem do caminho do documento, nunca de um valor fixo.
+ */
+export function toSettledSetlist(
+  ref: SetlistRef,
+  data: Record<string, unknown>,
+): SettledSetlist | null {
+  const ministryId = ministryIdOf(ref);
+  if (!ministryId) return null;
+  return {
+    id: ref.id,
+    ministryId,
+    date: String(data.date ?? ''),
+    songIds: (Array.isArray(data.items) ? data.items : [])
+      .map((item) => (item as { songId?: unknown } | null)?.songId)
+      .filter((id): id is string => typeof id === 'string'),
+  };
+}
+
+/** Uso sem ministryId (gravado antes da #136) vira '' e fica fora de todo ranking de ministério. */
+export function toUsage(data: Record<string, unknown>): {
+  date: string;
+  songIds: string[];
+  ministryId: string;
+} {
+  return {
+    date: String(data.date ?? ''),
+    songIds: stringIds(data.songIds),
+    ministryId: typeof data.ministryId === 'string' ? data.ministryId : '',
+  };
+}
+
 export function createStatsDeps(): StatsDeps {
   return {
     listSettledSetlists: async (cutoff) => {
@@ -22,20 +58,8 @@ export function createStatsDeps(): StatsDeps {
         .where('date', '<=', cutoff)
         .get();
       return snap.docs.flatMap((d) => {
-        const ministryId = ministryIdOf(d.ref);
-        if (!ministryId) return [];
-        const items: unknown = d.data().items;
-        const list = Array.isArray(items) ? items : [];
-        return [
-          {
-            id: d.id,
-            ministryId,
-            date: String(d.data().date ?? ''),
-            songIds: list
-              .map((item) => (item as { songId?: unknown } | null)?.songId)
-              .filter((id): id is string => typeof id === 'string'),
-          },
-        ];
+        const setlist = toSettledSetlist(d.ref, d.data());
+        return setlist ? [setlist] : [];
       });
     },
     recordUsage: async ({ setlistId, date, songIds, ministryId }) => {
@@ -61,11 +85,7 @@ export function createStatsDeps(): StatsDeps {
     },
     // Sem where de propósito: a coleção é pequena e o ministryId filtra em memória (evita índice composto).
     listUsage: async () =>
-      (await getFirestore().collection('setlistUsage').get()).docs.map((d) => ({
-        date: String(d.data().date ?? ''),
-        songIds: stringIds(d.data().songIds),
-        ministryId: String(d.data().ministryId ?? ''),
-      })),
+      (await getFirestore().collection('setlistUsage').get()).docs.map((d) => toUsage(d.data())),
     getSongs: async (ids) => {
       const songs = new Map<string, { title: string; artistName: string }>();
       if (ids.length === 0) return songs;

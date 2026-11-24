@@ -1,6 +1,7 @@
 import { HttpsError } from 'firebase-functions/v2/https';
 import { countSettledSetlists, type UsageDeps } from './countUsage';
 import { addDays, todayInSaoPaulo } from './dates';
+import { readMinistryId } from '../ministries/model';
 import { isSongId } from './songId';
 
 export type TopSong = { songId: string; title: string; artistName: string; uses: number };
@@ -103,18 +104,29 @@ export async function getStats(deps: StatsDeps): Promise<StatsResult> {
   };
 }
 
-/** Ranking de um ministério: só os usos com esse ministryId. Mesmas regras de tally/rank do geral. */
-async function rankingOf(deps: CallerDeps, mid: string): Promise<MinistryRanking> {
+/** Lê o ministério pedido; sem ele, not-found. Chamado antes de qualquer cálculo caro. */
+async function requireMinistry(
+  deps: CallerDeps,
+  mid: string,
+): Promise<{ id: string; name: string }> {
   const ministry = await deps.readMinistry(mid);
   if (!ministry) throw new HttpsError('not-found', 'Ministério não encontrado.');
-  const usage = (await deps.listUsage()).filter((u) => u.ministryId === mid);
+  return { id: mid, name: ministry.name };
+}
+
+/** Ranking de um ministério: só os usos com esse ministryId. Mesmas regras de tally/rank do geral. */
+async function rankingOf(
+  deps: CallerDeps,
+  ministry: { id: string; name: string },
+): Promise<MinistryRanking> {
+  const usage = (await deps.listUsage()).filter((u) => u.ministryId === ministry.id);
   const since = addDays(todayInSaoPaulo(deps.now()), -(WINDOW_DAYS - 1));
   const allTime = tally(usage);
   const recent = tally(usage.filter((u) => u.date >= since));
   const ids = [...new Set([...allTime.keys(), ...recent.keys()])];
   const songs = await deps.getSongs(ids);
   return {
-    id: mid,
+    id: ministry.id,
     name: ministry.name,
     topAllTime: rank(allTime, songs),
     topLast30Days: rank(recent, songs),
@@ -127,20 +139,27 @@ export async function getStatsForCaller(
   ministryId: unknown,
 ): Promise<StatsCallerResult> {
   if (!uid) throw new HttpsError('unauthenticated', 'Entre para continuar.');
-  const mid = typeof ministryId === 'string' && ministryId !== '' ? ministryId : undefined;
+  // Mesma validação dos callables de ministério: '/' e formato inválido viram invalid-argument.
+  const mid =
+    ministryId === undefined || ministryId === null || ministryId === ''
+      ? undefined
+      : readMinistryId({ ministryId });
   const caller = await deps.readUser(uid);
   if (caller?.appAdmin === true) {
+    const ministry = mid ? await requireMinistry(deps, mid) : undefined;
+    const general = await getStats(deps);
     return {
-      general: await getStats(deps),
-      ministry: mid ? await rankingOf(deps, mid) : null,
+      general,
+      ministry: ministry ? await rankingOf(deps, ministry) : null,
     };
   }
   if (!mid) {
-    throw new HttpsError('permission-denied', 'Só o admin da app vê as estatísticas gerais.');
+    throw new HttpsError('permission-denied', 'Informe o ministério para ver o ranking.');
   }
   const membership = await deps.readMembership(mid, uid);
   if (membership?.role !== 'admin') {
     throw new HttpsError('permission-denied', 'Só o admin do ministério vê este ranking.');
   }
-  return { general: null, ministry: await rankingOf(deps, mid) };
+  const ministry = await requireMinistry(deps, mid);
+  return { general: null, ministry: await rankingOf(deps, ministry) };
 }
