@@ -75,4 +75,49 @@ describe('RequireRole', () => {
     expect(screen.queryByText('Início')).not.toBeInTheDocument();
     expect(screen.queryByText('Página protegida')).not.toBeInTheDocument();
   });
+
+  describe('predicados de claim (upload, appAdmin) não dependem do ministério', () => {
+    const appAdmin = { ...authStateFor(null), appAdmin: true, canUploadSong: true };
+
+    it.each([
+      ['/nova', 'upload'],
+      ['/gestao', 'appAdmin'],
+    ] as const)(
+      'admin da app abre %s (when="%s") com a carga do ministério falha',
+      (path, when) => {
+        renderAt(path, withAuth(appAdmin, { ministryFailed: true }), when);
+        expect(screen.getByText('Página protegida')).toBeInTheDocument();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(screen.queryByText('Início')).not.toBeInTheDocument();
+      },
+    );
+
+    it.each([
+      ['/nova', 'upload'],
+      ['/gestao', 'appAdmin'],
+    ] as const)(
+      'admin da app abre %s (when="%s") na hora com o ministério pendente',
+      (path, when) => {
+        renderAt(path, withAuth(appAdmin, { ministryPending: true }), when);
+        expect(screen.getByText('Página protegida')).toBeInTheDocument();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        expect(screen.queryByText('Carregando…')).not.toBeInTheDocument();
+      },
+    );
+
+    it('admin do ministério com a carga falha abre /nova, mas vê o erro do ministério em /pessoas', () => {
+      const failed = withAuth(authStateFor('admin'), { ministryFailed: true });
+      expect(failed.canUploadSong).toBe(true);
+      const { unmount } = renderAt('/nova', failed, 'upload');
+      expect(screen.getByText('Página protegida')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      unmount();
+      renderAt('/pessoas', failed, 'ministryAdmin');
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Não foi possível carregar o ministério.',
+      );
+      expect(screen.queryByText('Página protegida')).not.toBeInTheDocument();
+      expect(screen.queryByText('Início')).not.toBeInTheDocument();
+    });
+  });
 });
