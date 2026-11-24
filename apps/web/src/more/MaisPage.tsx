@@ -52,12 +52,13 @@ interface MenuLinkProps {
   icon: ReactNode;
   title: string;
   hint: string;
-  /** Pedidos pendentes; sem contador quando zero (ou ausente). */
-  pending?: number;
+  /** Pedidos pendentes. `null` (desconhecido, ainda carregando ou falhou) não mostra contador. */
+  pending?: number | null;
 }
 
-function MenuLink({ to, icon, title, hint, pending = 0 }: MenuLinkProps) {
-  const label = pending > 0 ? `${title}, ${pendentes(pending)}` : undefined;
+function MenuLink({ to, icon, title, hint, pending = null }: MenuLinkProps) {
+  const count = pending ?? 0;
+  const label = count > 0 ? `${title}, ${pendentes(count)}` : undefined;
   return (
     <li>
       <Link to={to} className="menu-row" aria-label={label}>
@@ -66,9 +67,9 @@ function MenuLink({ to, icon, title, hint, pending = 0 }: MenuLinkProps) {
           <strong>{title}</strong>
           <span className="muted">{hint}</span>
         </span>
-        {pending > 0 && (
+        {count > 0 && (
           <span className="count-badge" aria-hidden="true">
-            {badgeText(pending)}
+            {badgeText(count)}
           </span>
         )}
         {CHEVRON}
@@ -77,27 +78,45 @@ function MenuLink({ to, icon, title, hint, pending = 0 }: MenuLinkProps) {
   );
 }
 
-/** Contadores de pedidos: só consultados para quem vê a linha correspondente. Falha conta como zero. */
+/** Contagem com a chave (ministério ou "app") a que pertence: resultado de outro ministério não vale. */
+interface Counted {
+  key: string;
+  n: number | null;
+}
+
+const APP_KEY = 'app';
+
+/**
+ * Contadores de pedidos, só para quem vê a linha correspondente. Falha tenta de novo uma vez; se
+ * falhar de novo, o contador fica desconhecido (`null`): sem badge e sem zero na tela.
+ * O resultado guarda a chave a que pertence: ao trocar de ministério, o valor antigo deixa de valer
+ * na hora, sem flash.
+ */
 function usePendingCounts(
   api: MinistriesApi,
   ministryId: string | undefined,
   showMinistry: boolean,
   showApp: boolean,
 ) {
-  const [ministryCount, setMinistryCount] = useState(0);
-  const [appCount, setAppCount] = useState(0);
+  const [ministry, setMinistry] = useState<Counted>({ key: '', n: null });
+  const [app, setApp] = useState<Counted>({ key: '', n: null });
 
   useEffect(() => {
     if (!showMinistry || !ministryId) return;
     let live = true;
-    api.countPending(ministryId).then(
-      (n) => {
-        if (live) setMinistryCount(n);
-      },
-      () => {
-        if (live) setMinistryCount(0);
-      },
-    );
+    const ask = (retry: boolean) => {
+      api.countPending(ministryId).then(
+        (n) => {
+          if (live) setMinistry({ key: ministryId, n });
+        },
+        () => {
+          if (!live) return;
+          if (retry) ask(false);
+          else setMinistry({ key: ministryId, n: null });
+        },
+      );
+    };
+    ask(true);
     return () => {
       live = false;
     };
@@ -106,20 +125,28 @@ function usePendingCounts(
   useEffect(() => {
     if (!showApp) return;
     let live = true;
-    api.countPendingAll().then(
-      (n) => {
-        if (live) setAppCount(n);
-      },
-      () => {
-        if (live) setAppCount(0);
-      },
-    );
+    const ask = (retry: boolean) => {
+      api.countPendingAll().then(
+        (n) => {
+          if (live) setApp({ key: APP_KEY, n });
+        },
+        () => {
+          if (!live) return;
+          if (retry) ask(false);
+          else setApp({ key: APP_KEY, n: null });
+        },
+      );
+    };
+    ask(true);
     return () => {
       live = false;
     };
   }, [api, showApp]);
 
-  return { ministryCount, appCount };
+  return {
+    ministryCount: showMinistry && ministryId && ministry.key === ministryId ? ministry.n : null,
+    appCount: showApp && app.key === APP_KEY ? app.n : null,
+  };
 }
 
 function MenuCard({ eyebrow, children }: { eyebrow?: string; children: ReactNode }) {
@@ -128,6 +155,24 @@ function MenuCard({ eyebrow, children }: { eyebrow?: string; children: ReactNode
       {eyebrow && <p className="section-eyebrow">{eyebrow}</p>}
       <ul className="menu-card">{children}</ul>
     </>
+  );
+}
+
+/** Linha em esqueleto enquanto o ministério carrega; o texto oculto é anunciado a leitor de tela. */
+function MinistrySkeleton() {
+  return (
+    <li>
+      <span className="sr-only" role="status">
+        Carregando…
+      </span>
+      <div className="menu-row mn-skeleton-row" aria-hidden="true">
+        <span className="skeleton skeleton-tile" />
+        <span className="mn-skeleton-text">
+          <span className="skeleton skeleton-title" style={{ width: '120px' }} />
+          <span className="skeleton skeleton-line" style={{ width: '72px' }} />
+        </span>
+      </div>
+    </li>
   );
 }
 
@@ -140,7 +185,8 @@ export function MaisPage({ api }: { api: MinistriesApi }) {
   const { ministryCount, appCount } = usePendingCounts(api, ministry?.id, ministryAdmin, appAdmin);
   const name = user?.displayName ?? user?.email ?? '';
   // Com as duas visões (app e ministério), cada grupo ganha o seu eyebrow, como no Paper (tela 40).
-  const bothViews = appAdmin && ministry !== null;
+  // Enquanto o ministério carrega, o layout já é o de duas visões para o admin da app não pular.
+  const splitViews = appAdmin && (loading || ministry !== null);
 
   const pills: ReactNode[] = [];
   if (appAdmin) {
@@ -230,7 +276,7 @@ export function MaisPage({ api }: { api: MinistriesApi }) {
         </div>
       </div>
       {appAdmin && (
-        <MenuCard eyebrow={bothViews ? 'Aplicativo' : undefined}>
+        <MenuCard eyebrow={splitViews ? 'Aplicativo' : undefined}>
           <MenuLink
             to="/gestao"
             icon={<path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z" />}
@@ -240,7 +286,21 @@ export function MaisPage({ api }: { api: MinistriesApi }) {
           />
         </MenuCard>
       )}
-      {bothViews ? (
+      {loading ? (
+        splitViews ? (
+          <>
+            <MenuCard>
+              <MinistrySkeleton />
+            </MenuCard>
+            <MenuCard>{commonRows}</MenuCard>
+          </>
+        ) : (
+          <MenuCard>
+            <MinistrySkeleton />
+            {commonRows}
+          </MenuCard>
+        )
+      ) : splitViews ? (
         <>
           {ministryRows && <MenuCard eyebrow={ministry?.name}>{ministryRows}</MenuCard>}
           <MenuCard>{commonRows}</MenuCard>

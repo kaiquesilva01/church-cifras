@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthState, type MinistryRole } from '../auth/useAuth';
@@ -191,8 +191,56 @@ describe('MaisPage contadores de pedidos', () => {
   it('some com zero pedidos', async () => {
     const api = createFakeMinistriesApi({ countPending: vi.fn(() => Promise.resolve(0)) });
     const { container } = renderMais({ ministry: 'admin', api });
-    await waitFor(() => expect(api.countPending).toHaveBeenCalled());
+    await act(async () => {});
+    expect(api.countPending).toHaveBeenCalledTimes(1);
     expect(container.querySelector('.count-badge')).toBeNull();
+  });
+
+  it('falha ao contar tenta de novo uma vez e, sem sucesso, não mostra badge nem zero', async () => {
+    const api = createFakeMinistriesApi({
+      countPending: vi.fn(() => Promise.reject(new Error('rede'))),
+    });
+    const { container } = renderMais({ ministry: 'admin', api });
+    await waitFor(() => expect(api.countPending).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(container.querySelector('.count-badge')).toBeNull();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Pessoas do ministério/ })).toHaveAttribute(
+      'href',
+      '/pessoas',
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('na segunda tentativa que dá certo, mostra o total', async () => {
+    const countPending = vi
+      .fn<() => Promise<number>>()
+      .mockRejectedValueOnce(new Error('rede'))
+      .mockResolvedValueOnce(2);
+    const api = createFakeMinistriesApi({ countPending });
+    renderMais({ ministry: 'admin', api });
+    expect(await screen.findByText('2')).toHaveClass('count-badge');
+    expect(countPending).toHaveBeenCalledTimes(2);
+  });
+
+  it('falha ao contar a Gestão não mostra badge nem zero', async () => {
+    const api = createFakeMinistriesApi({
+      countPendingAll: vi.fn(() => Promise.reject(new Error('rede'))),
+    });
+    const { container } = renderMais({ ministry: null, appAdmin: true, api });
+    await waitFor(() => expect(api.countPendingAll).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(container.querySelector('.count-badge')).toBeNull();
+    expect(screen.getByRole('link', { name: /^Gestão/ })).toBeInTheDocument();
+  });
+
+  it('nunca mostra zero enquanto o contador não chegou', () => {
+    const api = createFakeMinistriesApi({
+      countPending: vi.fn(() => new Promise<number>(() => {})),
+    });
+    const { container } = renderMais({ ministry: 'admin', api });
+    expect(container.querySelector('.count-badge')).toBeNull();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 
   it('mostra 99+ acima de 99 pedidos', async () => {
@@ -213,5 +261,21 @@ describe('MaisPage contadores de pedidos', () => {
     const { api } = renderMais({ ministry: 'member' });
     expect(api.countPending).not.toHaveBeenCalled();
     expect(api.countPendingAll).not.toHaveBeenCalled();
+  });
+});
+
+describe('MaisPage carregamento do ministério', () => {
+  it('mostra o esqueleto com "Carregando…" para leitor de tela', () => {
+    const { container } = renderMais({ ministry: null, ministryPending: true });
+    expect(screen.getByRole('status')).toHaveTextContent('Carregando…');
+    expect(container.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /Sair/ })).toBeInTheDocument();
+  });
+
+  it('o admin da app mantém a moldura de duas visões enquanto carrega', () => {
+    renderMais({ ministry: null, ministryPending: true, appAdmin: true });
+    expect(screen.getByText('Aplicativo')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Gestão/ })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Carregando…');
   });
 });

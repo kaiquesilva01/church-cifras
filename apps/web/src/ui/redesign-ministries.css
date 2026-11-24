@@ -680,6 +680,22 @@
   margin-top: 2px;
 }
 
+/* Linha de esqueleto do ministério (Mais, enquanto carrega) */
+.mn-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.mn-skeleton-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
 .mn-profile-avatar {
   display: grid;
   flex-shrink: 0;
