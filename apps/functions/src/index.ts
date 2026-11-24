@@ -94,7 +94,6 @@ export const onUserCreated = functionsV1
 export { onArrangementWritten } from './songs/keys';
 export { onMinistrySetlistWritten } from './push/setlistTrigger';
 export { sendRehearsalReminders } from './push/reminderSchedule';
-export { mirrorSetlists } from './ministries/mirrorTrigger';
 
 const replaceDeps: ReplaceDeps = {
   replaceIfGenerated: (songId, slug, data) => {
