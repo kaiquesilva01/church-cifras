@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { createFakeMinistriesApi } from '../../test/fakeMinistriesApi';
 import type { MinistryItem } from '../ministriesApi';
@@ -25,6 +26,29 @@ describe('EntryConfirm', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pedir para entrar' })).toBeInTheDocument();
+  });
+
+  it('sem foco no opener (iOS), Cancelar devolve o foco à linha passada em returnTo', () => {
+    // A linha existe, mas não está focada: como no toque do iOS, o foco fica no body ao abrir.
+    const row = document.createElement('button');
+    document.body.append(row);
+    function Harness() {
+      const [open, setOpen] = useState(true);
+      return open ? (
+        <EntryConfirm
+          api={createFakeMinistriesApi()}
+          ministry={haja}
+          returnTo={row}
+          onClose={() => setOpen(false)}
+        />
+      ) : null;
+    }
+    render(<Harness />);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(row).toHaveFocus();
+    row.remove();
   });
 
   it('foco inicial em Cancelar', () => {
@@ -62,9 +86,8 @@ describe('EntryConfirm', () => {
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute('aria-busy', 'true');
     await act(async () => resolve());
-    // Sucesso: a assinatura de pedidos troca a tela; o diálogo não fecha sozinho nem devolve foco.
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    // Sucesso: o diálogo fecha (não fica preso esperando a assinatura).
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('Tab fica preso no diálogo', () => {

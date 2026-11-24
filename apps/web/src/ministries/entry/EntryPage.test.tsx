@@ -217,6 +217,50 @@ describe('EntryPage', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Pedido enviado' })).toHaveFocus();
   });
 
+  it('a assinatura falha depois de pedir: o diálogo fecha e a escolha mostra o erro', async () => {
+    let fail!: (e: unknown) => void;
+    const api = createFakeMinistriesApi({
+      listMinistries: vi.fn(() => Promise.resolve([haja])),
+      subscribeMyRequests: vi.fn((_uid, cb, onError) => {
+        fail = onError;
+        cb([]);
+        return () => {};
+      }),
+    });
+    renderEntry({ api });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Pedir para entrar em Haja Luz, São Paulo' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Pedir para entrar' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    act(() => fail(new Error('rede')));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível carregar os seus pedidos.',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Pedir para entrar em Haja Luz, São Paulo' }),
+    ).toBeInTheDocument();
+  });
+
+  it('cancelar o pedido devolve o foco ao título da escolha', async () => {
+    let emit!: (r: Request[]) => void;
+    const api = createFakeMinistriesApi({
+      listMinistries: vi.fn(() => Promise.resolve([haja])),
+      subscribeMyRequests: vi.fn((_uid, cb) => {
+        emit = cb;
+        cb([{ ministryId: 'hajaluz', status: 'pending' }]);
+        return () => {};
+      }),
+    });
+    renderEntry({ api });
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar pedido' }));
+    await waitFor(() => expect(api.callable.cancelRequest).toHaveBeenCalledWith('hajaluz'));
+    act(() => emit([]));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Escolha seu ministério' }),
+    ).toHaveFocus();
+  });
+
   it('Sair chama signOut', async () => {
     const { signOut } = renderEntry({
       api: createFakeMinistriesApi({ subscribeMyRequests: fakeSubscribe([]) }),

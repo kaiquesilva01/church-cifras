@@ -26,7 +26,10 @@ export function EntryPage({ api }: { api: MinistriesApi }) {
     rejected: null,
   });
   const [attempt, setAttempt] = useState(0);
+  const [requestsAttempt, setRequestsAttempt] = useState(0);
   const [catalog, setCatalog] = useState<Catalog>({ status: 'loading', list: [] });
+  // Depois de cancelar o pedido, a escolha volta com o foco no título (a tela trocou).
+  const [cancelled, setCancelled] = useState(false);
   // Lido no primeiro render e apagado num efeito (StrictMode: o useState repete a leitura sem apagar).
   const [removed] = useState(() => peekRemovedNotice());
   const [busy, setBusy] = useState(false);
@@ -65,9 +68,10 @@ export function EntryPage({ api }: { api: MinistriesApi }) {
           rejected: list.find((r) => r.status === 'rejected')?.ministryId ?? null,
         });
       },
-      () => setRequests((prev) => ({ ...prev, loaded: true, failed: true })),
+      // Falha da assinatura: a escolha mostra o erro com "Tentar de novo" (nunca fica presa).
+      () => setRequests({ loaded: true, failed: true, pending: null, rejected: null }),
     );
-  }, [api, uid]);
+  }, [api, uid, requestsAttempt]);
 
   function exit() {
     setExitFailed(false);
@@ -92,6 +96,7 @@ export function EntryPage({ api }: { api: MinistriesApi }) {
           setBusy(true);
           try {
             await api.callable.cancelRequest(pendingId);
+            setCancelled(true);
           } finally {
             setBusy(false);
           }
@@ -111,6 +116,12 @@ export function EntryPage({ api }: { api: MinistriesApi }) {
         setCatalog({ status: 'loading', list: [] });
         setAttempt((n) => n + 1);
       }}
+      requestsFailed={requests.failed}
+      onRetryRequests={() => {
+        setRequests({ loaded: false, failed: false, pending: null, rejected: null });
+        setRequestsAttempt((n) => n + 1);
+      }}
+      focusTitle={cancelled}
       firstName={user?.displayName?.split(' ')[0]}
       rejectedId={requests.rejected}
       removedFrom={removed}

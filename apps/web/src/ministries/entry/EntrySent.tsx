@@ -44,8 +44,8 @@ export function EntrySent({
     try {
       await onCancel();
     } catch (err) {
-      // Código conhecido do servidor: a mensagem dele é a que a pessoa vê (decisão do orquestrador);
-      // o texto da especificação é só o fallback.
+      // Código conhecido do servidor: a mensagem dele é a que a pessoa vê; o texto da
+      // especificação é o fallback (ver messageFor em ministries/callable.ts).
       setCancelFailed(messageFor(err, CANCEL_FAILED));
     }
   }

@@ -8,16 +8,20 @@ const FALLBACK = 'Não foi possível enviar o pedido. Tente de novo.';
 
 /**
  * Diálogo 35: confirma o pedido de entrada num ministério. Esc, Cancelar e toque no scrim fecham;
- * Tab fica preso no diálogo. Em sucesso o diálogo continua ocupado: a assinatura de pedidos troca a
- * tela inteira (EntrySent), então não há linha para devolver o foco.
+ * Tab fica preso no diálogo. `returnTo` é a linha tocada: o foco volta para ela ao fechar, mesmo
+ * quando o navegador não focou o botão no toque (iOS). Em sucesso o diálogo fecha; a assinatura de
+ * pedidos troca a tela (EntrySent), que recebe o foco.
  */
 export function EntryConfirm({
   api,
   ministry,
+  returnTo,
   onClose,
 }: {
   api: MinistriesApi;
   ministry: MinistryItem;
+  /** Omitido: volta para o elemento focado na montagem. */
+  returnTo?: HTMLElement | null;
   onClose: () => void;
 }) {
   const titleId = useId();
@@ -26,7 +30,7 @@ export function EntryConfirm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useFocusTrap(rootRef, { onEscape: onClose, busy });
+  useFocusTrap(rootRef, { onEscape: onClose, busy, opener: returnTo });
 
   useEffect(() => {
     cancelRef.current?.focus();
@@ -42,11 +46,14 @@ export function EntryConfirm({
     try {
       await api.callable.requestAccess(ministry.id);
     } catch (err) {
-      // Código conhecido do servidor: a mensagem em pt-BR dele é a que a pessoa vê (decisão do
-      // orquestrador); o texto da especificação é só o fallback (ver messageFor em callable.ts).
+      // Código conhecido do servidor: a mensagem dele é a que a pessoa vê; o texto da
+      // especificação é o fallback (ver messageFor em ministries/callable.ts).
       setError(messageFor(err, FALLBACK));
       setBusy(false);
+      return;
     }
+    setBusy(false);
+    onClose();
   }
 
   return (

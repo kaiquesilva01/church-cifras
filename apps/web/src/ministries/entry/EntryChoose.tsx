@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { SearchInput } from '../../ui/SearchInput';
 import { initialsOf } from '../../ui/initials';
 import { normalizeForSearch } from '../normalize';
@@ -43,11 +43,17 @@ export function RemovedNotice({ ministryName }: { ministryName: string }) {
   );
 }
 
-/** Tela 34 (escolha) com as caixas de 37 (recusado) e de 50 (removido). Quem lê o catálogo é a EntryPage. */
+/**
+ * Tela 34 (escolha) com as caixas de 37 (recusado) e de 50 (removido). Quem lê o catálogo e os
+ * pedidos é a EntryPage. `focusTitle` leva o foco ao título ao montar (volta depois de cancelar).
+ */
 export function EntryChoose({
   api,
   catalog,
   onRetry,
+  requestsFailed,
+  onRetryRequests,
+  focusTitle = false,
   firstName,
   rejectedId,
   removedFrom,
@@ -58,6 +64,9 @@ export function EntryChoose({
   api: MinistriesApi;
   catalog: Catalog;
   onRetry: () => void;
+  requestsFailed: boolean;
+  onRetryRequests: () => void;
+  focusTitle?: boolean;
   firstName?: string;
   rejectedId: string | null;
   removedFrom: string | null;
@@ -66,7 +75,14 @@ export function EntryChoose({
   exitFailed: boolean;
 }) {
   const [query, setQuery] = useState('');
-  const [picked, setPicked] = useState<MinistryItem | null>(null);
+  const [picked, setPicked] = useState<{ ministry: MinistryItem; opener: HTMLElement } | null>(
+    null,
+  );
+  const titleRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (focusTitle) titleRef.current?.focus();
+  }, [focusTitle]);
 
   const needle = normalizeForSearch(query);
   const shown = catalog.list.filter((m) =>
@@ -77,15 +93,30 @@ export function EntryChoose({
     ? (catalog.list.find((m) => m.id === rejectedId)?.name ?? 'o ministério')
     : null;
 
+  function pick(ministry: MinistryItem, event: MouseEvent<HTMLButtonElement>) {
+    setPicked({ ministry, opener: event.currentTarget });
+  }
+
   return (
     <main className="entry-screen">
       <header className="entry-head">
         {firstName && <p className="eyebrow">Olá, {firstName}</p>}
-        <h1 className="screen-title">Escolha seu ministério</h1>
+        <h1 ref={titleRef} tabIndex={-1} className="screen-title">
+          Escolha seu ministério
+        </h1>
         <p className="entry-text">
           Peça para entrar no ministério em que você toca. Um admin dele precisa aprovar.
         </p>
       </header>
+
+      {requestsFailed && (
+        <div className="error-box" role="alert">
+          <span>Não foi possível carregar os seus pedidos. Tente de novo.</span>
+          <button type="button" className="btn btn-primary" onClick={onRetryRequests}>
+            Tentar de novo
+          </button>
+        </div>
+      )}
 
       {rejectedId && (
         <div className="entry-alert" role="alert">
@@ -135,7 +166,7 @@ export function EntryChoose({
               type="button"
               className="entry-row"
               aria-label={`Pedir para entrar em ${m.name}, ${m.city}`}
-              onClick={() => setPicked(m)}
+              onClick={(event) => pick(m, event)}
             >
               <span className="min-tile" aria-hidden="true">
                 {initialsOf(m.name)}
@@ -167,7 +198,14 @@ export function EntryChoose({
         </p>
       )}
 
-      {picked && <EntryConfirm api={api} ministry={picked} onClose={() => setPicked(null)} />}
+      {picked && (
+        <EntryConfirm
+          api={api}
+          ministry={picked.ministry}
+          returnTo={picked.opener}
+          onClose={() => setPicked(null)}
+        />
+      )}
     </main>
   );
 }

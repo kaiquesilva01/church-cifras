@@ -24,6 +24,8 @@ function renderChoose(
     email: 'pessoa@exemplo.test',
     onExit: vi.fn(),
     exitFailed: false,
+    requestsFailed: false,
+    onRetryRequests: vi.fn(),
     ...overrides,
   };
   render(<EntryChoose {...props} />);
@@ -98,6 +100,8 @@ describe('EntryChoose', () => {
         api={createFakeMinistriesApi()}
         catalog={{ status: 'loading', list: [] }}
         onRetry={vi.fn()}
+        requestsFailed={false}
+        onRetryRequests={vi.fn()}
         rejectedId={null}
         removedFrom={null}
         email="pessoa@exemplo.test"
@@ -136,6 +140,60 @@ describe('EntryChoose', () => {
     renderChoose({ removedFrom: 'Haja Luz' });
     expect(screen.getByText('Você não faz mais parte de Haja Luz.')).toBeInTheDocument();
     expect(screen.getByText('Escolha um ministério para continuar.')).toBeInTheDocument();
+  });
+
+  it('Cancelar e Esc devolvem o foco à linha tocada, mesmo com o foco no body (iOS)', () => {
+    renderChoose();
+    const row = screen.getByRole('button', { name: 'Pedir para entrar em Haja Luz, São Paulo' });
+    fireEvent.click(row);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(row).toHaveFocus();
+
+    fireEvent.click(row);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(row).toHaveFocus();
+  });
+
+  it('focusTitle leva o foco ao título ao montar', () => {
+    render(
+      <EntryChoose
+        api={createFakeMinistriesApi()}
+        catalog={{ status: 'ready', list: catalog }}
+        onRetry={vi.fn()}
+        requestsFailed={false}
+        onRetryRequests={vi.fn()}
+        focusTitle
+        rejectedId={null}
+        removedFrom={null}
+        email="pessoa@exemplo.test"
+        onExit={vi.fn()}
+        exitFailed={false}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 1, name: 'Escolha seu ministério' })).toHaveFocus();
+  });
+
+  it('erro dos pedidos mostra Tentar de novo, que chama onRetryRequests', () => {
+    const onRetryRequests = vi.fn();
+    render(
+      <EntryChoose
+        api={createFakeMinistriesApi()}
+        catalog={{ status: 'ready', list: catalog }}
+        onRetry={vi.fn()}
+        requestsFailed
+        onRetryRequests={onRetryRequests}
+        rejectedId={null}
+        removedFrom={null}
+        email="pessoa@exemplo.test"
+        onExit={vi.fn()}
+        exitFailed={false}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Não foi possível carregar os seus pedidos.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(onRetryRequests).toHaveBeenCalledTimes(1);
   });
 
   it('tocar numa linha abre o diálogo de confirmação', () => {
