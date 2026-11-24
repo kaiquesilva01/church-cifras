@@ -258,7 +258,7 @@ export type StatsCallerResult = {
 6. **Avisos:** aparelho de outro ministério não recebe e **não** é apagado; aparelho de quem não tem ministério nenhum é apagado. Repertório **sempre** com `ministryId` (tipo e teste de runtime). Testes em `send.test.ts`, `announce.test.ts`, `reminders.test.ts` (Tarefa 10).
 7. **Estatísticas sem contagem dupla:** `collectionGroup('setlists')` também traz a raiz; só entra quem tem `ministryId` (`ministryIdOf(ref)` não nulo). Testes em `model.test.ts` e `countUsage.test.ts` (Tarefa 11).
 8. **Admin da app não lê repertório alheio:** `ministries/{mid}/setlists` exige documento de membro; a app admin só lê `members` e `requests`. Teste de rules (Tarefa 6).
-9. **Pedido sem corrida:** as checagens do pedido de entrada estão dentro da transação, antes de qualquer escrita (Tarefa 8).
+9. **Pedido de entrada:** as checagens estão dentro da transação, antes de qualquer escrita (Tarefa 8). Isso fecha a corrida no mesmo ministério. Entre ministérios diferentes, duas requisições simultâneas ainda podem criar dois pedidos pendentes (o SDK só trava documentos retornados pela consulta). Risco residual aceito pelo orquestrador (raro; o dado aceita N ministérios), como na decisão 11 da #135.
 
 ---
 
