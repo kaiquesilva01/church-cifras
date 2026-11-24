@@ -194,8 +194,38 @@ describe('Storage por claims (pacote)', () => {
     );
   });
 
-  it('claim hasMinistry como texto "true" não vale (comparação estrita)', async () => {
-    await assertFails(getBytes(ref(st('m', { hasMinistry: 'true' }), 'songs/s1/original.pdf')));
+  it('claim hasMinistry como texto "true" não vale, mesmo com role member (comparação estrita)', async () => {
+    await assertFails(
+      getBytes(ref(st('m', { role: 'member', hasMinistry: 'true' }), 'songs/s1/original.pdf')),
+    );
+    await assertFails(
+      getBytes(ref(st('m', { role: 'member', hasMinistry: 'true' }), 'pads/v1/DS04-C.m4a')),
+    );
+  });
+
+  it('admin da app sem ministério lê o catálogo e os pads', async () => {
+    await assertSucceeds(getBytes(ref(st('chefe', { appAdmin: true }), 'songs/s1/original.pdf')));
+    await assertSucceeds(getBytes(ref(st('chefe', { appAdmin: true }), 'pads/v1/DS04-C.m4a')));
+  });
+
+  it('membro com hasMinistry é negado ao subir com uploadedBy alheio, não PDF ou acima de 10 MB', async () => {
+    const member = st('m', { role: 'viewer', hasMinistry: true });
+    await assertFails(
+      uploadBytes(ref(member, 'songs/s1/K-wrong.pdf'), one, pdfFor('someone-else')),
+    );
+    await assertFails(
+      uploadBytes(ref(member, 'songs/s1/K-text.pdf'), one, {
+        contentType: 'text/plain',
+        customMetadata: { uploadedBy: 'm' },
+      }),
+    );
+    await assertFails(
+      uploadBytes(
+        ref(member, 'songs/s1/K-big.pdf'),
+        new Uint8Array(10 * 1024 * 1024 + 1),
+        pdfFor('m'),
+      ),
+    );
   });
 
   it('membro com hasMinistry sobe o PDF gerado', async () => {

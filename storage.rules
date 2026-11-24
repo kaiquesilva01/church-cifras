@@ -5,9 +5,10 @@ service firebase.storage {
     // Fallback decidido por token, como em firestore.rules: se o token traz claim novo, o role é ignorado.
     // Só token antigo (sem claim novo) usa o role legado, até a limpeza (#137).
     function hasNewClaims() {
-      return 'hasMinistry' in request.auth.token
-        || 'canUploadSong' in request.auth.token
-        || 'appAdmin' in request.auth.token;
+      return request.auth != null
+        && ('hasMinistry' in request.auth.token
+          || 'canUploadSong' in request.auth.token
+          || 'appAdmin' in request.auth.token);
     }
 
     // Claim novo manda; token sem o claim usa o role legado até a limpeza (#137).
