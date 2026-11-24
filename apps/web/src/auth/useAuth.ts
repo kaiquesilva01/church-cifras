@@ -22,7 +22,7 @@ export interface AuthState {
   /** O documento do ministério não existe (distinto de erro de leitura, que aceita tentar de novo). */
   ministryMissing: boolean;
   /**
-   * Há vínculo, e o documento do ministério ainda não chegou nem falhou. Vale também para o admin
+   * Com acesso liberado, há vínculo, e o documento do ministério ainda não chegou nem falhou. Vale também para o admin
    * da app que é membro (ele tem ministério, só espera a carga).
    */
   ministryPending: boolean;

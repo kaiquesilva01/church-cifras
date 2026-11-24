@@ -19,19 +19,30 @@ const PERMISSIONS: Record<RoutePermission, (auth: AuthState) => boolean> = {
   listSetlists: canListSetlists,
 };
 
+/** Predicados que leem o ministério: esperam a carga e mostram o erro dela. Os de claim, não. */
+const NEEDS_MINISTRY: Record<RoutePermission, boolean> = {
+  upload: false,
+  appAdmin: false,
+  ministryAdmin: true,
+  listSetlists: true,
+};
+
 export function RequireRole({ when }: { when: RoutePermission }) {
   const auth = useAuth();
-  // Vínculo confirmado e documento do ministério ainda carregando: espera, sem redirecionar.
-  if (isMinistryLoading(auth)) {
-    return (
-      <p role="status" className="status">
-        Carregando…
-      </p>
-    );
+  if (NEEDS_MINISTRY[when]) {
+    // Vínculo confirmado e documento do ministério ainda carregando: espera, sem redirecionar.
+    if (isMinistryLoading(auth)) {
+      return (
+        <p role="status" className="status">
+          Carregando…
+        </p>
+      );
+    }
+    // Falha ao carregar o documento do ministério: erro com retry, sem redirecionar.
+    if (auth.access === 'granted' && auth.ministryFailed) {
+      return <MinistryLoadError missing={auth.ministryMissing} />;
+    }
   }
-  // Falha ao carregar o documento do ministério: erro com retry, sem redirecionar.
-  if (auth.access === 'granted' && auth.ministryFailed) {
-    return <MinistryLoadError missing={auth.ministryMissing} />;
-  }
+  // Claims (upload, appAdmin) decidem na hora, mesmo com o documento do ministério pendente ou falho.
   return PERMISSIONS[when](auth) ? <Outlet /> : <Navigate to="/" replace />;
 }

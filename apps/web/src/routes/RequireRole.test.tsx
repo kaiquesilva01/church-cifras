@@ -64,13 +64,13 @@ describe('RequireRole', () => {
 
   it('mostra o erro do ministério, sem redirecionar, quando o documento falhou', () => {
     const auth = withAuth(authStateFor(null), { ministryFailed: true });
-    renderAt('/nova', auth, 'upload');
+    renderAt('/pessoas', auth, 'ministryAdmin');
     expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível carregar o ministério.');
     expect(screen.queryByText('Início')).not.toBeInTheDocument();
   });
 
   it('mostra "Carregando…", sem redirecionar, enquanto o ministério carrega', () => {
-    renderAt('/nova', { ...authStateFor(null), ministryPending: true }, 'upload');
+    renderAt('/pessoas', { ...authStateFor(null), ministryPending: true }, 'ministryAdmin');
     expect(screen.getByRole('status')).toHaveTextContent('Carregando…');
     expect(screen.queryByText('Início')).not.toBeInTheDocument();
     expect(screen.queryByText('Página protegida')).not.toBeInTheDocument();

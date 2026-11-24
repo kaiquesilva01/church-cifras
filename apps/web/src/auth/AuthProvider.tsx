@@ -241,7 +241,8 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
   const ministryFailed = ministryCurrent && ministryLoad.failed;
   const ministryMissing = ministryCurrent && ministryLoad.missing;
   // Vínculo sem documento ainda: nem carregou, nem falhou (o documento chega por onMinistry).
-  const ministryPending = first !== undefined && ministryInfo === null && !ministryFailed;
+  const ministryPending =
+    granted && first !== undefined && ministryInfo === null && !ministryFailed;
 
   // Estável entre mudanças de sessão: a tela de entrada aquece o popup uma vez só.
   const prepareSignIn = useCallback(() => gateway.prepareSignIn(), [gateway]);
