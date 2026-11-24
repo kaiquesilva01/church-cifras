@@ -8,15 +8,9 @@ import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { createFakeGateway, testUser } from '../test/fakeGateway';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import { createFakeMinistriesApi } from '../test/fakeMinistriesApi';
-import type { PeopleApi } from '../people/peopleApi';
 import { fakeStatsApi } from '../test/fakeStatsApi';
 
 vi.mock('../lib/reloadPage', () => ({ reloadPage: vi.fn() }));
-
-const peopleApi: PeopleApi = {
-  listUsers: () => Promise.resolve([]),
-  setRole: () => Promise.resolve(),
-};
 
 function scenarioOf(role: Role): Scenario {
   if (role === 'viewer') return {};
@@ -29,7 +23,6 @@ async function setup(path: string, signedIn?: Role) {
   render(
     <App
       gateway={gateway}
-      peopleApi={peopleApi}
       statsApi={fakeStatsApi()}
       catalogApi={fakeCatalogApi()}
       setlistApi={fakeSetlistApi()}
@@ -77,7 +70,6 @@ describe('routes', () => {
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
@@ -98,7 +90,6 @@ describe('routes', () => {
       render(
         <App
           gateway={gateway}
-          peopleApi={peopleApi}
           statsApi={fakeStatsApi()}
           catalogApi={fakeCatalogApi()}
           setlistApi={fakeSetlistApi()}
@@ -167,7 +158,6 @@ describe('routes', () => {
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
@@ -192,7 +182,6 @@ describe('routes', () => {
     render(
       <App
         gateway={failing}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
@@ -220,7 +209,6 @@ describe('routes', () => {
     render(
       <App
         gateway={failing}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
@@ -243,7 +231,6 @@ describe('routes', () => {
     render(
       <App
         gateway={missing}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
@@ -266,7 +253,6 @@ describe('routes', () => {
     render(
       <App
         gateway={failing}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
@@ -292,7 +278,6 @@ describe('routes', () => {
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
@@ -318,7 +303,6 @@ describe('routes', () => {
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={setlistApi}
@@ -373,7 +357,6 @@ describe('visitante sem acesso (#126)', () => {
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi(undefined, { subscribeSongs })}
         setlistApi={fakeSetlistApi([], { subscribeSetlists })}
@@ -393,7 +376,6 @@ describe('visitante sem acesso (#126)', () => {
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}

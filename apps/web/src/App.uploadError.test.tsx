@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import type { PeopleApi } from './people/peopleApi';
 import { fakeStatsApi } from './test/fakeStatsApi';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway } from './test/fakeGateway';
@@ -13,11 +12,6 @@ vi.mock('./upload/UploadRoute', () => {
   throw new Error('chunk failed');
 });
 
-const peopleApi: PeopleApi = {
-  listUsers: () => Promise.resolve([]),
-  setRole: () => Promise.resolve(),
-};
-
 describe('/nova route failure', () => {
   it('shows the boundary message and reloads on retry', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -26,7 +20,6 @@ describe('/nova route failure', () => {
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}

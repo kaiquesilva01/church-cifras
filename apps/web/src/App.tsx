@@ -11,8 +11,7 @@ import { ActiveSetlistProvider } from './setlists/ActiveSetlistProvider';
 import type { SetlistApi } from './setlists/setlistApi';
 import type { MinistriesApi } from './ministries/ministriesApi';
 import { SetlistsProvider } from './setlists/SetlistsProvider';
-import type { PeopleApi } from './people/peopleApi';
-import { PeoplePage } from './people/PeoplePage';
+import { PessoasRoute } from './people/PessoasRoute';
 import type { StatsApi } from './stats/statsApi';
 import { StatsPage } from './stats/StatsPage';
 import { loadViewerRoute } from './lib/prefetch';
@@ -37,7 +36,6 @@ const SetlistRoute = lazy(() => import('./setlists/SetlistRoute'));
 
 export interface AppProps {
   gateway: AuthGateway;
-  peopleApi: PeopleApi;
   statsApi: StatsApi;
   catalogApi: CatalogApi;
   setlistApi: SetlistApi;
@@ -51,14 +49,12 @@ export interface AppProps {
 }
 
 function AppRoutes({
-  peopleApi,
   statsApi,
   catalogApi,
   setlistApi,
   ministriesApi,
   onReload,
 }: {
-  peopleApi: PeopleApi;
   statsApi: StatsApi;
   catalogApi: CatalogApi;
   setlistApi: SetlistApi;
@@ -135,7 +131,7 @@ function AppRoutes({
               />
             </Route>
             <Route element={<RequireRole when="ministryAdmin" />}>
-              <Route path="/pessoas" element={<PeoplePage api={peopleApi} />} />
+              <Route path="/pessoas" element={<PessoasRoute api={ministriesApi} />} />
               <Route path="/estatisticas" element={<StatsPage api={statsApi} />} />
             </Route>
             <Route element={<RequireRole when="upload" />}>
@@ -168,7 +164,6 @@ const reloadPage = () => window.location.reload();
 
 export function App({
   gateway,
-  peopleApi,
   statsApi,
   catalogApi,
   setlistApi,
@@ -182,7 +177,6 @@ export function App({
       initialPath ? (
         <MemoryRouter initialEntries={[initialPath]}>
           <AppRoutes
-            peopleApi={peopleApi}
             statsApi={statsApi}
             catalogApi={catalogApi}
             setlistApi={setlistApi}
@@ -193,7 +187,6 @@ export function App({
       ) : (
         <BrowserRouter>
           <AppRoutes
-            peopleApi={peopleApi}
             statsApi={statsApi}
             catalogApi={catalogApi}
             setlistApi={setlistApi}
@@ -202,7 +195,7 @@ export function App({
           />
         </BrowserRouter>
       ),
-    [initialPath, peopleApi, statsApi, catalogApi, setlistApi, ministriesApi, onReload],
+    [initialPath, statsApi, catalogApi, setlistApi, ministriesApi, onReload],
   );
   return (
     <ThemeProvider>

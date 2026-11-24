@@ -6,7 +6,6 @@ import { createCatalogApi } from './catalog/catalogApi';
 import { createMinistriesApi } from './ministries/ministriesApi';
 import { readPushConfig, readWebEnv } from './lib/env';
 import { createFirebase } from './lib/firebase';
-import { createPeopleApi } from './people/peopleApi';
 import { createFakeMessagingPort } from './push/fakeMessaging';
 import { createMessagingPort } from './push/messaging';
 import { createPushApi } from './push/pushApi';
@@ -43,7 +42,6 @@ export function renderApp(root: Root): void {
     const gateway = createAuthGateway(services, {
       beforeSignOut: () => pushService?.forgetDevice() ?? Promise.resolve(),
     });
-    const peopleApi = createPeopleApi(services);
     const statsApi = createStatsApi(services);
     const catalogApi = createCatalogApi(services);
     // Ponte até a Tarefa 25 (MinistryScope): o ministério atual vem do provedor, não daqui.
@@ -54,7 +52,6 @@ export function renderApp(root: Root): void {
         <TestBanner label={import.meta.env.VITE_TEST_BANNER} />
         <App
           gateway={gateway}
-          peopleApi={peopleApi}
           statsApi={statsApi}
           catalogApi={catalogApi}
           setlistApi={setlistApi}

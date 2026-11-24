@@ -903,3 +903,46 @@
   font-weight: 600;
   line-height: 20px;
 }
+
+/* Pessoas do ministério (tela 41): colunas, cabeçalho de seção, âncora do menu e nota final */
+.people-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.people-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.person-list,
+.request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.request-list {
+  gap: 10px;
+}
+.person-menu-anchor {
+  position: relative;
+}
+.people-dialog-text {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 22px;
+}
+.people-note {
+  margin: 0;
+  padding-inline: 8px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+}

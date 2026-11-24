@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import type { PeopleApi } from './people/peopleApi';
 import { fakeStatsApi } from './test/fakeStatsApi';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway } from './test/fakeGateway';
@@ -13,17 +12,11 @@ vi.mock('./import/ImportRoute', () => ({
   default: () => <p>Importar (marker)</p>,
 }));
 
-const peopleApi: PeopleApi = {
-  listUsers: () => Promise.resolve([]),
-  setRole: () => Promise.resolve(),
-};
-
 function setup(scenario: Scenario) {
   const gateway = createFakeGateway();
   render(
     <App
       gateway={gateway}
-      peopleApi={peopleApi}
       statsApi={fakeStatsApi()}
       catalogApi={fakeCatalogApi()}
       setlistApi={fakeSetlistApi()}
