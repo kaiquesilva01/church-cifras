@@ -36,6 +36,22 @@ describe('callCallable', () => {
     expect(error).toMatchObject({ code: 'unknown', message: GENERIC_MESSAGE });
   });
 
+  it('mensagem vazia do servidor conta como ausente', async () => {
+    const error = await callCallable(() =>
+      Promise.reject({ code: 'functions/invalid-argument', message: '' }),
+    ).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'invalid-argument', message: GENERIC_MESSAGE });
+  });
+
+  it('rejeição null ou undefined vira código unknown e mensagem genérica', async () => {
+    const fromNull = await callCallable(() => Promise.reject(null)).catch((e: unknown) => e);
+    const fromUndefined = await callCallable(() => Promise.reject(undefined)).catch(
+      (e: unknown) => e,
+    );
+    expect(fromNull).toMatchObject({ code: 'unknown', message: GENERIC_MESSAGE });
+    expect(fromUndefined).toMatchObject({ code: 'unknown', message: GENERIC_MESSAGE });
+  });
+
   it('código conhecido sem mensagem vira genérica', async () => {
     const error = await callCallable(() => Promise.reject({ code: 'functions/not-found' })).catch(
       (e: unknown) => e,
@@ -56,6 +72,12 @@ describe('messageFor', () => {
         'Servidor disse.',
       );
     }
+  });
+
+  it('usa o fallback quando a mensagem é a genérica, mesmo com código conhecido', () => {
+    expect(messageFor(new CallableError('failed-precondition', GENERIC_MESSAGE), 'Padrão')).toBe(
+      'Padrão',
+    );
   });
 
   it('usa o fallback para outros códigos e para erros que não são CallableError', () => {

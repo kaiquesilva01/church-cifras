@@ -6,6 +6,8 @@ type CallableOverrides = Partial<MinistriesApi['callable']>;
 /**
  * Fake de MinistriesApi: leituras vazias e callables resolvidas por padrão.
  * `overrides.callable` mescla por campo; cada teste sobrescreve só o que usa.
+ * Um override que rejeita deve usar `new CallableError(code, mensagem)` (de `ministries/callable.ts`),
+ * como o tradutor real: `messageFor` só mostra a mensagem para a classe `CallableError`.
  */
 export function createFakeMinistriesApi(
   overrides: Partial<Omit<MinistriesApi, 'callable'>> & { callable?: CallableOverrides } = {},

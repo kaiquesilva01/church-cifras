@@ -17,21 +17,30 @@ export class CallableError extends Error {
   }
 }
 
+function isKnownCode(code: string): boolean {
+  return (KNOWN_CODES as readonly string[]).includes(code);
+}
+
 export async function callCallable<T>(call: () => Promise<{ data: T }>): Promise<T> {
   try {
     return (await call()).data;
   } catch (error) {
-    const e = error as { code?: unknown; message?: unknown };
+    const e = (error ?? {}) as { code?: unknown; message?: unknown };
     const code = typeof e.code === 'string' ? e.code.replace(/^functions\//, '') : 'unknown';
-    const serverMessage = typeof e.message === 'string' ? e.message : undefined;
-    const known = (KNOWN_CODES as readonly string[]).includes(code) && serverMessage !== undefined;
+    const serverMessage = typeof e.message === 'string' && e.message !== '' ? e.message : undefined;
+    const known = isKnownCode(code) && serverMessage !== undefined;
     throw new CallableError(code, known ? serverMessage : GENERIC_MESSAGE);
   }
 }
 
-/** Mensagem para a pessoa: a do servidor quando o código é conhecido; senão o `fallback`. */
+/**
+ * Mensagem para a pessoa: a do servidor quando o código é conhecido e a mensagem não é a genérica;
+ * senão o `fallback` da tela.
+ */
 export function messageFor(error: unknown, fallback: string): string {
-  return error instanceof CallableError && (KNOWN_CODES as readonly string[]).includes(error.code)
+  return error instanceof CallableError &&
+    isKnownCode(error.code) &&
+    error.message !== GENERIC_MESSAGE
     ? error.message
     : fallback;
 }

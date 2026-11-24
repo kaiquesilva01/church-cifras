@@ -32,10 +32,12 @@ export interface MinistryItem {
   name: string;
   city: string;
   nameNormalized: string;
-  memberCount?: number;
-  pendingCount?: number;
 }
 
+/**
+ * Leituras lançam o erro do SDK do Firestore sem tradução: a tela mostra o próprio texto em pt-BR,
+ * nunca a mensagem crua. Escritas passam por `callable`, que traduz o erro (ver `callable.ts`).
+ */
 export interface MinistriesApi {
   /** Ordenada por name (pt-BR); a busca usa nameNormalized. */
   listMinistries(): Promise<MinistryItem[]>;
