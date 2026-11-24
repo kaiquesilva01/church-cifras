@@ -14,7 +14,7 @@ import { SongsProvider } from '../catalog/SongsProvider';
 import { PadContext, type PadContextValue } from '../pad/usePad';
 import { ActiveSetlistProvider } from '../setlists/ActiveSetlistProvider';
 import { fakeCatalogApi, sampleSongs } from '../test/fakeCatalogApi';
-import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import { loadFontFromDisk, sheetInG } from './transposeFixtures';
 import { ViewerPage } from './ViewerPage';
@@ -90,15 +90,7 @@ function setup(path: string, pad: PadContextValue | null) {
       ],
     }),
   ]);
-  const auth: AuthState = {
-    status: 'signed-in',
-    user: testUser,
-    role: 'member',
-    access: 'granted',
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
-  };
+  const auth: AuthState = authStateFor('member');
   render(
     <AuthContext.Provider value={auth}>
       <PadContext.Provider value={pad}>

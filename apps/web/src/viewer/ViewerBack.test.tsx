@@ -9,7 +9,7 @@ import { BuscaPage } from '../search/BuscaPage';
 import { HomePage } from '../search/HomePage';
 import { SetlistsProvider } from '../setlists/SetlistsProvider';
 import { fakeCatalogApi, makeSong } from '../test/fakeCatalogApi';
-import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { fakeSetlistApi } from '../test/fakeSetlistApi';
 import { ViewerPage } from './ViewerPage';
 
@@ -50,15 +50,7 @@ const songs = [
 const api = fakeCatalogApi(songs);
 const setlistApi = fakeSetlistApi([]);
 
-const auth: AuthState = {
-  status: 'signed-in',
-  user: testUser,
-  role: 'member',
-  access: 'granted',
-  prepareSignIn: () => Promise.resolve(),
-  signIn: () => Promise.resolve(),
-  signOut: () => Promise.resolve(),
-};
+const auth: AuthState = authStateFor('member');
 
 function ViewerRoute() {
   const { songId = '' } = useParams();

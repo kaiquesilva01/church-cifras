@@ -18,11 +18,10 @@ import {
   useSearchParams,
 } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi, sampleSongs } from '../test/fakeCatalogApi';
-import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { stubShare, unstubShare } from '../test/shareStub';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import { ActiveSetlistProvider } from '../setlists/ActiveSetlistProvider';
@@ -95,13 +94,13 @@ function setup(
   path: string,
   items: SetlistItem[] = [ia, ix, ib, ic],
   {
-    role = 'member',
+    auth = authStateFor('member'),
     writer,
     history = [],
     setlistOverrides,
     provider = true,
   }: {
-    role?: Role;
+    auth?: AuthState;
     writer?: ChordWriter;
     /** Entries before `path` in the history (so `navigate(-1)` has somewhere to go). */
     history?: string[];
@@ -120,15 +119,6 @@ function setup(
     ),
   });
   const setlistApi = fakeSetlistApi([makeSetlist({ id: 'r1', items })], setlistOverrides);
-  const auth: AuthState = {
-    status: 'signed-in',
-    user: testUser,
-    role,
-    access: 'granted',
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
-  };
   const { container, unmount } = render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[...history, path]} initialIndex={history.length}>
@@ -229,8 +219,8 @@ describe('ViewerPage in a setlist', () => {
     expect(screen.getByRole('button', { name: /Próxima/ })).toBeDisabled();
   });
 
-  it('visitors see the bar', async () => {
-    setup('/musicas/s2?tom=Fsm&repertorio=r1&item=b', undefined, { role: 'viewer' });
+  it('membros veem a barra', async () => {
+    setup('/musicas/s2?tom=Fsm&repertorio=r1&item=b', undefined, { auth: authStateFor('member') });
     await screen.findByTestId('pdf-pages');
     expect(screen.getByText('2 de 3')).toBeInTheDocument();
   });
@@ -250,7 +240,9 @@ describe('ViewerPage in a setlist', () => {
     });
 
     it('deleting the open key keeps the params', async () => {
-      setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, { role: 'admin' });
+      setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, {
+        auth: { ...authStateFor('admin'), appAdmin: true },
+      });
       fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar' }));
       fireEvent.click(screen.getByRole('button', { name: 'Apagar tom G' }));
       const dialog = await screen.findByRole('dialog');
@@ -408,7 +400,9 @@ describe('ViewerPage in a setlist', () => {
     };
 
     it('the saved-data notice survives a tom switch but not another song', async () => {
-      setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, { role: 'admin' });
+      setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, {
+        auth: { ...authStateFor('admin'), appAdmin: true },
+      });
       await saveMeta();
       fireEvent.click(screen.getByRole('link', { name: 'Sonda-me, tom A' }));
       expect(screen.getByText('Dados atualizados.')).toBeInTheDocument();
@@ -418,7 +412,9 @@ describe('ViewerPage in a setlist', () => {
     });
 
     it('an open manage menu does not follow to the next song', async () => {
-      setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, { role: 'admin' });
+      setup('/musicas/s1?tom=G&repertorio=r1&item=a', undefined, {
+        auth: { ...authStateFor('admin'), appAdmin: true },
+      });
       fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar' }));
       expect(screen.getByRole('group', { name: 'Gerenciar música' })).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /Próxima/ }));

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi, makeSong } from '../test/fakeCatalogApi';
-import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { stubShare, unstubShare } from '../test/shareStub';
 import { ViewerPage } from './ViewerPage';
 
@@ -38,15 +38,7 @@ function Page({ api, openPdf }: { api: ReturnType<typeof fakeCatalogApi>; openPd
 
 function renderViewer(path: string, api = fakeCatalogApi()) {
   const openPdf = vi.fn(() => Promise.resolve({ numPages: 3, destroy: vi.fn() }));
-  const auth: AuthState = {
-    status: 'signed-in',
-    user: testUser,
-    role: 'member',
-    access: 'granted',
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
-  };
+  const auth: AuthState = authStateFor('member');
   render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[path]}>
