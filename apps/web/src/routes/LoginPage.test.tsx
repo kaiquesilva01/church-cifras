@@ -28,6 +28,32 @@ function mount(from: unknown) {
   );
 }
 
+describe('LoginPage note', () => {
+  it('explains that a first access chooses a ministry and waits for an admin', () => {
+    const auth: AuthState = {
+      status: 'signed-out',
+      user: null,
+      access: 'checking',
+      prepareSignIn: () => Promise.resolve(),
+      signIn: () => Promise.resolve(),
+      signOut: () => Promise.resolve(),
+    } as unknown as AuthState;
+    render(
+      <AuthContext.Provider value={auth}>
+        <MemoryRouter initialEntries={['/login']}>
+          <LoginPage />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+    expect(
+      screen.getByText(
+        'Quem entra pela primeira vez escolhe o ministério e pede para entrar. Um admin aprova.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/liberação de um admin/)).toBeNull();
+  });
+});
+
 describe('LoginPage redirect after sign-in', () => {
   it('goes back to the protected screen the person was sent from', () => {
     mount('/repertorios/r1');

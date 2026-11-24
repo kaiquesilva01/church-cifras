@@ -28,7 +28,10 @@ export function createFakeMinistriesApi(
   };
   return {
     listMinistries: vi.fn(() => Promise.resolve([])),
-    subscribeMyRequests: vi.fn(() => () => {}),
+    subscribeMyRequests: vi.fn((_uid, cb) => {
+      cb([]);
+      return () => {};
+    }),
     countPending: vi.fn(() => Promise.resolve(0)),
     countPendingAll: vi.fn(() => Promise.resolve(0)),
     listRequests: vi.fn(() => Promise.resolve([])),

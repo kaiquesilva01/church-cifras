@@ -3,6 +3,7 @@ import type { Root } from 'react-dom/client';
 import { App } from './App';
 import { createAuthGateway } from './auth/gateway';
 import { createCatalogApi } from './catalog/catalogApi';
+import { createMinistriesApi } from './ministries/ministriesApi';
 import { readPushConfig, readWebEnv } from './lib/env';
 import { createFirebase } from './lib/firebase';
 import { createPeopleApi } from './people/peopleApi';
@@ -46,6 +47,7 @@ export function renderApp(root: Root): void {
     const statsApi = createStatsApi(services);
     const catalogApi = createCatalogApi(services);
     const setlistApi = createSetlistApi(services);
+    const ministriesApi = createMinistriesApi(services);
     root.render(
       <StrictMode>
         <TestBanner label={import.meta.env.VITE_TEST_BANNER} />
@@ -55,6 +57,7 @@ export function renderApp(root: Root): void {
           statsApi={statsApi}
           catalogApi={catalogApi}
           setlistApi={setlistApi}
+          ministriesApi={ministriesApi}
           pushService={pushService}
         />
         <UpdatePrompt />

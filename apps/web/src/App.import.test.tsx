@@ -7,6 +7,7 @@ import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway } from './test/fakeGateway';
 import { signInAs, type Scenario } from './test/authState';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
+import { createFakeMinistriesApi } from './test/fakeMinistriesApi';
 
 vi.mock('./import/ImportRoute', () => ({
   default: () => <p>Importar (marker)</p>,
@@ -26,6 +27,7 @@ function setup(scenario: Scenario) {
       statsApi={fakeStatsApi()}
       catalogApi={fakeCatalogApi()}
       setlistApi={fakeSetlistApi()}
+      ministriesApi={createFakeMinistriesApi()}
       initialPath="/importar"
     />,
   );
@@ -47,7 +49,7 @@ describe('/importar route', () => {
   it('shows only the access screen to visitors', async () => {
     setup({});
     expect(
-      await screen.findByRole('heading', { name: 'Acesso ainda não liberado' }),
+      await screen.findByRole('heading', { name: 'Escolha seu ministério' }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Importar (marker)')).not.toBeInTheDocument();
   });

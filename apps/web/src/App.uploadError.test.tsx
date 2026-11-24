@@ -7,6 +7,7 @@ import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway } from './test/fakeGateway';
 import { signInAs } from './test/authState';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
+import { createFakeMinistriesApi } from './test/fakeMinistriesApi';
 
 vi.mock('./upload/UploadRoute', () => {
   throw new Error('chunk failed');
@@ -29,6 +30,7 @@ describe('/nova route failure', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/nova"
         onReload={onReload}
       />,

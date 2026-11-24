@@ -7,6 +7,7 @@ import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway } from './test/fakeGateway';
 import { signInAs, type Scenario } from './test/authState';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
+import { createFakeMinistriesApi } from './test/fakeMinistriesApi';
 
 vi.mock('./upload/UploadRoute', () => ({
   default: () => <p>Nova cifra (marker)</p>,
@@ -26,6 +27,7 @@ function setup(scenario: Scenario) {
       statsApi={fakeStatsApi()}
       catalogApi={fakeCatalogApi()}
       setlistApi={fakeSetlistApi()}
+      ministriesApi={createFakeMinistriesApi()}
       initialPath="/nova"
     />,
   );
@@ -42,7 +44,7 @@ describe('/nova route', () => {
   it('shows only the access screen to visitors', async () => {
     setup({});
     expect(
-      await screen.findByRole('heading', { name: 'Acesso ainda não liberado' }),
+      await screen.findByRole('heading', { name: 'Escolha seu ministério' }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Nova cifra (marker)')).not.toBeInTheDocument();
   });

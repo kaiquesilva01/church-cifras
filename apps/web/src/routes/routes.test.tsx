@@ -7,6 +7,7 @@ import { signInAs, type Scenario } from '../test/authState';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { createFakeGateway, testUser } from '../test/fakeGateway';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
+import { createFakeMinistriesApi } from '../test/fakeMinistriesApi';
 import type { PeopleApi } from '../people/peopleApi';
 import { fakeStatsApi } from '../test/fakeStatsApi';
 
@@ -32,6 +33,7 @@ async function setup(path: string, signedIn?: Role) {
       statsApi={fakeStatsApi()}
       catalogApi={fakeCatalogApi()}
       setlistApi={fakeSetlistApi()}
+      ministriesApi={createFakeMinistriesApi()}
       initialPath={path}
     />,
   );
@@ -48,11 +50,11 @@ describe('routes', () => {
     expect(screen.getByText('Entrar com Google')).toBeInTheDocument();
   });
 
-  it('login explains that the first access needs an admin release', async () => {
+  it('login explains that the first access chooses a ministry and waits for an admin', async () => {
     await setup('/login');
     expect(
       screen.getByText(
-        'Quem entra pela primeira vez precisa da liberação de um admin do ministério para ver as cifras.',
+        'Quem entra pela primeira vez escolhe o ministério e pede para entrar. Um admin aprova.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Cifras · Louvor' })).toBeInTheDocument();
@@ -79,6 +81,7 @@ describe('routes', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/login"
       />,
     );
@@ -99,6 +102,7 @@ describe('routes', () => {
           statsApi={fakeStatsApi()}
           catalogApi={fakeCatalogApi()}
           setlistApi={fakeSetlistApi()}
+          ministriesApi={createFakeMinistriesApi()}
           initialPath="/login"
         />,
       );
@@ -164,6 +168,7 @@ describe('routes', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/pessoas"
       />,
     );
@@ -188,6 +193,7 @@ describe('routes', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/pessoas"
       />,
     );
@@ -215,6 +221,7 @@ describe('routes', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/mais"
       />,
     );
@@ -237,6 +244,7 @@ describe('routes', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/mais"
       />,
     );
@@ -259,6 +267,7 @@ describe('routes', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/mais"
       />,
     );
@@ -284,6 +293,7 @@ describe('routes', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/login"
       />,
     );
@@ -309,6 +319,7 @@ describe('routes', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={setlistApi}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/repertorios/r1"
       />,
     );
@@ -347,7 +358,7 @@ describe('visitante sem acesso (#126)', () => {
   ])('visitor sees only the access screen at %s', async (path) => {
     await setup(path, 'viewer');
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Acesso ainda não liberado' }),
+      screen.getByRole('heading', { level: 1, name: 'Escolha seu ministério' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Principal' })).not.toBeInTheDocument();
   });
@@ -363,12 +374,13 @@ describe('visitante sem acesso (#126)', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi(undefined, { subscribeSongs })}
         setlistApi={fakeSetlistApi([], { subscribeSetlists })}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/"
       />,
     );
     signInAs(gateway);
     await act(async () => undefined);
-    expect(screen.getByRole('heading', { name: 'Acesso ainda não liberado' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Escolha seu ministério' })).toBeInTheDocument();
     expect(subscribeSongs).not.toHaveBeenCalled();
     expect(subscribeSetlists).not.toHaveBeenCalled();
   });
@@ -382,12 +394,13 @@ describe('visitante sem acesso (#126)', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/"
       />,
     );
     signInAs(gateway);
     await act(async () => undefined);
-    expect(screen.getByRole('heading', { name: 'Acesso ainda não liberado' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Escolha seu ministério' })).toBeInTheDocument();
     // O vínculo chega e o token é renovado com o claim novo (o fake copia nextClaims no refresh).
     gateway.nextClaims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
     await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
@@ -395,6 +408,6 @@ describe('visitante sem acesso (#126)', () => {
     expect(
       await screen.findByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Acesso ainda não liberado' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Escolha seu ministério' })).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import { App } from './App';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway } from './test/fakeGateway';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
+import { createFakeMinistriesApi } from './test/fakeMinistriesApi';
 import type { PeopleApi } from './people/peopleApi';
 import { fakeStatsApi } from './test/fakeStatsApi';
 
@@ -22,6 +23,7 @@ describe('App', () => {
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/"
       />,
     );
