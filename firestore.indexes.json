@@ -9,6 +9,22 @@
     },
     { "collectionGroup": "avisosEnviados", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
     {
+      "collectionGroup": "setlists",
+      "fieldPath": "date",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
+      "collectionGroup": "setlists",
+      "fieldPath": "rehearsalAt",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
       "collectionGroup": "members",
       "fieldPath": "uid",
       "indexes": [

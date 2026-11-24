@@ -152,7 +152,7 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if signedIn() && (request.auth.uid == uid || role() == 'admin');
+      allow read: if signedIn() && (request.auth.uid == uid || isAppAdminClaim() || role() == 'admin');
       allow write: if false;
     }
 
@@ -224,13 +224,15 @@ service cloud.firestore {
       }
     }
 
-    // Admin da app: todos os vínculos e pedidos (consulta de grupo). Não lê repertórios.
-    match /{path=**}/members/{uid} {
-      allow read: if isAppAdminClaim();
+    // Consulta de grupo por uid: a pessoa lê só os próprios vínculos e pedidos (campo uid = id do documento).
+    // Admin da app lê todos. Repertório não é lido por aqui.
+    // Estas regras confiam no campo `uid` gravado; só o Admin SDK escreve vínculos e pedidos (uid == id do documento).
+    match /{path=**}/members/{memberUid} {
+      allow read: if isAppAdminClaim() || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
-    match /{path=**}/requests/{uid} {
-      allow read: if isAppAdminClaim();
+    match /{path=**}/requests/{requestUid} {
+      allow read: if isAppAdminClaim() || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
     // setlistUsage é acessado só pelo Admin SDK (Cloud Functions): sem regra, fica negado por padrão.
