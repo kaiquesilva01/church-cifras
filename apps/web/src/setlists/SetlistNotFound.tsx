@@ -15,7 +15,7 @@ export function SetlistNotFound() {
         <BackChevronIcon />
         Voltar
       </Link>
-      <div className="empty-card empty-card--search setlist-not-found-body">
+      <div className="setlist-not-found-body">
         <span className="setlist-not-found-icon" aria-hidden="true">
           <LayersIcon />
         </span>

@@ -11,12 +11,14 @@
   padding: 16px 8px 80px;
 }
 
+/* Sem cartão: a tela 49 do Paper não tem borda nem fundo (não combinar com `.empty-card`). */
 .setlist-not-found-body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   gap: 28px;
-  border: 0;
-  background: none;
   text-align: center;
 }
 
