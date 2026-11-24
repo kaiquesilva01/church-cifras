@@ -1,10 +1,11 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import type { PeopleApi } from './people/peopleApi';
 import { fakeStatsApi } from './test/fakeStatsApi';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
-import { createFakeGateway, testUser } from './test/fakeGateway';
+import { createFakeGateway } from './test/fakeGateway';
+import { signInAs } from './test/authState';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
 
 vi.mock('./upload/UploadRoute', () => {
@@ -32,9 +33,7 @@ describe('/nova route failure', () => {
         onReload={onReload}
       />,
     );
-    gateway.claimRole = 'member';
-    act(() => gateway.emitUser(testUser));
-    act(() => gateway.emitRole('member'));
+    signInAs(gateway, { ministry: { role: 'member' } });
     expect(await screen.findByText('Não foi possível carregar a página.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
     expect(onReload).toHaveBeenCalledTimes(1);

@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../App';
 import type { Role } from '../auth/roles';
+import { signInAs, type Scenario } from '../test/authState';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { createFakeGateway, testUser } from '../test/fakeGateway';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
@@ -13,10 +14,14 @@ const peopleApi: PeopleApi = {
   setRole: () => Promise.resolve(),
 };
 
-/** O claim do token é a fonte do gate: ele é definido antes do login, como no Firebase. */
+function scenarioOf(role: Role): Scenario {
+  if (role === 'viewer') return {};
+  return { ministry: { role } };
+}
+
+/** Os claims do token são a fonte do gate: o login os traz junto com o vínculo (`signInAs`). */
 async function setup(path: string, signedIn?: Role) {
   const gateway = createFakeGateway();
-  if (signedIn) gateway.claimRole = signedIn;
   render(
     <App
       gateway={gateway}
@@ -27,8 +32,10 @@ async function setup(path: string, signedIn?: Role) {
       initialPath={path}
     />,
   );
-  await act(async () => gateway.emitUser(signedIn ? testUser : null));
-  if (signedIn) await act(async () => gateway.emitRole(signedIn));
+  if (signedIn) signInAs(gateway, scenarioOf(signedIn));
+  else await act(async () => gateway.emitUser(null));
+  // Deixa as páginas lazy carregarem (o fallback "Carregando…" sai depois de uma volta de microtarefas).
+  await act(async () => undefined);
   return gateway;
 }
 
@@ -146,7 +153,7 @@ describe('routes', () => {
 
   it('waits for the role before deciding on /pessoas', async () => {
     const gateway = createFakeGateway();
-    gateway.claimRole = 'admin';
+    gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: true };
     render(
       <App
         gateway={gateway}
@@ -159,7 +166,10 @@ describe('routes', () => {
     );
     await act(async () => gateway.emitUser(testUser));
     expect(screen.getByText('Carregando…')).toBeInTheDocument();
-    await act(async () => gateway.emitRole('admin'));
+    await act(async () => gateway.emitProfile({ appAdmin: false }));
+    await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'admin' }]));
+    act(() => gateway.emitMinistry({ name: 'Haja Luz', city: 'São Paulo' }));
+    await act(async () => undefined);
     expect(screen.getByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
   });
 
@@ -190,7 +200,6 @@ describe('routes', () => {
 
   it('returns to the protected screen after signing in, not to home', async () => {
     const gateway = createFakeGateway();
-    gateway.claimRole = 'member';
     const setlistApi = fakeSetlistApi([makeSetlist({ id: 'r1', label: 'Culto de domingo' })]);
     render(
       <App
@@ -205,8 +214,7 @@ describe('routes', () => {
     act(() => gateway.emitUser(null));
     expect(screen.getByText('Entrar com Google')).toBeInTheDocument();
 
-    await act(async () => gateway.emitUser(testUser));
-    await act(async () => gateway.emitRole('member'));
+    signInAs(gateway, { ministry: { role: 'member' } });
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Culto de domingo' }),
     ).toBeInTheDocument();
@@ -247,7 +255,6 @@ describe('visitante sem acesso (#126)', () => {
     const subscribeSongs = vi.fn(() => () => undefined);
     const subscribeSetlists = vi.fn(() => () => undefined);
     const gateway = createFakeGateway();
-    gateway.claimRole = 'viewer';
     render(
       <App
         gateway={gateway}
@@ -258,8 +265,8 @@ describe('visitante sem acesso (#126)', () => {
         initialPath="/"
       />,
     );
-    await act(async () => gateway.emitUser(testUser));
-    await act(async () => gateway.emitRole('viewer'));
+    signInAs(gateway);
+    await act(async () => undefined);
     expect(screen.getByRole('heading', { name: 'Acesso ainda não liberado' })).toBeInTheDocument();
     expect(subscribeSongs).not.toHaveBeenCalled();
     expect(subscribeSetlists).not.toHaveBeenCalled();
@@ -267,7 +274,6 @@ describe('visitante sem acesso (#126)', () => {
 
   it('member is redirected to the app after the claim arrives', async () => {
     const gateway = createFakeGateway();
-    gateway.claimRole = 'viewer';
     render(
       <App
         gateway={gateway}
@@ -278,10 +284,13 @@ describe('visitante sem acesso (#126)', () => {
         initialPath="/"
       />,
     );
-    await act(async () => gateway.emitUser(testUser));
-    await act(async () => gateway.emitRole('viewer'));
+    signInAs(gateway);
+    await act(async () => undefined);
     expect(screen.getByRole('heading', { name: 'Acesso ainda não liberado' })).toBeInTheDocument();
-    await act(async () => gateway.emitRole('member'));
+    // O vínculo chega e o token é renovado com o claim novo (o fake copia nextClaims no refresh).
+    gateway.nextClaims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+    act(() => gateway.emitMinistry({ name: 'Haja Luz', city: 'São Paulo' }));
     expect(
       await screen.findByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
     ).toBeInTheDocument();

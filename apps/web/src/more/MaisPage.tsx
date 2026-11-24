@@ -1,5 +1,6 @@
 import { useContext } from 'react';
 import { Link } from 'react-router';
+import { legacyRole } from '../auth/legacyRole';
 import { ROLE_LABELS, canEdit, isAdmin } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import { AvisosRow } from '../push/AvisosRow';
@@ -41,7 +42,10 @@ function Icon({ children }: { children: React.ReactNode }) {
 }
 
 export function MaisPage() {
-  const { user, role, signOut } = useAuth();
+  const auth = useAuth();
+  const { user, signOut } = auth;
+  // Ponte até a Tarefa 21 (papel de rota derivado do estado novo; ver auth/legacyRole.ts).
+  const role = legacyRole(auth);
   const push = useContext(PushContext);
   const name = user?.displayName ?? user?.email ?? '';
   return (

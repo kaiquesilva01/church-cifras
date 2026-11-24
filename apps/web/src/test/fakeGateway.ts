@@ -1,11 +1,22 @@
-import { vi } from 'vitest';
-import type { AuthGateway, SessionUser } from '../auth/AuthProvider';
-import type { Role } from '../auth/roles';
+import { vi, type Mock } from 'vitest';
+import type {
+  AuthGateway,
+  Claims,
+  Membership,
+  MinistryInfo,
+  SessionUser,
+} from '../auth/AuthProvider';
 
 export interface FakeGateway extends AuthGateway {
   emitUser(user: SessionUser | null): void;
-  emitRole(role: Role | undefined): void;
-  claimRole: Role | undefined;
+  emitProfile(p: { appAdmin: boolean }): void;
+  emitMemberships(m: Membership[]): void;
+  emitMinistry(m: MinistryInfo | null): void;
+  /** Claims devolvidos por getClaims(). */
+  claims: Claims;
+  /** Claims que aparecem depois de refreshToken(). */
+  nextClaims: Claims;
+  forgetLocalData: Mock<(removedFrom?: string) => Promise<void>>;
 }
 
 export const testUser: SessionUser = {
@@ -15,12 +26,16 @@ export const testUser: SessionUser = {
   photoURL: null,
 };
 
+const NONE: Claims = { appAdmin: false, hasMinistry: false, canUploadSong: false };
+
 export function createFakeGateway(): FakeGateway {
   let userCb: ((u: SessionUser | null) => void) | undefined;
-  let currentRole: Role | undefined;
-  let roleCb: ((r: Role | undefined) => void) | undefined;
+  let profileCb: ((p: { appAdmin: boolean }) => void) | undefined;
+  let membershipsCb: ((m: Membership[]) => void) | undefined;
+  let ministryCb: ((m: MinistryInfo | null) => void) | undefined;
   const gateway: FakeGateway = {
-    claimRole: 'viewer',
+    claims: NONE,
+    nextClaims: NONE,
     onUser: (cb) => {
       userCb = cb;
       return () => {
@@ -28,24 +43,36 @@ export function createFakeGateway(): FakeGateway {
       };
     },
     onUserDoc: (_uid, cb) => {
-      roleCb = cb;
+      profileCb = cb;
       return () => {
-        roleCb = undefined;
+        profileCb = undefined;
       };
     },
-    getClaimRole: () => Promise.resolve(gateway.claimRole),
+    onMemberships: (_uid, cb) => {
+      membershipsCb = cb;
+      return () => {
+        membershipsCb = undefined;
+      };
+    },
+    onMinistry: (_id, cb) => {
+      ministryCb = cb;
+      return () => {
+        ministryCb = undefined;
+      };
+    },
+    getClaims: () => Promise.resolve(gateway.claims),
     refreshToken: vi.fn(() => {
-      gateway.claimRole = currentRole;
+      gateway.claims = gateway.nextClaims;
       return Promise.resolve();
     }),
     prepareSignIn: vi.fn(() => Promise.resolve()),
     signIn: vi.fn(() => Promise.resolve()),
     signOut: vi.fn(() => Promise.resolve()),
+    forgetLocalData: vi.fn(() => Promise.resolve()),
     emitUser: (u) => userCb?.(u),
-    emitRole: (r) => {
-      currentRole = r;
-      roleCb?.(r);
-    },
+    emitProfile: (p) => profileCb?.(p),
+    emitMemberships: (m) => membershipsCb?.(m),
+    emitMinistry: (m) => ministryCb?.(m),
   };
   return gateway;
 }

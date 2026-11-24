@@ -1,11 +1,11 @@
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import type { Role } from './auth/roles';
 import type { PeopleApi } from './people/peopleApi';
 import { fakeStatsApi } from './test/fakeStatsApi';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
-import { createFakeGateway, testUser } from './test/fakeGateway';
+import { createFakeGateway } from './test/fakeGateway';
+import { signInAs, type Scenario } from './test/authState';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
 
 vi.mock('./upload/UploadRoute', () => ({
@@ -17,7 +17,7 @@ const peopleApi: PeopleApi = {
   setRole: () => Promise.resolve(),
 };
 
-function setup(role: Role) {
+function setup(scenario: Scenario) {
   const gateway = createFakeGateway();
   render(
     <App
@@ -29,20 +29,18 @@ function setup(role: Role) {
       initialPath="/nova"
     />,
   );
-  gateway.claimRole = role;
-  act(() => gateway.emitUser(testUser));
-  act(() => gateway.emitRole(role));
+  signInAs(gateway, scenario);
 }
 
 describe('/nova route', () => {
   it('shows the fallback first and then the page for members', async () => {
-    setup('member');
+    setup({ ministry: { role: 'member' } });
     expect(screen.getByText('Carregando…')).toBeInTheDocument();
     expect(await screen.findByText('Nova cifra (marker)')).toBeInTheDocument();
   });
 
   it('shows only the access screen to visitors', async () => {
-    setup('viewer');
+    setup({});
     expect(
       await screen.findByRole('heading', { name: 'Acesso ainda não liberado' }),
     ).toBeInTheDocument();
