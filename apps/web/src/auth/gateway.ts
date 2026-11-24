@@ -88,17 +88,14 @@ export function createAuthGateway(
           ),
         onError,
       ),
-    onMinistry: (ministryId, cb) =>
+    onMinistry: (ministryId, cb, onError) =>
       onSnapshot(
         doc(db, 'ministries', ministryId),
         (snap) => {
           const data = snap.data();
           cb(data ? { name: String(data.name ?? ''), city: String(data.city ?? '') } : null);
         },
-        (error) => {
-          console.warn('Falha ao carregar o ministério', error);
-          cb(null);
-        },
+        onError,
       ),
     refreshToken: async () => {
       if (auth.currentUser) await getIdToken(auth.currentUser, true);

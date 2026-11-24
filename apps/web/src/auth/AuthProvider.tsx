@@ -25,7 +25,11 @@ export interface AuthGateway {
     onError: (e: unknown) => void,
   ): () => void;
   /** ministries/{mid}; null se o documento não existe. */
-  onMinistry(ministryId: string, cb: (m: MinistryInfo | null) => void): () => void;
+  onMinistry(
+    ministryId: string,
+    cb: (m: MinistryInfo | null) => void,
+    onError: (e: unknown) => void,
+  ): () => void;
   refreshToken(): Promise<void>;
   prepareSignIn(): Promise<void>;
   signIn(): Promise<void>;
@@ -54,7 +58,12 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     failed: false,
     list: [],
   });
-  const [ministryInfo, setMinistryInfo] = useState<MinistryInfo | null>(null);
+  // Leitura do ministério, presa ao id: troca de vínculo não herda o nome do anterior.
+  const [ministryLoad, setMinistryLoad] = useState<{
+    id: string;
+    info: MinistryInfo | null;
+    failed: boolean;
+  }>({ id: '', info: null, failed: false });
   const uid = session.resolved ? session.user?.uid : undefined;
   const hadMinistry = useRef(false);
   const lastMinistryName = useRef<string | undefined>(undefined);
@@ -104,13 +113,19 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
   // Ministério atual: o primeiro vínculo (a interface aceita um só).
   const first = memberships.list[0];
   const ministryId = first?.ministryId;
+  const ministryCurrent = ministryId !== undefined && ministryLoad.id === ministryId;
+  const ministryInfo = ministryCurrent ? ministryLoad.info : null;
+  const ministryFailed = ministryCurrent && ministryLoad.failed;
   useEffect(() => {
     if (!ministryId) return;
-    const off = gateway.onMinistry(ministryId, setMinistryInfo);
-    return () => {
-      off();
-      setMinistryInfo(null);
-    };
+    return gateway.onMinistry(
+      ministryId,
+      (info) => setMinistryLoad({ id: ministryId, info, failed: info === null }),
+      (error) => {
+        console.warn('Falha ao carregar o ministério', error);
+        setMinistryLoad({ id: ministryId, info: null, failed: true });
+      },
+    );
   }, [gateway, ministryId]);
   useEffect(() => {
     if (ministryInfo) lastMinistryName.current = ministryInfo.name;
@@ -129,8 +144,13 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
   const hasMinistry = memberships.list.length > 0;
   const appAdminDoc = profile.value.appAdmin;
   const ready = claims.loaded && profile.loaded && memberships.loaded && !memberships.failed;
+  // canUploadSong: admin de algum ministério ou admin da app (o claim é gravado pelo servidor).
+  const canUploadDoc = appAdminDoc || memberships.list.some((m) => m.role === 'admin');
   const mismatch =
-    ready && (claims.value.hasMinistry !== hasMinistry || claims.value.appAdmin !== appAdminDoc);
+    ready &&
+    (claims.value.hasMinistry !== hasMinistry ||
+      claims.value.appAdmin !== appAdminDoc ||
+      claims.value.canUploadSong !== canUploadDoc);
   useEffect(() => {
     if (!uid || !mismatch) return;
     let active = true;
@@ -142,7 +162,12 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
           const value = await gateway.getClaims();
           if (!active) return;
           setClaims({ loaded: true, value });
-          if (value.hasMinistry === hasMinistry && value.appAdmin === appAdminDoc) return;
+          if (
+            value.hasMinistry === hasMinistry &&
+            value.appAdmin === appAdminDoc &&
+            value.canUploadSong === canUploadDoc
+          )
+            return;
         } catch (error) {
           console.warn('Falha ao atualizar o token de sessão', error);
           return;
@@ -158,7 +183,7 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
       active = false;
       clearTimeout(timer);
     };
-  }, [gateway, uid, mismatch, hasMinistry, appAdminDoc]);
+  }, [gateway, uid, mismatch, hasMinistry, appAdminDoc, canUploadDoc]);
 
   // Estável entre mudanças de sessão: a tela de entrada aquece o popup uma vez só.
   const prepareSignIn = useCallback(() => gateway.prepareSignIn(), [gateway]);
@@ -193,11 +218,21 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
       appAdmin: claims.value.appAdmin,
       canUploadSong: claims.value.canUploadSong,
       ministry,
+      ministryFailed,
       prepareSignIn,
       signIn: () => gateway.signIn(),
       signOut: () => gateway.signOut(),
     };
-  }, [session, profile.loaded, claims, first, ministryInfo, gateway, prepareSignIn]);
+  }, [
+    session,
+    profile.loaded,
+    claims,
+    first,
+    ministryInfo,
+    ministryFailed,
+    gateway,
+    prepareSignIn,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

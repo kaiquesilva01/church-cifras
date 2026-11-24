@@ -17,6 +17,8 @@ export interface AuthState {
   canUploadSong: boolean;
   /** Único vínculo da pessoa (a interface aceita um). null sem ministério. */
   ministry: CurrentMinistry | null;
+  /** Vínculo confirmado, mas o documento do ministério falhou ao carregar (ou não existe). */
+  ministryFailed: boolean;
   prepareSignIn(): Promise<void>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;

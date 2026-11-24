@@ -12,6 +12,8 @@ export interface FakeGateway extends AuthGateway {
   emitProfile(p: { appAdmin: boolean }): void;
   emitMemberships(m: Membership[]): void;
   emitMinistry(m: MinistryInfo | null): void;
+  /** Simula erro ao ler o documento do ministério. */
+  failMinistry(): void;
   /** Claims devolvidos por getClaims(). */
   claims: Claims;
   /** Claims que aparecem depois de refreshToken(). */
@@ -33,6 +35,7 @@ export function createFakeGateway(): FakeGateway {
   let profileCb: ((p: { appAdmin: boolean }) => void) | undefined;
   let membershipsCb: ((m: Membership[]) => void) | undefined;
   let ministryCb: ((m: MinistryInfo | null) => void) | undefined;
+  let ministryErrCb: ((e: unknown) => void) | undefined;
   const gateway: FakeGateway = {
     claims: NONE,
     nextClaims: NONE,
@@ -54,10 +57,12 @@ export function createFakeGateway(): FakeGateway {
         membershipsCb = undefined;
       };
     },
-    onMinistry: (_id, cb) => {
+    onMinistry: (_id, cb, onError) => {
       ministryCb = cb;
+      ministryErrCb = onError;
       return () => {
         ministryCb = undefined;
+        ministryErrCb = undefined;
       };
     },
     getClaims: () => Promise.resolve(gateway.claims),
@@ -73,6 +78,7 @@ export function createFakeGateway(): FakeGateway {
     emitProfile: (p) => profileCb?.(p),
     emitMemberships: (m) => membershipsCb?.(m),
     emitMinistry: (m) => ministryCb?.(m),
+    failMinistry: () => ministryErrCb?.(new Error('rede')),
   };
   return gateway;
 }

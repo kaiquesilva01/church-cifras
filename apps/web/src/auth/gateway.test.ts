@@ -166,14 +166,23 @@ describe('createAuthGateway', () => {
   describe('onMinistry', () => {
     it('reports name and city of the ministry', () => {
       const cb = vi.fn();
-      createAuthGateway(services).onMinistry('hajaluz', cb);
+      createAuthGateway(services).onMinistry('hajaluz', cb, vi.fn());
       handlers.next({ data: () => ({ name: 'Haja Luz', city: 'São Paulo' }) });
       expect(cb).toHaveBeenCalledWith({ name: 'Haja Luz', city: 'São Paulo' });
     });
 
+    it('reports read errors to onError, not as a missing ministry', () => {
+      const cb = vi.fn();
+      const onError = vi.fn();
+      createAuthGateway(services).onMinistry('hajaluz', cb, onError);
+      handlers.fail(new Error('permission-denied'));
+      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect(cb).not.toHaveBeenCalled();
+    });
+
     it('reports null when the ministry document does not exist', () => {
       const cb = vi.fn();
-      createAuthGateway(services).onMinistry('hajaluz', cb);
+      createAuthGateway(services).onMinistry('hajaluz', cb, vi.fn());
       handlers.next({ data: () => undefined });
       expect(cb).toHaveBeenCalledWith(null);
     });

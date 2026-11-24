@@ -5,6 +5,7 @@ import { ROLE_LABELS, canEdit, isAdmin } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import { AvisosRow } from '../push/AvisosRow';
 import { PushContext } from '../push/types';
+import { MinistryLoadError } from '../routes/MinistryLoadError';
 import { initialsOf } from '../ui/initials';
 import { ScreenHeader } from '../ui/ScreenHeader';
 
@@ -58,7 +59,11 @@ export function MaisPage() {
         <div className="profile-info">
           {user?.displayName && <p className="profile-name">{user.displayName}</p>}
           <p className="muted">{user?.email}</p>
-          <span className="role-badge">{ROLE_LABELS[role]}</span>
+          {auth.ministryFailed ? (
+            <MinistryLoadError />
+          ) : (
+            <span className="role-badge">{ROLE_LABELS[role]}</span>
+          )}
         </div>
       </div>
       <ul className="menu-card">

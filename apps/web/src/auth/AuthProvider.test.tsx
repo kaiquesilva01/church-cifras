@@ -13,6 +13,7 @@ function Probe() {
     appAdmin: a.appAdmin,
     canUploadSong: a.canUploadSong,
     ministry: a.ministry,
+    ministryFailed: a.ministryFailed,
     status: a.status,
     keys: Object.keys(a),
   });
@@ -148,8 +149,7 @@ describe('AuthProvider', () => {
   it('falha ao ler os vínculos: não tenta renovar o token e avisa', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const gateway = setup();
-    gateway.claims = NONE;
-    gateway.nextClaims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
     gateway.onMemberships = (_uid, _cb, onError) => {
       onError(new Error('rede'));
       return () => undefined;
@@ -157,8 +157,54 @@ describe('AuthProvider', () => {
     await enter(gateway);
     await act(async () => undefined);
     expect(gateway.refreshToken).not.toHaveBeenCalled();
+    expect(read().access).toBe('granted');
     expect(warn).toHaveBeenCalledWith('Falha ao ler os vínculos', expect.any(Error));
     warn.mockRestore();
+  });
+
+  describe('promoção, ministério e saída', () => {
+    it('promoção a admin de ministério: renova o token até canUploadSong chegar', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      gateway.nextClaims = { appAdmin: false, hasMinistry: true, canUploadSong: true };
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+      expect(gateway.refreshToken).not.toHaveBeenCalled();
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'admin' }]));
+      expect(gateway.refreshToken).toHaveBeenCalledTimes(1);
+      expect(read().canUploadSong).toBe(true);
+    });
+
+    it('documento do ministério ausente: ministryFailed e ministry null', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+      act(() => gateway.emitMinistry(null));
+      expect(read().ministryFailed).toBe(true);
+      expect(read().ministry).toBeNull();
+    });
+
+    it('erro ao ler o ministério: ministryFailed; carregando não é falha', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+      expect(read().ministryFailed).toBe(false);
+      act(() => gateway.failMinistry());
+      expect(read().ministryFailed).toBe(true);
+    });
+
+    it('sair não apaga o cache pelo vínculo (só a remoção apaga)', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+      act(() => gateway.emitMinistry({ name: 'Haja Luz', city: 'São Paulo' }));
+      fireEvent.click(screen.getByText('out'));
+      expect(gateway.signOut).toHaveBeenCalledTimes(1);
+      expect(gateway.forgetLocalData).not.toHaveBeenCalled();
+    });
   });
 
   describe('atualização do token com espera crescente', () => {

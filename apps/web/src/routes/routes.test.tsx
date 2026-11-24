@@ -173,6 +173,59 @@ describe('routes', () => {
     expect(screen.getByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
   });
 
+  it('shows a retry error instead of waiting forever when the ministry fails to load', async () => {
+    const gateway = await setup('/pessoas', 'admin');
+    expect(screen.getByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
+    cleanup();
+    const failing = createFakeGateway();
+    render(
+      <App
+        gateway={failing}
+        peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
+        catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
+        initialPath="/pessoas"
+      />,
+    );
+    failing.claims = { appAdmin: false, hasMinistry: true, canUploadSong: true };
+    await act(async () => failing.emitUser(testUser));
+    await act(async () => failing.emitProfile({ appAdmin: false }));
+    await act(async () => failing.emitMemberships([{ ministryId: 'hajaluz', role: 'admin' }]));
+    act(() => failing.failMinistry());
+    await act(async () => undefined);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Não foi possível carregar o ministério. Tente de novo.',
+    );
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Pessoas' })).not.toBeInTheDocument();
+    expect(gateway.signOut).not.toHaveBeenCalled();
+  });
+
+  it('Mais shows the ministry error instead of the Visitante label when the ministry fails', async () => {
+    const failing = createFakeGateway();
+    render(
+      <App
+        gateway={failing}
+        peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
+        catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
+        initialPath="/mais"
+      />,
+    );
+    failing.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    await act(async () => failing.emitUser(testUser));
+    await act(async () => failing.emitProfile({ appAdmin: false }));
+    await act(async () => failing.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+    act(() => failing.failMinistry());
+    await act(async () => undefined);
+    expect(
+      screen.getByText('Não foi possível carregar o ministério. Tente de novo.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Visitante')).not.toBeInTheDocument();
+  });
+
   it('disables the login button while the popup is open', async () => {
     const gateway = createFakeGateway();
     gateway.signIn = () => new Promise(() => undefined);
