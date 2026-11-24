@@ -305,6 +305,12 @@ describe('ViewerPage manage', () => {
     expect(screen.queryByRole('button', { name: 'Gerenciar' })).not.toBeInTheDocument();
   });
 
+  it('admin da app sem ministério vê Gerenciar', async () => {
+    setup({ ...authStateFor(null), appAdmin: true, canUploadSong: true, access: 'granted' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar' }));
+    expect(screen.getByRole('group', { name: 'Gerenciar música' })).toBeInTheDocument();
+  });
+
   it('admin do ministério sem admin da app não vê Gerenciar', async () => {
     setup(authStateFor('admin'));
     await screen.findByTestId('pdf-pages');

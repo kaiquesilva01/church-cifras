@@ -149,6 +149,13 @@ describe('ViewerPage change key', () => {
     expect(await screen.findByRole('button', { name: 'Mudar tom' })).toBeEnabled();
   });
 
+  it('admin da app sem ministério vê Mudar tom', async () => {
+    renderViewer({
+      auth: { ...authStateFor(null), appAdmin: true, canUploadSong: true, access: 'granted' },
+    });
+    expect(await screen.findByRole('button', { name: 'Mudar tom' })).toBeEnabled();
+  });
+
   it('admin do ministério vê Mudar tom', async () => {
     renderViewer({ auth: authStateFor('admin') });
     expect(await screen.findByRole('button', { name: 'Mudar tom' })).toBeEnabled();
