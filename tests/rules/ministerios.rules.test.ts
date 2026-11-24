@@ -394,4 +394,29 @@ describe('matriz de acesso (§4.4): lacunas', () => {
       ),
     );
   });
+
+  it('controle: admin de B grava repertório de B', async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(CTX.adminOutro(), 'ministries/outro/setlists/x2'),
+        setlistData({ createdBy: 'o2', updatedBy: 'o2' }),
+      ),
+    );
+  });
+
+  // Token legado (só role), sem claims novas e sem documento de membro: removido não tem acesso.
+  const tokenLegadoRemovido = () => env.authenticatedContext('ex', { role: 'admin' }).firestore();
+
+  it('token legado removido não lê repertório do ministério', async () => {
+    await assertFails(getDoc(doc(tokenLegadoRemovido(), 'ministries/hajaluz/setlists/s1')));
+  });
+
+  it('token legado removido não grava repertório do ministério', async () => {
+    await assertFails(
+      setDoc(
+        doc(tokenLegadoRemovido(), 'ministries/hajaluz/setlists/n9'),
+        setlistData({ createdBy: 'ex', updatedBy: 'ex' }),
+      ),
+    );
+  });
 });
