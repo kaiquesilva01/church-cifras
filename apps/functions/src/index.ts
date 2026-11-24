@@ -8,7 +8,7 @@ import { onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { requireRole } from './auth/requireRole';
 import { countSettledSetlists } from './stats/countUsage';
-import { getStatsForAdmin } from './stats/getStats';
+import { getStatsForCaller } from './stats/getStats';
 import { createStatsDeps } from './stats/statsDeps';
 import { createPushDeps } from './push/adminDeps';
 import {
@@ -235,7 +235,11 @@ export const deleteSong = onCall({ region: REGION }, async (request) => {
 const statsDeps = createStatsDeps();
 
 export const getStats = onCall({ region: REGION }, (request) =>
-  getStatsForAdmin({ ...statsDeps, ...deps }, request.auth?.uid),
+  getStatsForCaller(
+    { ...statsDeps, ...ministryDeps },
+    request.auth?.uid,
+    (request.data as { ministryId?: unknown } | null | undefined)?.ministryId,
+  ),
 );
 
 export const countSetlistUsage = onSchedule(
