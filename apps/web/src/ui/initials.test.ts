@@ -12,4 +12,17 @@ describe('initialsOf', () => {
   it('keeps a character outside the basic plane whole', () => {
     expect(initialsOf('𝒜lma Nova')).toBe('𝒜N');
   });
+
+  it.each([
+    ['Casa de Oração', 'CO'],
+    ['Maria Souza', 'MS'],
+    ['Maria da Silva Souza', 'MS'],
+    ['Ministério dos Jovens', 'MJ'],
+    ['Ana e Pedro', 'AP'],
+    ['Ana', 'A'],
+    ['de', 'D'],
+    ['', ''],
+  ])('%s -> %s', (name, expected) => {
+    expect(initialsOf(name)).toBe(expected);
+  });
 });
