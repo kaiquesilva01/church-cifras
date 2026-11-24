@@ -21,6 +21,7 @@ export function createFakeMinistryDeps(seed: Record<string, Record<string, unkno
     Object.entries(seed).map(([path, data]) => [path, { ...data }]),
   );
   const claimCalls: Array<[string, Claims]> = [];
+  const log: string[] = [];
 
   const toMembership = (d: Record<string, unknown>): MembershipRecord => ({
     uid: d.uid as string,
@@ -68,6 +69,18 @@ export function createFakeMinistryDeps(seed: Record<string, Record<string, unkno
     },
   };
 
+  const memberships = async (uid: string) =>
+    [...docs.entries()]
+      .filter(([k, d]) => /^ministries\/[^/]+\/members\/[^/]+$/.test(k) && d.uid === uid)
+      .map(([k, d]) => ({ ministryId: k.split('/')[1] ?? '', role: d.role as MembershipRole }));
+  const pendings = async (uid: string) =>
+    [...docs.entries()]
+      .filter(
+        ([k, d]) =>
+          /^ministries\/[^/]+\/requests\/[^/]+$/.test(k) && d.uid === uid && d.status === 'pending',
+      )
+      .map(([k]) => ({ ministryId: k.split('/')[1] ?? '' }));
+
   // Aplica uma escrita sobre um mapa de documentos (o do commit, ou um rascunho).
   function applyWrite(target: Map<string, Record<string, unknown>>, op: WriteOp): void {
     const current = target.get(op.path);
@@ -89,23 +102,27 @@ export function createFakeMinistryDeps(seed: Record<string, Record<string, unkno
   async function runTransaction<T>(fn: (tx: MinistryTx) => Promise<T>): Promise<T> {
     const buffered: WriteOp[] = [];
     const guard =
-      <A extends unknown[], R>(read: (...args: A) => Promise<R>) =>
+      <A extends unknown[], R>(name: string, read: (...args: A) => Promise<R>) =>
       (...args: A): Promise<R> => {
+        log.push(`tx:${name}`);
         if (buffered.length > 0) {
           throw new Error('Leitura depois de escrita na mesma transação');
         }
         return read(...args);
       };
-    const txReads: MinistryReads = {
-      readUser: guard(reads.readUser),
-      readMinistry: guard(reads.readMinistry),
-      readMembership: guard(reads.readMembership),
-      readRequest: guard(reads.readRequest),
-      listAdminUids: guard(reads.listAdminUids),
+    const txReads = {
+      readUser: guard('readUser', reads.readUser),
+      readMinistry: guard('readMinistry', reads.readMinistry),
+      readMembership: guard('readMembership', reads.readMembership),
+      readRequest: guard('readRequest', reads.readRequest),
+      listAdminUids: guard('listAdminUids', reads.listAdminUids),
+      listMembershipsOfUser: guard('listMembershipsOfUser', memberships),
+      listPendingRequestsOfUser: guard('listPendingRequestsOfUser', pendings),
     };
     const result = await fn({
       ...txReads,
       write(op) {
+        log.push('tx:write');
         buffered.push(op);
       },
     });
@@ -121,25 +138,12 @@ export function createFakeMinistryDeps(seed: Record<string, Record<string, unkno
     ...reads,
     now: () => NOW,
     runTransaction,
-    async listMembershipsOfUser(uid) {
-      return [...docs.entries()]
-        .filter(([k, d]) => /^ministries\/[^/]+\/members\/[^/]+$/.test(k) && d.uid === uid)
-        .map(([k, d]) => ({ ministryId: k.split('/')[1] ?? '', role: d.role as MembershipRole }));
-    },
-    async listPendingRequestsOfUser(uid) {
-      return [...docs.entries()]
-        .filter(
-          ([k, d]) =>
-            /^ministries\/[^/]+\/requests\/[^/]+$/.test(k) &&
-            d.uid === uid &&
-            d.status === 'pending',
-        )
-        .map(([k]) => ({ ministryId: k.split('/')[1] ?? '' }));
-    },
+    listMembershipsOfUser: memberships,
+    listPendingRequestsOfUser: pendings,
     async setClaims(uid, claims) {
       claimCalls.push([uid, claims]);
     },
   };
 
-  return { deps, docs, claimCalls };
+  return { deps, docs, claimCalls, log };
 }

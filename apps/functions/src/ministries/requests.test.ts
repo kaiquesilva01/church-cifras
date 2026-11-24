@@ -111,6 +111,40 @@ describe('requestAccess', () => {
       code: 'not-found',
     });
   });
+
+  it('lê vínculos e pedidos de outros ministérios dentro da transação, antes de gravar', async () => {
+    const { deps, log } = setup();
+    await requestAccess(deps, 'u1', { ministryId: 'hajaluz' });
+    expect(log).toContain('tx:listMembershipsOfUser');
+    expect(log).toContain('tx:listPendingRequestsOfUser');
+    expect(log.indexOf('tx:listMembershipsOfUser')).toBeLessThan(log.indexOf('tx:write'));
+    expect(log.indexOf('tx:listPendingRequestsOfUser')).toBeLessThan(log.indexOf('tx:write'));
+  });
+
+  it('pedido recusado não impede novo pedido, inclusive para o mesmo ministério', async () => {
+    const { deps } = setup({
+      'ministries/hajaluz/requests/u1': {
+        uid: 'u1',
+        status: 'rejected',
+        displayName: 'Ana',
+        email: null,
+        photoURL: null,
+      },
+    });
+    await expect(requestAccess(deps, 'u1', { ministryId: 'hajaluz' })).resolves.toEqual({
+      ministryId: 'hajaluz',
+      status: 'pending',
+    });
+  });
+
+  it('pedido pendente no mesmo ministério devolve pending sem gravar de novo', async () => {
+    const { deps, log } = setup(pedidoU1);
+    await expect(requestAccess(deps, 'u1', { ministryId: 'hajaluz' })).resolves.toEqual({
+      ministryId: 'hajaluz',
+      status: 'pending',
+    });
+    expect(log).not.toContain('tx:write');
+  });
 });
 
 describe('approveRequest', () => {

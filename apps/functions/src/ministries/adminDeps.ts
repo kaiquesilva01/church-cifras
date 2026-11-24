@@ -51,6 +51,20 @@ export function toRequest(d: DocumentData | undefined, uid: string): RequestReco
   };
 }
 
+// Consultas de grupo: a mesma conversão serve à leitura solta e à transação (só muda onde a consulta roda).
+type GroupSnap = {
+  docs: Array<{ ref: { parent: { parent: { id: string } | null } }; get(f: string): unknown }>;
+};
+export const toMemberships = (
+  snap: GroupSnap,
+): Array<{ ministryId: string; role: MembershipRole }> =>
+  snap.docs.map((d) => ({
+    ministryId: d.ref.parent.parent?.id ?? '',
+    role: d.get('role') as MembershipRole,
+  }));
+export const toPending = (snap: GroupSnap): Array<{ ministryId: string }> =>
+  snap.docs.map((d) => ({ ministryId: d.ref.parent.parent?.id ?? '' }));
+
 // Mesmas leituras para a transação e para a leitura solta; só muda o `get`.
 function readersWith(
   get: Get,
@@ -86,6 +100,9 @@ function applyWrite(t: Transaction, op: WriteOp): void {
 
 export function createMinistryDeps(): MinistryDeps {
   const db = () => getFirestore();
+  const membershipsOf = (uid: string) => db().collectionGroup('members').where('uid', '==', uid);
+  const pendingOf = (uid: string) =>
+    db().collectionGroup('requests').where('uid', '==', uid).where('status', '==', 'pending');
   const outside = readersWith(
     async (path) => (await db().doc(path).get()).data(),
     async (mid) =>
@@ -109,25 +126,18 @@ export function createMinistryDeps(): MinistryDeps {
                 )
               ).docs.map((d) => d.id),
           ),
+          listMembershipsOfUser: async (uid) => toMemberships(await t.get(membershipsOf(uid))),
+          listPendingRequestsOfUser: async (uid) => toPending(await t.get(pendingOf(uid))),
           write: (op) => applyWrite(t, op),
         };
         return fn(tx);
       });
     },
     async listMembershipsOfUser(uid) {
-      const snap = await db().collectionGroup('members').where('uid', '==', uid).get();
-      return snap.docs.map((d) => ({
-        ministryId: d.ref.parent.parent?.id ?? '',
-        role: d.get('role') as MembershipRole,
-      }));
+      return toMemberships(await membershipsOf(uid).get());
     },
     async listPendingRequestsOfUser(uid) {
-      const snap = await db()
-        .collectionGroup('requests')
-        .where('uid', '==', uid)
-        .where('status', '==', 'pending')
-        .get();
-      return snap.docs.map((d) => ({ ministryId: d.ref.parent.parent?.id ?? '' }));
+      return toPending(await pendingOf(uid).get());
     },
     async setClaims(uid: string, claims: Claims) {
       await getAuth().setCustomUserClaims(uid, claims);

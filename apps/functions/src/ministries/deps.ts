@@ -40,6 +40,8 @@ export interface MinistryReads {
 
 export interface MinistryTx extends MinistryReads {
   write(op: WriteOp): void; // todas as leituras da transação vêm antes das escritas
+  listMembershipsOfUser(uid: string): Promise<Array<{ ministryId: string; role: MembershipRole }>>;
+  listPendingRequestsOfUser(uid: string): Promise<Array<{ ministryId: string }>>;
 }
 
 export interface MinistryDeps extends MinistryReads {
