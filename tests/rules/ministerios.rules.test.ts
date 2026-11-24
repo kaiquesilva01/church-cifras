@@ -13,12 +13,14 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore';
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 let env: RulesTestEnvironment;
 
@@ -283,4 +285,61 @@ describe('ministerios: edição e exclusão do setlist', () => {
       await assertFails(deleteDoc(doc(CTX[nome](), S1)));
     });
   }
+});
+
+describe('consulta de grupo por uid (P1)', () => {
+  beforeEach(async () => {
+    await env.clearFirestore();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'ministries/hajaluz/members/ana'), { uid: 'ana', role: 'member' });
+      await setDoc(doc(db, 'ministries/outro/members/bia'), { uid: 'bia', role: 'admin' });
+      await setDoc(doc(db, 'ministries/outro/requests/ana'), { uid: 'ana', status: 'pending' });
+      await setDoc(doc(db, 'users/ana'), { appAdmin: false, role: 'viewer' });
+      await setDoc(doc(db, 'users/bia'), { appAdmin: false, role: 'viewer' });
+    });
+  });
+
+  it('a pessoa lista só os próprios vínculos', async () => {
+    const db = env.authenticatedContext('ana', {}).firestore();
+    const snap = await assertSucceeds(
+      getDocs(query(collectionGroup(db, 'members'), where('uid', '==', 'ana'))),
+    );
+    expect(snap.docs.map((d) => d.id)).toEqual(['ana']);
+  });
+
+  it('consulta de grupo sem filtro por uid é negada', async () => {
+    const db = env.authenticatedContext('ana', {}).firestore();
+    await assertFails(getDocs(collectionGroup(db, 'members')));
+  });
+
+  it('não lê vínculo nem pedido de outra pessoa por consulta de grupo', async () => {
+    const db = env.authenticatedContext('ana', {}).firestore();
+    await assertFails(getDocs(query(collectionGroup(db, 'members'), where('uid', '==', 'bia'))));
+    await assertFails(getDocs(query(collectionGroup(db, 'requests'), where('uid', '==', 'bia'))));
+  });
+
+  it('a pessoa lê o próprio pedido por consulta de grupo', async () => {
+    const db = env.authenticatedContext('ana', {}).firestore();
+    const snap = await assertSucceeds(
+      getDocs(query(collectionGroup(db, 'requests'), where('uid', '==', 'ana'))),
+    );
+    expect(snap.docs.map((d) => d.id)).toEqual(['ana']);
+  });
+
+  it('admin da app lê todos os vínculos e pedidos pendentes', async () => {
+    const db = env.authenticatedContext('chefe', { appAdmin: true }).firestore();
+    await assertSucceeds(getDocs(collectionGroup(db, 'members')));
+    await assertSucceeds(
+      getDocs(query(collectionGroup(db, 'requests'), where('status', '==', 'pending'))),
+    );
+  });
+
+  it('users: a pessoa lê o próprio; admin da app lê todos; outra pessoa não', async () => {
+    const ana = env.authenticatedContext('ana', {}).firestore();
+    await assertSucceeds(getDoc(doc(ana, 'users/ana')));
+    await assertFails(getDoc(doc(ana, 'users/bia')));
+    const chefe = env.authenticatedContext('chefe', { appAdmin: true }).firestore();
+    await assertSucceeds(getDoc(doc(chefe, 'users/bia')));
+  });
 });
