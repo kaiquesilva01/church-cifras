@@ -60,7 +60,7 @@ export function MaisPage() {
           {user?.displayName && <p className="profile-name">{user.displayName}</p>}
           <p className="muted">{user?.email}</p>
           {auth.ministryFailed ? (
-            <MinistryLoadError />
+            <MinistryLoadError missing={auth.ministryMissing} />
           ) : (
             <span className="role-badge">{ROLE_LABELS[role]}</span>
           )}

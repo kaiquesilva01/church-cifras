@@ -14,6 +14,7 @@ function Probe() {
     canUploadSong: a.canUploadSong,
     ministry: a.ministry,
     ministryFailed: a.ministryFailed,
+    ministryMissing: a.ministryMissing,
     status: a.status,
     keys: Object.keys(a),
   });
@@ -182,7 +183,29 @@ describe('AuthProvider', () => {
       await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
       act(() => gateway.emitMinistry(null));
       expect(read().ministryFailed).toBe(true);
+      expect(read().ministryMissing).toBe(true);
       expect(read().ministry).toBeNull();
+    });
+
+    it('erro de leitura não é documento ausente', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+      act(() => gateway.failMinistry());
+      expect(read().ministryFailed).toBe(true);
+      expect(read().ministryMissing).toBe(false);
+    });
+
+    it('zerar o vínculo ao sair: ministryLoad não vaza para a próxima sessão', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+      act(() => gateway.failMinistry());
+      expect(read().ministryFailed).toBe(true);
+      act(() => gateway.emitUser(null));
+      expect(read().ministryFailed).toBe(false);
     });
 
     it('erro ao ler o ministério: ministryFailed; carregando não é falha', async () => {
@@ -230,6 +253,22 @@ describe('AuthProvider', () => {
         await vi.advanceTimersByTimeAsync(2000 + 4000 + 8000 + 16000 + 60000);
       });
       expect(gateway.refreshToken).toHaveBeenCalledTimes(6);
+    });
+
+    it('A. claim hasMinistry sem vínculo depois de esgotar as releituras: ministryFailed', async () => {
+      const gateway = setup();
+      gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      gateway.nextClaims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+      await enter(gateway);
+      await act(async () => gateway.emitMemberships([]));
+      expect(read().ministryFailed).toBe(false);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31000);
+      });
+      expect(gateway.refreshToken).toHaveBeenCalledTimes(6);
+      expect(read().ministryFailed).toBe(true);
+      expect(read().ministryMissing).toBe(false);
+      expect(read().access).toBe('granted');
     });
   });
 });

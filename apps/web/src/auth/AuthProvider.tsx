@@ -63,7 +63,10 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     id: string;
     info: MinistryInfo | null;
     failed: boolean;
-  }>({ id: '', info: null, failed: false });
+    missing: boolean;
+  }>({ id: '', info: null, failed: false, missing: false });
+  // Chave (uid, vínculo, admin) cujas releituras do token se esgotaram sem o claim bater.
+  const [syncFailedKey, setSyncFailedKey] = useState<string | null>(null);
   const uid = session.resolved ? session.user?.uid : undefined;
   const hadMinistry = useRef(false);
   const lastMinistryName = useRef<string | undefined>(undefined);
@@ -107,6 +110,7 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
       lastMinistryName.current = undefined;
       setProfile({ loaded: false, value: { appAdmin: false } });
       setMemberships({ loaded: false, failed: false, list: [] });
+      setMinistryLoad({ id: '', info: null, failed: false, missing: false });
     };
   }, [gateway, uid]);
 
@@ -115,15 +119,20 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
   const ministryId = first?.ministryId;
   const ministryCurrent = ministryId !== undefined && ministryLoad.id === ministryId;
   const ministryInfo = ministryCurrent ? ministryLoad.info : null;
-  const ministryFailed = ministryCurrent && ministryLoad.failed;
   useEffect(() => {
     if (!ministryId) return;
     return gateway.onMinistry(
       ministryId,
-      (info) => setMinistryLoad({ id: ministryId, info, failed: info === null }),
+      (info) =>
+        setMinistryLoad({
+          id: ministryId,
+          info,
+          failed: info === null,
+          missing: info === null,
+        }),
       (error) => {
         console.warn('Falha ao carregar o ministério', error);
-        setMinistryLoad({ id: ministryId, info: null, failed: true });
+        setMinistryLoad({ id: ministryId, info: null, failed: true, missing: false });
       },
     );
   }, [gateway, ministryId]);
@@ -151,6 +160,7 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     (claims.value.hasMinistry !== hasMinistry ||
       claims.value.appAdmin !== appAdminDoc ||
       claims.value.canUploadSong !== canUploadDoc);
+  const syncKey = `${uid}|${hasMinistry}|${appAdminDoc}|${canUploadDoc}`;
   useEffect(() => {
     if (!uid || !mismatch) return;
     let active = true;
@@ -170,9 +180,14 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
             return;
         } catch (error) {
           console.warn('Falha ao atualizar o token de sessão', error);
+          if (active) setSyncFailedKey(syncKey);
           return;
         }
-        if (attempt >= RETRY_DELAYS_MS.length) return;
+        if (attempt >= RETRY_DELAYS_MS.length) {
+          // Esgotou as releituras sem o claim bater: vira estado de erro, não espera infinita.
+          if (active) setSyncFailedKey(syncKey);
+          return;
+        }
         await new Promise<void>((resolve) => {
           timer = setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? 0);
         });
@@ -183,7 +198,12 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
       active = false;
       clearTimeout(timer);
     };
-  }, [gateway, uid, mismatch, hasMinistry, appAdminDoc, canUploadDoc]);
+  }, [gateway, uid, mismatch, hasMinistry, appAdminDoc, canUploadDoc, syncKey]);
+
+  // Sem o claim refletir o vínculo depois das releituras: erro com "Tentar de novo" (não tela vazia).
+  const syncFailed = mismatch && syncFailedKey === syncKey;
+  const ministryFailed = (ministryCurrent && ministryLoad.failed) || syncFailed;
+  const ministryMissing = ministryCurrent && ministryLoad.missing;
 
   // Estável entre mudanças de sessão: a tela de entrada aquece o popup uma vez só.
   const prepareSignIn = useCallback(() => gateway.prepareSignIn(), [gateway]);
@@ -219,6 +239,7 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
       canUploadSong: claims.value.canUploadSong,
       ministry,
       ministryFailed,
+      ministryMissing,
       prepareSignIn,
       signIn: () => gateway.signIn(),
       signOut: () => gateway.signOut(),
@@ -230,6 +251,7 @@ export function AuthProvider({ gateway, children }: { gateway: AuthGateway; chil
     first,
     ministryInfo,
     ministryFailed,
+    ministryMissing,
     gateway,
     prepareSignIn,
   ]);

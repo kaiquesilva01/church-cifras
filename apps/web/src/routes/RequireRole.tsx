@@ -9,7 +9,7 @@ export function RequireRole({ roles, children }: { roles: Role[]; children?: Rea
   const auth = useAuth();
   // Vínculo confirmado (claim) e documento do ministério sem carregar: espera, sem redirecionar.
   if (auth.access === 'granted' && !auth.appAdmin && !auth.ministry) {
-    return auth.ministryFailed ? <MinistryLoadError /> : null;
+    return auth.ministryFailed ? <MinistryLoadError missing={auth.ministryMissing} /> : null;
   }
   const role = legacyRole(auth);
   return roles.includes(role) ? (children ?? <Outlet />) : <Navigate to="/" replace />;

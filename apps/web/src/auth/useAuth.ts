@@ -19,6 +19,8 @@ export interface AuthState {
   ministry: CurrentMinistry | null;
   /** Vínculo confirmado, mas o documento do ministério falhou ao carregar (ou não existe). */
   ministryFailed: boolean;
+  /** O documento do ministério não existe (distinto de erro de leitura, que aceita tentar de novo). */
+  ministryMissing: boolean;
   prepareSignIn(): Promise<void>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;

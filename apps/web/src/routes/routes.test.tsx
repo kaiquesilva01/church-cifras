@@ -2,12 +2,15 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../App';
 import type { Role } from '../auth/roles';
+import { reloadPage } from '../lib/reloadPage';
 import { signInAs, type Scenario } from '../test/authState';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { createFakeGateway, testUser } from '../test/fakeGateway';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
 import type { PeopleApi } from '../people/peopleApi';
 import { fakeStatsApi } from '../test/fakeStatsApi';
+
+vi.mock('../lib/reloadPage', () => ({ reloadPage: vi.fn() }));
 
 const peopleApi: PeopleApi = {
   listUsers: () => Promise.resolve([]),
@@ -174,7 +177,7 @@ describe('routes', () => {
   });
 
   it('shows a retry error instead of waiting forever when the ministry fails to load', async () => {
-    const gateway = await setup('/pessoas', 'admin');
+    await setup('/pessoas', 'admin');
     expect(screen.getByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
     cleanup();
     const failing = createFakeGateway();
@@ -199,7 +202,52 @@ describe('routes', () => {
     );
     expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Pessoas' })).not.toBeInTheDocument();
-    expect(gateway.signOut).not.toHaveBeenCalled();
+    expect(failing.signOut).not.toHaveBeenCalled();
+  });
+
+  it('Tentar de novo no erro do ministério recarrega a página', async () => {
+    vi.mocked(reloadPage).mockClear();
+    const failing = createFakeGateway();
+    render(
+      <App
+        gateway={failing}
+        peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
+        catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
+        initialPath="/mais"
+      />,
+    );
+    failing.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    await act(async () => failing.emitUser(testUser));
+    await act(async () => failing.emitProfile({ appAdmin: false }));
+    await act(async () => failing.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+    act(() => failing.failMinistry());
+    await act(async () => undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(reloadPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('ministério que não existe: mensagem própria, sem botão de tentar de novo', async () => {
+    const missing = createFakeGateway();
+    render(
+      <App
+        gateway={missing}
+        peopleApi={peopleApi}
+        statsApi={fakeStatsApi()}
+        catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
+        initialPath="/mais"
+      />,
+    );
+    missing.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    await act(async () => missing.emitUser(testUser));
+    await act(async () => missing.emitProfile({ appAdmin: false }));
+    await act(async () => missing.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+    act(() => missing.emitMinistry(null));
+    await act(async () => undefined);
+    expect(screen.getByText('Ministério não encontrado.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).not.toBeInTheDocument();
   });
 
   it('Mais shows the ministry error instead of the Visitante label when the ministry fails', async () => {
