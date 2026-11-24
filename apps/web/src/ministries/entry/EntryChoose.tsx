@@ -54,6 +54,7 @@ export function EntryChoose({
   requestsFailed,
   onRetryRequests,
   focusTitle = false,
+  onTitleFocused,
   firstName,
   rejectedId,
   removedFrom,
@@ -67,6 +68,8 @@ export function EntryChoose({
   requestsFailed: boolean;
   onRetryRequests: () => void;
   focusTitle?: boolean;
+  /** Chamado depois de focar o título: a EntryPage zera o pedido de foco (uso único). */
+  onTitleFocused?: () => void;
   firstName?: string;
   rejectedId: string | null;
   removedFrom: string | null;
@@ -81,8 +84,10 @@ export function EntryChoose({
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
-    if (focusTitle) titleRef.current?.focus();
-  }, [focusTitle]);
+    if (!focusTitle) return;
+    titleRef.current?.focus();
+    onTitleFocused?.();
+  }, [focusTitle, onTitleFocused]);
 
   const needle = normalizeForSearch(query);
   const shown = catalog.list.filter((m) =>

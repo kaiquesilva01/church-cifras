@@ -28,8 +28,9 @@ export function EntryPage({ api }: { api: MinistriesApi }) {
   const [attempt, setAttempt] = useState(0);
   const [requestsAttempt, setRequestsAttempt] = useState(0);
   const [catalog, setCatalog] = useState<Catalog>({ status: 'loading', list: [] });
-  // Depois de cancelar o pedido, a escolha volta com o foco no título (a tela trocou).
-  const [cancelled, setCancelled] = useState(false);
+  // Foco no título da escolha ao montá-la: depois de cancelar o pedido ou de tentar a assinatura de
+  // novo (a tela trocou). É de uso único: a escolha o zera ao focar, para uma remontagem não roubar o foco.
+  const [focusTitle, setFocusTitle] = useState(false);
   // Lido no primeiro render e apagado num efeito (StrictMode: o useState repete a leitura sem apagar).
   const [removed] = useState(() => peekRemovedNotice());
   const [busy, setBusy] = useState(false);
@@ -96,7 +97,7 @@ export function EntryPage({ api }: { api: MinistriesApi }) {
           setBusy(true);
           try {
             await api.callable.cancelRequest(pendingId);
-            setCancelled(true);
+            setFocusTitle(true);
           } finally {
             setBusy(false);
           }
@@ -120,8 +121,10 @@ export function EntryPage({ api }: { api: MinistriesApi }) {
       onRetryRequests={() => {
         setRequests({ loaded: false, failed: false, pending: null, rejected: null });
         setRequestsAttempt((n) => n + 1);
+        setFocusTitle(true);
       }}
-      focusTitle={cancelled}
+      focusTitle={focusTitle}
+      onTitleFocused={() => setFocusTitle(false)}
       firstName={user?.displayName?.split(' ')[0]}
       rejectedId={requests.rejected}
       removedFrom={removed}

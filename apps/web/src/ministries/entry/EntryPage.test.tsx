@@ -242,6 +242,34 @@ describe('EntryPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('Tentar de novo da assinatura refaz a leitura e a tela se recupera', async () => {
+    const unsubscribe = vi.fn();
+    const callbacks: Array<{ cb: (r: Request[]) => void; onError: (e: unknown) => void }> = [];
+    const api = createFakeMinistriesApi({
+      listMinistries: vi.fn(() => Promise.resolve([haja])),
+      subscribeMyRequests: vi.fn((_uid, cb, onError) => {
+        callbacks.push({ cb, onError });
+        return unsubscribe;
+      }),
+    });
+    renderEntry({ api });
+    act(() => callbacks[0]!.onError(new Error('rede')));
+    fireEvent.click(await screen.findByRole('button', { name: 'Tentar de novo' }));
+    expect(api.subscribeMyRequests).toHaveBeenCalledTimes(2);
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    // Enquanto a nova leitura não chega, a tela é o esqueleto; quando chega, a escolha volta com foco no título.
+    act(() => callbacks[1]!.cb([]));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Escolha seu ministério' }),
+    ).toHaveFocus();
+
+    act(() => callbacks[1]!.cb([{ ministryId: 'hajaluz', status: 'pending' }]));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Pedido enviado' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('cancelar o pedido devolve o foco ao título da escolha', async () => {
     let emit!: (r: Request[]) => void;
     const api = createFakeMinistriesApi({
