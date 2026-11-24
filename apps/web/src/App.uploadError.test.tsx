@@ -35,7 +35,7 @@ describe('/nova route failure', () => {
         onReload={onReload}
       />,
     );
-    signInAs(gateway, { ministry: { role: 'member' } });
+    signInAs(gateway, { ministry: { role: 'admin' } });
     expect(await screen.findByText('Não foi possível carregar a página.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
     expect(onReload).toHaveBeenCalledTimes(1);

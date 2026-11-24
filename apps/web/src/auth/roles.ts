@@ -11,9 +11,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   admin: 'Admin',
 };
 
-// Pontes temporárias até as Tarefas 18 a 21: canEdit, canEditSetlists e isAdmin ainda são usados por
-// HomePage, MaisPage, PushProvider, AvisosCard, SetlistPage e ViewerPage. Saem junto com cada consumidor.
+// Pontes temporárias até as Tarefas 21 e 25: canEdit e isAdmin ainda são usados por MaisPage,
+// PushProvider e AvisosCard. Saem junto com cada consumidor.
 export const canEdit = (role: Role): boolean => role === 'member' || role === 'admin';
-/** Só admin cria, edita, duplica e apaga repertórios (membro só lê). */
-export const canEditSetlists = (role: Role): boolean => role === 'admin';
 export const isAdmin = (role: Role): boolean => role === 'admin';

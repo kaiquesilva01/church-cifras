@@ -116,7 +116,7 @@ function AppRoutes({
                 </ErrorBoundary>
               }
             />
-            <Route element={<RequireRole roles={['member', 'admin']} />}>
+            <Route element={<RequireRole when="upload" />}>
               <Route
                 path="/nova"
                 element={
@@ -134,9 +134,11 @@ function AppRoutes({
                 }
               />
             </Route>
-            <Route element={<RequireRole roles={['admin']} />}>
+            <Route element={<RequireRole when="ministryAdmin" />}>
               <Route path="/pessoas" element={<PeoplePage api={peopleApi} />} />
               <Route path="/estatisticas" element={<StatsPage api={statsApi} />} />
+            </Route>
+            <Route element={<RequireRole when="upload" />}>
               <Route
                 path="/importar"
                 element={

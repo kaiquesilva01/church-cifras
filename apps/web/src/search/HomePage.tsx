@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
-import { canEdit, canEditSetlists } from '../auth/roles';
+import { canEditSetlist, canListSetlists, canUpload } from '../auth/permissions';
 import { useAuth } from '../auth/useAuth';
 import {
   compareTitles,
@@ -44,7 +44,7 @@ const TAB_PATHS = {
 };
 
 export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
-  const { role } = useAuth();
+  const auth = useAuth();
   const { status, songs } = useSongsContext();
   const { setlists, status: setlistsStatus } = useSetlistsContext();
   const [now] = useState(() => new Date());
@@ -70,7 +70,16 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
   }, [notice, navigate, pathname, search]);
   const query = params.get('q') ?? '';
   const abaParam = params.get('aba');
-  const tab = TABS.find((t) => t.id === abaParam) ?? TABS[0];
+  // Vínculo ainda carregando: o Repertórios segue resolvível (não cai na Músicas) e mostra "Carregando…".
+  const ministryLoading =
+    auth.access === 'granted' && !auth.appAdmin && auth.ministry === null && !auth.ministryFailed;
+  const repertoriosVisible = canListSetlists(auth) || ministryLoading;
+  const visibleTabs = useMemo(
+    () => TABS.filter((t) => t.id !== 'repertorios' || repertoriosVisible),
+    [repertoriosVisible],
+  );
+  // ?aba=repertorios sem permissão cai na primeira aba visível (a Músicas, sempre visível).
+  const tab = visibleTabs.find((t) => t.id === abaParam) ?? TABS[0];
 
   const { regular, harpa } = useMemo(() => splitHarpa(songs), [songs]);
   const artists = useMemo(() => deriveArtists(regular), [regular]);
@@ -139,16 +148,18 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
               onChange={setQuery}
             />
             <nav aria-label="Seções" className="tabs">
-              {TABS.filter((t) => t.id !== 'repertorios').map((t) => (
-                <Link
-                  key={t.id}
-                  to={TAB_PATHS[t.id]}
-                  aria-current={t.id === tab.id ? 'page' : undefined}
-                  className="tab"
-                >
-                  {t.label}
-                </Link>
-              ))}
+              {visibleTabs
+                .filter((t) => t.id !== 'repertorios')
+                .map((t) => (
+                  <Link
+                    key={t.id}
+                    to={TAB_PATHS[t.id]}
+                    aria-current={t.id === tab.id ? 'page' : undefined}
+                    className="tab"
+                  >
+                    {t.label}
+                  </Link>
+                ))}
             </nav>
           </div>
           <NextCultoCard setlists={setlists} today={today} now={now} />
@@ -156,7 +167,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
       )}
       {tab.id === 'repertorios' ? (
         <div>
-          {setlistsStatus === 'loading' && (
+          {(ministryLoading || setlistsStatus === 'loading') && (
             <p role="status" className="status">
               Carregando…
             </p>
@@ -166,7 +177,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
               Não foi possível carregar os repertórios.
             </p>
           )}
-          {setlistsStatus === 'ready' && (
+          {!ministryLoading && setlistsStatus === 'ready' && (
             <SetlistsTab
               setlists={setlists}
               today={today}
@@ -200,7 +211,7 @@ export function HomePage({ setlistApi }: { setlistApi: SetlistApi }) {
           )}
         </div>
       )}
-      {(tab.id === 'repertorios' ? canEditSetlists(role) : canEdit(role)) &&
+      {(tab.id === 'repertorios' ? canEditSetlist(auth) : canUpload(auth)) &&
         (tab.id === 'repertorios' ? (
           <button
             type="button"

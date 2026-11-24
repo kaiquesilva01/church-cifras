@@ -3,18 +3,11 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { LoginPage } from './LoginPage';
 
 function mount(from: unknown) {
-  const auth: AuthState = {
-    status: 'signed-in',
-    user: testUser,
-    role: 'member',
-    access: 'granted',
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
-  };
+  const auth: AuthState = { ...authStateFor('member'), status: 'signed-in', user: testUser };
   return render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[{ pathname: '/login', state: { from } }]}>

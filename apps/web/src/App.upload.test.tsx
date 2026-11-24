@@ -35,8 +35,8 @@ function setup(scenario: Scenario) {
 }
 
 describe('/nova route', () => {
-  it('shows the fallback first and then the page for members', async () => {
-    setup({ ministry: { role: 'member' } });
+  it('shows the fallback first and then the page for ministry admins', async () => {
+    setup({ ministry: { role: 'admin' } });
     expect(screen.getByText('Carregando…')).toBeInTheDocument();
     expect(await screen.findByText('Nova cifra (marker)')).toBeInTheDocument();
   });

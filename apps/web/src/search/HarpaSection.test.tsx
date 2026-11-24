@@ -9,7 +9,7 @@ import { SetlistsProvider } from '../setlists/SetlistsProvider';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { makeSong } from '../test/fakeCatalogApi';
 import { fakeSetlistApi } from '../test/fakeSetlistApi';
-import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { BuscaPage } from './BuscaPage';
 import { HomePage } from './HomePage';
 
@@ -56,15 +56,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-const auth: AuthState = {
-  status: 'signed-in',
-  user: testUser,
-  role: 'viewer',
-  access: 'granted',
-  prepareSignIn: () => Promise.resolve(),
-  signIn: () => Promise.resolve(),
-  signOut: () => Promise.resolve(),
-};
+const auth: AuthState = authStateFor('member');
 
 function renderWith(path: string, page: 'home' | 'busca' = 'home') {
   const setlistApi = fakeSetlistApi();

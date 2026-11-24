@@ -3,28 +3,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { LoginPage } from './LoginPage';
 import { RequireAuth } from './RequireAuth';
 
-const base = {
-  prepareSignIn: () => Promise.resolve(),
-  signIn: () => Promise.resolve(),
-  signOut: () => Promise.resolve(),
-};
-const signedOut: AuthState = {
-  ...base,
-  status: 'signed-out',
-  user: null,
-  role: 'viewer',
-  access: 'granted',
-};
-const signedIn: AuthState = {
-  ...base,
-  status: 'signed-in',
-  user: testUser,
-  role: 'member',
-  access: 'granted',
-};
+const signedOut: AuthState = { ...authStateFor(null), status: 'signed-out', user: null };
+const signedIn: AuthState = { ...authStateFor('member'), status: 'signed-in', user: testUser };
 
 function Where() {
   const { pathname, search, hash } = useLocation();

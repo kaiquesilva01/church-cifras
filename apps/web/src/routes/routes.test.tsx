@@ -339,7 +339,7 @@ describe('routes', () => {
     await setup('/', 'member');
     expect(screen.getByRole('navigation', { name: 'Principal' })).toBeInTheDocument();
     cleanup();
-    await setup('/nova', 'member');
+    await setup('/nova', 'admin');
     expect(screen.queryByRole('navigation', { name: 'Principal' })).not.toBeInTheDocument();
   });
 });

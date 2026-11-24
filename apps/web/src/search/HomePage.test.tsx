@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Role } from '../auth/roles';
-import { AuthContext, type AuthState } from '../auth/useAuth';
+import { AuthContext, type AuthState, type MinistryRole } from '../auth/useAuth';
+import { authStateFor } from '../test/authState';
 import type { SongSummary } from '../catalog/types';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { LyricsProvider } from '../catalog/LyricsProvider';
@@ -11,7 +11,6 @@ import { SetlistsProvider } from '../setlists/SetlistsProvider';
 import type { Setlist } from '../setlists/types';
 import { fakeCatalogApi, makeSong, sampleSongs } from '../test/fakeCatalogApi';
 import { fakeSetlistApi, makeSetlist, type FakeSetlistApi } from '../test/fakeSetlistApi';
-import { testUser } from '../test/fakeGateway';
 import { HomePage } from './HomePage';
 import { IPHONE_SAFARI } from '../test/installFixtures';
 import { PushContext, type PushService } from '../push/types';
@@ -63,7 +62,10 @@ afterEach(() => vi.useRealTimers());
 
 function renderHome(
   options: {
-    role?: Role;
+    /** Vínculo no ministério (padrão: membro). `null`: sem vínculo. */
+    ministry?: MinistryRole | null;
+    canUploadSong?: boolean;
+    appAdmin?: boolean;
     path?: string;
     songs?: SongSummary[];
     state?: unknown;
@@ -75,14 +77,11 @@ function renderHome(
 ) {
   const setlistApi = options.setlistApi ?? fakeSetlistApi(options.setlists);
   const catalogApi = fakeCatalogApi(options.songs, options.catalog);
+  const base = authStateFor(options.ministry === undefined ? 'member' : options.ministry);
   const auth: AuthState = {
-    status: 'signed-in',
-    user: testUser,
-    role: options.role ?? 'viewer',
-    access: 'granted',
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
+    ...base,
+    appAdmin: options.appAdmin ?? false,
+    canUploadSong: options.canUploadSong ?? base.canUploadSong,
   };
   return render(
     <AuthContext.Provider value={auth}>
@@ -202,17 +201,7 @@ describe('HomePage', () => {
       },
     });
     render(
-      <AuthContext.Provider
-        value={{
-          status: 'signed-in',
-          user: testUser,
-          role: 'viewer',
-          access: 'granted',
-          prepareSignIn: () => Promise.resolve(),
-          signIn: () => Promise.resolve(),
-          signOut: () => Promise.resolve(),
-        }}
-      >
+      <AuthContext.Provider value={authStateFor('member')}>
         <MemoryRouter>
           <SongsProvider api={api}>
             <LyricsProvider api={api}>
@@ -228,11 +217,19 @@ describe('HomePage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível carregar as cifras.');
   });
 
-  it('shows Nova cifra only for editors', () => {
-    const { unmount } = renderHome({ role: 'viewer' });
+  it('shows Nova cifra only with the canUploadSong claim', () => {
+    const { unmount } = renderHome({ ministry: null });
     expect(screen.queryByRole('link', { name: /Nova cifra/ })).not.toBeInTheDocument();
     unmount();
-    renderHome({ role: 'member' });
+    const member = renderHome({ ministry: 'member' });
+    expect(screen.queryByRole('link', { name: /Nova cifra/ })).not.toBeInTheDocument();
+    member.unmount();
+    renderHome({ ministry: 'admin', canUploadSong: true });
+    expect(screen.getByRole('link', { name: '＋ Nova cifra' })).toHaveAttribute('href', '/nova');
+  });
+
+  it('shows Nova cifra to the app admin without ministry when the claim allows upload', () => {
+    renderHome({ ministry: null, appAdmin: true, canUploadSong: true });
     expect(screen.getByRole('link', { name: '＋ Nova cifra' })).toHaveAttribute('href', '/nova');
   });
 
@@ -426,27 +423,41 @@ describe('HomePage', () => {
     });
 
     it('shows the right FAB per tab and role', () => {
-      const { unmount } = renderHome({ role: 'admin', path: '/?aba=repertorios' });
+      const { unmount } = renderHome({ ministry: 'admin', path: '/?aba=repertorios' });
       expect(screen.getByRole('button', { name: '＋ Novo repertório' })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /Nova cifra/ })).not.toBeInTheDocument();
       unmount();
-      const second = renderHome({ role: 'member' });
+      const second = renderHome({ ministry: 'admin', canUploadSong: true });
       expect(screen.getByRole('link', { name: '＋ Nova cifra' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Novo repertório/ })).not.toBeInTheDocument();
       second.unmount();
-      // Membro vê os repertórios, mas não cria: só admin.
-      const third = renderHome({ role: 'member', path: '/?aba=repertorios' });
+      // Membro vê os repertórios, mas não cria: só admin do ministério.
+      const third = renderHome({ ministry: 'member', path: '/?aba=repertorios' });
       expect(screen.queryByRole('button', { name: /Novo repertório/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /Nova cifra/ })).not.toBeInTheDocument();
       third.unmount();
-      renderHome({ role: 'viewer', path: '/?aba=repertorios' });
+      renderHome({ ministry: null, path: '/?aba=repertorios' });
       expect(screen.queryByRole('button', { name: /Novo repertório/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /Nova cifra/ })).not.toBeInTheDocument();
     });
 
+    it('hides the Repertórios tab from an app admin without ministry', () => {
+      renderHome({ ministry: null, appAdmin: true, path: '/?aba=repertorios' });
+      expect(screen.queryByRole('heading', { name: 'Repertório' })).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'Músicas' })).toBeInTheDocument();
+      expect(screen.getByRole('searchbox')).toBeInTheDocument();
+    });
+
+    it('waits for the ministry before deciding on the Repertórios tab', () => {
+      renderHome({ ministry: null, path: '/?aba=repertorios' });
+      expect(screen.getByRole('heading', { level: 1, name: 'Repertório' })).toBeInTheDocument();
+      expect(screen.getByText('Carregando…')).toHaveAttribute('role', 'status');
+      expect(screen.queryByRole('button', { name: /Novo repertório/ })).not.toBeInTheDocument();
+    });
+
     it('creates a setlist and navigates to it', async () => {
       const setlistApi = fakeSetlistApi();
-      renderHome({ role: 'admin', path: '/?aba=repertorios', setlistApi });
+      renderHome({ ministry: 'admin', path: '/?aba=repertorios', setlistApi });
       fireEvent.click(screen.getByRole('button', { name: '＋ Novo repertório' }));
       fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
       await waitFor(() =>
@@ -464,7 +475,7 @@ describe('HomePage', () => {
       const setlistApi = fakeSetlistApi([], {
         createSetlist: vi.fn(() => Promise.reject(new Error('boom'))),
       });
-      renderHome({ role: 'admin', path: '/?aba=repertorios', setlistApi });
+      renderHome({ ministry: 'admin', path: '/?aba=repertorios', setlistApi });
       fireEvent.click(screen.getByRole('button', { name: '＋ Novo repertório' }));
       fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
       expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -476,7 +487,7 @@ describe('HomePage', () => {
     });
 
     it('closes the dialog on cancel', () => {
-      renderHome({ role: 'admin', path: '/?aba=repertorios' });
+      renderHome({ ministry: 'admin', path: '/?aba=repertorios' });
       fireEvent.click(screen.getByRole('button', { name: '＋ Novo repertório' }));
       fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -523,21 +534,21 @@ describe('avisos card on the Músicas tab', () => {
   });
 
   it('aparece na Músicas para membro, no app instalado, com o estado disponível', async () => {
-    renderHome({ role: 'member', path: '/', push: fakePushService() });
+    renderHome({ ministry: 'member', path: '/', push: fakePushService() });
     expect(await screen.findByRole('region', { name: 'Ative os avisos' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Cifras como app' })).not.toBeInTheDocument();
   });
 
   it('não aparece nas outras abas', async () => {
     const service = fakePushService();
-    renderHome({ role: 'member', path: '/?aba=cantores', push: service });
+    renderHome({ ministry: 'member', path: '/?aba=cantores', push: service });
     await waitFor(() => expect(screen.queryByRole('region')).not.toBeInTheDocument());
     expect(service.load).not.toHaveBeenCalled();
   });
 
   it('não aparece para visitante', async () => {
     const service = fakePushService();
-    renderHome({ role: 'viewer', path: '/', push: service });
+    renderHome({ ministry: null, path: '/', push: service });
     expect(screen.queryByRole('region', { name: 'Ative os avisos' })).not.toBeInTheDocument();
     expect(service.load).not.toHaveBeenCalled();
   });
