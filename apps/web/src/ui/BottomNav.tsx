@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { usePad } from '../pad/usePad';
-import { NAV_TABS, type NavTab } from './navTabs';
+import { type NavTab, visibleNavTabs } from './navTabs';
 
 const ICONS: Record<NavTab, ReactNode> = {
   musicas: (
@@ -41,12 +41,12 @@ const ICONS: Record<NavTab, ReactNode> = {
   ),
 };
 
-/** Floating bottom bar with the five root screens. */
-export function BottomNav({ active }: { active: NavTab }) {
+/** Floating bottom bar with the root screens; Repertório only when `showRepertorio`. */
+export function BottomNav({ active, showRepertorio }: { active: NavTab; showRepertorio: boolean }) {
   const padPlaying = usePad()?.status === 'playing';
   return (
     <nav className="bottom-nav" aria-label="Principal">
-      {NAV_TABS.map((tab) => (
+      {visibleNavTabs(showRepertorio).map((tab) => (
         <Link
           key={tab.id}
           to={tab.to}

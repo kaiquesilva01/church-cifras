@@ -3,9 +3,9 @@ import type { Root } from 'react-dom/client';
 import { App } from './App';
 import { createAuthGateway } from './auth/gateway';
 import { createCatalogApi } from './catalog/catalogApi';
+import { createMinistriesApi } from './ministries/ministriesApi';
 import { readPushConfig, readWebEnv } from './lib/env';
 import { createFirebase } from './lib/firebase';
-import { createPeopleApi } from './people/peopleApi';
 import { createFakeMessagingPort } from './push/fakeMessaging';
 import { createMessagingPort } from './push/messaging';
 import { createPushApi } from './push/pushApi';
@@ -42,19 +42,20 @@ export function renderApp(root: Root): void {
     const gateway = createAuthGateway(services, {
       beforeSignOut: () => pushService?.forgetDevice() ?? Promise.resolve(),
     });
-    const peopleApi = createPeopleApi(services);
     const statsApi = createStatsApi(services);
     const catalogApi = createCatalogApi(services);
-    const setlistApi = createSetlistApi(services);
+    // Ponte até a Tarefa 25 (MinistryScope): o ministério atual vem do provedor, não daqui.
+    const setlistApi = createSetlistApi(services, { ministryId: 'hajaluz' });
+    const ministriesApi = createMinistriesApi(services);
     root.render(
       <StrictMode>
         <TestBanner label={import.meta.env.VITE_TEST_BANNER} />
         <App
           gateway={gateway}
-          peopleApi={peopleApi}
           statsApi={statsApi}
           catalogApi={catalogApi}
           setlistApi={setlistApi}
+          ministriesApi={ministriesApi}
           pushService={pushService}
         />
         <UpdatePrompt />

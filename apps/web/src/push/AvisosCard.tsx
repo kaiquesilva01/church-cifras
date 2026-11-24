@@ -1,5 +1,4 @@
 import { useContext, useEffect, useRef, useState } from 'react';
-import { canEdit } from '../auth/roles';
 import { useAuth } from '../auth/useAuth';
 import { readDismissRecord, writeDismissRecord } from '../lib/dismissRecord';
 import {
@@ -24,7 +23,7 @@ export interface AvisosCardProps {
  */
 export function AvisosCard({ session = avisosSession }: AvisosCardProps) {
   const service = useContext(PushContext);
-  const { role } = useAuth();
+  const { ministry } = useAuth();
   const [environment] = useState(() => readInstallEnvironment(window));
   const [storage] = useState(() => localStorageOrUndefined(window));
   const [dismissedAt] = useState(() => readDismissRecord(storage, AVISOS_RECORD_KEY).dismissedAt);
@@ -32,7 +31,7 @@ export function AvisosCard({ session = avisosSession }: AvisosCardProps) {
   const [now] = useState(() => Date.now());
   if (!service) return null;
   const mode = decideAvisosCard({
-    canEdit: canEdit(role),
+    canEdit: ministry !== null,
     standalone: isStandalone(environment),
     dismissedAt,
     now,

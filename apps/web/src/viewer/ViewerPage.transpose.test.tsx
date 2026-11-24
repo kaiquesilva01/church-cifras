@@ -2,13 +2,12 @@ import type { ChordWriter, OverlayOp } from '@cifras/overlay';
 import { configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { ArrangementExistsError } from '../catalog/catalogApi';
 import type { SongSummary } from '../catalog/types';
 import { SongsProvider } from '../catalog/SongsProvider';
 import { fakeCatalogApi, makeSong } from '../test/fakeCatalogApi';
-import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { loadFontFromDisk, sheetInG } from './transposeFixtures';
 import { ViewerPage, type ViewerPageProps } from './ViewerPage';
 
@@ -85,7 +84,7 @@ const songG = makeSong({
 });
 
 interface Options {
-  role?: Role;
+  auth?: AuthState;
   path?: string;
   songs?: SongSummary[];
   api?: ReturnType<typeof fakeCatalogApi>;
@@ -108,15 +107,7 @@ function renderViewer(options: Options = {}) {
     options.readLines ?? (() => Promise.resolve(options.lines ?? sheetInG())),
   );
   const openPdf = vi.fn(() => Promise.resolve(fakeDoc()));
-  const auth: AuthState = {
-    status: 'signed-in',
-    user: testUser,
-    role: options.role ?? 'member',
-    access: 'granted',
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
-  };
+  const auth: AuthState = options.auth ?? authStateFor('member');
   const { container, unmount } = render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={[options.path ?? '/musicas/s1?tom=G']}>
@@ -153,8 +144,25 @@ const openPanel = async () => {
 const where = () => screen.getByTestId('location').textContent;
 
 describe('ViewerPage change key', () => {
-  it('visitor does not see Mudar tom', async () => {
-    renderViewer({ role: 'viewer' });
+  it('todo membro vê Mudar tom', async () => {
+    renderViewer({ auth: authStateFor('member') });
+    expect(await screen.findByRole('button', { name: 'Mudar tom' })).toBeEnabled();
+  });
+
+  it('admin da app sem ministério vê Mudar tom', async () => {
+    renderViewer({
+      auth: { ...authStateFor(null), appAdmin: true, canUploadSong: true, access: 'granted' },
+    });
+    expect(await screen.findByRole('button', { name: 'Mudar tom' })).toBeEnabled();
+  });
+
+  it('admin do ministério vê Mudar tom', async () => {
+    renderViewer({ auth: authStateFor('admin') });
+    expect(await screen.findByRole('button', { name: 'Mudar tom' })).toBeEnabled();
+  });
+
+  it('sem acesso liberado não vê Mudar tom', async () => {
+    renderViewer({ auth: { ...authStateFor('member'), access: 'blocked' } });
     await waitFor(() => expect(document.querySelector('.pdf-pages')).not.toBeNull());
     expect(screen.queryByRole('button', { name: 'Mudar tom' })).not.toBeInTheDocument();
   });

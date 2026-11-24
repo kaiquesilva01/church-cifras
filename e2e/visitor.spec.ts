@@ -11,7 +11,7 @@ import {
 import { seedSetlist, seedSong, todayInSaoPaulo } from './fixtures/emulator';
 import { lettersTag } from './fixtures/names';
 
-const ACCESS_HEADING = 'Acesso ainda não liberado';
+const ACCESS_HEADING = 'Escolha seu ministério';
 const PRINCIPAL = /^Principal$/;
 
 // Any App route a visitor could type or follow (#126 criterion 1): none may open for them.

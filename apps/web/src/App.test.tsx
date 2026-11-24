@@ -4,13 +4,8 @@ import { App } from './App';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
 import { createFakeGateway } from './test/fakeGateway';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
-import type { PeopleApi } from './people/peopleApi';
+import { createFakeMinistriesApi } from './test/fakeMinistriesApi';
 import { fakeStatsApi } from './test/fakeStatsApi';
-
-const peopleApi: PeopleApi = {
-  listUsers: () => Promise.resolve([]),
-  setRole: () => Promise.resolve(),
-};
 
 describe('App', () => {
   it('shows nothing but a loading state until session resolves, then login', () => {
@@ -18,10 +13,10 @@ describe('App', () => {
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/"
       />,
     );

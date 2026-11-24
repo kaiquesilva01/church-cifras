@@ -38,6 +38,17 @@ export function BackChevronIcon() {
   );
 }
 
+/** Camadas da tela 49 (repertório não encontrado): 30 px, herda a cor do texto. */
+export function LayersIcon() {
+  return (
+    <svg {...SVG_PROPS} width={30} height={30} strokeWidth={2}>
+      <path d="M12 3l9 5-9 5-9-5 9-5z" />
+      <path d="M3 13l9 5 9-5" />
+      <path d="M3 17.5l9 5 9-5" />
+    </svg>
+  );
+}
+
 /** Relógio da linha do ensaio: 14 px, herda a cor do texto. */
 export function ClockIcon() {
   return (

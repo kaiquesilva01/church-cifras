@@ -9,7 +9,7 @@ export async function requireRole(
   uid: string | undefined,
   allowed: Role[],
 ): Promise<Role> {
-  if (!uid) throw new HttpsError('unauthenticated', 'Login required.');
+  if (!uid) throw new HttpsError('unauthenticated', 'Faça login para continuar.');
   const raw = await deps.getUserRole(uid);
   const role = ROLES.find((r) => r === raw);
   if (!role || !allowed.includes(role)) {

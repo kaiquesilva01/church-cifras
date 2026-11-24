@@ -11,13 +11,14 @@ const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
-type Doc = { id: string; data: Record<string, unknown> };
+type Doc = { id: string; ministryId: string; data: Record<string, unknown> };
 const doc = (
   id: string,
   rehearsalAt: Date | undefined,
   extra: Record<string, unknown> = {},
 ): Doc => ({
   id,
+  ministryId: 'hajaluz',
   data: {
     date: '2026-11-22',
     label: 'Culto de domingo',
@@ -29,7 +30,7 @@ const doc = (
   },
 });
 
-const members = { roles: { m1: 'member', a1: 'admin' } } satisfies FakeOptions;
+const members = { ministries: { m1: ['hajaluz'], a1: ['hajaluz'] } } satisfies FakeOptions;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -453,9 +454,34 @@ describe('runRehearsalReminders: mudança de horário', () => {
 });
 
 describe('runRehearsalReminders: interruptor, origem e falhas', () => {
+  it('lembrete vai só ao ministério do ensaio; aparelho de outro ministério não recebe', async () => {
+    const { reminderDeps, calls, clock } = setup([doc('r1', br('2026-11-21', '17:20'))], {
+      devices: [device('t-a', 'ana'), device('t-b', 'bia')],
+      ministries: { ana: ['hajaluz'], bia: ['outro'] },
+    });
+    clock.now = br('2026-11-21', '17:00');
+
+    await runRehearsalReminders(reminderDeps);
+
+    expect(sentTokens(calls)).toEqual(['t-a']);
+  });
+
+  it('lembrete de repertório de outro ministério: só o outro recebe, hajaluz não', async () => {
+    const outro: Doc = { ...doc('r9', br('2026-11-21', '17:20')), ministryId: 'outro' };
+    const { reminderDeps, calls, clock } = setup([outro], {
+      devices: [device('t-hajaluz', 'ana'), device('t-outro', 'bia')],
+      ministries: { ana: ['hajaluz'], bia: ['outro'] },
+    });
+    clock.now = br('2026-11-21', '17:00');
+
+    await runRehearsalReminders(reminderDeps);
+
+    expect(sentTokens(calls)).toEqual(['t-outro']);
+  });
+
   it('viewer: aviso de 1 hora vai só ao membro, e o aparelho do viewer é removido', async () => {
     const { reminderDeps, calls, clock } = setup([doc('r1', br('2026-11-21', '17:20'))], {
-      roles: { m1: 'member', v1: 'viewer' },
+      ministries: { m1: ['hajaluz'] },
       devices: [device('t1', 'm1'), device('t-viewer', 'v1')],
     });
     const deleteDevices = vi.spyOn(reminderDeps, 'deleteDevices');
@@ -626,6 +652,7 @@ describe('runRehearsalReminders: interruptor, origem e falhas', () => {
     reminderDeps.listRehearsalSetlists = async () => [
       {
         id: 'texto',
+        ministryId: 'hajaluz',
         data: {
           date: '2026-11-21',
           label: 'Culto',
@@ -635,6 +662,7 @@ describe('runRehearsalReminders: interruptor, origem e falhas', () => {
       },
       {
         id: 'passado',
+        ministryId: 'hajaluz',
         data: {
           date: '2026-11-21',
           label: 'Culto',

@@ -12,7 +12,7 @@ import {
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { canEdit, isAdmin } from '../auth/roles';
+import { canChangeKey, canManageSongs } from '../auth/permissions';
 import { useAuth } from '../auth/useAuth';
 import type { CatalogApi } from '../catalog/catalogApi';
 import { deriveArtists } from '../catalog/search';
@@ -150,7 +150,8 @@ export function ViewerPage({
   matchMedia,
 }: ViewerPageProps) {
   const { status, songs } = useSongsContext();
-  const { role, user } = useAuth();
+  const auth = useAuth();
+  const { user } = auth;
   const navigate = useNavigate();
   const song = songs.find((s) => s.id === songId);
   const artistNames = useMemo(() => deriveArtists(songs).map((a) => a.name), [songs]);
@@ -420,7 +421,7 @@ export function ViewerPage({
     }
   };
 
-  const admin = isAdmin(role);
+  const admin = canManageSongs(auth);
   // The Mudar tom panel and the manage menu/dialogs are never open together.
   const managing = menuOpen || manage !== null;
   const closeManage = (): void => setManage(null);
@@ -498,7 +499,7 @@ export function ViewerPage({
     }
   };
 
-  const canChange = canEdit(role);
+  const canChange = canChangeKey(auth);
   const prepareFailed =
     current?.status === 'error' || (prepared?.doc === readyDoc && prepared?.status === 'error');
   const prepareError = prepareFailed ? 'Não foi possível preparar a troca de tom.' : null;

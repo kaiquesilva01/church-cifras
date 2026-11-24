@@ -40,7 +40,7 @@ function isRole(value: unknown): value is Role {
 export function validateRoleChange(input: RoleChangeInput): RoleChangeResult {
   const { callerUid, callerRole, targetUid, newRole } = input;
   if (!callerUid) {
-    return { ok: false, code: 'unauthenticated', message: 'Login required.' };
+    return { ok: false, code: 'unauthenticated', message: 'Faça login para continuar.' };
   }
   if (callerRole !== 'admin') {
     return { ok: false, code: 'permission-denied', message: 'Only admins can change roles.' };

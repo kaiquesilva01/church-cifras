@@ -86,3 +86,10 @@ export const paths = {
   member: (mid: string, uid: string) => `ministries/${mid}/members/${uid}`,
   request: (mid: string, uid: string) => `ministries/${mid}/requests/${uid}`,
 };
+
+/** Repertório de ministério é `ministries/{mid}/setlists/{sid}`: o pai do pai é o ministério. A raiz `setlists/{sid}` não tem. */
+export function ministryIdOf(ref: {
+  parent: { parent: { id: string } | null };
+}): string | undefined {
+  return ref.parent.parent?.id || undefined;
+}

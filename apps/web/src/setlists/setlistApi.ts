@@ -87,8 +87,11 @@ function toSetlist(id: string, data: Record<string, unknown>): Setlist {
 
 export function createSetlistApi(
   { auth, db }: FirebaseServices,
-  { hostname = window.location.hostname }: { hostname?: string } = {},
+  { ministryId, hostname = window.location.hostname }: { ministryId: string; hostname?: string },
 ): SetlistApi {
+  // Repertórios vivem no ministério atual: `ministries/{mid}/setlists`. A raiz `setlists` é congelada.
+  const setlistsCol = () => collection(db, 'ministries', ministryId, 'setlists');
+  const setlistRef = (id: string) => doc(db, 'ministries', ministryId, 'setlists', id);
   const uid = (): string => {
     const id = auth.currentUser?.uid;
     if (!id) throw new Error('Usuário não autenticado');
@@ -98,13 +101,13 @@ export function createSetlistApi(
   return {
     subscribeSetlists: (cb, onError) =>
       onSnapshot(
-        query(collection(db, 'setlists'), where('expiresAt', '>', Timestamp.fromDate(new Date()))),
+        query(setlistsCol(), where('expiresAt', '>', Timestamp.fromDate(new Date()))),
         (snap) => cb(snap.docs.map((d) => toSetlist(d.id, d.data()))),
         onError,
       ),
     subscribeSetlist: (id, cb, onError) =>
       onSnapshot(
-        doc(db, 'setlists', id),
+        setlistRef(id),
         { includeMetadataChanges: true },
         (snap) =>
           cb({
@@ -115,7 +118,7 @@ export function createSetlistApi(
       ),
     createSetlist: async ({ date, label, items, rehearsalAt }) => {
       const by = uid();
-      const ref = await addDoc(collection(db, 'setlists'), {
+      const ref = await addDoc(setlistsCol(), {
         date,
         label,
         items,
@@ -130,7 +133,7 @@ export function createSetlistApi(
       return ref.id;
     },
     updateSetlistMeta: async (id, { date, label, rehearsalAt }) => {
-      await updateDoc(doc(db, 'setlists', id), {
+      await updateDoc(setlistRef(id), {
         date,
         label,
         // sempre enviado: trocar a data revalida o ensaio gravado; limpar é `deleteField()`, nunca `null`
@@ -142,7 +145,7 @@ export function createSetlistApi(
     },
     applyOp: async (id, op) => {
       const by = uid();
-      const ref = doc(db, 'setlists', id);
+      const ref = setlistRef(id);
       return runTransaction(db, async (tx) => {
         const snap = await tx.get(ref);
         if (!snap.exists()) throw new SetlistGoneError();
@@ -154,7 +157,7 @@ export function createSetlistApi(
       });
     },
     deleteSetlist: async (id) => {
-      await deleteDoc(doc(db, 'setlists', id));
+      await deleteDoc(setlistRef(id));
     },
   };
 }

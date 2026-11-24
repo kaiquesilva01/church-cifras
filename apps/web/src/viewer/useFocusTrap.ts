@@ -9,18 +9,27 @@ interface FocusTrapOptions {
   busy?: boolean;
   /** Keep Tab inside the container (modal). Escape and focus return always apply. */
   trap?: boolean;
+  /**
+   * Element to return focus to on unmount. Pass it when the opener is known (e.g. the tapped row):
+   * on iOS Safari a tap does not focus the button, so document.activeElement is body at mount.
+   * `null` means no return; omitted means the focused element at mount.
+   */
+  opener?: HTMLElement | null;
 }
 
 /** Moves focus into `root`, returns it to the opener on unmount; Esc closes; Tab can be trapped. */
 export function useFocusTrap(
   root: RefObject<HTMLElement | null>,
-  { onEscape, busy = false, trap = true }: FocusTrapOptions,
+  { onEscape, busy = false, trap = true, opener: explicitOpener }: FocusTrapOptions,
 ): void {
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
+    const opener =
+      explicitOpener !== undefined
+        ? explicitOpener
+        : (document.activeElement as HTMLElement | null);
     root.current?.focus();
     return () => opener?.focus?.();
-  }, [root]);
+  }, [root, explicitOpener]);
 
   // The focused control is about to be disabled: keep focus inside, on the container.
   useEffect(() => {

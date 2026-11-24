@@ -1,8 +1,7 @@
-import { HAJALUZ_ID } from '../ministries/model';
 import { addDays, todayInSaoPaulo } from './dates';
 import { isSongId } from './songId';
 
-export type SettledSetlist = { id: string; date: string; songIds: string[] };
+export type SettledSetlist = { id: string; ministryId: string; date: string; songIds: string[] };
 
 export type UsageDeps = {
   listSettledSetlists(cutoff: string): Promise<SettledSetlist[]>;
@@ -36,8 +35,7 @@ export async function countSettledSetlists(
       setlistId: setlist.id,
       date: setlist.date,
       songIds,
-      // Nesta entrega, a raiz setlists é só da Haja Luz.
-      ministryId: HAJALUZ_ID,
+      ministryId: setlist.ministryId,
     });
     if (outcome === 'created') created += 1;
     else alreadyCounted += 1;

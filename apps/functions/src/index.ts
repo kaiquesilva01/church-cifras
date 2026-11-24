@@ -6,9 +6,14 @@ import { defineString } from 'firebase-functions/params';
 import * as functionsV1 from 'firebase-functions/v1';
 import { onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { requireRole } from './auth/requireRole';
+import {
+  requireAppAdmin,
+  requireCatalogContributor,
+  requireUploader,
+  type GuardDeps,
+} from './auth/guards';
 import { countSettledSetlists } from './stats/countUsage';
-import { getStatsForAdmin } from './stats/getStats';
+import { getStatsForCaller } from './stats/getStats';
 import { createStatsDeps } from './stats/statsDeps';
 import { createPushDeps } from './push/adminDeps';
 import {
@@ -17,14 +22,12 @@ import {
   unregisterDevice as unregisterDeviceLogic,
 } from './push/devices';
 import { buildHealth } from './health';
-import { applyHajaLuzRole } from './ministries/bridge';
 import { createMinistryDeps } from './ministries/adminDeps';
 import {
   createMinistry as createMinistryLogic,
   setAppAdmin as setAppAdminLogic,
   updateMinistry as updateMinistryLogic,
 } from './ministries/admin';
-import { recalcClaims } from './ministries/claims';
 import {
   removeMember as removeMemberLogic,
   setMemberRole as setMemberRoleLogic,
@@ -48,7 +51,7 @@ import {
   type ReplaceDeps,
 } from './songs/replaceArrangement';
 import { readUploader } from './songs/storageMetadata';
-import { changeUserRole, createUserProfile, type UserDeps } from './users';
+import { createUserProfile, type UserDeps } from './users';
 
 if (getApps().length === 0) initializeApp();
 
@@ -57,18 +60,21 @@ const adminEmails = defineString('ADMIN_EMAILS');
 
 const ministryDeps = createMinistryDeps();
 
+const guardDeps: GuardDeps = {
+  readUser: ministryDeps.readUser,
+  listMembershipsOfUser: ministryDeps.listMembershipsOfUser,
+};
+
+// Deps do cadastro (onUserCreated): grava claims e users/{uid} na criação da conta.
 const deps: UserDeps = {
   setClaims: (uid, claims) => getAuth().setCustomUserClaims(uid, claims),
   writeUser: async (uid, data, merge) => {
     await getFirestore().doc(`users/${uid}`).set(data, { merge });
   },
-  userExists: async (uid) => (await getFirestore().doc(`users/${uid}`).get()).exists,
   getUserRole: async (uid) => {
     const role = (await getFirestore().doc(`users/${uid}`).get()).data()?.role;
     return ROLES.find((r) => r === role);
   },
-  applyHajaLuzRole: (uid, role, caller) => applyHajaLuzRole(ministryDeps, uid, role, caller),
-  recalcClaims: (uid, next) => recalcClaims(ministryDeps, uid, next),
   now: () => new Date(),
 };
 
@@ -92,9 +98,8 @@ export const onUserCreated = functionsV1
   });
 
 export { onArrangementWritten } from './songs/keys';
-export { onSetlistWritten } from './push/setlistTrigger';
+export { onMinistrySetlistWritten } from './push/setlistTrigger';
 export { sendRehearsalReminders } from './push/reminderSchedule';
-export { mirrorSetlists } from './ministries/mirrorTrigger';
 
 const replaceDeps: ReplaceDeps = {
   replaceIfGenerated: (songId, slug, data) => {
@@ -122,7 +127,7 @@ const replaceDeps: ReplaceDeps = {
 
 export const replaceArrangement = onCall({ region: REGION }, async (request) => {
   const uid = request.auth?.uid;
-  await requireRole(deps, uid, ['member', 'admin']);
+  await requireUploader(guardDeps, uid);
   const data = (request.data ?? {}) as Record<string, unknown>;
   return replaceArrangementLogic(replaceDeps, {
     uid: uid as string,
@@ -148,7 +153,7 @@ const discardDeps: DiscardDeps = {
 
 export const discardUpload = onCall({ region: REGION }, async (request) => {
   const uid = request.auth?.uid;
-  await requireRole(deps, uid, ['member', 'admin']);
+  await requireCatalogContributor(guardDeps, uid);
   const data = (request.data ?? {}) as Record<string, unknown>;
   return discardUploadLogic(discardDeps, { uid: uid as string, storagePath: data.storagePath });
 });
@@ -211,7 +216,7 @@ const adminDeps: AdminDeps = {
 };
 
 export const updateSongMeta = onCall({ region: REGION }, async (request) => {
-  await requireRole(deps, request.auth?.uid, ['admin']);
+  await requireAppAdmin(guardDeps, request.auth?.uid);
   const data = (request.data ?? {}) as Record<string, unknown>;
   return updateSongMetaLogic(adminDeps, {
     songId: data.songId,
@@ -221,13 +226,13 @@ export const updateSongMeta = onCall({ region: REGION }, async (request) => {
 });
 
 export const deleteArrangement = onCall({ region: REGION }, async (request) => {
-  await requireRole(deps, request.auth?.uid, ['admin']);
+  await requireAppAdmin(guardDeps, request.auth?.uid);
   const data = (request.data ?? {}) as Record<string, unknown>;
   return deleteArrangementLogic(adminDeps, { songId: data.songId, key: data.key });
 });
 
 export const deleteSong = onCall({ region: REGION }, async (request) => {
-  await requireRole(deps, request.auth?.uid, ['admin']);
+  await requireAppAdmin(guardDeps, request.auth?.uid);
   const data = (request.data ?? {}) as Record<string, unknown>;
   return deleteSongLogic(adminDeps, { songId: data.songId });
 });
@@ -235,7 +240,16 @@ export const deleteSong = onCall({ region: REGION }, async (request) => {
 const statsDeps = createStatsDeps();
 
 export const getStats = onCall({ region: REGION }, (request) =>
-  getStatsForAdmin({ ...statsDeps, ...deps }, request.auth?.uid),
+  getStatsForCaller(
+    {
+      ...statsDeps,
+      readUser: guardDeps.readUser,
+      readMembership: ministryDeps.readMembership,
+      readMinistry: ministryDeps.readMinistry,
+    },
+    request.auth?.uid,
+    (request.data ?? {}).ministryId,
+  ),
 );
 
 export const countSetlistUsage = onSchedule(
@@ -244,17 +258,6 @@ export const countSetlistUsage = onSchedule(
     await countSettledSetlists(statsDeps);
   },
 );
-
-export const setUserRole = onCall({ region: REGION }, async (request) => {
-  const data = (request.data ?? {}) as { uid?: unknown; role?: unknown };
-  const callerRole = await requireRole(deps, request.auth?.uid, ['admin']);
-  return changeUserRole(deps, {
-    callerUid: request.auth?.uid,
-    callerRole,
-    targetUid: data.uid,
-    newRole: data.role,
-  });
-});
 
 const pushDeps = createPushDeps();
 

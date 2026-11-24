@@ -1,5 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { toMembership, toRequest, toUser } from './adminDeps';
+import { toMembership, toMemberships, toPending, toRequest, toUser } from './adminDeps';
+
+// Documento de consulta de grupo: o ministério é o pai da coleção `members`/`requests`.
+const groupDoc = (ministryId: string, data: Record<string, unknown>) => ({
+  ref: { parent: { parent: { id: ministryId } } },
+  get: (field: string) => data[field],
+});
+
+describe('adaptador admin: consultas de grupo (dentro ou fora da transação)', () => {
+  it('vínculos devolvem o ministério do caminho e o papel', () => {
+    expect(
+      toMemberships({
+        docs: [groupDoc('hajaluz', { role: 'admin' }), groupDoc('outro', { role: 'member' })],
+      }),
+    ).toEqual([
+      { ministryId: 'hajaluz', role: 'admin' },
+      { ministryId: 'outro', role: 'member' },
+    ]);
+  });
+
+  it('pedidos pendentes devolvem só o ministério do caminho', () => {
+    expect(toPending({ docs: [groupDoc('hajaluz', { status: 'pending' })] })).toEqual([
+      { ministryId: 'hajaluz' },
+    ]);
+  });
+
+  it('sem documentos, devolvem lista vazia', () => {
+    expect(toMemberships({ docs: [] })).toEqual([]);
+    expect(toPending({ docs: [] })).toEqual([]);
+  });
+});
 
 describe('adaptador admin: mapeamento de documentos', () => {
   it('usuário ausente vira null', () => {

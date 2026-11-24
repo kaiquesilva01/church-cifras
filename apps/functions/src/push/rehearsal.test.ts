@@ -62,7 +62,7 @@ describe('readRehearsalSetlist', () => {
 
   it('lê horário, rótulo e origem; origem ausente vira producao', () => {
     expect(
-      readRehearsalSetlist('r1', {
+      readRehearsalSetlist('r1', 'hajaluz', {
         label: 'Culto',
         items: [],
         date: '2026-11-22',
@@ -71,6 +71,7 @@ describe('readRehearsalSetlist', () => {
       }),
     ).toEqual({
       id: 'r1',
+      ministryId: 'hajaluz',
       label: 'Culto',
       origin: 'teste',
       rehearsalAt: at(MIN),
@@ -78,14 +79,14 @@ describe('readRehearsalSetlist', () => {
     });
 
     expect(
-      readRehearsalSetlist('r2', { label: 'Culto', items: [], rehearsalAt: at(MIN) }),
+      readRehearsalSetlist('r2', 'hajaluz', { label: 'Culto', items: [], rehearsalAt: at(MIN) }),
     ).toMatchObject({ origin: 'producao', rehearsalAt: at(MIN) });
   });
 
   it('sem rehearsalAt, ou com texto no lugar do horário, devolve undefined', () => {
-    expect(readRehearsalSetlist('r1', { label: 'Culto', items: [] })).toBeUndefined();
+    expect(readRehearsalSetlist('r1', 'hajaluz', { label: 'Culto', items: [] })).toBeUndefined();
     expect(
-      readRehearsalSetlist('r1', {
+      readRehearsalSetlist('r1', 'hajaluz', {
         label: 'Culto',
         items: [],
         rehearsalAt: '2026-11-21T20:10:00Z',
@@ -94,7 +95,7 @@ describe('readRehearsalSetlist', () => {
   });
 
   it('sem dados devolve undefined', () => {
-    expect(readRehearsalSetlist('r1', undefined)).toBeUndefined();
+    expect(readRehearsalSetlist('r1', 'hajaluz', undefined)).toBeUndefined();
   });
 });
 
@@ -298,11 +299,13 @@ describe('buildRehearsalReminder: textos exatos', () => {
   const rehearsalAt = br('2026-11-21', '18:30');
   const base = {
     id: 'r1',
+    ministryId: 'hajaluz',
     label: 'Culto de domingo',
     origin: 'producao' as const,
     expiresAt: undefined,
   };
   const common = {
+    ministryId: 'hajaluz',
     link: '/repertorios/r1',
     tag: 'setlist-r1-ensaio',
     origin: 'producao',

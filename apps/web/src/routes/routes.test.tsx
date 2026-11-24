@@ -2,33 +2,38 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../App';
 import type { Role } from '../auth/roles';
+import { reloadPage } from '../lib/reloadPage';
+import { signInAs, type Scenario } from '../test/authState';
 import { fakeCatalogApi } from '../test/fakeCatalogApi';
 import { createFakeGateway, testUser } from '../test/fakeGateway';
 import { fakeSetlistApi, makeSetlist } from '../test/fakeSetlistApi';
-import type { PeopleApi } from '../people/peopleApi';
+import { createFakeMinistriesApi } from '../test/fakeMinistriesApi';
 import { fakeStatsApi } from '../test/fakeStatsApi';
 
-const peopleApi: PeopleApi = {
-  listUsers: () => Promise.resolve([]),
-  setRole: () => Promise.resolve(),
-};
+vi.mock('../lib/reloadPage', () => ({ reloadPage: vi.fn() }));
 
-/** O claim do token é a fonte do gate: ele é definido antes do login, como no Firebase. */
+function scenarioOf(role: Role): Scenario {
+  if (role === 'viewer') return {};
+  return { ministry: { role } };
+}
+
+/** Os claims do token são a fonte do gate: o login os traz junto com o vínculo (`signInAs`). */
 async function setup(path: string, signedIn?: Role) {
   const gateway = createFakeGateway();
-  if (signedIn) gateway.claimRole = signedIn;
   render(
     <App
       gateway={gateway}
-      peopleApi={peopleApi}
       statsApi={fakeStatsApi()}
       catalogApi={fakeCatalogApi()}
       setlistApi={fakeSetlistApi()}
+      ministriesApi={createFakeMinistriesApi()}
       initialPath={path}
     />,
   );
-  await act(async () => gateway.emitUser(signedIn ? testUser : null));
-  if (signedIn) await act(async () => gateway.emitRole(signedIn));
+  if (signedIn) signInAs(gateway, scenarioOf(signedIn));
+  else await act(async () => gateway.emitUser(null));
+  // Deixa as páginas lazy carregarem (o fallback "Carregando…" sai depois de uma volta de microtarefas).
+  await act(async () => undefined);
   return gateway;
 }
 
@@ -38,11 +43,11 @@ describe('routes', () => {
     expect(screen.getByText('Entrar com Google')).toBeInTheDocument();
   });
 
-  it('login explains that the first access needs an admin release', async () => {
+  it('login explains that the first access chooses a ministry and waits for an admin', async () => {
     await setup('/login');
     expect(
       screen.getByText(
-        'Quem entra pela primeira vez precisa da liberação de um admin do ministério para ver as cifras.',
+        'Quem entra pela primeira vez escolhe o ministério e pede para entrar. Um admin aprova.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Cifras · Louvor' })).toBeInTheDocument();
@@ -65,10 +70,10 @@ describe('routes', () => {
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/login"
       />,
     );
@@ -85,10 +90,10 @@ describe('routes', () => {
       render(
         <App
           gateway={gateway}
-          peopleApi={peopleApi}
           statsApi={fakeStatsApi()}
           catalogApi={fakeCatalogApi()}
           setlistApi={fakeSetlistApi()}
+          ministriesApi={createFakeMinistriesApi()}
           initialPath="/login"
         />,
       );
@@ -107,12 +112,15 @@ describe('routes', () => {
     expect(screen.queryByRole('link', { name: 'Pessoas' })).not.toBeInTheDocument();
   });
 
-  it('shows the Admin link (to Pessoas) in Mais for admin only', async () => {
+  it('shows Pessoas do ministério (to Pessoas) in Mais for ministry admin only', async () => {
     await setup('/mais', 'admin');
-    expect(screen.getByRole('link', { name: /Admin/ })).toHaveAttribute('href', '/pessoas');
+    expect(screen.getByRole('link', { name: /^Pessoas do ministério/ })).toHaveAttribute(
+      'href',
+      '/pessoas',
+    );
     cleanup();
     await setup('/mais', 'member');
-    expect(screen.queryByRole('link', { name: /Admin/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Pessoas do ministério/ })).not.toBeInTheDocument();
   });
 
   it('redirects non-admin away from /pessoas', async () => {
@@ -146,21 +154,122 @@ describe('routes', () => {
 
   it('waits for the role before deciding on /pessoas', async () => {
     const gateway = createFakeGateway();
-    gateway.claimRole = 'admin';
+    gateway.claims = { appAdmin: false, hasMinistry: true, canUploadSong: true };
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/pessoas"
       />,
     );
     await act(async () => gateway.emitUser(testUser));
     expect(screen.getByText('Carregando…')).toBeInTheDocument();
-    await act(async () => gateway.emitRole('admin'));
+    await act(async () => gateway.emitProfile({ appAdmin: false }));
+    await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'admin' }]));
+    act(() => gateway.emitMinistry({ name: 'Haja Luz', city: 'São Paulo' }));
+    await act(async () => undefined);
     expect(screen.getByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
+  });
+
+  it('shows a retry error instead of waiting forever when the ministry fails to load', async () => {
+    await setup('/pessoas', 'admin');
+    expect(screen.getByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
+    cleanup();
+    const failing = createFakeGateway();
+    render(
+      <App
+        gateway={failing}
+        statsApi={fakeStatsApi()}
+        catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
+        initialPath="/pessoas"
+      />,
+    );
+    failing.claims = { appAdmin: false, hasMinistry: true, canUploadSong: true };
+    await act(async () => failing.emitUser(testUser));
+    await act(async () => failing.emitProfile({ appAdmin: false }));
+    await act(async () => failing.emitMemberships([{ ministryId: 'hajaluz', role: 'admin' }]));
+    act(() => failing.failMinistry());
+    await act(async () => undefined);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Não foi possível carregar o ministério. Tente de novo.',
+    );
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Pessoas' })).not.toBeInTheDocument();
+    expect(failing.signOut).not.toHaveBeenCalled();
+  });
+
+  it('Tentar de novo no erro do ministério recarrega a página', async () => {
+    vi.mocked(reloadPage).mockClear();
+    const failing = createFakeGateway();
+    render(
+      <App
+        gateway={failing}
+        statsApi={fakeStatsApi()}
+        catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
+        initialPath="/mais"
+      />,
+    );
+    failing.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    await act(async () => failing.emitUser(testUser));
+    await act(async () => failing.emitProfile({ appAdmin: false }));
+    await act(async () => failing.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+    act(() => failing.failMinistry());
+    await act(async () => undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(reloadPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('ministério que não existe: mensagem própria, sem botão de tentar de novo', async () => {
+    const missing = createFakeGateway();
+    render(
+      <App
+        gateway={missing}
+        statsApi={fakeStatsApi()}
+        catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
+        initialPath="/mais"
+      />,
+    );
+    missing.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    await act(async () => missing.emitUser(testUser));
+    await act(async () => missing.emitProfile({ appAdmin: false }));
+    await act(async () => missing.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+    act(() => missing.emitMinistry(null));
+    await act(async () => undefined);
+    expect(screen.getByText('Ministério não encontrado.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).not.toBeInTheDocument();
+  });
+
+  it('Mais shows the ministry error instead of the Visitante label when the ministry fails', async () => {
+    const failing = createFakeGateway();
+    render(
+      <App
+        gateway={failing}
+        statsApi={fakeStatsApi()}
+        catalogApi={fakeCatalogApi()}
+        setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
+        initialPath="/mais"
+      />,
+    );
+    failing.claims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    await act(async () => failing.emitUser(testUser));
+    await act(async () => failing.emitProfile({ appAdmin: false }));
+    await act(async () => failing.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+    act(() => failing.failMinistry());
+    await act(async () => undefined);
+    expect(
+      screen.getByText('Não foi possível carregar o ministério. Tente de novo.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Visitante')).not.toBeInTheDocument();
   });
 
   it('disables the login button while the popup is open', async () => {
@@ -169,10 +278,10 @@ describe('routes', () => {
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/login"
       />,
     );
@@ -183,30 +292,28 @@ describe('routes', () => {
 
   it('Mais shows the role label and Sair', async () => {
     const gateway = await setup('/mais', 'member');
-    expect(screen.getByText('Membro')).toBeInTheDocument();
+    expect(screen.getByText('Haja Luz · Membro')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Sair/ }));
     expect(gateway.signOut).toHaveBeenCalledTimes(1);
   });
 
   it('returns to the protected screen after signing in, not to home', async () => {
     const gateway = createFakeGateway();
-    gateway.claimRole = 'member';
     const setlistApi = fakeSetlistApi([makeSetlist({ id: 'r1', label: 'Culto de domingo' })]);
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={setlistApi}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/repertorios/r1"
       />,
     );
     act(() => gateway.emitUser(null));
     expect(screen.getByText('Entrar com Google')).toBeInTheDocument();
 
-    await act(async () => gateway.emitUser(testUser));
-    await act(async () => gateway.emitRole('member'));
+    signInAs(gateway, { ministry: { role: 'member' } });
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Culto de domingo' }),
     ).toBeInTheDocument();
@@ -219,7 +326,7 @@ describe('routes', () => {
     await setup('/', 'member');
     expect(screen.getByRole('navigation', { name: 'Principal' })).toBeInTheDocument();
     cleanup();
-    await setup('/nova', 'member');
+    await setup('/nova', 'admin');
     expect(screen.queryByRole('navigation', { name: 'Principal' })).not.toBeInTheDocument();
   });
 });
@@ -238,7 +345,7 @@ describe('visitante sem acesso (#126)', () => {
   ])('visitor sees only the access screen at %s', async (path) => {
     await setup(path, 'viewer');
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Acesso ainda não liberado' }),
+      screen.getByRole('heading', { level: 1, name: 'Escolha seu ministério' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Principal' })).not.toBeInTheDocument();
   });
@@ -247,44 +354,45 @@ describe('visitante sem acesso (#126)', () => {
     const subscribeSongs = vi.fn(() => () => undefined);
     const subscribeSetlists = vi.fn(() => () => undefined);
     const gateway = createFakeGateway();
-    gateway.claimRole = 'viewer';
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi(undefined, { subscribeSongs })}
         setlistApi={fakeSetlistApi([], { subscribeSetlists })}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/"
       />,
     );
-    await act(async () => gateway.emitUser(testUser));
-    await act(async () => gateway.emitRole('viewer'));
-    expect(screen.getByRole('heading', { name: 'Acesso ainda não liberado' })).toBeInTheDocument();
+    signInAs(gateway);
+    await act(async () => undefined);
+    expect(screen.getByRole('heading', { name: 'Escolha seu ministério' })).toBeInTheDocument();
     expect(subscribeSongs).not.toHaveBeenCalled();
     expect(subscribeSetlists).not.toHaveBeenCalled();
   });
 
   it('member is redirected to the app after the claim arrives', async () => {
     const gateway = createFakeGateway();
-    gateway.claimRole = 'viewer';
     render(
       <App
         gateway={gateway}
-        peopleApi={peopleApi}
         statsApi={fakeStatsApi()}
         catalogApi={fakeCatalogApi()}
         setlistApi={fakeSetlistApi()}
+        ministriesApi={createFakeMinistriesApi()}
         initialPath="/"
       />,
     );
-    await act(async () => gateway.emitUser(testUser));
-    await act(async () => gateway.emitRole('viewer'));
-    expect(screen.getByRole('heading', { name: 'Acesso ainda não liberado' })).toBeInTheDocument();
-    await act(async () => gateway.emitRole('member'));
+    signInAs(gateway);
+    await act(async () => undefined);
+    expect(screen.getByRole('heading', { name: 'Escolha seu ministério' })).toBeInTheDocument();
+    // O vínculo chega e o token é renovado com o claim novo (o fake copia nextClaims no refresh).
+    gateway.nextClaims = { appAdmin: false, hasMinistry: true, canUploadSong: false };
+    await act(async () => gateway.emitMemberships([{ ministryId: 'hajaluz', role: 'member' }]));
+    act(() => gateway.emitMinistry({ name: 'Haja Luz', city: 'São Paulo' }));
     expect(
       await screen.findByRole('searchbox', { name: 'Buscar música, cantor ou letra…' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Acesso ainda não liberado' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Escolha seu ministério' })).toBeNull();
   });
 });

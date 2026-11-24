@@ -5,7 +5,7 @@ import { deviceId } from './token';
 
 describe('registerDevice', () => {
   it('denies viewer and anonymous', async () => {
-    const { deps } = fakeDeps({ roles: { v1: 'viewer' } });
+    const { deps } = fakeDeps({ ministries: {} });
     await expect(
       registerDevice(deps, 'v1', { token: 't', origin: 'producao' }),
     ).rejects.toMatchObject({ code: 'permission-denied' });
@@ -25,21 +25,21 @@ describe('registerDevice', () => {
     ['token undefined', { token: undefined, origin: 'producao' }],
     ['token número', { token: 1, origin: 'producao' }],
   ])('rejects %s with invalid-argument', async (_name, data) => {
-    const { deps } = fakeDeps({ roles: { m1: 'member' } });
+    const { deps } = fakeDeps({ ministries: { m1: ['hajaluz'] } });
     await expect(registerDevice(deps, 'm1', data)).rejects.toMatchObject({
       code: 'invalid-argument',
     });
   });
 
   it('accepts a token of exactly 4096 characters', async () => {
-    const { deps } = fakeDeps({ roles: { m1: 'member' } });
+    const { deps } = fakeDeps({ ministries: { m1: ['hajaluz'] } });
     await expect(
       registerDevice(deps, 'm1', { token: 'a'.repeat(4096), origin: 'producao' }),
     ).resolves.toEqual({ ok: true });
   });
 
   it('stores the device under sha256(token) with uid, token, origin, createdAt and lastSeenAt', async () => {
-    const { deps, devices } = fakeDeps({ roles: { m1: 'member' } });
+    const { deps, devices } = fakeDeps({ ministries: { m1: ['hajaluz'] } });
 
     await registerDevice(deps, 'm1', { token: 'tok-A', origin: 'teste' });
 
@@ -53,7 +53,7 @@ describe('registerDevice', () => {
   });
 
   it('same token twice keeps one record, keeps createdAt and updates lastSeenAt', async () => {
-    const { deps, devices, clock } = fakeDeps({ roles: { m1: 'member' } });
+    const { deps, devices, clock } = fakeDeps({ ministries: { m1: ['hajaluz'] } });
     await registerDevice(deps, 'm1', { token: 'tok-A', origin: 'producao' });
     const createdAt = devices.get(deviceId('tok-A'))?.createdAt;
 
@@ -66,7 +66,7 @@ describe('registerDevice', () => {
   });
 
   it('token previously owned by another uid moves to the new uid', async () => {
-    const { deps, devices } = fakeDeps({ roles: { m1: 'member', a1: 'admin' } });
+    const { deps, devices } = fakeDeps({ ministries: { m1: ['hajaluz'], a1: ['hajaluz'] } });
     await registerDevice(deps, 'm1', { token: 'tok-A', origin: 'producao' });
 
     await registerDevice(deps, 'a1', { token: 'tok-A', origin: 'producao' });
@@ -76,7 +76,7 @@ describe('registerDevice', () => {
   });
 
   it('token moved to another uid gets a new createdAt (first write of the new owner)', async () => {
-    const { deps, devices, clock } = fakeDeps({ roles: { m1: 'member', a1: 'admin' } });
+    const { deps, devices, clock } = fakeDeps({ ministries: { m1: ['hajaluz'], a1: ['hajaluz'] } });
     await registerDevice(deps, 'm1', { token: 'tok-A', origin: 'producao' });
 
     clock.now = new Date('2026-11-21T13:00:00Z');
@@ -107,7 +107,7 @@ describe('unregisterDevice', () => {
 
   it('deletes the caller own device, any role', async () => {
     const { deps, devices } = fakeDeps({
-      roles: { v1: 'viewer' },
+      ministries: {},
       devices: [device('tok-V', 'v1', 'producao')],
     });
 
@@ -143,14 +143,14 @@ describe('unregisterDevice', () => {
 
 describe('sendTestPush', () => {
   it('denies viewer', async () => {
-    const { deps } = fakeDeps({ roles: { v1: 'viewer' }, devices: [device('t1', 'v1')] });
+    const { deps } = fakeDeps({ ministries: {}, devices: [device('t1', 'v1')] });
 
     await expect(sendTestPush(deps, 'v1')).rejects.toMatchObject({ code: 'permission-denied' });
   });
 
   it('sends only to the caller devices, ignores the disabled switch, returns counts', async () => {
     const { deps, calls } = fakeDeps({
-      roles: { m1: 'member', m2: 'member' },
+      ministries: { m1: ['hajaluz'], m2: ['hajaluz'] },
       devices: [
         device('t1', 'm1', 'producao'),
         device('t2', 'm1', 'teste'),
@@ -167,9 +167,9 @@ describe('sendTestPush', () => {
   });
 
   it('returns pruned, so "no device" (all zero) differs from "device pruned"', async () => {
-    const none = fakeDeps({ roles: { m1: 'member' } });
+    const none = fakeDeps({ ministries: { m1: ['hajaluz'] } });
     const pruned = fakeDeps({
-      roles: { m1: 'member' },
+      ministries: { m1: ['hajaluz'] },
       devices: [device('morto-1', 'm1')],
       failures: { 'morto-1': 'messaging/registration-token-not-registered' },
     });
@@ -181,7 +181,7 @@ describe('sendTestPush', () => {
 
   it('returns only counts, never tokens', async () => {
     const { deps } = fakeDeps({
-      roles: { m1: 'member' },
+      ministries: { m1: ['hajaluz'] },
       devices: [device('segredo-1', 'm1')],
       failures: { 'segredo-1': 'messaging/registration-token-not-registered' },
     });

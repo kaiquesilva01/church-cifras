@@ -13,21 +13,23 @@ export async function requestAccess(
   const ministryId = readMinistryId(data);
   const user = await deps.readUser(uid);
   if (!user) throw new HttpsError('not-found', 'Usuário não encontrado.');
-  if ((await deps.listMembershipsOfUser(uid)).length > 0) {
-    throw new HttpsError('failed-precondition', 'Você já faz parte de um ministério.');
-  }
-  const pending = await deps.listPendingRequestsOfUser(uid);
-  if (pending.some((p) => p.ministryId !== ministryId)) {
-    throw new HttpsError(
-      'failed-precondition',
-      'Você já tem um pedido pendente em outro ministério.',
-    );
-  }
-  if (pending.length > 0) return { ministryId, status: 'pending' };
   if (!(await deps.readMinistry(ministryId)))
     throw new HttpsError('not-found', 'Ministério não encontrado.');
   const now = deps.now();
   await deps.runTransaction(async (tx) => {
+    // Todas as leituras antes da primeira escrita (regra do Admin SDK; o fake reprova o contrário).
+    if ((await tx.listMembershipsOfUser(uid)).length > 0) {
+      throw new HttpsError('failed-precondition', 'Você já faz parte de um ministério.');
+    }
+    const pending = await tx.listPendingRequestsOfUser(uid);
+    if (pending.some((p) => p.ministryId !== ministryId)) {
+      throw new HttpsError(
+        'failed-precondition',
+        'Você já tem um pedido pendente em outro ministério.',
+      );
+    }
+    const existing = await tx.readRequest(ministryId, uid);
+    if (existing?.status === 'pending') return; // já pendente aqui: não grava de novo
     tx.write({
       op: 'set',
       path: paths.request(ministryId, uid),

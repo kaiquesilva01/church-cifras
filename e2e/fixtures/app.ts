@@ -46,7 +46,7 @@ export async function signInWithPopup(
     await popup.getByRole('button', { name: /sign in with google/i }).click();
   }
   if (wait === 'access') {
-    await expect(page.getByRole('heading', { name: 'Acesso ainda não liberado' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Escolha seu ministério' })).toBeVisible();
   } else {
     await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
   }

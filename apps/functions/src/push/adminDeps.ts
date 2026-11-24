@@ -1,19 +1,44 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
-import { ROLES, type Role } from '../roles';
+import { createMinistryDeps } from '../ministries/adminDeps';
 import type { DeviceRecord, PushDeps, SendResult } from './types';
 
-// Limite de referências por getAll (igual a statsDeps) e de operações por batch do Firestore.
-const GET_ALL_BLOCK = 300;
+// Operações por batch do Firestore.
 const DELETE_BLOCK = 500;
+// `in` do Firestore aceita até 30 valores por consulta.
+const IN_BLOCK = 30;
 
 // Ícone e distintivo saem do site da origem do link (o aparelho de teste usa o site de teste).
 const siteAsset = (link: string, path: string): string => new URL(path, link).href;
 
+/** uid -> Set de ministryId, pelo grupo `members` (uid é o campo do documento). Só traduz consultas. */
+export async function ministriesOfUids(uids: string[]): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>();
+  const valid = [...new Set(uids)].filter((uid) => uid !== '' && !uid.includes('/'));
+  const db = getFirestore();
+  for (let start = 0; start < valid.length; start += IN_BLOCK) {
+    const snap = await db
+      .collectionGroup('members')
+      .where('uid', 'in', valid.slice(start, start + IN_BLOCK))
+      .get();
+    for (const d of snap.docs) {
+      const mid = d.ref.parent.parent?.id;
+      const uid = String(d.data().uid ?? '');
+      if (!mid || !uid) continue;
+      const set = out.get(uid) ?? new Set<string>();
+      set.add(mid);
+      out.set(uid, set);
+    }
+  }
+  return out;
+}
+
 /** Implementação real de PushDeps com firebase-admin. Sem lógica: só traduz chamadas. */
 export function createPushDeps(): PushDeps {
+  const ministry = createMinistryDeps();
   return {
-    getUserRole: async (uid) => (await getFirestore().doc(`users/${uid}`).get()).data()?.role,
+    readUser: ministry.readUser,
+    listMembershipsOfUser: ministry.listMembershipsOfUser,
     getDeviceOwner: async (id) => {
       const owner = (await getFirestore().doc(`pushDevices/${id}`).get()).data()?.uid;
       return typeof owner === 'string' ? owner : null;
@@ -39,23 +64,8 @@ export function createPushDeps(): PushDeps {
         token: String(d.data().token ?? ''),
         origin: d.data().origin,
       })),
-    // getAll em blocos: funciona para qualquer quantidade de uids (where 'in' limita a 30).
-    // uid inválido (vazio ou com "/") não tem papel: o aparelho cai em "stale" e é apagado.
-    getUserRoles: async (uids) => {
-      const roles = new Map<string, Role>();
-      const valid = uids.filter((uid) => uid !== '' && !uid.includes('/'));
-      if (valid.length === 0) return roles;
-      const db = getFirestore();
-      for (let start = 0; start < valid.length; start += GET_ALL_BLOCK) {
-        const block = valid.slice(start, start + GET_ALL_BLOCK);
-        const snaps = await db.getAll(...block.map((uid) => db.doc(`users/${uid}`)));
-        for (const snap of snaps) {
-          const role = ROLES.find((r) => r === snap.data()?.role);
-          if (role) roles.set(snap.id, role);
-        }
-      }
-      return roles;
-    },
+    // uid inválido não tem ministério: o aparelho cai em "stale" e é apagado.
+    getUserMinistries: ministriesOfUids,
     // sendEach: uma mensagem por token (sendEachForMulticast está deprecado para tokens no 14.5.1).
     sendBatch: async (messages): Promise<SendResult[]> => {
       const response = await getMessaging().sendEach(

@@ -9,12 +9,11 @@ import {
   useSearchParams,
 } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Role } from '../auth/roles';
 import { AuthContext, type AuthState } from '../auth/useAuth';
 import { SongsProvider } from '../catalog/SongsProvider';
 import type { ArrangementSummary } from '../catalog/types';
 import { fakeCatalogApi, makeSong } from '../test/fakeCatalogApi';
-import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { ViewerPage } from './ViewerPage';
 
 vi.mock('./PdfPages', () => ({
@@ -76,22 +75,15 @@ const song = makeSong({
   handmadeKeys: ['G'],
 });
 
-function setup(role: Role = 'admin', overrides: Parameters<typeof fakeCatalogApi>[1] = {}) {
+const appAdmin = (): AuthState => ({ ...authStateFor('admin'), appAdmin: true });
+
+function setup(auth: AuthState = appAdmin(), overrides: Parameters<typeof fakeCatalogApi>[1] = {}) {
   const api = fakeCatalogApi([song], {
     updateSongMeta: vi.fn(() => Promise.resolve()),
     deleteArrangement: vi.fn(() => Promise.resolve()),
     deleteSong: vi.fn(() => Promise.resolve()),
     ...overrides,
   });
-  const auth: AuthState = {
-    status: 'signed-in',
-    user: testUser,
-    role,
-    access: 'granted',
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
-  };
   render(
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={['/musicas/s1?tom=G']}>
@@ -123,7 +115,7 @@ const codeError = (code: string, message: string) => Object.assign(new Error(mes
 
 describe('ViewerPage manage', () => {
   it('manage menu only for admins', async () => {
-    setup('member');
+    setup(authStateFor('member'));
     await screen.findByTestId('pdf-pages');
     expect(screen.queryByRole('button', { name: 'Gerenciar' })).not.toBeInTheDocument();
   });
@@ -173,7 +165,7 @@ describe('ViewerPage manage', () => {
   });
 
   it('shows already exists error', async () => {
-    setup('admin', {
+    setup(appAdmin(), {
       updateSongMeta: vi.fn(() => Promise.reject(codeError('functions/already-exists', 'x'))),
     });
     const dialog = await openMenu('Editar nome e cantor');
@@ -204,15 +196,7 @@ describe('ViewerPage manage', () => {
   it('goes home when the deleted key was the last one', async () => {
     const only = makeSong({ id: 's1', title: 'Sonda-me', keys: ['G'], handmadeKeys: ['G'] });
     const api = fakeCatalogApi([only], { deleteArrangement: vi.fn(() => Promise.resolve()) });
-    const auth: AuthState = {
-      status: 'signed-in',
-      user: testUser,
-      role: 'admin',
-      access: 'granted',
-      prepareSignIn: () => Promise.resolve(),
-      signIn: () => Promise.resolve(),
-      signOut: () => Promise.resolve(),
-    };
+    const auth: AuthState = appAdmin();
     render(
       <AuthContext.Provider value={auth}>
         <MemoryRouter initialEntries={['/musicas/s1?tom=G']}>
@@ -258,7 +242,7 @@ describe('ViewerPage manage', () => {
       derivedFromKey: null,
       collisions: 0,
     });
-    const api = setup('admin', {
+    const api = setup(appAdmin(), {
       subscribeArrangements: (_id, cb) => {
         emit = cb;
         cb([arr('G', 'handmade'), arr('A', 'handmade')]);
@@ -272,7 +256,7 @@ describe('ViewerPage manage', () => {
   });
 
   it('treats not-found on delete-key as success', async () => {
-    setup('admin', {
+    setup(appAdmin(), {
       deleteArrangement: vi.fn(() => Promise.reject(codeError('functions/not-found', 'sumiu'))),
     });
     const dialog = await openMenu('Apagar tom G');
@@ -281,7 +265,7 @@ describe('ViewerPage manage', () => {
   });
 
   it('shows last handmade error', async () => {
-    setup('admin', {
+    setup(appAdmin(), {
       deleteArrangement: vi.fn(() =>
         Promise.reject(
           codeError(
@@ -315,8 +299,20 @@ describe('ViewerPage manage', () => {
     expect(api.deleteSong).toHaveBeenCalledWith('s1');
     expect(screen.getByTestId('location')).toHaveAttribute('data-notice', 'Música apagada.');
   });
-  it('viewer role does not see the menu', async () => {
-    setup('viewer');
+  it('membro sem admin da app não vê Gerenciar', async () => {
+    setup(authStateFor('member'));
+    await screen.findByTestId('pdf-pages');
+    expect(screen.queryByRole('button', { name: 'Gerenciar' })).not.toBeInTheDocument();
+  });
+
+  it('admin da app sem ministério vê Gerenciar', async () => {
+    setup({ ...authStateFor(null), appAdmin: true, canUploadSong: true, access: 'granted' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar' }));
+    expect(screen.getByRole('group', { name: 'Gerenciar música' })).toBeInTheDocument();
+  });
+
+  it('admin do ministério sem admin da app não vê Gerenciar', async () => {
+    setup(authStateFor('admin'));
     await screen.findByTestId('pdf-pages');
     expect(screen.queryByRole('button', { name: 'Gerenciar' })).not.toBeInTheDocument();
   });
@@ -351,7 +347,7 @@ describe('ViewerPage manage', () => {
 
   it('ignores Escape and keeps focus inside while busy', async () => {
     let finish: () => void = () => undefined;
-    setup('admin', {
+    setup(appAdmin(), {
       deleteArrangement: vi.fn(() => new Promise<void>((resolve) => (finish = resolve))),
     });
     const dialog = await openMenu('Apagar tom G');

@@ -33,6 +33,7 @@ export type AnnounceResult =
 export async function announceNewSetlist(
   deps: AnnounceDeps,
   setlistId: string,
+  ministryId: string,
   beforeData: Record<string, unknown> | undefined,
   afterData: Record<string, unknown> | undefined,
 ): Promise<AnnounceResult> {
@@ -40,7 +41,7 @@ export async function announceNewSetlist(
   const after = readSetlist(afterData);
   if (after === undefined || !shouldAnnounce(before, after)) return 'not-due';
 
-  const input = buildNewSetlistMessage(setlistId, after, before);
+  const input = buildNewSetlistMessage(setlistId, ministryId, after, before);
   if (input === null) return 'invalid';
 
   const now = deps.now();

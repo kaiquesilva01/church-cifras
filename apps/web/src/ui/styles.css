@@ -8,6 +8,7 @@
   /* Amber as TEXT/links: the fill amber is too light for small text on white. */
   --color-accent-text: #b45309;
   --color-accent-soft: rgb(217 119 6 / 14%);
+  --color-accent-border: rgb(217 119 6 / 40%);
   --color-on-accent: #15120a;
   --color-bg: #f4f5f7;
   --color-surface: #ffffff;
@@ -42,6 +43,7 @@
   --color-accent: #f5a623;
   --color-accent-text: #f5a623;
   --color-accent-soft: rgb(245 166 35 / 14%);
+  --color-accent-border: rgb(245 166 35 / 40%);
   --color-on-accent: #15120a;
   --color-bg: #0a0b0d;
   --color-surface: #15171b;

@@ -23,7 +23,7 @@ function renderNav(value: PadContextValue | null) {
   return render(
     <MemoryRouter>
       <PadContext.Provider value={value}>
-        <BottomNav active="musicas" />
+        <BottomNav active="musicas" showRepertorio />
       </PadContext.Provider>
     </MemoryRouter>,
   );
@@ -33,7 +33,7 @@ describe('BottomNav', () => {
   it('links the five tabs and marks the active one', () => {
     render(
       <MemoryRouter>
-        <BottomNav active="pad" />
+        <BottomNav active="pad" showRepertorio />
       </MemoryRouter>,
     );
     const nav = screen.getByRole('navigation', { name: 'Principal' });
@@ -47,6 +47,16 @@ describe('BottomNav', () => {
     ]);
     expect(screen.getByRole('link', { name: 'Pad' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Músicas' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('hides the Repertório tab without a ministry', () => {
+    render(
+      <MemoryRouter>
+        <BottomNav active="musicas" showRepertorio={false} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('link', { name: 'Repertório' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link')).toHaveLength(4);
   });
 
   it('shows a green dot on the Pad tab while the pad plays, on any screen', () => {

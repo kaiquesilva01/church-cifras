@@ -1,5 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https';
-import { requireRole } from '../auth/requireRole';
+import { requireMinistryMember } from '../auth/guards';
 import { sendToDevices } from './send';
 import { deviceId, parseOrigin } from './token';
 import type { PushDeps } from './types';
@@ -23,7 +23,7 @@ export async function registerDevice(
   uid: string | undefined,
   data: { token?: unknown; origin?: unknown },
 ): Promise<{ ok: true }> {
-  await requireRole(deps, uid, ['member', 'admin']);
+  await requireMinistryMember(deps, uid);
   const owner = uid as string;
 
   const token = parseToken(data.token);
@@ -50,7 +50,7 @@ export async function unregisterDevice(
   uid: string | undefined,
   data: { token?: unknown },
 ): Promise<{ ok: true }> {
-  if (!uid) throw new HttpsError('unauthenticated', 'Login required.');
+  if (!uid) throw new HttpsError('unauthenticated', 'Faça login para continuar.');
 
   const token = parseToken(data.token);
   const id = deviceId(token);
@@ -65,7 +65,7 @@ export async function sendTestPush(
   deps: PushDeps,
   uid: string | undefined,
 ): Promise<{ sent: number; failed: number; pruned: number }> {
-  await requireRole(deps, uid, ['member', 'admin']);
+  await requireMinistryMember(deps, uid);
 
   const outcome = await sendToDevices(deps, {
     title: 'Aviso de teste',

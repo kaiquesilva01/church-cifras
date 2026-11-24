@@ -9,9 +9,9 @@ import { PushProvider } from './push/PushProvider';
 import type { PushService } from './push/types';
 import { ActiveSetlistProvider } from './setlists/ActiveSetlistProvider';
 import type { SetlistApi } from './setlists/setlistApi';
+import type { MinistriesApi } from './ministries/ministriesApi';
 import { SetlistsProvider } from './setlists/SetlistsProvider';
-import type { PeopleApi } from './people/peopleApi';
-import { PeoplePage } from './people/PeoplePage';
+import { PessoasRoute } from './people/PessoasRoute';
 import type { StatsApi } from './stats/statsApi';
 import { StatsPage } from './stats/StatsPage';
 import { loadViewerRoute } from './lib/prefetch';
@@ -36,10 +36,11 @@ const SetlistRoute = lazy(() => import('./setlists/SetlistRoute'));
 
 export interface AppProps {
   gateway: AuthGateway;
-  peopleApi: PeopleApi;
   statsApi: StatsApi;
   catalogApi: CatalogApi;
   setlistApi: SetlistApi;
+  /** Entrada de quem não tem ministério (escolha e pedido). */
+  ministriesApi: MinistriesApi;
   initialPath?: string;
   /** Recarrega a página (injetável nos testes). */
   onReload?: () => void;
@@ -48,23 +49,23 @@ export interface AppProps {
 }
 
 function AppRoutes({
-  peopleApi,
   statsApi,
   catalogApi,
   setlistApi,
+  ministriesApi,
   onReload,
 }: {
-  peopleApi: PeopleApi;
   statsApi: StatsApi;
   catalogApi: CatalogApi;
   setlistApi: SetlistApi;
+  ministriesApi: MinistriesApi;
   onReload: () => void;
 }) {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
-        <Route element={<RequireAccess />}>
+        <Route element={<RequireAccess api={ministriesApi} />}>
           <Route
             element={
               <SongsProvider api={catalogApi}>
@@ -83,7 +84,7 @@ function AppRoutes({
             <Route index element={<HomePage setlistApi={setlistApi} />} />
             <Route path="/busca" element={<BuscaPage />} />
             <Route path="/pad" element={<PadPage />} />
-            <Route path="/mais" element={<MaisPage />} />
+            <Route path="/mais" element={<MaisPage api={ministriesApi} />} />
             <Route path="/cantores/:artistId" element={<ArtistPage />} />
             <Route
               path="/musicas/:songId"
@@ -111,7 +112,7 @@ function AppRoutes({
                 </ErrorBoundary>
               }
             />
-            <Route element={<RequireRole roles={['member', 'admin']} />}>
+            <Route element={<RequireRole when="upload" />}>
               <Route
                 path="/nova"
                 element={
@@ -129,9 +130,11 @@ function AppRoutes({
                 }
               />
             </Route>
-            <Route element={<RequireRole roles={['admin']} />}>
-              <Route path="/pessoas" element={<PeoplePage api={peopleApi} />} />
+            <Route element={<RequireRole when="ministryAdmin" />}>
+              <Route path="/pessoas" element={<PessoasRoute api={ministriesApi} />} />
               <Route path="/estatisticas" element={<StatsPage api={statsApi} />} />
+            </Route>
+            <Route element={<RequireRole when="upload" />}>
               <Route
                 path="/importar"
                 element={
@@ -161,10 +164,10 @@ const reloadPage = () => window.location.reload();
 
 export function App({
   gateway,
-  peopleApi,
   statsApi,
   catalogApi,
   setlistApi,
+  ministriesApi,
   initialPath,
   onReload = reloadPage,
   pushService,
@@ -174,25 +177,25 @@ export function App({
       initialPath ? (
         <MemoryRouter initialEntries={[initialPath]}>
           <AppRoutes
-            peopleApi={peopleApi}
             statsApi={statsApi}
             catalogApi={catalogApi}
             setlistApi={setlistApi}
+            ministriesApi={ministriesApi}
             onReload={onReload}
           />
         </MemoryRouter>
       ) : (
         <BrowserRouter>
           <AppRoutes
-            peopleApi={peopleApi}
             statsApi={statsApi}
             catalogApi={catalogApi}
             setlistApi={setlistApi}
+            ministriesApi={ministriesApi}
             onReload={onReload}
           />
         </BrowserRouter>
       ),
-    [initialPath, peopleApi, statsApi, catalogApi, setlistApi, onReload],
+    [initialPath, statsApi, catalogApi, setlistApi, ministriesApi, onReload],
   );
   return (
     <ThemeProvider>

@@ -10,16 +10,42 @@ service cloud.firestore {
       return request.auth.token.get('role', 'viewer');
     }
 
-    function isEditor() {
-      return signedIn() && role() in ['member', 'admin'];
-    }
-
-    function isAdmin() {
-      return signedIn() && role() == 'admin';
-    }
-
     function isAppAdminClaim() {
       return signedIn() && request.auth.token.get('appAdmin', false) == true;
+    }
+
+    // Fallback decidido por token: se o token traz algum claim novo, o role é ignorado.
+    // Só token antigo (sem nenhum claim novo, emitido antes da Preparação) usa o role legado,
+    // até a limpeza (#137). Assim a remoção vale no refresh do token.
+    function hasNewClaims() {
+      return 'hasMinistry' in request.auth.token
+        || 'canUploadSong' in request.auth.token
+        || 'appAdmin' in request.auth.token;
+    }
+
+    function claimOrLegacy(claim, legacyRoles) {
+      return signedIn()
+        && (request.auth.token.get(claim, false) == true
+          || (!hasNewClaims() && role() in legacyRoles));
+    }
+
+    function hasMinistryClaim() {
+      return claimOrLegacy('hasMinistry', ['member', 'admin']);
+    }
+
+    // Leitura do catálogo: qualquer um com ministério, ou admin da app.
+    function canReadCatalog() {
+      return isAppAdminClaim() || hasMinistryClaim();
+    }
+
+    // Subir cifra feita à mão, criar música e letra: admin de ministério ou da app.
+    function canUploadSong() {
+      return isAppAdminClaim() || claimOrLegacy('canUploadSong', ['admin']);
+    }
+
+    // Tom gerado (PDF por sobreposição): qualquer um com ministério, ou admin da app (decisão de 23/11).
+    function canContributeCatalog() {
+      return isAppAdminClaim() || hasMinistryClaim();
     }
 
     function isMemberOf(mid) {
@@ -152,23 +178,24 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if signedIn() && (request.auth.uid == uid || isAppAdminClaim() || role() == 'admin');
+      allow read: if signedIn() && (request.auth.uid == uid || isAppAdminClaim());
       allow write: if false;
     }
 
     match /artists/{id} {
-      allow read: if isEditor();
+      allow read: if canReadCatalog();
       allow write: if false;
     }
 
     match /songs/{songId} {
-      allow read: if isEditor();
-      allow create: if isEditor() && validSong(request.resource.data, songId);
+      allow read: if canReadCatalog();
+      allow create: if canUploadSong() && validSong(request.resource.data, songId);
       allow update, delete: if false;
 
       match /arrangements/{slug} {
-        allow read: if isEditor();
-        allow create: if isEditor()
+        allow read: if canReadCatalog();
+        // Tom feito à mão: quem sobe cifra. Tom gerado: quem tem ministério ou é admin da app.
+        allow create: if (request.resource.data.source == 'handmade' ? canUploadSong() : canContributeCatalog())
           && existsAfter(/databases/$(database)/documents/songs/$(songId))
           && validArrangement(request.resource.data, songId, slug);
         allow update, delete: if false;
@@ -176,24 +203,18 @@ service cloud.firestore {
     }
 
     match /songLyrics/{songId} {
-      allow read: if isEditor();
-      allow create: if isEditor()
+      allow read: if canReadCatalog();
+      allow create: if canUploadSong()
         && existsAfter(/databases/$(database)/documents/songs/$(songId))
         && validLyrics(request.resource.data, songId);
       allow update, delete: if false;
     }
 
+    // Raiz congelada: só leitura, e só para quem é da Haja Luz (documento de membro, nunca o role).
+    // O espelho é desligado neste pacote; a cópia em ministries/hajaluz/setlists passa a ser a fonte.
     match /setlists/{setlistId} {
-      allow read: if isEditor();
-      allow create: if isAdmin()
-        && validSetlist(request.resource.data, setlistId)
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.createdAt == request.time;
-      allow update: if isAdmin()
-        && validSetlist(request.resource.data, setlistId)
-        && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.createdAt == resource.data.createdAt;
-      allow delete: if isAdmin();
+      allow read: if isMemberOf('hajaluz');
+      allow create, update, delete: if false;
     }
 
     match /ministries/{mid} {

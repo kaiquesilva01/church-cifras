@@ -16,7 +16,7 @@ vi.mock('firebase/firestore', () => {
   return {
     Timestamp,
     addDoc: vi.fn(() => Promise.resolve({ id: 'new1' })),
-    collection: vi.fn((_db: unknown, name: string) => ({ path: name })),
+    collection: vi.fn((_db: unknown, ...segments: string[]) => ({ path: segments.join('/') })),
     deleteDoc: vi.fn(() => Promise.resolve()),
     deleteField: vi.fn(() => '<del>'),
     doc: vi.fn((_db: unknown, ...segments: string[]) => ({
@@ -37,6 +37,7 @@ vi.mock('firebase/firestore', () => {
 import {
   Timestamp,
   addDoc,
+  collection,
   deleteDoc,
   deleteField,
   onSnapshot,
@@ -52,7 +53,7 @@ import { SetlistGoneError, createSetlistApi } from './setlistApi';
 import { MAX_ITEMS } from './types';
 
 const services = { auth: { currentUser: { uid: 'u1' } }, db: {} } as unknown as FirebaseServices;
-const api = () => createSetlistApi(services);
+const api = () => createSetlistApi(services, { ministryId: 'hajaluz' });
 
 const stored = (items: unknown[], extra: Record<string, unknown> = {}) => ({
   exists: () => true,
@@ -70,6 +71,13 @@ const stored = (items: unknown[], extra: Record<string, unknown> = {}) => ({
 describe('createSetlistApi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('subscribeSetlists reads only ministries/{mid}/setlists, never the root', () => {
+    vi.mocked(onSnapshot).mockImplementationOnce((() => () => undefined) as never);
+    api().subscribeSetlists(vi.fn(), vi.fn());
+    expect(collection).toHaveBeenCalledWith(expect.anything(), 'ministries', 'hajaluz', 'setlists');
+    expect(collection).not.toHaveBeenCalledWith(expect.anything(), 'setlists');
   });
 
   it('subscribeSetlists queries by expiresAt > now and converts timestamps', () => {
@@ -112,7 +120,9 @@ describe('createSetlistApi', () => {
     }) as never);
     const cb = vi.fn();
     api().subscribeSetlist('l1', cb, vi.fn());
-    expect(vi.mocked(onSnapshot).mock.calls[0]?.[0]).toMatchObject({ path: 'setlists/l1' });
+    expect(vi.mocked(onSnapshot).mock.calls[0]?.[0]).toMatchObject({
+      path: 'ministries/hajaluz/setlists/l1',
+    });
     expect(vi.mocked(onSnapshot).mock.calls[0]?.[1]).toEqual({ includeMetadataChanges: true });
     expect(cb).toHaveBeenNthCalledWith(1, {
       setlist: expect.objectContaining({ id: 'l1', label: 'Culto' }) as unknown,
@@ -155,7 +165,7 @@ describe('createSetlistApi', () => {
       { path: string },
       Record<string, unknown>,
     ];
-    expect(ref.path).toBe('setlists');
+    expect(ref.path).toBe('ministries/hajaluz/setlists');
     expect(data).toEqual({
       date: '2026-11-20',
       label: 'Culto',
@@ -171,7 +181,10 @@ describe('createSetlistApi', () => {
 
   it('createSetlist grava rehearsalAt como Timestamp e origin teste no site de teste', async () => {
     const at = new Date('2026-11-22T21:30:00Z');
-    await createSetlistApi(services, { hostname: 'louvor-hajaluz-teste.web.app' }).createSetlist({
+    await createSetlistApi(services, {
+      ministryId: 'hajaluz',
+      hostname: 'louvor-hajaluz-teste.web.app',
+    }).createSetlist({
       date: '2026-11-22',
       label: 'Domingo',
       items: [],
@@ -194,7 +207,9 @@ describe('createSetlistApi', () => {
   });
 
   it('createSetlist requires an authenticated user', async () => {
-    const anon = createSetlistApi({ auth: { currentUser: null }, db: {} } as never);
+    const anon = createSetlistApi({ auth: { currentUser: null }, db: {} } as never, {
+      ministryId: 'hajaluz',
+    });
     await expect(anon.createSetlist({ date: '2026-11-20', label: '', items: [] })).rejects.toThrow(
       'Usuário não autenticado',
     );
@@ -206,7 +221,7 @@ describe('createSetlistApi', () => {
       { path: string },
       Record<string, unknown>,
     ];
-    expect(ref.path).toBe('setlists/l1');
+    expect(ref.path).toBe('ministries/hajaluz/setlists/l1');
     expect(data).toEqual({
       date: '2026-12-01',
       label: 'Ceia',
@@ -238,18 +253,23 @@ describe('createSetlistApi', () => {
     expect(txGet).toHaveBeenCalledTimes(1);
     expect(result.changed).toBe(true);
     expect(result.setlist.items.map((i) => i.id)).toEqual(['other', 'mine']);
-    expect(txUpdate).toHaveBeenCalledWith(expect.objectContaining({ path: 'setlists/l1' }), {
-      items: [
-        { id: 'other', songId: 's9', key: 'D' },
-        { id: 'mine', songId: 's1', key: 'G' },
-      ],
-      updatedBy: 'u1',
-      updatedAt: '<ts>',
-    });
+    expect(txUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'ministries/hajaluz/setlists/l1' }),
+      {
+        items: [
+          { id: 'other', songId: 's9', key: 'D' },
+          { id: 'mine', songId: 's1', key: 'G' },
+        ],
+        updatedBy: 'u1',
+        updatedAt: '<ts>',
+      },
+    );
   });
 
   it('applyOp rejects (does not throw) when unauthenticated', async () => {
-    const anon = createSetlistApi({ auth: { currentUser: null }, db: {} } as never);
+    const anon = createSetlistApi({ auth: { currentUser: null }, db: {} } as never, {
+      ministryId: 'hajaluz',
+    });
     let promise: Promise<unknown> | undefined;
     expect(() => {
       promise = anon.applyOp('l1', { type: 'remove', itemId: 'a' });
@@ -331,6 +351,8 @@ describe('createSetlistApi', () => {
 
   it('deleteSetlist deletes the doc', async () => {
     await api().deleteSetlist('l1');
-    expect(vi.mocked(deleteDoc).mock.calls[0]?.[0]).toMatchObject({ path: 'setlists/l1' });
+    expect(vi.mocked(deleteDoc).mock.calls[0]?.[0]).toMatchObject({
+      path: 'ministries/hajaluz/setlists/l1',
+    });
   });
 });

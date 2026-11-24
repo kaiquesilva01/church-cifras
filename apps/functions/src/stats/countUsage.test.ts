@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { countSettledSetlists, type SettledSetlist, type UsageDeps } from './countUsage';
 
 const SETLISTS: SettledSetlist[] = [
-  { id: 's20', date: '2026-11-20', songIds: ['a'] },
-  { id: 's21', date: '2026-11-21', songIds: ['b'] },
+  { id: 's20', ministryId: 'hajaluz', date: '2026-11-20', songIds: ['a'] },
+  { id: 's21', ministryId: 'hajaluz', date: '2026-11-21', songIds: ['b'] },
 ];
 
 function setup(opts: { now: string; setlists?: SettledSetlist[]; existing?: string[] }) {
@@ -31,6 +31,17 @@ function setup(opts: { now: string; setlists?: SettledSetlist[]; existing?: stri
 }
 
 describe('countSettledSetlists', () => {
+  it('grava o ministryId do repertório, não um valor fixo', async () => {
+    const { deps, recorded } = setup({
+      now: '2026-11-22T15:00:00Z',
+      setlists: [{ id: 's1', ministryId: 'outro', date: '2026-11-20', songIds: ['a'] }],
+    });
+
+    await countSettledSetlists(deps);
+
+    expect(recorded).toEqual([expect.objectContaining({ setlistId: 's1', ministryId: 'outro' })]);
+  });
+
   it('records only setlists dated on or before today minus 2 days', async () => {
     const { deps, cutoffs, recorded } = setup({ now: '2026-11-22T15:00:00Z' });
 
@@ -61,7 +72,7 @@ describe('countSettledSetlists', () => {
   it('deduplicates songIds keeping their first-seen order', async () => {
     const { deps, recorded } = setup({
       now: '2026-11-22T15:00:00Z',
-      setlists: [{ id: 's1', date: '2026-11-20', songIds: ['a', 'b', 'a'] }],
+      setlists: [{ id: 's1', ministryId: 'hajaluz', date: '2026-11-20', songIds: ['a', 'b', 'a'] }],
     });
 
     await countSettledSetlists(deps);
@@ -74,7 +85,14 @@ describe('countSettledSetlists', () => {
   it('drops invalid song ids before deduplicating and recording', async () => {
     const { deps, recorded } = setup({
       now: '2026-11-22T15:00:00Z',
-      setlists: [{ id: 's1', date: '2026-11-20', songIds: ['ok', 'a/b', '', '__x__', 'ok2'] }],
+      setlists: [
+        {
+          id: 's1',
+          ministryId: 'hajaluz',
+          date: '2026-11-20',
+          songIds: ['ok', 'a/b', '', '__x__', 'ok2'],
+        },
+      ],
     });
 
     await countSettledSetlists(deps);
@@ -87,7 +105,7 @@ describe('countSettledSetlists', () => {
   it('still records a setlist that only has invalid song ids, with an empty list', async () => {
     const { deps, recorded } = setup({
       now: '2026-11-22T15:00:00Z',
-      setlists: [{ id: 's1', date: '2026-11-20', songIds: ['a/b', ''] }],
+      setlists: [{ id: 's1', ministryId: 'hajaluz', date: '2026-11-20', songIds: ['a/b', ''] }],
     });
 
     await countSettledSetlists(deps);
@@ -100,7 +118,7 @@ describe('countSettledSetlists', () => {
   it('records an empty setlist with an empty songIds list', async () => {
     const { deps, recorded } = setup({
       now: '2026-11-22T15:00:00Z',
-      setlists: [{ id: 's1', date: '2026-11-20', songIds: [] }],
+      setlists: [{ id: 's1', ministryId: 'hajaluz', date: '2026-11-20', songIds: [] }],
     });
 
     await countSettledSetlists(deps);
@@ -114,8 +132,8 @@ describe('countSettledSetlists', () => {
     const { deps } = setup({
       now: '2026-11-22T15:00:00Z',
       setlists: [
-        { id: 's20', date: '2026-11-20', songIds: ['a'] },
-        { id: 's19', date: '2026-11-19', songIds: ['b'] },
+        { id: 's20', ministryId: 'hajaluz', date: '2026-11-20', songIds: ['a'] },
+        { id: 's19', ministryId: 'hajaluz', date: '2026-11-19', songIds: ['b'] },
       ],
       existing: ['s20'],
     });

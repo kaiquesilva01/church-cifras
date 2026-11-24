@@ -8,7 +8,15 @@ import {
   requireCaller,
   slugify,
   validateMinistryFields,
+  ministryIdOf,
 } from './model';
+
+describe('ministryIdOf', () => {
+  it('pai do pai é o ministério; raiz não tem', () => {
+    expect(ministryIdOf({ parent: { parent: { id: 'hajaluz' } } })).toBe('hajaluz');
+    expect(ministryIdOf({ parent: { parent: null } })).toBeUndefined();
+  });
+});
 
 function errorOf(fn: () => unknown): unknown {
   try {

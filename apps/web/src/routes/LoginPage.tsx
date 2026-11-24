@@ -58,8 +58,7 @@ export function LoginPage() {
         Entrar com Google
       </button>
       <p className="login-note">
-        Quem entra pela primeira vez precisa da liberação de um admin do ministério para ver as
-        cifras.
+        Quem entra pela primeira vez escolhe o ministério e pede para entrar. Um admin aprova.
       </p>
       {failed && (
         <p role="alert" className="error">

@@ -4,16 +4,21 @@ import type { DeviceRecord, PushDeps, PushMessage } from './types';
 /** Limite de mensagens por chamada de sendEach. */
 export const BATCH_SIZE = 500;
 
-export type SendInput = {
+type SendBase = {
   title: string;
   body: string;
   link: string; // caminho do site, começando por "/"; o domínio vem da origem do aparelho
   tag: string;
   origin?: Origin; // sem valor: todas as origens
-  onlyUid?: string; // só os aparelhos deste uid
   excludeUid?: string; // deixa de fora os aparelhos deste uid
   respectSwitch: boolean; // true: config/push.enabled === false bloqueia
 };
+
+/** Aviso de repertório: só aparelhos de quem é do ministério. `ministryId` é obrigatório. */
+export type RepertorioSend = SendBase & { ministryId: string; onlyUid?: undefined };
+/** Aparelho único (teste de push), sem ministério. */
+export type DeviceSend = SendBase & { ministryId?: undefined; onlyUid: string };
+export type SendInput = RepertorioSend | DeviceSend;
 
 export type SendOutcome = {
   sent: number;
@@ -37,6 +42,17 @@ function matches(d: DeviceRecord, input: SendInput): boolean {
 }
 
 export async function sendToDevices(deps: PushDeps, input: SendInput): Promise<SendOutcome> {
+  // Sem ministryId, o ministério não filtra; só onlyUid restringe. Com ministryId presente, o filtro é
+  // do ministério. Presente e vazio/em branco é inválido e falha fechado: nunca cai no envio por aparelho.
+  const scoped = input.ministryId !== undefined;
+  const ministryId = input.ministryId;
+  if (scoped && (typeof ministryId !== 'string' || ministryId.trim() === '')) {
+    throw new Error('push: ministryId vazio');
+  }
+  // Aviso sem ministério nem aparelho seria um envio a todos: recusado.
+  if (!scoped && !input.onlyUid) {
+    throw new Error('push: aviso sem ministério nem aparelho');
+  }
   if (!input.link.startsWith('/') || input.link.startsWith('//')) {
     throw new Error('push link must be a site path');
   }
@@ -48,14 +64,15 @@ export async function sendToDevices(deps: PushDeps, input: SendInput): Promise<S
 
   const selected = (await deps.listDevices()).filter((d) => matches(d, input));
   const uids = [...new Set(selected.map((d) => d.uid))];
-  const roles = await deps.getUserRoles(uids);
+  const ministries = await deps.getUserMinistries(uids);
 
   const stale: DeviceRecord[] = [];
   const senders: DeviceRecord[] = [];
   for (const d of selected) {
-    const role = roles.get(d.uid);
-    if (role === 'member' || role === 'admin') senders.push(d);
-    else stale.push(d);
+    const mine = ministries.get(d.uid);
+    // Sem ministério nenhum: aparelho órfão, apagado. Outro ministério: não recebe, mas não é apagado.
+    if (!mine || mine.size === 0) stale.push(d);
+    else if (ministryId === undefined || mine.has(ministryId)) senders.push(d);
   }
   if (stale.length > 0) await deps.deleteDevices(stale.map((d) => d.id));
 

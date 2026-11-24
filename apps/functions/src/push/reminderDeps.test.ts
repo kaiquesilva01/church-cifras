@@ -4,7 +4,11 @@ import { createReminderDeps } from './reminderDeps';
 const fs = vi.hoisted(() => ({
   collections: [] as string[],
   wheres: [] as unknown[][],
-  docs: [] as Array<{ id: string; data: () => Record<string, unknown> }>,
+  docs: [] as Array<{
+    id: string;
+    data: () => Record<string, unknown>;
+    ref?: { parent: { parent: { id: string } | null } };
+  }>,
 }));
 
 vi.mock('firebase-admin/firestore', () => {
@@ -19,7 +23,7 @@ vi.mock('firebase-admin/firestore', () => {
     };
     return q;
   };
-  return { getFirestore: () => ({ collection: query }) };
+  return { getFirestore: () => ({ collection: query, collectionGroup: query }) };
 });
 
 beforeEach(() => {
@@ -32,7 +36,16 @@ describe('createReminderDeps.listRehearsalSetlists', () => {
   it('consulta setlists por rehearsalAt em (after, until], com id e dados', async () => {
     const from = new Date('2026-11-21T11:55:00Z');
     const to = new Date('2026-11-21T12:30:00Z');
-    fs.docs.push({ id: 'r1', data: () => ({ label: 'Culto' }) });
+    fs.docs.push({
+      id: 's1',
+      data: () => ({ label: 'Culto' }),
+      ref: { parent: { parent: { id: 'hajaluz' } } },
+    });
+    fs.docs.push({
+      id: 'raiz',
+      data: () => ({ label: 'Antigo' }),
+      ref: { parent: { parent: null } },
+    });
 
     const found = await createReminderDeps().listRehearsalSetlists(from, to);
 
@@ -41,7 +54,22 @@ describe('createReminderDeps.listRehearsalSetlists', () => {
       ['rehearsalAt', '>', from],
       ['rehearsalAt', '<=', to],
     ]);
-    expect(found).toEqual([{ id: 'r1', data: { label: 'Culto' } }]);
+    expect(found.map((s) => s.id)).toEqual(['s1']);
+    expect(found[0]?.ministryId).toBe('hajaluz');
+  });
+});
+
+describe('createReminderDeps.listRehearsalSetlists: outro ministério', () => {
+  it('o ministryId vem do caminho do documento, nunca de hajaluz por padrão', async () => {
+    fs.docs.push({
+      id: 's9',
+      data: () => ({ label: 'Outro' }),
+      ref: { parent: { parent: { id: 'outro' } } },
+    });
+
+    const found = await createReminderDeps().listRehearsalSetlists(new Date(0), new Date());
+
+    expect(found.map((s) => [s.id, s.ministryId])).toEqual([['s9', 'outro']]);
   });
 });
 

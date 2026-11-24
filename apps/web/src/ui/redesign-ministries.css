@@ -1,0 +1,945 @@
+/*
+ * Telas de ministério (pacote dos ministérios). Só tokens de styles.css; medidas do paper-spec
+ * (docs/superpowers/plans/2026-11-23-136-paper-spec.md §3). Cada classe tem o prefixo do componente.
+ */
+
+/* 3.1 Tile do ministério (iniciais; ver ui/initials.ts) */
+.min-tile {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-elevated);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 18px;
+  text-transform: uppercase;
+}
+
+.min-tile--dialog {
+  width: 48px;
+  height: 48px;
+  font-size: 15px;
+}
+
+.min-tile--compact {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.min-tile--mini {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: var(--color-surface);
+  font-size: 9px;
+  line-height: 12px;
+}
+
+/* 3.2 Contador de pedidos */
+.count-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 24px;
+  min-width: 24px;
+  padding-inline: 7px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 16px;
+}
+
+/* 3.3 Pílula de papel: estende .role-badge (redesign.css) */
+.role-badge--member,
+.role-badge--admin,
+.role-badge--app {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 20px;
+  padding: 0 8px;
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+}
+
+.role-badge--member {
+  border-color: var(--color-border-strong);
+  background: var(--color-elevated);
+  color: var(--color-muted);
+}
+
+.role-badge--admin {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+
+.role-badge--app {
+  border-color: transparent;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* 3.4 Pílula de estado (pedidos) */
+.mn-status-pill {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  box-sizing: border-box;
+  height: 22px;
+  padding-inline: 9px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+/* 3.5 Seletor de papel (Membro/Admin, Sim/Não). Alvo de 44 px pelo ::before, visual de 36 px */
+.mn-role-select {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 36px;
+  padding-left: 12px;
+  padding-right: 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-elevated);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.mn-role-select::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.mn-role-select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.mn-role-select--active {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+
+.mn-role-select--disabled {
+  border-color: var(--color-border);
+  color: var(--color-muted);
+  opacity: 0.7;
+  cursor: default;
+}
+
+.mn-role-select--disabled::before {
+  display: none;
+}
+
+/* Sim/Não (tela 48): sem chevron, padding de 14 px */
+.mn-role-select--yesno {
+  padding-inline: 14px;
+}
+
+/* 3.6 Linha de pessoa */
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+}
+
+.person-row + .person-row {
+  margin-top: 8px;
+}
+
+.person-row-avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-elevated);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 18px;
+}
+
+.person-row-avatar--self {
+  border-color: transparent;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.person-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.person-row-name {
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.person-row-you {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.person-row-email {
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* 3.6 Cartão de pedido pendente */
+.request-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+}
+
+.request-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.request-card-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.request-card-meta {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.request-card-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.request-card-actions > button {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.request-card-decline {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-elevated);
+  color: var(--color-text);
+}
+
+.request-card-actions > .request-card-approve {
+  font-weight: 800;
+}
+
+/* 3.7 Chip de destino "Quer entrar em" */
+.dest-chip-label {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.dest-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  max-width: 100%;
+  height: 26px;
+  padding-left: 4px;
+  padding-right: 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-elevated);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  min-width: 0;
+}
+
+/* 3.8 Menu pop-over de ações */
+.action-menu {
+  position: absolute;
+  right: 14px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 216px;
+  max-width: calc(100vw - 32px);
+  padding: 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 16px;
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-pop);
+}
+
+.action-menu-item {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.action-menu-item:hover,
+.action-menu-item:active {
+  background: var(--color-border);
+}
+
+.action-menu-item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.action-menu-item--danger {
+  color: var(--color-error);
+}
+
+/* 3.9 Scrim e folha inferior (o diálogo reaproveita a classe de diálogo do app) */
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--color-scrim);
+}
+
+.sheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  max-height: 90vh;
+  padding: 12px 20px 28px;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-border-strong);
+  border-radius: 24px 24px 0 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.sheet-handle {
+  align-self: center;
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-border-strong);
+}
+
+.sheet-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 24px;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.sheet-actions > button {
+  flex: 1;
+  min-height: 46px;
+  border-radius: 999px;
+}
+
+.sheet-actions > .sheet-actions-primary {
+  flex: 1.5;
+}
+
+/* 3.11 Esqueleto de carregamento */
+.skeleton {
+  flex-shrink: 0;
+  border-radius: 5px;
+  background: var(--color-elevated);
+  animation: ministry-skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.skeleton-title {
+  height: 14px;
+  border-radius: 7px;
+}
+
+.skeleton-line {
+  height: 10px;
+}
+
+.skeleton-tile {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+}
+
+.skeleton-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+}
+
+.skeleton-pill {
+  width: 76px;
+  height: 36px;
+  border-radius: 999px;
+}
+
+@keyframes ministry-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* 3.12 Estados de bloco */
+.empty-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+  padding: 22px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+}
+
+.empty-card--search {
+  align-items: center;
+  padding: 28px 20px;
+  border-radius: 24px;
+  text-align: center;
+}
+
+.empty-card-title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.empty-card-text {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.error-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+/* Telas de entrada (34 a 37) */
+.entry-card {
+  overflow: clip;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: var(--color-surface);
+}
+
+.entry-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 72px;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.entry-row:last-child {
+  border-bottom: 0;
+}
+
+.entry-row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.entry-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-inline: 4px;
+}
+
+.entry-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--color-error-soft);
+}
+
+.entry-alert-title {
+  margin: 0;
+  color: var(--color-error);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.entry-alert-text {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.entry-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  box-sizing: border-box;
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: 20px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+
+.entry-sent {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+}
+
+.entry-sent-part {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.entry-sent-part:last-child {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  border-bottom: 0;
+}
+
+/* Mais e Gestão */
+.mn-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: var(--color-surface);
+}
+
+.mn-profile-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mn-profile-name {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.mn-profile-email {
+  margin: 0;
+  font-size: 13px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* Pílulas de papel lado a lado (admin da app que também é admin do ministério) */
+.mn-role-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* Linha de esqueleto do ministério (Mais, enquanto carrega) */
+.mn-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Eyebrow do ministério reservado enquanto carrega: mesma altura da linha de 14px do eyebrow */
+.mn-skeleton-eyebrow {
+  display: block;
+  width: 96px;
+  height: 10px;
+  margin-block: 2px;
+}
+
+.mn-skeleton-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mn-profile-avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.section-eyebrow {
+  margin: 0;
+  padding-inline: 4px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mn-section-title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.section-count {
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+/* Entrada (telas 34 a 37 e aviso de remoção da 50): layout e textos das classes entry-* */
+.entry-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  min-height: 100dvh;
+  padding: 4px 20px 24px;
+  color: var(--color-text);
+}
+.entry-screen--centered {
+  justify-content: center;
+  gap: 28px;
+  padding-inline: 28px;
+}
+.entry-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.entry-text {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 22px;
+}
+.entry-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.entry-row-name {
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 18px;
+}
+.entry-row-city {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.entry-row-chevron {
+  flex-shrink: 0;
+  color: var(--color-muted);
+  font-size: 18px;
+  line-height: 18px;
+}
+.entry-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 14px;
+  background: var(--color-elevated);
+}
+.entry-notice-title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+}
+.entry-alert-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.entry-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 22px;
+  color: var(--color-text);
+}
+.entry-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.entry-dialog-text {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 22px;
+}
+.entry-footer-account {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.entry-footer-email,
+.entry-sent-email {
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+.entry-exit {
+  min-height: 44px;
+  padding-inline: 18px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-elevated);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+.entry-exit-text {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 15px;
+  font-weight: 700;
+}
+.entry-action-wide {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-elevated);
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 800;
+}
+.entry-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.entry-sent-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.entry-sent-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.entry-sent-name {
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+/* Pessoas do ministério (tela 41): colunas, cabeçalho de seção, âncora do menu e nota final */
+.people-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.people-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.person-list,
+.request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.request-list {
+  gap: 10px;
+}
+.person-menu-anchor {
+  position: relative;
+}
+.people-screen .confirm-actions > .btn {
+  flex: 1;
+}
+.people-note {
+  margin: 0;
+  padding-inline: 8px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+}

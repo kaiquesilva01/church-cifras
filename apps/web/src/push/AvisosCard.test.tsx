@@ -1,9 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Role } from '../auth/roles';
-import { AuthContext, type AuthState } from '../auth/useAuth';
+import { AuthContext, type AuthState, type MinistryRole } from '../auth/useAuth';
 import { INSTALL_RECORD_KEY } from '../pwa/installPolicy';
-import { testUser } from '../test/fakeGateway';
+import { authStateFor } from '../test/authState';
 import { fakePushService } from '../test/fakePushService';
 import { AVISOS_RECORD_KEY } from './avisosPolicy';
 import { AvisosCard } from './AvisosCard';
@@ -20,25 +19,18 @@ function standalone(on: boolean) {
   });
 }
 
-function auth(role: Role): AuthState {
-  return {
-    status: 'signed-in',
-    user: testUser,
-    role,
-    access: 'granted',
-    prepareSignIn: () => Promise.resolve(),
-    signIn: () => Promise.resolve(),
-    signOut: () => Promise.resolve(),
-  };
+/** Com vínculo no ministério (membro ou admin) o cartão é elegível; sem vínculo, não. */
+function auth(ministry: MinistryRole | null): AuthState {
+  return authStateFor(ministry);
 }
 
 function renderCard(
   service: PushService | null,
-  role: Role = 'member',
+  ministry: MinistryRole | null = 'member',
   session: AvisosSession = createAvisosSession(),
 ) {
   return render(
-    <AuthContext.Provider value={auth(role)}>
+    <AuthContext.Provider value={auth(ministry)}>
       <PushContext.Provider value={service}>
         <AvisosCard session={session} />
       </PushContext.Provider>
@@ -63,9 +55,9 @@ describe('AvisosCard', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('nunca consulta o estado para visitante', () => {
+  it('nunca consulta o estado sem vínculo no ministério', () => {
     const service = fakePushService();
-    const { container } = renderCard(service, 'viewer');
+    const { container } = renderCard(service, null);
     expect(container).toBeEmptyDOMElement();
     expect(service.load).not.toHaveBeenCalled();
   });

@@ -1,50 +1,43 @@
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import type { Role } from './auth/roles';
-import type { PeopleApi } from './people/peopleApi';
 import { fakeStatsApi } from './test/fakeStatsApi';
 import { fakeCatalogApi } from './test/fakeCatalogApi';
-import { createFakeGateway, testUser } from './test/fakeGateway';
+import { createFakeGateway } from './test/fakeGateway';
+import { signInAs, type Scenario } from './test/authState';
 import { fakeSetlistApi } from './test/fakeSetlistApi';
+import { createFakeMinistriesApi } from './test/fakeMinistriesApi';
 
 vi.mock('./upload/UploadRoute', () => ({
   default: () => <p>Nova cifra (marker)</p>,
 }));
 
-const peopleApi: PeopleApi = {
-  listUsers: () => Promise.resolve([]),
-  setRole: () => Promise.resolve(),
-};
-
-function setup(role: Role) {
+function setup(scenario: Scenario) {
   const gateway = createFakeGateway();
   render(
     <App
       gateway={gateway}
-      peopleApi={peopleApi}
       statsApi={fakeStatsApi()}
       catalogApi={fakeCatalogApi()}
       setlistApi={fakeSetlistApi()}
+      ministriesApi={createFakeMinistriesApi()}
       initialPath="/nova"
     />,
   );
-  gateway.claimRole = role;
-  act(() => gateway.emitUser(testUser));
-  act(() => gateway.emitRole(role));
+  signInAs(gateway, scenario);
 }
 
 describe('/nova route', () => {
-  it('shows the fallback first and then the page for members', async () => {
-    setup('member');
+  it('shows the fallback first and then the page for ministry admins', async () => {
+    setup({ ministry: { role: 'admin' } });
     expect(screen.getByText('Carregando…')).toBeInTheDocument();
     expect(await screen.findByText('Nova cifra (marker)')).toBeInTheDocument();
   });
 
   it('shows only the access screen to visitors', async () => {
-    setup('viewer');
+    setup({});
     expect(
-      await screen.findByRole('heading', { name: 'Acesso ainda não liberado' }),
+      await screen.findByRole('heading', { name: 'Escolha seu ministério' }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Nova cifra (marker)')).not.toBeInTheDocument();
   });
