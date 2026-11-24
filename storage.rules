@@ -2,18 +2,31 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    function isEditor() {
-      return request.auth != null && request.auth.token.get('role', 'viewer') in ['member', 'admin'];
+    // Fallback decidido por token, como em firestore.rules: se o token traz claim novo, o role é ignorado.
+    // Só token antigo (sem claim novo) usa o role legado, até a limpeza (#137).
+    function hasNewClaims() {
+      return 'hasMinistry' in request.auth.token
+        || 'canUploadSong' in request.auth.token
+        || 'appAdmin' in request.auth.token;
+    }
+
+    // Claim novo manda; token sem o claim usa o role legado até a limpeza (#137).
+    // Comparação estrita: 'true' em texto não conta.
+    function hasMinistryClaim() {
+      return request.auth != null
+        && (request.auth.token.get('appAdmin', false) == true
+          || request.auth.token.get('hasMinistry', false) == true
+          || (!hasNewClaims() && request.auth.token.get('role', 'viewer') in ['member', 'admin']));
     }
 
     match /songs/{allPaths=**} {
-      allow read: if isEditor();
+      allow read: if hasMinistryClaim();
       allow update, delete: if false;
     }
 
     // Arquivos imutáveis: só criação, nunca sobrescrita (create exige que o objeto não exista).
     match /songs/{songId}/{fileName} {
-      allow create: if isEditor()
+      allow create: if hasMinistryClaim()
         && resource == null
         && request.resource.contentType == 'application/pdf'
         && request.resource.size <= 10 * 1024 * 1024
@@ -21,9 +34,9 @@ service firebase.storage {
         && fileName.matches('[A-Za-z]+-[A-Za-z0-9_-]+[.]pdf');
     }
 
-    // Loops do pad ambiente: leitura para membro e admin; escrita só via script admin (fora das rules).
+    // Loops do pad ambiente: leitura para quem tem ministério; escrita só via script admin (fora das rules).
     match /pads/{version}/{fileName} {
-      allow read: if isEditor();
+      allow read: if hasMinistryClaim();
       allow write: if false;
     }
 

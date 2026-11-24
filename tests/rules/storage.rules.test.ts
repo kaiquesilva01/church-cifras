@@ -172,3 +172,81 @@ describe('storage.rules', () => {
     await assertFails(getBytes(ref(storage, 'other/file.txt')));
   });
 });
+
+describe('Storage por claims (pacote)', () => {
+  const pdfFor = (uid: string) => ({
+    contentType: 'application/pdf',
+    customMetadata: { uploadedBy: uid },
+  });
+  const one = new Uint8Array([1]);
+  const st = (uid: string, claims: Record<string, unknown>) =>
+    env.authenticatedContext(uid, claims).storage();
+
+  it('membro com hasMinistry lê o catálogo', async () => {
+    await assertSucceeds(
+      getBytes(ref(st('m', { role: 'viewer', hasMinistry: true }), 'songs/s1/original.pdf')),
+    );
+  });
+
+  it('removido (hasMinistry falso) não lê, mesmo com role member', async () => {
+    await assertFails(
+      getBytes(ref(st('r', { role: 'member', hasMinistry: false }), 'songs/s1/original.pdf')),
+    );
+  });
+
+  it('claim hasMinistry como texto "true" não vale (comparação estrita)', async () => {
+    await assertFails(getBytes(ref(st('m', { hasMinistry: 'true' }), 'songs/s1/original.pdf')));
+  });
+
+  it('membro com hasMinistry sobe o PDF gerado', async () => {
+    await assertSucceeds(
+      uploadBytes(
+        ref(st('m', { role: 'viewer', hasMinistry: true }), 'songs/s1/D-gerado.pdf'),
+        one,
+        pdfFor('m'),
+      ),
+    );
+  });
+
+  it('pessoa sem ministério não sobe', async () => {
+    await assertFails(
+      uploadBytes(
+        ref(st('v', { role: 'viewer', hasMinistry: false }), 'songs/s1/E-x.pdf'),
+        one,
+        pdfFor('v'),
+      ),
+    );
+  });
+
+  it('admin da app sobe sem ministério', async () => {
+    await assertSucceeds(
+      uploadBytes(ref(st('chefe', { appAdmin: true }), 'songs/s1/F-x.pdf'), one, pdfFor('chefe')),
+    );
+  });
+
+  it('token antigo com role member lê pelo legado', async () => {
+    await assertSucceeds(getBytes(ref(st('old', { role: 'member' }), 'songs/s1/original.pdf')));
+  });
+
+  it('removido com role admin não sobe (token com claim novo ignora o role)', async () => {
+    await assertFails(
+      uploadBytes(
+        ref(st('r', { role: 'admin', hasMinistry: false }), 'songs/s1/G-removido.pdf'),
+        one,
+        pdfFor('r'),
+      ),
+    );
+  });
+
+  it('removido com role member não lê o repertório de pads', async () => {
+    await assertFails(
+      getBytes(ref(st('r', { role: 'member', hasMinistry: false }), 'pads/v1/DS04-C.m4a')),
+    );
+  });
+
+  it('membro com hasMinistry lê pads/', async () => {
+    await assertSucceeds(
+      getBytes(ref(st('m', { role: 'viewer', hasMinistry: true }), 'pads/v1/DS04-C.m4a')),
+    );
+  });
+});
